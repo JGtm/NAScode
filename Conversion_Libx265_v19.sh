@@ -1229,7 +1229,7 @@ _execute_conversion() {
     # On récupère ensuite les codes de sortie via PIPESTATUS pour diagnostiquer précisément.
     
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-    §hwaccel $HWACCEL \
+        -hwaccel $HWACCEL \
         -i "$tmp_input" -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
