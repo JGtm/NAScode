@@ -30,6 +30,10 @@ if command -v brew >/dev/null 2>&1; then
     if [[ -d "$gawk_bin" ]]; then
         PATH="$gawk_bin:$PATH"
     fi
+    bash_bin="$(brew --prefix bash 2>/dev/null)/bin"
+    if [[ -d "$bash_bin" ]]; then
+        PATH="$bash_bin:$PATH"
+    fi
 fi
 
 # préfixe md5 portable (8 premiers caractères) pour créer les noms temporaires
@@ -1206,7 +1210,13 @@ _execute_conversion() {
     #  -tune fastdecode     : optimiser pour un décodage rapide
     #  -pix_fmt yuv420p10le : FFormat de pixel YUV 4:2:0 avec 10 bits de profondeur de couleur maximum
 
-    if $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+    # timestamp de départ portable (utilise `date` uniquement, pas de python)
+    START_TS="$(date +%s)"
+
+    # Exécute ffmpeg et pipe vers awk pour affichage de progression.
+    # On récupère ensuite les codes de sortie via PIPESTATUS pour diagnostiquer précisément.
+    
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         -i "$tmp_input" -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
@@ -1215,24 +1225,27 @@ _execute_conversion() {
         -map 0 -f matroska \
         "$tmp_output" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" '
+    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" '
         BEGIN {
             duration = DURATION + 0;
             if (duration < 1) exit;
-
-            start = systime();
+            start = START + 0;
             last_update = 0;
             refresh_interval = 10;
         }
 
         /out_time_us=/ {
-            gsub(/out_time_us=/, "");
-            current_time = $0 / 1000000;
+            if (match($0, /[0-9]+/)) {
+                current_time = substr($0, RSTART, RLENGTH) / 1000000;
+            } else {
+                current_time = 0;
+            }
 
             percent = (current_time / duration) * 100;
             if (percent > 100) percent = 100;
 
-            elapsed = systime() - start;
+            cmd = "date +%s"; cmd | getline now; close(cmd);
+            elapsed = now - start;
 
             speed = (elapsed > 0 ? current_time / elapsed : 1);
 
@@ -1245,7 +1258,8 @@ _execute_conversion() {
 
             eta_str = sprintf("%02d:%02d:%02d", h, m, s);
 
-            now = systime() + (strftime("%S") % 1);
+            # Recalcule maintenant (entier) pour contrôler les rafraîchissements
+            cmd = "date +%s"; cmd | getline now; close(cmd);
             if (NOPROG != "true" && (now - last_update >= refresh_interval || percent >= 99)) {
                 printf "  ... [%-40.40s] %5.1f%% | ETA: %s | Speed: %.2fx\n",
                        CURRENT_FILE_NAME, percent, eta_str, speed;
@@ -1261,9 +1275,27 @@ _execute_conversion() {
                 fflush();
             }
         }
-    '; then
+    '
+
+    # Récupère les codes de sortie du pipeline (0 = succès).
+    local ffmpeg_rc=0
+    local awk_rc=0
+    if [[ ${#PIPESTATUS[@]} -ge 1 ]]; then
+        ffmpeg_rc=${PIPESTATUS[0]:-0}
+        awk_rc=${PIPESTATUS[1]:-0}
+    fi
+
+    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
         return 0
     else
+        # Affiche les dernières lignes du log ffmpeg pour aider au diagnostic
+        if [[ -f "$ffmpeg_log_temp" ]]; then
+            echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log_temp) ---" >&2
+            tail -n 80 "$ffmpeg_log_temp" >&2 || true
+            echo "--- Fin du log ffmpeg ---" >&2
+        else
+            echo "(Aucun fichier de log ffmpeg trouvé: $ffmpeg_log_temp)" >&2
+        fi
         return 1
     fi
 }
@@ -1721,7 +1753,7 @@ main() {
     
     dry_run_compare_names
 
-    if [[ "$DRYRUN" != true ]]; then
+    if [[ "$DRYRUN" == true ]]; then
         show_summary
     fi
 }
