@@ -183,10 +183,16 @@ set_conversion_mode_parameters() {
         film)
             CRF=20.6
             ENCODER_PRESET="slow"
+            # Plafond pour les films (en kbps). Ajuste si tu veux différencier film/serie.
+            MAXRATE_KBPS=4000
+            BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             ;;
         serie)
             CRF=20.7
             ENCODER_PRESET="slow"
+            # Plafond pour les séries (par défaut identique)
+            MAXRATE_KBPS=3200
+            BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             ;;
         *)
             echo -e "${RED}ERREUR : Mode de conversion inconnu : $CONVERSION_MODE${NOCOLOR}"
@@ -194,6 +200,10 @@ set_conversion_mode_parameters() {
             exit 1
             ;;
     esac
+    # Valeurs dérivées utilisées par ffmpeg/x265 (ffmpeg attend suffixe 'k', x265 attend kbps sans suffixe)
+    MAXRATE_FFMPEG="${MAXRATE_KBPS}k"
+    BUFSIZE_FFMPEG="${BUFSIZE_KBPS}k"
+    X265_VBV_PARAMS="vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}"
 }
 
 ###########################################################
@@ -1227,13 +1237,20 @@ _execute_conversion() {
 
     # Exécute ffmpeg et pipe vers awk pour affichage de progression.
     # On récupère ensuite les codes de sortie via PIPESTATUS pour diagnostiquer précisément.
-    
+
+    # Préparer les paramètres VBV / maxrate/bufsize en local (utilise les valeurs calculées par set_conversion_mode_parameters)
+    local ff_maxrate="${MAXRATE_FFMPEG:-${MAXRATE_KBPS}k}"
+    local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
+    local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
+    local x265_params="pools=${threads_per_job}:${x265_vbv}"
+
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         -hwaccel $HWACCEL \
         -i "$tmp_input" -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode -crf "$CRF" -x265-params "pools=${threads_per_job}" \
+        -tune fastdecode -crf "$CRF" -x265-params "$x265_params" \
+        -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
         -c:a copy \
         -map 0 -f matroska \
         "$tmp_output" \
@@ -1741,6 +1758,7 @@ export_variables() {
         prepare_dynamic_queue start_fifo_writer start_consumer finalize_processing start_processing_info
     export DRYRUN LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE LOG_DIR
     export TMP_DIR ENCODER_PRESET CRF IO_PRIORITY_CMD SOURCE OUTPUT_DIR FFMPEG_MIN_VERSION
+    export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS HWACCEL
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE 
