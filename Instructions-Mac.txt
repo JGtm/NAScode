@@ -1,0 +1,23 @@
+Recommandations pratiques (rapide)
+Option A — Installer GNU utils via Homebrew (rapide, recommandé si vous contrôlez la machine) :
+
+Installer Homebrew (si nécessaire):
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+Installer dépendances utiles :
+brew install ffmpeg gnu-coreutils gnu-sed gawk grep gnu-tar
+brew install gnu-sed gawk coreutils
+Ajoutez GNU coreutils en tête du PATH (optionnel pour rendre les commandes GNU par défaut):
+export PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
+Installer Python3 (souvent déjà présent) ou utiliser python3.
+Installer ffmpeg via brew si nécessaire:
+brew install ffmpeg
+
+tapes suivantes suggérées (à exécuter sur votre Mac)
+
+Vérifier que les paquets nécessaires sont bien installés et accessibles (ffmpeg, coreutils, gawk) :
+
+brew list ffmpeg coreutils gawk || echo 'Vérifier installation via brew'command -v ffmpegcommand -v statcommand -v readlinkcommand -v gawk || command -v awk
+
+(Optionnel mais recommandé) Ajouter coreutils gnubin au PATH dans votre shell (~/.zprofile ou ~/.bash_profile selon le shell) si vous voulez que ces utilitaires GNU soient prioritaires :
+
+echo 'export PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"' >> ~/.zprofilesource ~/.zprofile

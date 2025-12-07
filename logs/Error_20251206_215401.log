@@ -1,0 +1,28 @@
+2025-12-06 21:54:29 | ERROR ffmpeg | /Users/JGtm/Downloads/Familia de Medianoche - 1x01 - Pilote.mkv
+--- Erreur détaillée FFMPEG ---
+x265 [info]: HEVC encoder version 4.1+1-1d117be
+x265 [info]: build info [Mac OS X][clang 17.0.0][64 bit] 10bit
+x265 [info]: using cpu capabilities: NEON Neon_DotProd Neon_I8MM
+x265 [info]: Main 10 profile, Level-4 (Main tier)
+x265 [info]: Thread pool created using 10 threads
+x265 [info]: Slices                              : 1
+x265 [info]: frame threads / pool features       : 3 / wpp(17 rows)
+x265 [info]: Coding QT: max CU size, min CU size : 64 / 8
+x265 [info]: Residual QT: max TU size, max depth : 32 / 1 inter / 1 intra
+x265 [info]: ME / range / subpel / merge         : star / 57 / 3 / 3
+x265 [info]: Keyframe min / max / scenecut / bias  : 600 / 600 / 40 / 5.00 
+x265 [info]: Lookahead / bframes / badapt        : 25 / 4 / 2
+x265 [info]: b-pyramid / weightp / weightb       : 1 / 0 / 0
+x265 [info]: References / ref-limit  cu / depth  : 4 / on / on
+x265 [info]: AQ: mode / str / qg-size / cu-tree  : 2 / 1.0 / 32 / 1
+x265 [info]: Rate Control / qCompress            : CRF-20.7 / 0.60
+x265 [info]: tools: rect limit-modes rd=4 psy-rd=2.00 rdoq=2 psy-rdoq=1.00
+x265 [info]: tools: rskip mode=1 signhide tmvp strong-intra-smoothing lslices=4
+x265 [info]: tools: dhdr10-info
+Error closing progress log, loss of information possible: Broken pipe
+x265 [info]: frame I:      1, Avg QP:24.77  kb/s: 98.59   
+x265 [info]: frame P:    158, Avg QP:24.46  kb/s: 1913.77 
+x265 [info]: frame B:    343, Avg QP:26.77  kb/s: 566.72  
+
+encoded 502 frames in 22.33s (22.48 fps), 989.76 kb/s, Avg QP:26.04
+-------------------------------
