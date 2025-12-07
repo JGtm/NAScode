@@ -1,0 +1,5 @@
+awk: calling undefined function systime
+ source line number 6
+
+line 1572: declare: -g: invalid option
+declare: usage: declare [-afFirtx] [-p] [name[=value] ...]

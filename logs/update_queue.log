@@ -1,4 +1,0 @@
-2025-12-06 21:54:01 | main: TOTAL_MASTER_FILE='./logs/total_master_20251206_215401' value=5
-2025-12-06 21:54:01 | main: NEXT_MASTER_POS_FILE='./logs/next_master_pos_20251206_215401' value=1
-2025-12-06 21:54:02 | main: FIFO writer started (WORKFIFO=./logs/queue_fifo_20251206_215401) pid=7412 ready=./logs/fifo_writer.ready_20251206_215401
-2025-12-06 21:54:29 | update_queue: skip (no WORKFIFO or not a pipe) WORKFIFO=./logs/queue_fifo_20251206_215401
