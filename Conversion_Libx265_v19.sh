@@ -1231,7 +1231,7 @@ _execute_conversion() {
             if (duration < 1) exit;
             start = START + 0;
             last_update = 0;
-            refresh_interval = 10;
+            refresh_interval = 60;
         }
 
         /out_time_us=/ {
@@ -1354,6 +1354,142 @@ _finalize_conversion_error() {
     rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null
 }
 
+# Préparer la queue dynamique et les fichiers d'état (MASTER_QUEUE, NEXT/TOTAL)
+prepare_dynamic_queue() {
+    MASTER_QUEUE="$QUEUE.full"
+    NEXT_MASTER_POS_FILE="$LOG_DIR/next_master_pos_${EXECUTION_TIMESTAMP}"
+    TOTAL_MASTER_FILE="$LOG_DIR/total_master_${EXECUTION_TIMESTAMP}"
+    WORKFIFO="$LOG_DIR/queue_fifo_${EXECUTION_TIMESTAMP}"
+    FIFO_WRITER_PID="$LOG_DIR/fifo_writer_pid_${EXECUTION_TIMESTAMP}"
+    FIFO_WRITER_READY="$LOG_DIR/fifo_writer.ready_${EXECUTION_TIMESTAMP}"
+
+    # Total d'éléments dans la master queue
+    local total_master=0
+    if [[ -f "$MASTER_QUEUE" ]]; then
+        total_master=$(tr -cd '\0' < "$MASTER_QUEUE" | wc -c) || total_master=0
+    fi
+    echo "$total_master" > "$TOTAL_MASTER_FILE"
+    if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+        printf "%s | prepare_dynamic_queue: TOTAL_MASTER_FILE='%s' value=%d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$TOTAL_MASTER_FILE" "$total_master" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+    fi
+
+    # Position initiale (nombre d'éléments déjà présents dans la queue limitée)
+    local initial_in_queue=0
+    if [[ -f "$QUEUE" ]]; then
+        initial_in_queue=$(tr -cd '\0' < "$QUEUE" | wc -c) || initial_in_queue=0
+    fi
+    echo "$initial_in_queue" > "$NEXT_MASTER_POS_FILE"
+    if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+        printf "%s | prepare_dynamic_queue: NEXT_MASTER_POS_FILE='%s' value=%d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$NEXT_MASTER_POS_FILE" "$initial_in_queue" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+    fi
+
+    # Exporter pour les workers
+    export MASTER_QUEUE WORKFIFO NEXT_MASTER_POS_FILE TOTAL_MASTER_FILE
+}
+
+# Créer le FIFO et lancer le writer persistant en arrière-plan
+start_fifo_writer() {
+    rm -f "$WORKFIFO" 2>/dev/null || true
+    mkfifo "$WORKFIFO"
+    (
+        # Ouvre la FIFO en lecture-écriture pour éviter le blocage en l'absence de lecteur
+        exec 3<> "$WORKFIFO"
+        # écrire le PID du writer et marquer prêt pour que update_queue détecte la disponibilité
+        if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
+            printf "%d" "$$" > "$FIFO_WRITER_PID" 2>/dev/null || true
+        fi
+        # écrire le contenu initial (NUL séparés)
+        if [[ -f "$QUEUE" ]]; then
+            cat "$QUEUE" >&3
+        fi
+        # En mode dry-run, fermer le writer après l'injection initiale
+        if [[ "$DRYRUN" == true ]]; then
+            if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
+                touch "$FIFO_WRITER_READY" 2>/dev/null || true
+            fi
+            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+                printf "%s | start_fifo_writer: FIFO writer wrote initial queue and exiting (dry-run)\n" "$(date +'%Y-%m-%d %H:%M:%S')" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+            fi
+            exec 3>&-
+            exit 0
+        fi
+        # signaler prêt
+        if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
+            touch "$FIFO_WRITER_READY" 2>/dev/null || true
+        fi
+        # journaliser le démarrage du worker
+        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+            printf "%s | start_fifo_writer: FIFO writer started (WORKFIFO=%s) pid=%s ready=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$WORKFIFO" "$(cat ${FIFO_WRITER_PID} 2>/dev/null || echo '')" "$FIFO_WRITER_READY" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+        fi
+        # garder la FD ouverte tant que le script tourne (permet update_queue d'écrire sans bloquer)
+        while [[ ! -f "$STOP_FLAG" ]]; do
+            sleep 0.5
+        done
+        exec 3>&-
+    ) &
+}
+
+# Démarrer le consumer en arrière-plan
+start_consumer() {
+    _consumer_run() {
+        local file
+        local -a _pids=()
+        while IFS= read -r -d '' file; do
+            convert_file "$file" "$OUTPUT_DIR" &
+            _pids+=("$!")
+            if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
+                if ! wait -n 2>/dev/null; then
+                    wait "${_pids[0]}" 2>/dev/null || true
+                fi
+                local -a _still=()
+                for file in "${_pids[@]}"; do
+                    if kill -0 "$file" 2>/dev/null; then
+                        _still+=("$file")
+                    fi
+                done
+                _pids=("${_still[@]}")
+            fi
+        done < "$WORKFIFO"
+        for file in "${_pids[@]}"; do
+            wait "$file" || true
+        done
+    }
+    _consumer_run &
+}
+
+# Afficher les informations de démarrage (nb fichiers, mode dry-run, message de début)
+start_processing_info() {
+    NB_FILES=0
+    if [[ -f "${QUEUE:-}" ]]; then
+        NB_FILES=$(tr -cd '\0' < "$QUEUE" | wc -c) || NB_FILES=0
+    fi
+
+    if [[ "$DRYRUN" == true ]]; then
+        echo -e "${MAGENTA}ℹ️  MODE DRY RUN activé : simulation uniquement — aucun encodage réel effectué.${NOCOLOR}"
+    fi
+
+    if [[ "$NO_PROGRESS" != true ]]; then
+        echo -e "${CYAN}Démarrage du traitement ($NB_FILES fichiers)...${NOCOLOR}"
+    fi
+}
+
+# Attendre la fin du traitement et exécuter la finalisation
+finalize_processing() {
+    # Signaler au writer FIFO qu'il doit se terminer (évite un deadlock wait <-> writer)
+    touch "$STOP_FLAG" 2>/dev/null || true
+
+    # Attendre que les tâches en arrière-plan (consumer, writer, conversions) se terminent
+    wait
+    sleep 1
+
+    if [[ "$DRYRUN" == true ]]; then
+        echo -e "${GREEN}Dry run terminé${NOCOLOR}"
+        dry_run_compare_names
+    else
+        show_summary
+    fi
+}
+
 ###########################################################
 # CONSTRUCTION DE LA FILE D ATTENTE
 ###########################################################
@@ -1447,8 +1583,6 @@ convert_file() {
 ###########################################################
 
 dry_run_compare_names() {
-    if [[ "$DRYRUN" != true ]]; then return 0; fi
-
     local TTY_DEV="/dev/tty"
     local LOG_FILE="$LOG_DRYRUN_COMPARISON"
 
@@ -1590,7 +1724,8 @@ export_for_parallel() {
         _finalize_conversion_success _finalize_conversion_error is_excluded _get_temp_filename \
         _handle_custom_queue _handle_existing_index _count_total_video_files _index_video_files \
         _generate_index _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty \
-        _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy update_queue
+        _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy update_queue \
+        prepare_dynamic_queue start_fifo_writer start_consumer finalize_processing start_processing_info
     export DRYRUN LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE LOG_DIR
     export TMP_DIR ENCODER_PRESET CRF IO_PRIORITY_CMD SOURCE OUTPUT_DIR FFMPEG_MIN_VERSION
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
@@ -1628,134 +1763,20 @@ main() {
     
     export_for_parallel
 
-    # Préparer une queue dynamique (FIFO) pour permettre l'ajout de candidats lorsque des fichiers sont skip
-    MASTER_QUEUE="$QUEUE.full"
-    NEXT_MASTER_POS_FILE="$LOG_DIR/next_master_pos_${EXECUTION_TIMESTAMP}"
-    TOTAL_MASTER_FILE="$LOG_DIR/total_master_${EXECUTION_TIMESTAMP}"
-    WORKFIFO="$LOG_DIR/queue_fifo_${EXECUTION_TIMESTAMP}"
-    FIFO_WRITER_PID="$LOG_DIR/fifo_writer_pid_${EXECUTION_TIMESTAMP}"
-    FIFO_WRITER_READY="$LOG_DIR/fifo_writer.ready_${EXECUTION_TIMESTAMP}"
+    # Préparer la queue dynamique (FIFO) pour permettre l'ajout de candidats lorsque des fichiers sont skip
+    prepare_dynamic_queue
 
-    # Total d'éléments dans la master queue
-    local total_master=0
-    if [[ -f "$MASTER_QUEUE" ]]; then
-        total_master=$(tr -cd '\0' < "$MASTER_QUEUE" | wc -c) || total_master=0
-    fi
-    echo "$total_master" > "$TOTAL_MASTER_FILE"
-    # Log debug : valeur TOTAL_MASTER_FILE écrite
-    if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-        printf "%s | main: TOTAL_MASTER_FILE='%s' value=%d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$TOTAL_MASTER_FILE" "$total_master" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-    fi
+    # Créer la FIFO et lancer le writer persistant en arrière-plan
+    start_fifo_writer
 
-    # Position initiale (nombre d'éléments déjà présents dans la queue limitée)
-    local initial_in_queue=0
-    if [[ -f "$QUEUE" ]]; then
-        initial_in_queue=$(tr -cd '\0' < "$QUEUE" | wc -c) || initial_in_queue=0
-    fi
-    echo "$initial_in_queue" > "$NEXT_MASTER_POS_FILE"
-    # Log debug : valeur NEXT_MASTER_POS_FILE initiale
-    if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-        printf "%s | main: NEXT_MASTER_POS_FILE='%s' value=%d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$NEXT_MASTER_POS_FILE" "$initial_in_queue" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-    fi
+    # Traitement des fichiers (affichage d'information)
+    start_processing_info
 
-    # Créer le FIFO et lancer un writer de fond qui garde la FIFO ouverte
-    rm -f "$WORKFIFO" 2>/dev/null || true
-    mkfifo "$WORKFIFO"
-    # Writer persistant : ouvre la FIFO en écriture, injecte la queue initiale,
-    # puis garde la FD ouverte jusqu'à l'arrêt du script (évite EOF prématuré)
-    (
-        # Ouvre la FIFO en lecture-écriture pour éviter le blocage en l'absence de lecteur
-        exec 3<> "$WORKFIFO"
-        # écrire le PID du writer et marquer prêt pour que update_queue détecte la disponibilité
-        if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
-            printf "%d" "$$" > "$FIFO_WRITER_PID" 2>/dev/null || true
-        fi
-        # écrire le contenu initial (NUL séparés)
-        if [[ -f "$QUEUE" ]]; then
-            cat "$QUEUE" >&3
-        fi
-        # En mode dry-run, fermer le writer (writer FIFO) après avoir injecté la file initiale
-        # afin que le consumer reçoive EOF et puisse se terminer normalement. En mode normal,
-        # on garde le writer ouvert pour permettre l'alimentation dynamique via update_queue.
-        if [[ "$DRYRUN" == true ]]; then
-            if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
-                touch "$FIFO_WRITER_READY" 2>/dev/null || true
-            fi
-            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                printf "%s | main: FIFO writer wrote initial queue and exiting (dry-run)\n" "$(date +'%Y-%m-%d %H:%M:%S')" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-            fi
-            exec 3>&-
-            exit 0
-        fi
-        # signaler prêt
-        if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
-            touch "$FIFO_WRITER_READY" 2>/dev/null || true
-        fi
-        # journaliser le démarrage du worker
-        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | main: FIFO writer started (WORKFIFO=%s) pid=%s ready=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$WORKFIFO" "$(cat ${FIFO_WRITER_PID} 2>/dev/null || echo '')" "$FIFO_WRITER_READY" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-        fi
-        # garder la FD ouverte tant que le script tourne (permet update_queue d'écrire sans bloquer)
-        while [[ ! -f "$STOP_FLAG" ]]; do
-            sleep 0.5
-        done
-        exec 3>&-
-    ) &
-    # Exporter les variables de queue dynamique pour les workers
-    export MASTER_QUEUE WORKFIFO NEXT_MASTER_POS_FILE TOTAL_MASTER_FILE
-    
-    # Traitement des fichiers
-    local nb_files=0
-    if [[ -f "${QUEUE:-}" ]]; then
-        nb_files=$(tr -cd '\0' < "$QUEUE" | wc -c) || nb_files=0
-    fi
+    # Lancer le consumer en arrière-plan
+    start_consumer
 
-    if [[ "$DRYRUN" == true ]]; then
-        echo -e "${MAGENTA}ℹ️  MODE DRY RUN activé : simulation uniquement — aucun encodage réel effectué.${NOCOLOR}"
-    fi
-
-    if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
-    fi
-    
-    # Consumer : lire des chemins séparés par NUL et lancer les conversions en parallèle
-    _consumer_run() {
-        local file
-        local -a _pids=()
-        while IFS= read -r -d '' file; do
-            convert_file "$file" "$OUTPUT_DIR" &
-            _pids+=("$!")
-            if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
-                if ! wait -n 2>/dev/null; then
-                    wait "${_pids[0]}" 2>/dev/null || true
-                fi
-                local -a _still=()
-                for file in "${_pids[@]}"; do
-                    if kill -0 "$file" 2>/dev/null; then
-                        _still+=("$file")
-                    fi
-                done
-                _pids=("${_still[@]}")
-            fi
-        done < "$WORKFIFO"
-        for file in "${_pids[@]}"; do
-            wait "$file" || true
-        done
-    }
-    _consumer_run &
-
-    wait
-    sleep 1
-
-    if [[ "$DRYRUN" == true ]]; then
-        echo -e "${GREEN}Traitement terminé${NOCOLOR}"
-    fi
-    
-    dry_run_compare_names
-
-    if [[ "$DRYRUN" == true ]]; then
-        show_summary
-    fi
+    # Attendre la fin et effectuer les actions de finalisation
+    finalize_processing
 }
 
 ###########################################################
