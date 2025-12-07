@@ -418,6 +418,18 @@ check_dependencies() {
     echo -e "${GREEN}Environnement validé.${NOCOLOR}"
 }
 
+# Détecte et définit la variable HWACCEL utilisée pour le décodage matériel
+detect_hwaccel() {
+    HWACCEL=""
+
+    # macOS -> videotoolbox
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        HWACCEL="videotoolbox"
+    else
+        HWACCEL="cuda"
+    fi
+}
+
 validate_queue_file() {
     local queue_file="$1"
     
@@ -1217,6 +1229,7 @@ _execute_conversion() {
     # On récupère ensuite les codes de sortie via PIPESTATUS pour diagnostiquer précisément.
     
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+    §hwaccel $HWACCEL \
         -i "$tmp_input" -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
@@ -1714,10 +1727,10 @@ show_summary() {
 }
 
 ###########################################################
-# EXPORT DES FONCTIONS ET VARIABLES POUR PARALLEL
+# EXPORT DES FONCTIONS ET VARIABLES
 ###########################################################
 
-export_for_parallel() {
+export_variables() {
     export -f convert_file get_video_metadata should_skip_conversion clean_number \
         _prepare_file_paths _check_output_exists _handle_dryrun_mode _setup_temp_files_and_logs \
         _check_disk_space _analyze_video _copy_to_temp_storage _execute_conversion custom_pv \
@@ -1729,7 +1742,7 @@ export_for_parallel() {
     export DRYRUN LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE LOG_DIR
     export TMP_DIR ENCODER_PRESET CRF IO_PRIORITY_CMD SOURCE OUTPUT_DIR FFMPEG_MIN_VERSION
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
-    export MIN_TMP_FREE_MB PARALLEL_JOBS
+    export MIN_TMP_FREE_MB PARALLEL_JOBS HWACCEL
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE 
     export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG SCRIPT_DIR
     export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE EXECUTION_TIMESTAMP QUEUE INDEX INDEX_READABLE
@@ -1759,9 +1772,12 @@ main() {
     check_plexignore
     check_output_suffix
     
+    # Détecter le hwaccel avant d'indexer / construire la queue
+    detect_hwaccel
+
     build_queue
     
-    export_for_parallel
+    export_variables
 
     # Préparer la queue dynamique (FIFO) pour permettre l'ajout de candidats lorsque des fichiers sont skip
     prepare_dynamic_queue
