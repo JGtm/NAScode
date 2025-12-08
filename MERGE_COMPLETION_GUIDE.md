@@ -50,7 +50,7 @@ Create a new pull request from `jobs-&-limite` to this branch (`copilot/merge-al
 ```bash
 # Create a merge commit referencing jobs-&-limite
 git fetch origin 'jobs-&-limite'
-git merge origin/'jobs-&-limite' -m "Merge remaining commits from jobs-&-limite"
+git merge 'origin/jobs-&-limite' -m "Merge remaining commits from jobs-&-limite"
 git push origin copilot/merge-all-branches
 ```
 
