@@ -475,9 +475,13 @@ initialize_directories() {
     rm -f "$STOP_FLAG"
     
     # Créer les fichiers de log
-    for log_file in "$LOG_SUCCESS" "$LOG_SKIPPED" "$LOG_ERROR" "$SUMMARY_FILE" "$LOG_PROGRESS" "$LOG_DRYRUN_COMPARISON"; do
+    for log_file in "$LOG_SUCCESS" "$LOG_SKIPPED" "$LOG_ERROR" "$SUMMARY_FILE" "$LOG_PROGRESS"; do
         touch "$log_file"
     done
+    # Le log de comparaison dry-run n'est créé que si on est en mode dry-run
+    if [[ "$DRYRUN" == true ]]; then
+        touch "$LOG_DRYRUN_COMPARISON"
+    fi
     # Log pour update_queue
     touch "$LOG_DIR/update_queue.log"
 }
@@ -1184,7 +1188,7 @@ _setup_temp_files_and_logs() {
     
     mkdir -p "$final_dir" 2>/dev/null || true
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${YELLOW}▶️ Démarrage du fichier : $filename${NOCOLOR}"
+        echo -e "▶️ Démarrage du fichier : $filename"
     fi
     if [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
@@ -1390,109 +1394,78 @@ _execute_conversion() {
     fi
 }
 
-_finalize_conversion_success() {
-    local filename="$1"
-    local file_original="$2"
-    local tmp_input="$3"
-    local tmp_output="$4"
-    local final_output="$5"
-    local ffmpeg_log_temp="$6"
-    local sizeBeforeMB="$7"
-    
-    # Si un marqueur d'arrêt global existe (utilisateur a interrompu avec Ctrl+C),
-    # ne pas marquer le fichier comme converti avec succès ni le transférer.
-    if [[ -f "$STOP_FLAG" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
-        fi
-        # Nettoyer les fichiers temporaires d'entrée/log mais conserver la sortie partielle pour inspection
-        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
-        return 1
-    fi
+### Finalisation refactorisée : petites fonctions responsables chacune d'une tâche.
 
-    if [[ "$NO_PROGRESS" != true ]]; then
-        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
-        local elapsed_str="N/A"
-        if [[ -n "${START_TS:-}" ]]; then
-            local end_ts
-            end_ts=$(date +%s)
-            local elapsed=$((end_ts - START_TS))
-            local eh=$((elapsed / 3600))
-            local em=$(((elapsed % 3600) / 60))
-            local es=$((elapsed % 60))
-            elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
-        fi
+# Essayer de déplacer le fichier produit vers la destination finale.
+# Renvoie le chemin réel utilisé pour le fichier final sur stdout.
+# Usage : _finalize_try_move <tmp_output> <final_output> <file_original>
+_finalize_try_move() {
+    local tmp_output="$1"
+    local final_output="$2"
+    local file_original="$3"
 
-        echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
-    fi
-
-    # Calculer le checksum du fichier temporaire local avant le déplacement (si possible)
-    local checksum_before
-    checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
-
-    # Tentative robuste de déplacement / upload : mv (3 essais), puis cp+rm (3 essais), sinon repli local
-    local mv_ok=false
-    local try=0
     local max_try=3
+    local try=0
+
+    # Tentative mv (3 essais)
     while [[ $try -lt $max_try ]]; do
         if mv "$tmp_output" "$final_output" 2>/dev/null; then
-            mv_ok=true
-            break
+            printf "%s" "$final_output"
+            return 0
         fi
         try=$((try+1))
         sleep 2
     done
 
-    local used_fallback_local=false
-    local cp_ok=false
-    if [[ "$mv_ok" != true ]]; then
-        # Essayer une copie suivie d'un effacement du temporaire
-        try=0
-        while [[ $try -lt $max_try ]]; do
-            if cp "$tmp_output" "$final_output" 2>/dev/null; then
-                cp_ok=true
-                rm -f "$tmp_output" 2>/dev/null || true
-                break
-            fi
-            try=$((try+1))
-            sleep 2
-        done
+    # Essayer cp + rm (3 essais)
+    try=0
+    while [[ $try -lt $max_try ]]; do
+        if cp "$tmp_output" "$final_output" 2>/dev/null; then
+            rm -f "$tmp_output" 2>/dev/null || true
+            printf "%s" "$final_output"
+            return 0
+        fi
+        try=$((try+1))
+        sleep 2
+    done
+
+    # Repli local : dossier fallback
+    local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
+    mkdir -p "$local_fallback_dir" 2>/dev/null || true
+    if mv "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
+        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
+        return 0
+    fi
+    if cp "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
+        rm -f "$tmp_output" 2>/dev/null || true
+        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
+        return 0
     fi
 
-    if [[ "$mv_ok" != true && "$cp_ok" != true ]]; then
-        # Échec d'upload : déplacer le fichier vers un dossier local de repli dans le dossier utilisateur
-        # Par défaut utilise $HOME/Conversion_failed_uploads, peut être redéfini par la variable d'environnement FALLBACK_DIR
-        local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
-        mkdir -p "$local_fallback_dir" 2>/dev/null || true
-        if mv "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
-            used_fallback_local=true
-        else
-            # si mv échoue, essayer cp puis suppression
-            if cp "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
-                rm -f "$tmp_output" 2>/dev/null || true
-                used_fallback_local=true
-            else
-                # ultime repli : laisser le fichier temporaire en place
-                used_fallback_local=false
-            fi
-        fi
-    fi
+    # Ultime repli : laisser le temporaire et l'utiliser
+    printf "%s" "$tmp_output"
+    return 2
+}
+
+# Nettoyage local des artefacts temporaires et calculs de taille/checksum.
+# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <sizeBeforeMB>
+_finalize_log_and_verify() {
+    local file_original="$1"
+    local final_actual="$2"
+    local tmp_input="$3"
+    local ffmpeg_log_temp="$4"
+    local checksum_before="$5"
+    local sizeBeforeMB="$6"
 
     # Nettoyer les artefacts temporaires liés à l'entrée et au log ffmpeg
     rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
 
-    # Déterminer le chemin réel du fichier final (remote ou fallback local)
-    local final_actual
-    if [[ "$mv_ok" == true || "$cp_ok" == true ]]; then
-        final_actual="$final_output"
-    elif [[ "$used_fallback_local" == true ]]; then
-        final_actual="$local_fallback_dir/$(basename "$final_output")"
-    else
-        # Aucun déplacement réussi : tenter d'utiliser le fichier temporaire restant
-        final_actual="$tmp_output"
+    # Taille après (en MB)
+    local sizeAfterMB=0
+    if [[ -e "$final_actual" ]]; then
+        sizeAfterMB=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
     fi
 
-    local sizeAfterMB=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
     local size_comparison="${sizeBeforeMB}MB → ${sizeAfterMB}MB"
 
     if [[ "$sizeAfterMB" -ge "$sizeBeforeMB" ]]; then
@@ -1501,11 +1474,11 @@ _finalize_conversion_success() {
         fi
     fi
 
-    # Par défaut nous conservons la ligne SUCCESS existante.
-    # Vérification checksum après l'upload : effectuée pour tous les fichiers, résultat uniquement dans les logs.
+    # Log success
     if [[ -n "$LOG_SUCCESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
+
     # calculer le checksum après le déplacement (sur le chemin réellement utilisé)
     local checksum_after
     checksum_after=$(compute_sha256 "$final_actual" 2>/dev/null || echo "")
@@ -1523,7 +1496,7 @@ _finalize_conversion_success() {
         verify_status="NO_CHECKSUM"
     fi
 
-    # Écrire uniquement dans les logs : SUCCESS + ligne VERIFY
+    # Écrire uniquement dans les logs : VERIFY
     if [[ -n "$LOG_SUCCESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeMB}MB->${sizeAfterMB}MB | checksum_before:${checksum_before:-NA} | checksum_after:${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
@@ -1531,9 +1504,56 @@ _finalize_conversion_success() {
     # En cas de mismatch, journaliser dans le log d'erreur
     if [[ "$verify_status" == "MISMATCH" ]]; then
         if [[ -n "$LOG_ERROR" ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR verify_mismatch | $file_original -> $final_actual | before=$checksum_before after=$checksum_after" >> "$LOG_ERROR" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR verify_mismatch | $file_original -> $final_actual | before=$checksum_before after=$checksum_after" >> "$LOG_ERROR" 2>/dev/null || true
         fi
     fi
+}
+
+# Fonction principale de finalisation (regroupe l'affichage, le déplacement, le logging)
+_finalize_conversion_success() {
+    local filename="$1"
+    local file_original="$2"
+    local tmp_input="$3"
+    local tmp_output="$4"
+    local final_output="$5"
+    local ffmpeg_log_temp="$6"
+    local sizeBeforeMB="$7"
+
+    if [[ "$NO_PROGRESS" != true ]]; then
+        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
+        local elapsed_str="N/A"
+        if [[ -n "${START_TS:-}" ]]; then
+            local end_ts
+            end_ts=$(date +%s)
+            local elapsed=$((end_ts - START_TS))
+            local eh=$((elapsed / 3600))
+            local em=$(((elapsed % 3600) / 60))
+            local es=$((elapsed % 60))
+            elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
+        fi
+
+        echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
+    fi
+
+    # Si un marqueur d'arrêt global existe, ne pas finaliser
+    if [[ -f "$STOP_FLAG" ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
+        fi
+        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+        return 1
+    fi
+
+    # checksum avant déplacement (si possible)
+    local checksum_before
+    checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
+
+    # Déplacer / copier / fallback et récupérer le chemin réel
+    local final_actual
+    final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
+
+    # Nettoyage, logs et vérifications
+    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB"
 }
 
 _finalize_conversion_error() {
@@ -1928,7 +1948,7 @@ export_variables() {
     export -f convert_file get_video_metadata should_skip_conversion clean_number \
         _prepare_file_paths _check_output_exists _handle_dryrun_mode _setup_temp_files_and_logs \
         _check_disk_space _analyze_video _copy_to_temp_storage _execute_conversion custom_pv \
-        _finalize_conversion_success _finalize_conversion_error is_excluded _get_temp_filename \
+        _finalize_conversion_success _finalize_try_move _finalize_log_and_verify _finalize_conversion_error is_excluded _get_temp_filename \
         _handle_custom_queue _handle_existing_index _count_total_video_files _index_video_files \
         _generate_index _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty \
         _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy update_queue \
