@@ -91,7 +91,7 @@ CUSTOM_QUEUE=""
 SOURCE="../"
 OUTPUT_DIR="$SCRIPT_DIR/Converted"
 FORCE_NO_SUFFIX=false
-PARALLEL_JOBS=1
+PARALLEL_JOBS=3
 NO_PROGRESS=false
 CONVERSION_MODE="serie"
 
@@ -1300,8 +1300,8 @@ _execute_conversion() {
 
         /progress=end/ {
             if (NOPROG != "true") {
-                printf "  ... [%-40.40s] 100%% | ETA: 00:00:00 | Speed: %.2fx\n",
-                    CURRENT_FILE_NAME, speed;
+                printf "  ... [%-40.40s] %5s | ETA: 00:00:00 | Speed: %.2fx\n",
+                    CURRENT_FILE_NAME, "100%", speed;
                 fflush();
             }
         }
@@ -1477,7 +1477,7 @@ start_consumer() {
                         _still+=("$file")
                     fi
                 done
-                _pids=("${_still[@]}")
+                _pids=("${_still[@]:-}")
             fi
         done < "$WORKFIFO"
         for file in "${_pids[@]}"; do
