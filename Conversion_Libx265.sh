@@ -163,7 +163,7 @@ readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans /tmp
 ENCODER_PRESET=""
 
 # SEUIL DE BITRATE DE CONVERSION (KBPS)
-readonly BITRATE_CONVERSION_THRESHOLD_KBPS=2300
+readonly BITRATE_CONVERSION_THRESHOLD_KBPS=2800
 
 # TOLÉRANCE DU BITRATE A SKIP (%)
 readonly SKIP_TOLERANCE_PERCENT=10
@@ -191,7 +191,7 @@ set_conversion_mode_parameters() {
             CRF=20.7
             ENCODER_PRESET="slow"
             # Plafond pour les séries (par défaut identique)
-            MAXRATE_KBPS=3200
+            MAXRATE_KBPS=2800
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             ;;
         *)
@@ -1220,6 +1220,14 @@ _execute_conversion() {
     local cores
     cores=$(nproc_compat)
     local threads_per_job=$(( cores / PARALLEL_JOBS ))
+
+    # If a processing limit is specified and is strictly less than 3,
+    # allocate that small limit as threads per job to favor concurrency
+    # when few files are requested (e.g. LIMIT_FILES=1 or 2).
+    if [[ "${LIMIT_FILES:-0}" -gt 0 && "${LIMIT_FILES:-0}" -lt 3 ]]; then
+        threads_per_job=$LIMIT_FILES
+    fi
+
     if [[ "$threads_per_job" -lt 1 ]]; then
         threads_per_job=1
     fi
