@@ -101,7 +101,7 @@ CONVERSION_MODE="serie"
 #   - size_asc   : Trier par taille croissante
 #   - name_asc   : Trier par nom de fichier (ordre alphabétique ascendant)
 #   - name_desc  : Trier par nom de fichier (ordre alphabétique descendant)
-SORT_MODE="size_desc"
+SORT_MODE="size_asc"
 
 # Conserver l index existant sans demander confirmation
 KEEP_INDEX=false
@@ -1173,7 +1173,7 @@ PY
         return 0
     fi
 
-    # fallback: empty
+    # fallback: vide si aucun outil n'est disponible
     echo ""
 }
 
@@ -1399,19 +1399,31 @@ _finalize_conversion_success() {
     local ffmpeg_log_temp="$6"
     local sizeBeforeMB="$7"
     
-    # If a global stop flag exists (user interrupted with Ctrl+C),
-    # do not mark the file as successfully converted nor transfer it.
+    # Si un marqueur d'arrêt global existe (utilisateur a interrompu avec Ctrl+C),
+    # ne pas marquer le fichier comme converti avec succès ni le transférer.
     if [[ -f "$STOP_FLAG" ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
             echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
         fi
-        # Cleanup input/log temp files but keep the partial output for inspection
+        # Nettoyer les fichiers temporaires d'entrée/log mais conserver la sortie partielle pour inspection
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
         return 1
     fi
 
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "  ${GREEN}✅ Fichier converti : $filename${NOCOLOR}"
+        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
+        local elapsed_str="N/A"
+        if [[ -n "${START_TS:-}" ]]; then
+            local end_ts
+            end_ts=$(date +%s)
+            local elapsed=$((end_ts - START_TS))
+            local eh=$((elapsed / 3600))
+            local em=$(((elapsed % 3600) / 60))
+            local es=$((elapsed % 60))
+            elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
+        fi
+
+        echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
     fi
 
     # Calculer le checksum du fichier temporaire local avant le déplacement (si possible)
