@@ -356,7 +356,7 @@ cleanup() {
     if [[ -n "${NEXT_MASTER_POS_FILE:-}" ]]; then
         rm -f "${NEXT_MASTER_POS_FILE}" "${TOTAL_MASTER_FILE:-}" 2>/dev/null || true
     fi
-    # Remove FIFO writer artifacts if present
+    # Suppression des artefacts du writer FIFO si présents
     if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
         rm -f "${FIFO_WRITER_PID}" "${FIFO_WRITER_READY:-}" 2>/dev/null || true
     fi
@@ -379,6 +379,63 @@ check_lock() {
     fi
     
     echo $$ > "$LOCKFILE"
+}
+
+# Helpers portables pour verrou (lock) / déverrouillage (unlock)
+# Utilisation : lock <chemin> [timeout_seconds]
+# Si `flock` est disponible il est privilégié, sinon on utilise un verrou par répertoire (mkdir).
+lock() {
+    local file="$1"
+    local timeout="${2:-10}"
+
+    if [[ -z "$file" ]]; then
+        return 1
+    fi
+
+    if command -v flock >/dev/null 2>&1; then
+        # Utilise un descripteur de fichier dédié pour maintenir le flock
+        exec 200>"$file" || return 1
+        local elapsed=0
+        while ! flock -n 200; do
+            sleep 1
+            elapsed=$((elapsed+1))
+            if (( elapsed >= timeout )); then
+                return 2
+            fi
+        done
+        return 0
+    else
+        # Repli : créer un répertoire de verrou (opération atomique sur les systèmes POSIX)
+        local lockdir="${file}.lock"
+        local elapsed_ms=0
+        while ! mkdir "$lockdir" 2>/dev/null; do
+            sleep 0.1
+            elapsed_ms=$((elapsed_ms+1))
+            if (( elapsed_ms >= timeout * 10 )); then
+                return 2
+            fi
+        done
+        printf "%s\n" "$$" > "$lockdir/pid" 2>/dev/null || true
+        return 0
+    fi
+}
+
+# Utilisation : unlock <chemin>
+unlock() {
+    local file="$1"
+    if [[ -z "$file" ]]; then
+        return 1
+    fi
+
+    if command -v flock >/dev/null 2>&1; then
+        # Ferme le descripteur 200 si ouvert
+        exec 200>&- 2>/dev/null || true
+        return 0
+    else
+        local lockdir="${file}.lock"
+        rm -rf "$lockdir" 2>/dev/null || true
+        return 0
+    fi
 }
 
 ###########################################################
@@ -1039,11 +1096,13 @@ update_queue() {
         return 0
     fi
 
+    local no_fifo=false
     if [[ -z "${WORKFIFO:-}" ]] || [[ ! -p "$WORKFIFO" ]]; then
+        no_fifo=true
         if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | update_queue: skip (no WORKFIFO or not a pipe) WORKFIFO=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "${WORKFIFO:-}" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+            printf "%s | update_queue: WORKFIFO missing or not a pipe; will fallback to appending to QUEUE. WORKFIFO=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "${WORKFIFO:-}" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
         fi
-        return 0
+        # don't return: try fallback below (append to QUEUE)
     fi
 
     local lockdir="$LOG_DIR/update_queue.lock"
@@ -1064,10 +1123,33 @@ update_queue() {
         local candidate
         candidate=$(tr '\0' '\n' < "$MASTER_QUEUE" | sed -n "$((nextpos+1))p") || candidate=""
         if [[ -n "$candidate" ]]; then
-            # Écrire atomiquement dans le FIFO (en arrière-plan pour ne pas bloquer l'appelant)
-            printf '%s\0' "$candidate" > "$WORKFIFO" &
+            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+                printf "%s | update_queue: selected candidate pos=%d -> %s (reason=%s)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$((nextpos+1))" "$candidate" "${reason:-}" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+            fi
+            if [[ "$no_fifo" == true ]]; then
+                # fallback : ajouter atomiquement à la queue active (NUL separated)
+                if [[ -f "$QUEUE" ]]; then
+                    printf '%s\0' "$candidate" >> "$QUEUE"
+                else
+                    printf '%s\0' "$candidate" > "$QUEUE"
+                fi
+                if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+                    printf "%s | update_queue: appended candidate to QUEUE (fallback) : %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+                fi
+            else
+                # Écrire atomiquement dans le FIFO (en arrière-plan pour ne pas bloquer l'appelant)
+                printf '%s\0' "$candidate" > "$WORKFIFO" &
+            fi
+        else
+            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+                printf "%s | update_queue: no candidate found at pos=%d (total=%d)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$((nextpos+1))" "$total" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+            fi
         fi
-        echo $((nextpos+1)) > "$NEXT_MASTER_POS_FILE"
+        local newpos=$((nextpos+1))
+        echo "$newpos" > "$NEXT_MASTER_POS_FILE"
+        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+            printf "%s | update_queue: NEXT_MASTER_POS_FILE updated -> %d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$newpos" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+        fi
     fi
 
     rmdir "$lockdir" 2>/dev/null || true
@@ -1519,6 +1601,15 @@ _finalize_conversion_success() {
     local ffmpeg_log_temp="$6"
     local sizeBeforeMB="$7"
 
+    # Si un marqueur d'arrêt global existe, ne pas finaliser
+    if [[ -f "$STOP_FLAG" ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
+        fi
+        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+        return 1
+    fi
+
     if [[ "$NO_PROGRESS" != true ]]; then
         # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
         local elapsed_str="N/A"
@@ -1533,15 +1624,6 @@ _finalize_conversion_success() {
         fi
 
         echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
-    fi
-
-    # Si un marqueur d'arrêt global existe, ne pas finaliser
-    if [[ -f "$STOP_FLAG" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
-        fi
-        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
-        return 1
     fi
 
     # checksum avant déplacement (si possible)
@@ -1625,11 +1707,13 @@ start_fifo_writer() {
         if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
             printf "%d" "$$" > "$FIFO_WRITER_PID" 2>/dev/null || true
         fi
-        # écrire le contenu initial (NUL séparés)
+
+        # Écrire le contenu initial (NUL séparés) depuis le fichier QUEUE si présent
         if [[ -f "$QUEUE" ]]; then
             cat "$QUEUE" >&3
         fi
-        # En mode dry-run, fermer le writer après l'injection initiale
+
+        # Si dry-run, on injecte initialement et on sort
         if [[ "$DRYRUN" == true ]]; then
             if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
                 touch "$FIFO_WRITER_READY" 2>/dev/null || true
@@ -1640,18 +1724,51 @@ start_fifo_writer() {
             exec 3>&-
             exit 0
         fi
+
         # signaler prêt
         if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
             touch "$FIFO_WRITER_READY" 2>/dev/null || true
         fi
-        # journaliser le démarrage du worker
+
         if [[ -w "$LOG_DIR/update_queue.log" ]]; then
             printf "%s | start_fifo_writer: FIFO writer started (WORKFIFO=%s) pid=%s ready=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$WORKFIFO" "$(cat ${FIFO_WRITER_PID} 2>/dev/null || echo '')" "$FIFO_WRITER_READY" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
         fi
-        # garder la FD ouverte tant que le script tourne (permet update_queue d'écrire sans bloquer)
+
+        # Boucle active: surveille NEXT_MASTER_POS_FILE pour écrire dynamiquement
+        # les candidats issus de MASTER_QUEUE lorsque update_queue incrémente la position.
+        local last_sent_pos=0
+        if [[ -f "${NEXT_MASTER_POS_FILE:-}" ]]; then
+            last_sent_pos=$(cat "$NEXT_MASTER_POS_FILE" 2>/dev/null || echo 0)
+        fi
+
         while [[ ! -f "$STOP_FLAG" ]]; do
-            sleep 0.5
+            # lire la position demandée par update_queue
+            local target_pos=0
+            if [[ -f "${NEXT_MASTER_POS_FILE:-}" ]]; then
+                target_pos=$(cat "$NEXT_MASTER_POS_FILE" 2>/dev/null || echo 0)
+            fi
+
+            # Si la position augmente, envoyer les éléments manquants depuis MASTER_QUEUE
+            if [[ $target_pos -gt $last_sent_pos ]] && [[ -f "${MASTER_QUEUE:-}" ]]; then
+                # On parcourt les nouvelles positions et on écrit chaque candidate dans la fifo
+                local i
+                for (( i=last_sent_pos+1; i<=target_pos; i++ )); do
+                    local candidate
+                    candidate=$(tr '\0' '\n' < "$MASTER_QUEUE" | sed -n "${i}p") || candidate=""
+                    if [[ -n "$candidate" ]]; then
+                        printf '%s\0' "$candidate" >&3
+                        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+                            printf "%s | start_fifo_writer: pushed candidate from MASTER_QUEUE pos=%d -> %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$i" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+                        fi
+                    fi
+                done
+                last_sent_pos=$target_pos
+            fi
+
+            sleep 0.2
+
         done
+
         exec 3>&-
     ) &
 }
