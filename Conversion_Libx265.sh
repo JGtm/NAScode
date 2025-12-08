@@ -1123,33 +1123,31 @@ update_queue() {
         local candidate
         candidate=$(tr '\0' '\n' < "$MASTER_QUEUE" | sed -n "$((nextpos+1))p") || candidate=""
         if [[ -n "$candidate" ]]; then
-            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                printf "%s | update_queue: selected candidate pos=%d -> %s (reason=%s)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$((nextpos+1))" "$candidate" "${reason:-}" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-            fi
-            if [[ "$no_fifo" == true ]]; then
-                # fallback : ajouter atomiquement à la queue active (NUL separated)
-                if [[ -f "$QUEUE" ]]; then
-                    printf '%s\0' "$candidate" >> "$QUEUE"
-                else
-                    printf '%s\0' "$candidate" > "$QUEUE"
-                fi
+            # Si le writer FIFO est prêt, on évite d'écrire directement dans la FIFO
+            # pour éviter les conditions de course : on signale plutôt au writer
+            # en incrémentant NEXT_MASTER_POS_FILE et le writer poussera le candidat.
+            if [[ -n "${FIFO_WRITER_READY:-}" && -f "${FIFO_WRITER_READY}" && -p "$WORKFIFO" ]]; then
                 if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                    printf "%s | update_queue: appended candidate to QUEUE (fallback) : %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+                    printf "%s | update_queue: writer ready - will signal writer to push candidate pos=%d -> %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$((nextpos+1))" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
                 fi
             else
-                # Écrire atomiquement dans le FIFO (en arrière-plan pour ne pas bloquer l'appelant)
-                printf '%s\0' "$candidate" > "$WORKFIFO" &
-            fi
-        else
-            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                printf "%s | update_queue: no candidate found at pos=%d (total=%d)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$((nextpos+1))" "$total" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+                if [[ "$no_fifo" == true ]]; then
+                    # fallback : ajouter atomiquement à la queue active (NUL separated)
+                    if [[ -f "$QUEUE" ]]; then
+                        printf '%s\0' "$candidate" >> "$QUEUE"
+                    else
+                        printf '%s\0' "$candidate" > "$QUEUE"
+                    fi
+                    if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+                        printf "%s | update_queue: appended candidate to QUEUE (fallback) : %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+                    fi
+                else
+                    # Écrire atomiquement dans le FIFO (en arrière-plan pour ne pas bloquer l'appelant)
+                    printf '%s\0' "$candidate" > "$WORKFIFO" &
+                fi
             fi
         fi
-        local newpos=$((nextpos+1))
-        echo "$newpos" > "$NEXT_MASTER_POS_FILE"
-        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | update_queue: NEXT_MASTER_POS_FILE updated -> %d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$newpos" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-        fi
+        echo $((nextpos+1)) > "$NEXT_MASTER_POS_FILE"
     fi
 
     rmdir "$lockdir" 2>/dev/null || true
@@ -1699,10 +1697,33 @@ prepare_dynamic_queue() {
 # Créer le FIFO et lancer le writer persistant en arrière-plan
 start_fifo_writer() {
     rm -f "$WORKFIFO" 2>/dev/null || true
-    mkfifo "$WORKFIFO"
+    # Essayer de créer une FIFO ; sur certains environnements Windows/Git-Bash, mkfifo peut échouer
+    if mkfifo "$WORKFIFO" 2>/dev/null; then
+        USE_FILE_QUEUE=false
+    else
+        USE_FILE_QUEUE=true
+        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+            printf "%s | start_fifo_writer: mkfifo failed, enabling file-queue fallback (WORKFIFO=%s)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$WORKFIFO" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+        fi
+    fi
+
+    # S'assurer que les répertoires de logs existent et créer des marqueurs
+    mkdir -p "$LOG_DIR" 2>/dev/null || true
+    # Créer des fichiers vides pour que l'utilisateur voie immédiatement l'intention
+    # Le subshell du writer écrira ensuite son PID réel dans $FIFO_WRITER_PID
+    if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
+        : > "$FIFO_WRITER_PID" 2>/dev/null || true
+    fi
+    if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
+        touch "$FIFO_WRITER_READY" 2>/dev/null || true
+    fi
+
     (
-        # Ouvre la FIFO en lecture-écriture pour éviter le blocage en l'absence de lecteur
-        exec 3<> "$WORKFIFO"
+        # Si on utilise la FIFO native, ouvrir la FD pour écriture
+        if [[ "$USE_FILE_QUEUE" == false ]]; then
+            exec 3<> "$WORKFIFO"
+        fi
+
         # écrire le PID du writer et marquer prêt pour que update_queue détecte la disponibilité
         if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
             printf "%d" "$$" > "$FIFO_WRITER_PID" 2>/dev/null || true
@@ -1710,7 +1731,13 @@ start_fifo_writer() {
 
         # Écrire le contenu initial (NUL séparés) depuis le fichier QUEUE si présent
         if [[ -f "$QUEUE" ]]; then
-            cat "$QUEUE" >&3
+            if [[ "$USE_FILE_QUEUE" == false ]]; then
+                cat "$QUEUE" >&3
+            else
+                if [[ -w "$LOG_DIR/update_queue.log" ]]; then
+                    printf "%s | start_fifo_writer: file-queue fallback active, initial queue will be processed by file consumer\n" "$(date +'%Y-%m-%d %H:%M:%S')" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+                fi
+            fi
         fi
 
         # Si dry-run, on injecte initialement et on sort
@@ -1721,7 +1748,9 @@ start_fifo_writer() {
             if [[ -w "$LOG_DIR/update_queue.log" ]]; then
                 printf "%s | start_fifo_writer: FIFO writer wrote initial queue and exiting (dry-run)\n" "$(date +'%Y-%m-%d %H:%M:%S')" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
             fi
-            exec 3>&-
+            if [[ "$USE_FILE_QUEUE" == false ]]; then
+                exec 3>&-
+            fi
             exit 0
         fi
 
@@ -1731,7 +1760,7 @@ start_fifo_writer() {
         fi
 
         if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | start_fifo_writer: FIFO writer started (WORKFIFO=%s) pid=%s ready=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$WORKFIFO" "$(cat ${FIFO_WRITER_PID} 2>/dev/null || echo '')" "$FIFO_WRITER_READY" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+            printf "%s | start_fifo_writer: FIFO writer started (WORKFIFO=%s) pid=%s ready=%s use_file_queue=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$WORKFIFO" "$(cat ${FIFO_WRITER_PID} 2>/dev/null || echo '')" "$FIFO_WRITER_READY" "$USE_FILE_QUEUE" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
         fi
 
         # Boucle active: surveille NEXT_MASTER_POS_FILE pour écrire dynamiquement
@@ -1756,9 +1785,11 @@ start_fifo_writer() {
                     local candidate
                     candidate=$(tr '\0' '\n' < "$MASTER_QUEUE" | sed -n "${i}p") || candidate=""
                     if [[ -n "$candidate" ]]; then
-                        printf '%s\0' "$candidate" >&3
+                        if [[ "$USE_FILE_QUEUE" == false ]]; then
+                            printf '%s\0' "$candidate" >&3
+                        fi
                         if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                            printf "%s | start_fifo_writer: pushed candidate from MASTER_QUEUE pos=%d -> %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$i" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
+                            printf "%s | start_fifo_writer: pushed candidate from MASTER_QUEUE pos=%d -> %s (use_file_queue=%s)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$i" "$candidate" "$USE_FILE_QUEUE" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
                         fi
                     fi
                 done
@@ -1769,36 +1800,96 @@ start_fifo_writer() {
 
         done
 
-        exec 3>&-
+        if [[ "$USE_FILE_QUEUE" == false ]]; then
+            exec 3>&-
+        fi
     ) &
 }
 
 # Démarrer le consumer en arrière-plan
 start_consumer() {
-    _consumer_run() {
-        local file
-        local -a _pids=()
-        while IFS= read -r -d '' file; do
-            convert_file "$file" "$OUTPUT_DIR" &
-            _pids+=("$!")
-            if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
-                if ! wait -n 2>/dev/null; then
-                    wait "${_pids[0]}" 2>/dev/null || true
-                fi
-                local -a _still=()
-                for file in "${_pids[@]}"; do
-                    if kill -0 "$file" 2>/dev/null; then
-                        _still+=("$file")
+    # Si WORKFIFO est un pipe, utiliser le consumer basé sur la FIFO (comportement natif)
+    if [[ -p "$WORKFIFO" ]]; then
+        _consumer_run_fifo() {
+            local file
+            local -a _pids=()
+            while IFS= read -r -d '' file; do
+                convert_file "$file" "$OUTPUT_DIR" &
+                _pids+=("$!")
+                if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
+                    if ! wait -n 2>/dev/null; then
+                        wait "${_pids[0]}" 2>/dev/null || true
                     fi
-                done
-                _pids=("${_still[@]:-}")
+                    local -a _still=()
+                    for pid in "${_pids[@]}"; do
+                        if kill -0 "$pid" 2>/dev/null; then
+                            _still+=("$pid")
+                        fi
+                    done
+                    _pids=("${_still[@]:-}")
+                fi
+            done < "$WORKFIFO"
+            for pid in "${_pids[@]}"; do
+                wait "$pid" || true
+            done
+        }
+        _consumer_run_fifo &
+        return 0
+    fi
+
+    # Fallback : environnement sans FIFO fiable (Windows/Git-Bash)
+    _consumer_run_file() {
+        local -a _pids=()
+        local LOCKDIR="$LOG_DIR/file_queue.lock"
+        while [[ ! -f "$STOP_FLAG" ]]; do
+            # Si la queue existe, l'atomiser pour traitement
+            if [[ -f "$QUEUE" ]]; then
+                # Essayer d'obtenir le lock pour déplacer la queue
+                if mkdir "$LOCKDIR" 2>/dev/null; then
+                    if [[ -f "$QUEUE" ]]; then
+                        mv "$QUEUE" "${QUEUE}.processing" 2>/dev/null || true
+                    fi
+                    rmdir "$LOCKDIR" 2>/dev/null || true
+
+                    if [[ -f "${QUEUE}.processing" ]]; then
+                        while IFS= read -r -d $'\0' file; do
+                            convert_file "$file" "$OUTPUT_DIR" &
+                            _pids+=("$!")
+                            if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
+                                if ! wait -n 2>/dev/null; then
+                                    wait "${_pids[0]}" 2>/dev/null || true
+                                fi
+                                local -a _still=()
+                                for pid in "${_pids[@]}"; do
+                                    if kill -0 "$pid" 2>/dev/null; then
+                                        _still+=("$pid")
+                                    fi
+                                done
+                                _pids=("${_still[@]:-}")
+                            fi
+                        done < "${QUEUE}.processing"
+
+                        # Nettoyer le fichier de processing
+                        rm -f "${QUEUE}.processing" 2>/dev/null || true
+                    fi
+                else
+                    # Lock occupé -> attendre un peu
+                    sleep 0.1
+                fi
+            else
+                # Pas de queue pour le moment -> attendre
+                sleep 0.3
             fi
-        done < "$WORKFIFO"
-        for file in "${_pids[@]}"; do
-            wait "$file" || true
+        done
+
+        # Attendre les pids restants
+        for pid in "${_pids[@]}"; do
+            wait "$pid" || true
         done
     }
-    _consumer_run &
+
+    # Lancer le consumer fichier en arrière-plan
+    _consumer_run_file &
 }
 
 # Afficher les informations de démarrage (nb fichiers, mode dry-run, message de début)
