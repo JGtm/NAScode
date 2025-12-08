@@ -1251,29 +1251,46 @@ _execute_conversion() {
     local duration_secs="$4"
     local base_name="$5"
 
-    # Calcul du nombre de threads à allouer par job
+    # Calcul du nombre de threads à allouer par job.
+    # Principe : répartir les coeurs CPU disponibles (`nproc_compat`)
+    # entre le nombre de jobs parallèles souhaités (`PARALLEL_JOBS`).
+    # Si l'utilisateur a fixé `LIMIT_FILES` et que ce nombre est inférieur
+    # à `PARALLEL_JOBS`, on réduit le nombre de jobs concurrents afin
+    # d'allouer plus de threads par job (meilleure utilisation CPU).
     local cores
-    cores=$(nproc_compat)
-    local threads_per_job=$(( cores / PARALLEL_JOBS ))
+    local parallel_jobs
 
-    # If a processing limit is specified and is strictly less than 3,
-    # allocate that small limit as threads per job to favor concurrency
-    # when few files are requested (e.g. LIMIT_FILES=1 or 2).
-    if [[ "${LIMIT_FILES:-0}" -gt 0 && "${LIMIT_FILES:-0}" -lt 3 ]]; then
-        threads_per_job=$LIMIT_FILES
+    parallel_jobs=${PARALLEL_JOBS:-3}
+
+    # Si une limite de fichiers est définie et plus petite que le nombre
+    # de jobs parallèles, adapter le parallélisme à cette limite.
+    if [[ "${LIMIT_FILES:-0}" -gt 0 && "${LIMIT_FILES:-0}" -lt "$parallel_jobs" ]]; then
+        parallel_jobs=$LIMIT_FILES
     fi
 
+    cores=$(nproc_compat)
+
+    # Garanties : valeurs minimales >= 1
+    if [[ "$cores" -lt 1 ]]; then
+        cores=1
+    fi
+    if [[ "$parallel_jobs" -lt 1 ]]; then
+        parallel_jobs=1
+    fi
+
+    # Nombre de threads alloués par job (au moins 1)
+    local threads_per_job=$(( cores / parallel_jobs ))
     if [[ "$threads_per_job" -lt 1 ]]; then
         threads_per_job=1
     fi
        
-    # Options :
-    #  -g 600               : GOP size (nombre d images entre I-frames)
-    #  -keyint_min 600      : intervalle minimum entre keyframes (force I-frame régulière)
+    # Options de l'encodage (principales) :
+    #  -g 600               : taille GOP (nombre d'images entre I-frames)
+    #  -keyint_min 600      : intervalle minimum entre keyframes (force des I-frames régulières)
     #  -c:v libx265         : encodeur logiciel x265 (HEVC)
     #  -preset slow         : préréglage qualité/temps (lent = meilleure compression)
-    #  -tune fastdecode     : optimiser pour un décodage rapide
-    #  -pix_fmt yuv420p10le : FFormat de pixel YUV 4:2:0 avec 10 bits de profondeur de couleur maximum
+    #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
+    #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits
 
     # timestamp de départ portable (utilise `date` uniquement, pas de python)
     START_TS="$(date +%s)"
