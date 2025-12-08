@@ -1399,6 +1399,17 @@ _finalize_conversion_success() {
     local ffmpeg_log_temp="$6"
     local sizeBeforeMB="$7"
     
+    # If a global stop flag exists (user interrupted with Ctrl+C),
+    # do not mark the file as successfully converted nor transfer it.
+    if [[ -f "$STOP_FLAG" ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
+        fi
+        # Cleanup input/log temp files but keep the partial output for inspection
+        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+        return 1
+    fi
+
     if [[ "$NO_PROGRESS" != true ]]; then
         echo -e "  ${GREEN}✅ Fichier converti : $filename${NOCOLOR}"
     fi
