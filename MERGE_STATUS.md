@@ -25,8 +25,8 @@ This document tracks the merge of all feature branches into a single unified bra
 - **Status**: ⚠️ Partially merged
 - **Merged via**: PR #2 merged commit 0bdbe17 into main (b9817ff)
 - **Additional commits not yet in main**:
-  - `b70e2e3` (2025-12-08 14:55): "Updat TO DO" - Updates To-Do.rtf file
-  - `d9bbc70` (2025-12-08 15:01): "Correction de la logique de conversion" - 11 line additions to Conversion_Libx265.sh
+  - `b70e2e3b6cb94ca1e3a355922cf0cd088d2e26b6` (2025-12-08 14:55): "Updat TO DO" - Updates To-Do.rtf file
+  - `d9bbc7057b601718ebce31b29f64613940fd6ab4` (2025-12-08 15:01): "Correction de la logique de conversion" - 11 line additions to Conversion_Libx265.sh
 - **Key changes already in main**:
   - Thread allocation improvements based on file limits
   - SHA256 checksum computation for integrity verification
@@ -40,7 +40,7 @@ This document tracks the merge of all feature branches into a single unified bra
 
 ## Remaining Work
 
-The jobs-&-limite branch has 2 additional commits (b70e2e3, d9bbc70) that were committed AFTER PR #2 was merged. These commits contain:
+The jobs-&-limite branch has 2 additional commits (b70e2e3b6cb94ca1e3a355922cf0cd088d2e26b6, d9bbc7057b601718ebce31b29f64613940fd6ab4) that were committed AFTER PR #2 was merged. These commits contain:
 1. Updates to the To-Do.rtf file  
 2. Conversion logic fixes (11 additional lines in Conversion_Libx265.sh)
 

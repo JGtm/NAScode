@@ -50,10 +50,10 @@ These commits couldn't be automatically integrated due to:
 
 ## Files in This Branch
 
-- `Conversion_Libx265.sh` (73,258 bytes) - Main conversion script
-- `To-Do.rtf` (2,782 bytes) - Project task list
-- `Instructions-Mac.txt` (1,343 bytes) - Mac setup instructions
-- `README.md` (3,950 bytes) - Project documentation
+- `Conversion_Libx265.sh` (73258 bytes) - Main conversion script
+- `To-Do.rtf` (2782 bytes) - Project task list
+- `Instructions-Mac.txt` (1343 bytes) - Mac setup instructions
+- `README.md` (3950 bytes) - Project documentation
 - `.gitignore` (27 bytes) - Git ignore rules
 - `MERGE_STATUS.md` - Detailed branch merge status
 - `MERGE_COMPLETION_GUIDE.md` - Guide to complete the merge
