@@ -1142,6 +1142,41 @@ _get_temp_filename() {
     echo "$TMP_DIR/tmp_${md5p}_${RANDOM}${suffix}"
 }
 
+# Calculer le checksum SHA256 d'un fichier en utilisant les outils disponibles (portable)
+compute_sha256() {
+    local file="$1"
+    if [[ ! -f "$file" ]]; then
+        echo ""
+        return 0
+    fi
+
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum -- "$file" | awk '{print $1}'
+        return 0
+    fi
+    if command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 -- "$file" | awk '{print $1}'
+        return 0
+    fi
+    if command -v openssl >/dev/null 2>&1; then
+        openssl dgst -sha256 -- "$file" | awk '{print $2}'
+        return 0
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - <<PY "$file"
+import sys,hashlib
+f=sys.argv[1]
+with open(f,'rb') as fh:
+    h=hashlib.sha256(fh.read()).hexdigest()
+print(h)
+PY
+        return 0
+    fi
+
+    # fallback: empty
+    echo ""
+}
+
 _setup_temp_files_and_logs() {
     local filename="$1"
     local file_original="$2"
@@ -1216,29 +1251,46 @@ _execute_conversion() {
     local duration_secs="$4"
     local base_name="$5"
 
-    # Calcul du nombre de threads à allouer par job
+    # Calcul du nombre de threads à allouer par job.
+    # Principe : répartir les coeurs CPU disponibles (`nproc_compat`)
+    # entre le nombre de jobs parallèles souhaités (`PARALLEL_JOBS`).
+    # Si l'utilisateur a fixé `LIMIT_FILES` et que ce nombre est inférieur
+    # à `PARALLEL_JOBS`, on réduit le nombre de jobs concurrents afin
+    # d'allouer plus de threads par job (meilleure utilisation CPU).
     local cores
-    cores=$(nproc_compat)
-    local threads_per_job=$(( cores / PARALLEL_JOBS ))
+    local parallel_jobs
 
-    # If a processing limit is specified and is strictly less than 3,
-    # allocate that small limit as threads per job to favor concurrency
-    # when few files are requested (e.g. LIMIT_FILES=1 or 2).
-    if [[ "${LIMIT_FILES:-0}" -gt 0 && "${LIMIT_FILES:-0}" -lt 3 ]]; then
-        threads_per_job=$LIMIT_FILES
+    parallel_jobs=${PARALLEL_JOBS:-3}
+
+    # Si une limite de fichiers est définie et plus petite que le nombre
+    # de jobs parallèles, adapter le parallélisme à cette limite.
+    if [[ "${LIMIT_FILES:-0}" -gt 0 && "${LIMIT_FILES:-0}" -lt "$parallel_jobs" ]]; then
+        parallel_jobs=$LIMIT_FILES
     fi
 
+    cores=$(nproc_compat)
+
+    # Garanties : valeurs minimales >= 1
+    if [[ "$cores" -lt 1 ]]; then
+        cores=1
+    fi
+    if [[ "$parallel_jobs" -lt 1 ]]; then
+        parallel_jobs=1
+    fi
+
+    # Nombre de threads alloués par job (au moins 1)
+    local threads_per_job=$(( cores / parallel_jobs ))
     if [[ "$threads_per_job" -lt 1 ]]; then
         threads_per_job=1
     fi
        
-    # Options :
-    #  -g 600               : GOP size (nombre d images entre I-frames)
-    #  -keyint_min 600      : intervalle minimum entre keyframes (force I-frame régulière)
+    # Options de l'encodage (principales) :
+    #  -g 600               : taille GOP (nombre d'images entre I-frames)
+    #  -keyint_min 600      : intervalle minimum entre keyframes (force des I-frames régulières)
     #  -c:v libx265         : encodeur logiciel x265 (HEVC)
     #  -preset slow         : préréglage qualité/temps (lent = meilleure compression)
-    #  -tune fastdecode     : optimiser pour un décodage rapide
-    #  -pix_fmt yuv420p10le : FFormat de pixel YUV 4:2:0 avec 10 bits de profondeur de couleur maximum
+    #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
+    #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits
 
     # timestamp de départ portable (utilise `date` uniquement, pas de python)
     START_TS="$(date +%s)"
@@ -1350,10 +1402,74 @@ _finalize_conversion_success() {
     if [[ "$NO_PROGRESS" != true ]]; then
         echo -e "  ${GREEN}✅ Fichier converti : $filename${NOCOLOR}"
     fi
-    mv "$tmp_output" "$final_output" 2>/dev/null || return 1
-    rm "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
 
-    local sizeAfterMB=$(du -m "$final_output" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
+    # Calculer le checksum du fichier temporaire local avant le déplacement (si possible)
+    local checksum_before
+    checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
+
+    # Tentative robuste de déplacement / upload : mv (3 essais), puis cp+rm (3 essais), sinon repli local
+    local mv_ok=false
+    local try=0
+    local max_try=3
+    while [[ $try -lt $max_try ]]; do
+        if mv "$tmp_output" "$final_output" 2>/dev/null; then
+            mv_ok=true
+            break
+        fi
+        try=$((try+1))
+        sleep 2
+    done
+
+    local used_fallback_local=false
+    local cp_ok=false
+    if [[ "$mv_ok" != true ]]; then
+        # Essayer une copie suivie d'un effacement du temporaire
+        try=0
+        while [[ $try -lt $max_try ]]; do
+            if cp "$tmp_output" "$final_output" 2>/dev/null; then
+                cp_ok=true
+                rm -f "$tmp_output" 2>/dev/null || true
+                break
+            fi
+            try=$((try+1))
+            sleep 2
+        done
+    fi
+
+    if [[ "$mv_ok" != true && "$cp_ok" != true ]]; then
+        # Échec d'upload : déplacer le fichier vers un dossier local de repli dans le dossier utilisateur
+        # Par défaut utilise $HOME/Conversion_failed_uploads, peut être redéfini par la variable d'environnement FALLBACK_DIR
+        local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
+        mkdir -p "$local_fallback_dir" 2>/dev/null || true
+        if mv "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
+            used_fallback_local=true
+        else
+            # si mv échoue, essayer cp puis suppression
+            if cp "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
+                rm -f "$tmp_output" 2>/dev/null || true
+                used_fallback_local=true
+            else
+                # ultime repli : laisser le fichier temporaire en place
+                used_fallback_local=false
+            fi
+        fi
+    fi
+
+    # Nettoyer les artefacts temporaires liés à l'entrée et au log ffmpeg
+    rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+
+    # Déterminer le chemin réel du fichier final (remote ou fallback local)
+    local final_actual
+    if [[ "$mv_ok" == true || "$cp_ok" == true ]]; then
+        final_actual="$final_output"
+    elif [[ "$used_fallback_local" == true ]]; then
+        final_actual="$local_fallback_dir/$(basename "$final_output")"
+    else
+        # Aucun déplacement réussi : tenter d'utiliser le fichier temporaire restant
+        final_actual="$tmp_output"
+    fi
+
+    local sizeAfterMB=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
     local size_comparison="${sizeBeforeMB}MB → ${sizeAfterMB}MB"
 
     if [[ "$sizeAfterMB" -ge "$sizeBeforeMB" ]]; then
@@ -1361,9 +1477,39 @@ _finalize_conversion_success() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: FICHIER PLUS LOURD ($size_comparison). | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
         fi
     fi
-    
+
+    # Par défaut nous conservons la ligne SUCCESS existante.
+    # Vérification checksum après l'upload : effectuée pour tous les fichiers, résultat uniquement dans les logs.
     if [[ -n "$LOG_SUCCESS" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_output | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
+    fi
+    # calculer le checksum après le déplacement (sur le chemin réellement utilisé)
+    local checksum_after
+    checksum_after=$(compute_sha256 "$final_actual" 2>/dev/null || echo "")
+
+    local verify_status="UNKNOWN"
+    if [[ -n "$checksum_before" && -n "$checksum_after" ]]; then
+        if [[ "$checksum_before" == "$checksum_after" ]]; then
+            verify_status="OK"
+        else
+            verify_status="MISMATCH"
+        fi
+    elif [[ -n "$checksum_after" ]]; then
+        verify_status="AFTER_ONLY"
+    else
+        verify_status="NO_CHECKSUM"
+    fi
+
+    # Écrire uniquement dans les logs : SUCCESS + ligne VERIFY
+    if [[ -n "$LOG_SUCCESS" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeMB}MB->${sizeAfterMB}MB | checksum_before:${checksum_before:-NA} | checksum_after:${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
+    fi
+
+    # En cas de mismatch, journaliser dans le log d'erreur
+    if [[ "$verify_status" == "MISMATCH" ]]; then
+        if [[ -n "$LOG_ERROR" ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR verify_mismatch | $file_original -> $final_actual | before=$checksum_before after=$checksum_after" >> "$LOG_ERROR" 2>/dev/null || true
+        fi
     fi
 }
 
