@@ -1746,8 +1746,16 @@ prepare_dynamic_queue() {
         done
     }
     _consumer_run &
+    local consumer_pid=$!
 
-    wait
+    # Attendre que le consumer termine
+    wait "$consumer_pid" 2>/dev/null || true
+    
+    # Signaler au writer FIFO qu'il doit se terminer
+    touch "$STOP_FLAG" 2>/dev/null || true
+    
+    # Attendre que le writer se termine proprement
+    wait 2>/dev/null || true
     sleep 1
 }
 
