@@ -346,9 +346,17 @@ EOF
 ###########################################################
 
 cleanup() {
+    # Afficher le message d'interruption immédiatement (avant de rendre la main au shell)
+    if [[ ! -f "$STOP_FLAG" ]]; then
+        echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
+    fi
     touch "$STOP_FLAG"
-    rm -f "$LOCKFILE"
+    # Attendre brièvement que les processus en arrière-plan détectent le STOP_FLAG
+    sleep 0.3
     kill $(jobs -p) 2>/dev/null || true
+    # Attendre que les jobs se terminent pour éviter les messages après le prompt
+    wait 2>/dev/null || true
+    rm -f "$LOCKFILE"
     # Nettoyage des artefacts de queue dynamique
     if [[ -n "${WORKFIFO:-}" ]]; then
         rm -f "${WORKFIFO}" 2>/dev/null || true
@@ -1581,12 +1589,9 @@ _finalize_conversion_success() {
     local ffmpeg_log_temp="$6"
     local sizeBeforeMB="$7"
 
-    # Si un marqueur d'arrêt global existe, ne pas finaliser
+    # Si un marqueur d'arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
     if [[ -f "$STOP_FLAG" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
-        fi
-        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+        rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
         return 1
     fi
 
