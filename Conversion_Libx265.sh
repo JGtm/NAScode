@@ -20,7 +20,7 @@ readonly STOP_FLAG="/tmp/conversion_stop_flag"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ----- Aides de compatibilité pour macOS / Homebrew -----
-# Si l'utilisateur a installé GNU coreutils / gawk via Homebrew, privilégier leur répertoire gnubin
+# Si l utilisateur a installé GNU coreutils / gawk via Homebrew, privilégier leur répertoire gnubin
 if command -v brew >/dev/null 2>&1; then
     core_gnubin="$(brew --prefix coreutils 2>/dev/null)/libexec/gnubin"
     if [[ -d "$core_gnubin" ]]; then
@@ -36,15 +36,29 @@ if command -v brew >/dev/null 2>&1; then
     fi
 fi
 
+# ----- Détection unique des outils disponibles -----
+# Ces variables sont évaluées une seule fois au démarrage pour éviter
+# des appels répétitifs à `command -v` dans les fonctions utilitaires.
+HAS_MD5SUM=$(command -v md5sum >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_MD5=$(command -v md5 >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_PYTHON3=$(command -v python3 >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_NPROC=$(command -v nproc >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_GETCONF=$(command -v getconf >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_SYSCTL=$(command -v sysctl >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_DATE_NANO=$(date +%s.%N >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_PERL_HIRES=$(perl -MTime::HiRes -e '1' 2>/dev/null && echo 1 || echo 0)
+# Détecter si awk supporte systime() (GNU awk)
+HAS_GAWK=$(awk 'BEGIN { print systime() }' 2>/dev/null | grep -qE '^[0-9]+$' && echo 1 || echo 0)
+
 # préfixe md5 portable (8 premiers caractères) pour créer les noms temporaires
 compute_md5_prefix() {
     local input="$1"
-    if command -v md5sum >/dev/null 2>&1; then
+    if [[ "$HAS_MD5SUM" -eq 1 ]]; then
         printf "%s" "$input" | md5sum | awk '{print substr($1,1,8)}'
-    elif command -v md5 >/dev/null 2>&1; then
+    elif [[ "$HAS_MD5" -eq 1 ]]; then
         # Sur macOS, `md5` n'affiche que le digest pour stdin ; gestion robuste
         printf "%s" "$input" | md5 | awk '{print substr($1,1,8)}'
-    elif command -v python3 >/dev/null 2>&1; then
+    elif [[ "$HAS_PYTHON3" -eq 1 ]]; then
         printf "%s" "$input" | python3 - <<PY | head -1
 import sys,hashlib
 print(hashlib.md5(sys.stdin.read().encode()).hexdigest()[:8])
@@ -57,14 +71,14 @@ PY
 
 # compatibilité pour `nproc`
 nproc_compat() {
-    if command -v nproc >/dev/null 2>&1; then
+    if [[ "$HAS_NPROC" -eq 1 ]]; then
         nproc
         return
     fi
-    if command -v getconf >/dev/null 2>&1; then
+    if [[ "$HAS_GETCONF" -eq 1 ]]; then
         getconf _NPROCESSORS_ONLN 2>/dev/null && return
     fi
-    if command -v sysctl >/dev/null 2>&1; then
+    if [[ "$HAS_SYSCTL" -eq 1 ]]; then
         sysctl -n hw.ncpu 2>/dev/null && return
     fi
     echo 1
@@ -72,12 +86,14 @@ nproc_compat() {
 
 # horodatage haute résolution (secondes avec fraction)
 now_ts() {
-    if date +%s.%N >/dev/null 2>&1; then
+    if [[ "$HAS_DATE_NANO" -eq 1 ]]; then
         date +%s.%N
-    elif command -v python3 >/dev/null 2>&1; then
+    elif [[ "$HAS_PYTHON3" -eq 1 ]]; then
         python3 -c 'import time; print(time.time())'
-    else
+    elif [[ "$HAS_PERL_HIRES" -eq 1 ]]; then
         perl -MTime::HiRes -e 'printf("%.6f\n", Time::HiRes::time)'
+    else
+        date +%s
     fi
 }
 
@@ -95,7 +111,7 @@ PARALLEL_JOBS=3
 NO_PROGRESS=false
 CONVERSION_MODE="serie"
 
-# Mode de tri pour la construction de la file d'attente (optionnel)
+# Mode de tri pour la construction de la file d attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
 #   - size_desc  : Trier par taille décroissante (par défaut, privilégie gros fichiers)
 #   - size_asc   : Trier par taille croissante
@@ -118,6 +134,33 @@ SUFFIX_STRING="_x265"  # Suffixe par défaut pour les fichiers de sortie
 
 # Exclusions par défaut
 EXCLUDES=("./logs" "./*.sh" "./*.txt" "Converted" "$SCRIPT_DIR")
+
+# Regex pré-compilée des exclusions (construite au démarrage pour optimiser is_excluded)
+_build_excludes_regex() {
+    local regex=""
+    for ex in "${EXCLUDES[@]}"; do
+        # Échapper les caractères spéciaux regex et convertir * en .*
+        local escaped
+        escaped=$(printf '%s' "$ex" | sed 's/[][\/.^$]/\\&/g; s/\*/\.\*/g')
+        if [[ -n "$regex" ]]; then
+            regex="${regex}|^${escaped}"
+        else
+            regex="^${escaped}"
+        fi
+    done
+    echo "$regex"
+}
+EXCLUDES_REGEX="$(_build_excludes_regex)"
+
+# Fonction utilitaire : compter les éléments dans un fichier null-separated
+count_null_separated() {
+    local file="$1"
+    if [[ -f "$file" ]]; then
+        tr -cd '\0' < "$file" | wc -c
+    else
+        echo 0
+    fi
+}
 
 ###########################################################
 # COULEURS ANSI
@@ -200,7 +243,7 @@ set_conversion_mode_parameters() {
             exit 1
             ;;
     esac
-    # Valeurs dérivées utilisées par ffmpeg/x265 (ffmpeg attend suffixe 'k', x265 attend kbps sans suffixe)
+    # Valeurs dérivées utilisées par ffmpeg/x265 (ffmpeg attend suffixe k, x265 attend kbps sans suffixe)
     MAXRATE_FFMPEG="${MAXRATE_KBPS}k"
     BUFSIZE_FFMPEG="${BUFSIZE_KBPS}k"
     X265_VBV_PARAMS="vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}"
@@ -346,15 +389,20 @@ EOF
 ###########################################################
 
 cleanup() {
+    # Afficher le message d interruption immédiatement (avant de rendre la main au shell)
+    if [[ ! -f "$STOP_FLAG" ]]; then
+        echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
+    fi
     touch "$STOP_FLAG"
-    rm -f "$LOCKFILE"
+    # Attendre brièvement que les processus en arrière-plan détectent le STOP_FLAG
+    sleep 0.3
     kill $(jobs -p) 2>/dev/null || true
+    # Attendre que les jobs se terminent pour éviter les messages après le prompt
+    wait 2>/dev/null || true
+    rm -f "$LOCKFILE"
     # Nettoyage des artefacts de queue dynamique
     if [[ -n "${WORKFIFO:-}" ]]; then
         rm -f "${WORKFIFO}" 2>/dev/null || true
-    fi
-    if [[ -n "${NEXT_MASTER_POS_FILE:-}" ]]; then
-        rm -f "${NEXT_MASTER_POS_FILE}" "${TOTAL_MASTER_FILE:-}" 2>/dev/null || true
     fi
     # Suppression des artefacts du writer FIFO si présents
     if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
@@ -381,6 +429,7 @@ check_lock() {
     echo $$ > "$LOCKFILE"
 }
 
+################## IDENTIFIER LE BESOIN ##################
 # Helpers portables pour verrou (lock) / déverrouillage (unlock)
 # Utilisation : lock <chemin> [timeout_seconds]
 # Si `flock` est disponible il est privilégié, sinon on utilise un verrou par répertoire (mkdir).
@@ -510,7 +559,7 @@ validate_queue_file() {
         return 1
     fi
     
-    local file_count=$(tr -cd '\0' < "$queue_file" | wc -c)
+    local file_count=$(count_null_separated "$queue_file")
     if [[ $file_count -eq 0 ]]; then
         echo -e "${RED}ERREUR : Le fichier queue n'a pas le format attendu (fichiers séparés par null).${NOCOLOR}"
         return 1
@@ -535,12 +584,10 @@ initialize_directories() {
     for log_file in "$LOG_SUCCESS" "$LOG_SKIPPED" "$LOG_ERROR" "$SUMMARY_FILE" "$LOG_PROGRESS"; do
         touch "$log_file"
     done
-    # Le log de comparaison dry-run n'est créé que si on est en mode dry-run
+    # Le log de comparaison dry-run n est créé que si on est en mode dry-run
     if [[ "$DRYRUN" == true ]]; then
         touch "$LOG_DRYRUN_COMPARISON"
     fi
-    # Log pour update_queue
-    touch "$LOG_DIR/update_queue.log"
 }
 
 ###########################################################
@@ -549,16 +596,17 @@ initialize_directories() {
 
 is_excluded() {
     local f="$1"
-    for ex in "${EXCLUDES[@]}"; do
-        if [[ "$f" == "$ex"* ]]; then 
-            return 0
-        fi
-    done
+    # Utilise la regex pré-compilée pour une vérification O(1) au lieu de O(n)
+    if [[ -n "$EXCLUDES_REGEX" ]] && [[ "$f" =~ $EXCLUDES_REGEX ]]; then
+        return 0
+    fi
     return 1
 }
 
+# Pure Bash - évite un fork vers sed
 clean_number() {
-    echo "$1" | sed 's/[^0-9]//g'
+    local val="${1//[!0-9]/}"
+    echo "${val:-0}"
 }
 
 # custom_pv : remplacement simple et sûr pour les binaires de `pv` utilisant `dd` + interrogation
@@ -566,6 +614,37 @@ clean_number() {
 # Utilisation : custom_pv <src> <dst> [couleur]
 # Remarques : utilise `dd` et `stat` ; affiche la progression sur `stderr` (colorée) et termine
 # à 100% à la fin.
+
+# Script AWK partagé pour l'affichage de progression (évite la duplication)
+# Arguments attendus: copied, total, start, now, width, color, nocolor, newline (0 ou 1)
+readonly AWK_PROGRESS_SCRIPT='
+function hr(bytes,   units,i,div,val){
+    units[0]="B"; units[1]="KiB"; units[2]="MiB"; units[3]="GiB"; units[4]="TiB";
+    val=bytes+0;
+    for(i=4;i>=0;i--){ div = 2^(10*i); if(val>=div){ return sprintf("%.2f%s", val/div, units[i]) } }
+    return sprintf("%dB", bytes);
+}
+function hms(secs,   s,h,m){ s=int(secs+0.5); h=int(s/3600); m=int((s%3600)/60); s=s%60; return sprintf("%d:%02d:%02d", h, m, s); }
+BEGIN{
+    elapsed = (now - start) + 0.0;
+    if(elapsed <= 0) elapsed = 0.000001;
+    speed = (copied / elapsed);
+    pct = (total>0 ? int( (copied*100)/total ) : (newline ? 100 : 0));
+    if(pct>100) pct=100;
+    filled = int(pct * width / 100);
+    bar="";
+    for(i=0;i<filled;i++) bar=bar"=";
+    if(filled<width) bar=bar">"; for(i=filled+1;i<width;i++) bar=bar" ";
+    line = sprintf("%s [%5.2fGiB/s] [%s] %3d%% %s/%s", hms(elapsed), (speed/(1024*1024*1024)), bar, pct, sprintf("%6s", hr(copied)), sprintf("%6s", hr(total)));
+    if (newline) {
+        printf("\r\033[K%s%s%s\n", color, line, nocolor);
+    } else {
+        printf("\r\033[K%s%s%s", color, line, nocolor);
+    }
+    fflush();
+}
+'
+
 custom_pv() {
     local src="$1"
     local dst="$2"
@@ -591,65 +670,27 @@ custom_pv() {
 
     start_ts=$(now_ts)
 
-    # Interroger la progression pendant l'exécution de dd
+    # Interroger la progression pendant l exécution de dd
     while kill -0 "$dd_pid" 2>/dev/null; do
         copied=$(stat -c%s -- "$dst" 2>/dev/null || echo 0)
         current_ts=$(now_ts)
 
-        # Calculer et afficher une ligne de progression lisible via awk (avec colorisation)
-        awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" -v width=40 -v color="$color" -v nocolor="$NOCOLOR" '
-        function hr(bytes,   units,i,div,val){
-            units[0]="B"; units[1]="KiB"; units[2]="MiB"; units[3]="GiB"; units[4]="TiB";
-            val=bytes+0;
-            for(i=4;i>=0;i--){ div = 2^(10*i); if(val>=div){ return sprintf("%.2f%s", val/div, units[i]) } }
-            return sprintf("%dB", bytes);
-        }
-        function hms(secs,   s,h,m){ s=int(secs+0.5); h=int(s/3600); m=int((s%3600)/60); s=s%60; return sprintf("%d:%02d:%02d", h, m, s); }
-        BEGIN{
-            elapsed = (now - start) + 0.0;
-            if(elapsed <= 0) elapsed = 0.000001;
-            speed = (copied / elapsed);
-            pct = (total>0 ? int( (copied*100)/total ) : 0);
-            if(pct>100) pct=100;
-            filled = int(pct * width / 100);
-            bar="";
-            for(i=0;i<filled;i++) bar=bar"=";
-            if(filled<width) bar=bar">"; for(i=filled+1;i<width;i++) bar=bar" ";
-            printf("\r\033[K%s%s%s", color, sprintf("%s [%5.2fGiB/s] [%s] %3d%% %s/%s", hms(elapsed), (speed/(1024*1024*1024)), bar, pct, sprintf("%6s", hr(copied)), sprintf("%6s", hr(total))), nocolor);
-            
-            fflush();
-        }
-        ' >&2
+        # Afficher la progression (sans saut de ligne)
+        awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" \
+            -v width=40 -v color="$color" -v nocolor="$NOCOLOR" -v newline=0 \
+            "$AWK_PROGRESS_SCRIPT" >&2
 
         sleep 0.5
     done
 
     wait "$dd_pid" 2>/dev/null || true
 
-    # valeur finale
+    # valeur finale (avec saut de ligne)
     copied=$(stat -c%s -- "$dst" 2>/dev/null || echo 0)
     current_ts=$(now_ts)
-    awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" -v width=40 -v color="$color" -v nocolor="$NOCOLOR" '
-    function hr(bytes,   units,i,div,val){
-        units[0]="B"; units[1]="KiB"; units[2]="MiB"; units[3]="GiB"; units[4]="TiB";
-        val=bytes+0;
-        for(i=4;i>=0;i--){ div = 2^(10*i); if(val>=div){ return sprintf("%.2f%s", val/div, units[i]) } }
-        return sprintf("%dB", bytes);
-    }
-    function hms(secs,   s,h,m){ s=int(secs+0.5); h=int(s/3600); m=int((s%3600)/60); s=s%60; return sprintf("%d:%02d:%02d", h, m, s); }
-    BEGIN{
-        elapsed = (now - start) + 0.0;
-        if(elapsed <= 0) elapsed = 0.000001;
-        speed = (copied / elapsed);
-        pct = (total>0 ? int( (copied*100)/total ) : 100);
-        if(pct>100) pct=100;
-        filled = int(pct * width / 100);
-        bar="";
-        for(i=0;i<filled;i++) bar=bar"=";
-        if(filled<width) bar=bar">"; for(i=filled+1;i<width;i++) bar=bar" ";
-        printf("\r\033[K%s%s%s\n", color, sprintf("%s [%5.2fGiB/s] [%s] %3d%% %s/%s", hms(elapsed), (speed/(1024*1024*1024)), bar, pct, sprintf("%6s", hr(copied)), sprintf("%6s", hr(total))), nocolor);
-    }
-    ' >&2
+    awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" \
+        -v width=40 -v color="$color" -v nocolor="$NOCOLOR" -v newline=1 \
+        "$AWK_PROGRESS_SCRIPT" >&2
 
     return 0
 }
@@ -994,8 +1035,7 @@ _generate_index() {
     fi
     
     # Sauvegarder l INDEX (fichier permanent, non trié, format taille\tchemin)
-    mv "$index_tmp" "$INDEX"
-    
+    mv "$index_tmp" "$INDEX" 
     cut -f2- "$INDEX" > "$INDEX_READABLE"
 }
 
@@ -1062,14 +1102,14 @@ _apply_queue_limitations() {
     mv "$tmp_limit" "$QUEUE"
 }
 
-_validate_queue_not_empty() {
+_validate_queue_not_empty() {										   
     if ! [[ -s "$QUEUE" ]]; then
         echo "Aucun fichier à traiter trouvé (vérifiez les filtres ou la source)."
         exit 0
     fi
 }
 
-_display_random_mode_selection() {
+_display_random_mode_selection() {													
     if [[ "$RANDOM_MODE" != true ]] || [[ "$NO_PROGRESS" == true ]]; then
         return 0
     fi
@@ -1079,79 +1119,27 @@ _display_random_mode_selection() {
     echo ""
 }
 
-_create_readable_queue_copy() {
+_create_readable_queue_copy() {																							  
     tr '\0' '\n' < "$QUEUE" > "$LOG_DIR/Queue_readable_${EXECUTION_TIMESTAMP}.txt"
 }
 
-# update_queue: lorsque un fichier est SKIPPÉ, ajouter le prochain candidat depuis la queue complète
-# pour maintenir le nombre de fichiers demandés par --limit
-update_queue() {
-    local reason="${1:-}"
-
-    # Ne rien faire si pas de limitation ou si pas de queue master
-    if [[ "$LIMIT_FILES" -le 0 ]]; then
-        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | update_queue: skip (no limit)\n" "$(date +'%Y-%m-%d %H:%M:%S')" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-        fi
-        return 0
+# Incrémenter le compteur de fichiers traités (thread-safe via lock)
+increment_processed_count() {
+    local lockdir="$LOG_DIR/processed_count.lock"
+    # Mutex simple via mkdir
+    local attempts=0
+    while ! mkdir "$lockdir" 2>/dev/null; do
+        sleep 0.05
+        attempts=$((attempts + 1))
+        if [[ $attempts -gt 100 ]]; then break; fi  # timeout 5s
+    done
+    
+    local current=0
+    if [[ -f "$PROCESSED_COUNT_FILE" ]]; then
+        current=$(cat "$PROCESSED_COUNT_FILE" 2>/dev/null || echo 0)
     fi
-
-    local no_fifo=false
-    if [[ -z "${WORKFIFO:-}" ]] || [[ ! -p "$WORKFIFO" ]]; then
-        no_fifo=true
-        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | update_queue: WORKFIFO missing or not a pipe; will fallback to appending to QUEUE. WORKFIFO=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "${WORKFIFO:-}" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-        fi
-        # don't return: try fallback below (append to QUEUE)
-    fi
-
-    local lockdir="$LOG_DIR/update_queue.lock"
-    # simple mutex par création de dossier
-    while ! mkdir "$lockdir" 2>/dev/null; do sleep 0.01; done
-
-    local nextpos=0
-    if [[ -f "$NEXT_MASTER_POS_FILE" ]]; then
-        nextpos=$(cat "$NEXT_MASTER_POS_FILE") || nextpos=0
-    fi
-    local total=0
-    if [[ -f "$TOTAL_MASTER_FILE" ]]; then
-        total=$(cat "$TOTAL_MASTER_FILE") || total=0
-    fi
-
-    if [[ $nextpos -lt $total ]]; then
-        # Récupérer l'élément suivant (convertir la master queue en lignes pour sed)
-        local candidate
-        candidate=$(tr '\0' '\n' < "$MASTER_QUEUE" | sed -n "$((nextpos+1))p") || candidate=""
-        if [[ -n "$candidate" ]]; then
-            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                printf "%s | update_queue: selected candidate pos=%d -> %s (reason=%s)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$((nextpos+1))" "$candidate" "${reason:-}" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-            fi
-            if [[ "$no_fifo" == true ]]; then
-                # fallback : ajouter atomiquement à la queue active (NUL separated)
-                if [[ -f "$QUEUE" ]]; then
-                    printf '%s\0' "$candidate" >> "$QUEUE"
-                else
-                    printf '%s\0' "$candidate" > "$QUEUE"
-                fi
-                if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                    printf "%s | update_queue: appended candidate to QUEUE (fallback) : %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-                fi
-            else
-                # Écrire atomiquement dans le FIFO (en arrière-plan pour ne pas bloquer l'appelant)
-                printf '%s\0' "$candidate" > "$WORKFIFO" &
-            fi
-        else
-            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                printf "%s | update_queue: no candidate found at pos=%d (total=%d)\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$((nextpos+1))" "$total" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-            fi
-        fi
-        local newpos=$((nextpos+1))
-        echo "$newpos" > "$NEXT_MASTER_POS_FILE"
-        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | update_queue: NEXT_MASTER_POS_FILE updated -> %d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$newpos" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-        fi
-    fi
-
+    echo $((current + 1)) > "$PROCESSED_COUNT_FILE"
+    
     rmdir "$lockdir" 2>/dev/null || true
 }
 
@@ -1199,10 +1187,6 @@ _check_output_exists() {
         if [[ -n "$LOG_SKIPPED" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
         fi
-        # Si une limite est en place, alimenter la queue avec le prochain candidat
-        if [[ "$LIMIT_FILES" -gt 0 ]]; then
-            update_queue "skip" || true
-        fi
         return 0
     fi
     return 1
@@ -1228,7 +1212,7 @@ _get_temp_filename() {
     echo "$TMP_DIR/tmp_${md5p}_${RANDOM}${suffix}"
 }
 
-# Calculer le checksum SHA256 d'un fichier en utilisant les outils disponibles (portable)
+# Calculer le checksum SHA256 d un fichier en utilisant les outils disponibles (portable)
 compute_sha256() {
     local file="$1"
     if [[ ! -f "$file" ]]; then
@@ -1259,7 +1243,7 @@ PY
         return 0
     fi
 
-    # fallback: vide si aucun outil n'est disponible
+    # fallback: vide si aucun outil n est disponible
     echo ""
 }
 
@@ -1338,11 +1322,11 @@ _execute_conversion() {
     local base_name="$5"
 
     # Calcul du nombre de threads à allouer par job.
-    # Principe : répartir les coeurs CPU disponibles (`nproc_compat`)
-    # entre le nombre de jobs parallèles souhaités (`PARALLEL_JOBS`).
-    # Si l'utilisateur a fixé `LIMIT_FILES` et que ce nombre est inférieur
-    # à `PARALLEL_JOBS`, on réduit le nombre de jobs concurrents afin
-    # d'allouer plus de threads par job (meilleure utilisation CPU).
+    # Principe : répartir les coeurs CPU disponibles (nproc_compat)
+    # entre le nombre de jobs parallèles souhaités (PARALLEL_JOBS).
+    # Si l utilisateur a fixé LIMIT_FILES et que ce nombre est inférieur
+    # à PARALLEL_JOBS, on réduit le nombre de jobs concurrents afin
+    # d allouer plus de threads par job (meilleure utilisation CPU).
     local cores
     local parallel_jobs
 
@@ -1370,15 +1354,15 @@ _execute_conversion() {
         threads_per_job=1
     fi
        
-    # Options de l'encodage (principales) :
-    #  -g 600               : taille GOP (nombre d'images entre I-frames)
+    # Options de l encodage (principales) :
+    #  -g 600               : taille GOP (nombre d images entre I-frames)
     #  -keyint_min 600      : intervalle minimum entre keyframes (force des I-frames régulières)
     #  -c:v libx265         : encodeur logiciel x265 (HEVC)
     #  -preset slow         : préréglage qualité/temps (lent = meilleure compression)
-    #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
+    #  -tune fastdecode     : optimiser l encodeur pour un décodage plus rapide
     #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits
 
-    # timestamp de départ portable (utilise `date` uniquement, pas de python)
+    # timestamp de départ portable
     START_TS="$(date +%s)"
 
     # Exécute ffmpeg et pipe vers awk pour affichage de progression.
@@ -1389,6 +1373,16 @@ _execute_conversion() {
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
     local x265_params="pools=${threads_per_job}:${x265_vbv}"
+
+    # Script AWK adapté selon la disponibilité de systime() (gawk vs awk BSD)
+    local awk_time_func
+    if [[ "$HAS_GAWK" -eq 1 ]]; then
+        # GNU awk : utilise systime() (pas de fork)
+        awk_time_func='function get_time() { return systime() }'
+    else
+        # awk BSD (macOS) : fallback vers fork date (moins optimal mais compatible)
+        awk_time_func='function get_time() { cmd="date +%s"; cmd | getline t; close(cmd); return t }'
+    fi
 
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         -hwaccel $HWACCEL \
@@ -1401,18 +1395,20 @@ _execute_conversion() {
         -map 0 -f matroska \
         "$tmp_output" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" '
+    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" "
+        $awk_time_func
         BEGIN {
             duration = DURATION + 0;
             if (duration < 1) exit;
             start = START + 0;
             last_update = 0;
-            refresh_interval = 60;
+            refresh_interval = 10;
+            speed = 1;
         }
 
         /out_time_us=/ {
-            if (match($0, /[0-9]+/)) {
-                current_time = substr($0, RSTART, RLENGTH) / 1000000;
+            if (match(\$0, /[0-9]+/)) {
+                current_time = substr(\$0, RSTART, RLENGTH) / 1000000;
             } else {
                 current_time = 0;
             }
@@ -1420,7 +1416,7 @@ _execute_conversion() {
             percent = (current_time / duration) * 100;
             if (percent > 100) percent = 100;
 
-            cmd = "date +%s"; cmd | getline now; close(cmd);
+            now = get_time();
             elapsed = now - start;
 
             speed = (elapsed > 0 ? current_time / elapsed : 1);
@@ -1432,12 +1428,11 @@ _execute_conversion() {
             m = int((eta % 3600) / 60);
             s = int(eta % 60);
 
-            eta_str = sprintf("%02d:%02d:%02d", h, m, s);
+            eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
 
-            # Recalcule maintenant (entier) pour contrôler les rafraîchissements
-            cmd = "date +%s"; cmd | getline now; close(cmd);
-            if (NOPROG != "true" && (now - last_update >= refresh_interval || percent >= 99)) {
-                printf "  ... [%-40.40s] %5.1f%% | ETA: %s | Speed: %.2fx\n",
+            # Contrôle des rafraîchissements (une seule lecture de now suffit)
+            if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
+                printf \"  ... [%-40.40s] %5.1f%% | ETA: %s | Speed: %.2fx\\n\",
                        CURRENT_FILE_NAME, percent, eta_str, speed;
                 fflush();
                 last_update = now;
@@ -1445,13 +1440,13 @@ _execute_conversion() {
         }
 
         /progress=end/ {
-            if (NOPROG != "true") {
-                printf "  ... [%-40.40s] %5s | ETA: 00:00:00 | Speed: %.2fx\n",
-                    CURRENT_FILE_NAME, "100%", speed;
+            if (NOPROG != \"true\") {
+                printf \"  ... [%-40.40s] %5s | ETA: 00:00:00 | Speed: %.2fx\\n\",
+                    CURRENT_FILE_NAME, \"  100%\", speed;
                 fflush();
             }
         }
-    '
+    "
 
     # Récupère les codes de sortie du pipeline (0 = succès).
     local ffmpeg_rc=0
@@ -1524,7 +1519,7 @@ _finalize_try_move() {
         return 0
     fi
 
-    # Ultime repli : laisser le temporaire et l'utiliser
+    # Ultime repli : laisser le temporaire et l utiliser
     printf "%s" "$tmp_output"
     return 2
 }
@@ -1539,7 +1534,7 @@ _finalize_log_and_verify() {
     local checksum_before="$5"
     local sizeBeforeMB="$6"
 
-    # Nettoyer les artefacts temporaires liés à l'entrée et au log ffmpeg
+    # Nettoyer les artefacts temporaires liés à l entrée et au log ffmpeg
     rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
 
     # Taille après (en MB)
@@ -1583,7 +1578,7 @@ _finalize_log_and_verify() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeMB}MB->${sizeAfterMB}MB | checksum_before:${checksum_before:-NA} | checksum_after:${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
-    # En cas de mismatch, journaliser dans le log d'erreur
+    # En cas de mismatch, journaliser dans le log d erreur
     if [[ "$verify_status" == "MISMATCH" ]]; then
         if [[ -n "$LOG_ERROR" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR verify_mismatch | $file_original -> $final_actual | before=$checksum_before after=$checksum_after" >> "$LOG_ERROR" 2>/dev/null || true
@@ -1591,7 +1586,7 @@ _finalize_log_and_verify() {
     fi
 }
 
-# Fonction principale de finalisation (regroupe l'affichage, le déplacement, le logging)
+# Fonction principale de finalisation (regroupe l affichage, le déplacement, le logging)
 _finalize_conversion_success() {
     local filename="$1"
     local file_original="$2"
@@ -1601,17 +1596,14 @@ _finalize_conversion_success() {
     local ffmpeg_log_temp="$6"
     local sizeBeforeMB="$7"
 
-    # Si un marqueur d'arrêt global existe, ne pas finaliser
+    # Si un marqueur d arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
     if [[ -f "$STOP_FLAG" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️ Conversion interrompue : $filename (fichier partiel non transféré)${NOCOLOR}"
-        fi
-        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+        rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
         return 1
     fi
 
     if [[ "$NO_PROGRESS" != true ]]; then
-        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
+        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l appel à ffmpeg)
         local elapsed_str="N/A"
         if [[ -n "${START_TS:-}" ]]; then
             local end_ts
@@ -1663,118 +1655,71 @@ _finalize_conversion_error() {
     rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null
 }
 
-# Préparer la queue dynamique et les fichiers d'état (MASTER_QUEUE, NEXT/TOTAL)
+# Préparer une queue dynamique (FIFO) pour le traitement parallèle
 prepare_dynamic_queue() {
-    MASTER_QUEUE="$QUEUE.full"
-    NEXT_MASTER_POS_FILE="$LOG_DIR/next_master_pos_${EXECUTION_TIMESTAMP}"
-    TOTAL_MASTER_FILE="$LOG_DIR/total_master_${EXECUTION_TIMESTAMP}"
     WORKFIFO="$LOG_DIR/queue_fifo_${EXECUTION_TIMESTAMP}"
     FIFO_WRITER_PID="$LOG_DIR/fifo_writer_pid_${EXECUTION_TIMESTAMP}"
     FIFO_WRITER_READY="$LOG_DIR/fifo_writer.ready_${EXECUTION_TIMESTAMP}"
-
-    # Total d'éléments dans la master queue
-    local total_master=0
-    if [[ -f "$MASTER_QUEUE" ]]; then
-        total_master=$(tr -cd '\0' < "$MASTER_QUEUE" | wc -c) || total_master=0
-    fi
-    echo "$total_master" > "$TOTAL_MASTER_FILE"
-    if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-        printf "%s | prepare_dynamic_queue: TOTAL_MASTER_FILE='%s' value=%d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$TOTAL_MASTER_FILE" "$total_master" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-    fi
-
-    # Position initiale (nombre d'éléments déjà présents dans la queue limitée)
-    local initial_in_queue=0
+    
+    # Fichier compteur : nombre de fichiers traités (succès + erreur + skip)
+    PROCESSED_COUNT_FILE="$LOG_DIR/processed_count_${EXECUTION_TIMESTAMP}"
+    echo "0" > "$PROCESSED_COUNT_FILE"
+    export PROCESSED_COUNT_FILE
+    
+    # Nombre de fichiers à traiter
+    local target_count=0
     if [[ -f "$QUEUE" ]]; then
-        initial_in_queue=$(tr -cd '\0' < "$QUEUE" | wc -c) || initial_in_queue=0
+        target_count=$(count_null_separated "$QUEUE")
     fi
-    echo "$initial_in_queue" > "$NEXT_MASTER_POS_FILE"
-    if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-        printf "%s | prepare_dynamic_queue: NEXT_MASTER_POS_FILE='%s' value=%d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$NEXT_MASTER_POS_FILE" "$initial_in_queue" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-    fi
+    # Fichier cible pour le writer
+    TARGET_COUNT_FILE="$LOG_DIR/target_count_${EXECUTION_TIMESTAMP}"
+    echo "$target_count" > "$TARGET_COUNT_FILE"
+    export TARGET_COUNT_FILE
 
-    # Exporter pour les workers
-    export MASTER_QUEUE WORKFIFO NEXT_MASTER_POS_FILE TOTAL_MASTER_FILE
-}
-
-# Créer le FIFO et lancer le writer persistant en arrière-plan
-start_fifo_writer() {
+    # Créer le FIFO et lancer un writer de fond
     rm -f "$WORKFIFO" 2>/dev/null || true
     mkfifo "$WORKFIFO"
+    
+    # Writer : écrit la queue initiale puis attend que tous les fichiers soient traités
     (
-        # Ouvre la FIFO en lecture-écriture pour éviter le blocage en l'absence de lecteur
         exec 3<> "$WORKFIFO"
-        # écrire le PID du writer et marquer prêt pour que update_queue détecte la disponibilité
-        if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
-            printf "%d" "$$" > "$FIFO_WRITER_PID" 2>/dev/null || true
-        fi
-
-        # Écrire le contenu initial (NUL séparés) depuis le fichier QUEUE si présent
+        # Écrire le contenu initial (NUL séparés)
         if [[ -f "$QUEUE" ]]; then
             cat "$QUEUE" >&3
         fi
-
-        # Si dry-run, on injecte initialement et on sort
-        if [[ "$DRYRUN" == true ]]; then
-            if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
-                touch "$FIFO_WRITER_READY" 2>/dev/null || true
-            fi
-            if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                printf "%s | start_fifo_writer: FIFO writer wrote initial queue and exiting (dry-run)\n" "$(date +'%Y-%m-%d %H:%M:%S')" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-            fi
-            exec 3>&-
-            exit 0
-        fi
-
-        # signaler prêt
-        if [[ -n "${FIFO_WRITER_READY:-}" ]]; then
-            touch "$FIFO_WRITER_READY" 2>/dev/null || true
-        fi
-
-        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-            printf "%s | start_fifo_writer: FIFO writer started (WORKFIFO=%s) pid=%s ready=%s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$WORKFIFO" "$(cat ${FIFO_WRITER_PID} 2>/dev/null || echo '')" "$FIFO_WRITER_READY" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-        fi
-
-        # Boucle active: surveille NEXT_MASTER_POS_FILE pour écrire dynamiquement
-        # les candidats issus de MASTER_QUEUE lorsque update_queue incrémente la position.
-        local last_sent_pos=0
-        if [[ -f "${NEXT_MASTER_POS_FILE:-}" ]]; then
-            last_sent_pos=$(cat "$NEXT_MASTER_POS_FILE" 2>/dev/null || echo 0)
-        fi
-
+        # Signaler prêt
+        touch "$FIFO_WRITER_READY" 2>/dev/null || true
+        
+        # Attendre que le nombre de fichiers traités atteigne la cible
         while [[ ! -f "$STOP_FLAG" ]]; do
-            # lire la position demandée par update_queue
-            local target_pos=0
-            if [[ -f "${NEXT_MASTER_POS_FILE:-}" ]]; then
-                target_pos=$(cat "$NEXT_MASTER_POS_FILE" 2>/dev/null || echo 0)
+            local processed=0
+            if [[ -f "$PROCESSED_COUNT_FILE" ]]; then
+                processed=$(cat "$PROCESSED_COUNT_FILE" 2>/dev/null || echo 0)
             fi
-
-            # Si la position augmente, envoyer les éléments manquants depuis MASTER_QUEUE
-            if [[ $target_pos -gt $last_sent_pos ]] && [[ -f "${MASTER_QUEUE:-}" ]]; then
-                # On parcourt les nouvelles positions et on écrit chaque candidate dans la fifo
-                local i
-                for (( i=last_sent_pos+1; i<=target_pos; i++ )); do
-                    local candidate
-                    candidate=$(tr '\0' '\n' < "$MASTER_QUEUE" | sed -n "${i}p") || candidate=""
-                    if [[ -n "$candidate" ]]; then
-                        printf '%s\0' "$candidate" >&3
-                        if [[ -w "$LOG_DIR/update_queue.log" ]]; then
-                            printf "%s | start_fifo_writer: pushed candidate from MASTER_QUEUE pos=%d -> %s\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$i" "$candidate" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
-                        fi
-                    fi
-                done
-                last_sent_pos=$target_pos
+            local target=$target_count
+            if [[ -f "$TARGET_COUNT_FILE" ]]; then
+                target=$(cat "$TARGET_COUNT_FILE" 2>/dev/null || echo "$target_count")
             fi
-
-            sleep 0.2
-
+            
+            if [[ "$processed" -ge "$target" ]]; then
+                break
+            fi
+            sleep 0.5
         done
-
         exec 3>&-
     ) &
-}
-
-# Démarrer le consumer en arrière-plan
-start_consumer() {
+    printf "%d" "$!" > "$FIFO_WRITER_PID" 2>/dev/null || true
+    
+    # Exporter la variable WORKFIFO pour les workers
+    export WORKFIFO
+    
+    # Traitement des fichiers
+    local nb_files=$target_count
+    if [[ "$NO_PROGRESS" != true ]]; then
+        echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
+    fi
+    
+    # Consumer : lire les noms de fichiers séparés par NUL et lancer les conversions en parallèle
     _consumer_run() {
         local file
         local -a _pids=()
@@ -1791,7 +1736,7 @@ start_consumer() {
                         _still+=("$file")
                     fi
                 done
-                _pids=("${_still[@]:-}")
+                _pids=("${_still[@]}")
             fi
         done < "$WORKFIFO"
         for file in "${_pids[@]}"; do
@@ -1799,39 +1744,50 @@ start_consumer() {
         done
     }
     _consumer_run &
-}
+    local consumer_pid=$!
 
-# Afficher les informations de démarrage (nb fichiers, mode dry-run, message de début)
-start_processing_info() {
-    NB_FILES=0
-    if [[ -f "${QUEUE:-}" ]]; then
-        NB_FILES=$(tr -cd '\0' < "$QUEUE" | wc -c) || NB_FILES=0
-    fi
-
-    if [[ "$DRYRUN" == true ]]; then
-        echo -e "${MAGENTA}ℹ️  MODE DRY RUN activé : simulation uniquement — aucun encodage réel effectué.${NOCOLOR}"
-    fi
-
-    if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}Démarrage du traitement ($NB_FILES fichiers)...${NOCOLOR}"
-    fi
-}
-
-# Attendre la fin du traitement et exécuter la finalisation
-finalize_processing() {
-    # Signaler au writer FIFO qu'il doit se terminer (évite un deadlock wait <-> writer)
+    # Attendre que le consumer termine
+    wait "$consumer_pid" 2>/dev/null || true
+    
+    # Signaler au writer FIFO qu il doit se terminer
     touch "$STOP_FLAG" 2>/dev/null || true
-
-    # Attendre que les tâches en arrière-plan (consumer, writer, conversions) se terminent
-    wait
-    sleep 1
-
-    if [[ "$DRYRUN" == true ]]; then
-        echo -e "${GREEN}Dry run terminé${NOCOLOR}"
-        dry_run_compare_names
-    else
-        show_summary
+    
+    # Si un writer a enregistré son PID, demander son arrêt proprement
+    if [[ -n "${FIFO_WRITER_PID:-}" ]] && [[ -f "${FIFO_WRITER_PID}" ]]; then
+        local _writer_pid
+        _writer_pid=$(cat "$FIFO_WRITER_PID" 2>/dev/null || echo "")
+        if [[ -n "$_writer_pid" ]] && [[ "$_writer_pid" != "" ]]; then
+            kill "$_writer_pid" 2>/dev/null || true
+            # attendre sa terminaison
+            wait "$_writer_pid" 2>/dev/null || true
+        fi
     fi
+
+    # Nettoyer les artefacts FIFO
+    rm -f "$WORKFIFO" "$FIFO_WRITER_PID" "$FIFO_WRITER_READY" 2>/dev/null || true
+    rm -f "$PROCESSED_COUNT_FILE" "$TARGET_COUNT_FILE" 2>/dev/null || true
+    # Tentative de terminaison des processus enfants éventuels restants
+    _reap_children() {
+        local children=""
+        if command -v pgrep >/dev/null 2>&1; then
+            children=$(pgrep -P $$ 2>/dev/null || true)
+        elif ps -o pid=,ppid= >/dev/null 2>&1; then
+            # Linux/macOS standard ps
+            children=$(ps -o pid=,ppid= | awk -v p=$$ '$2==p {print $1}' || true)
+        fi
+        # Si aucune méthode ne fonctionne (Windows/Git Bash), on skip silencieusement
+        for c in $children; do
+            if [[ -n "$c" ]] && [[ "$c" != "$$" ]]; then
+                kill "$c" 2>/dev/null || true
+                wait "$c" 2>/dev/null || true
+            fi
+        done
+    }
+    _reap_children 2>/dev/null || true
+
+    # Attendre les autres jobs éventuels
+    wait 2>/dev/null || true
+    sleep 1
 }
 
 ###########################################################
@@ -1854,8 +1810,6 @@ build_queue() {
     
     # Étape 2 : Construire la QUEUE à partir de l INDEX (tri par taille décroissante)
     _build_queue_from_index
-    # Sauvegarder la queue complète (avant application de la limitation) pour alimentation dynamique
-    cp -f "$QUEUE" "$QUEUE.full" 2>/dev/null || true
     
     # Étape 3 : Appliquer les limitations (limit, random)
     _apply_queue_limitations
@@ -1882,10 +1836,12 @@ convert_file() {
     IFS='|' read -r filename final_dir base_name effective_suffix final_output <<< "$path_info"
     
     if _check_output_exists "$file_original" "$filename" "$final_output"; then
+        increment_processed_count || true
         return 0
     fi
     
     if _handle_dryrun_mode "$final_dir" "$final_output"; then
+        increment_processed_count || true
         return 0
     fi
     
@@ -1899,10 +1855,8 @@ convert_file() {
     
     local metadata_info
     if ! metadata_info=$(_analyze_video "$file_original" "$filename"); then
-        # analyse a indiqué qu'on doit skip ce fichier -> alimenter la queue si nécessaire
-        if [[ "$LIMIT_FILES" -gt 0 ]]; then
-            update_queue "skip" || true
-        fi
+        # Analyse a indiqué qu'on doit skip ce fichier
+        increment_processed_count || true
         return 0
     fi
     IFS='|' read -r bitrate codec duration_secs <<< "$metadata_info"
@@ -1915,11 +1869,10 @@ convert_file() {
         _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$sizeBeforeMB"
     else
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
-        # En cas d'erreur de conversion, si on a une limite, alimenter la queue pour compenser
-        if [[ "$LIMIT_FILES" -gt 0 ]]; then
-            update_queue "skip" || true
-        fi
     fi
+    
+    # Incrémenter le compteur de fichiers traités (signal pour le FIFO writer)
+    increment_processed_count || true
 }
 
 ###########################################################
@@ -1942,7 +1895,7 @@ dry_run_compare_names() {
                 echo "-------------------------------------------"
             } | tee -a "$LOG_FILE"
             
-            local total_files=$(tr -cd '\0' < "$QUEUE" | wc -c)
+            local total_files=$(count_null_separated "$QUEUE")
             local count=0
             local anomaly_count=0
             
@@ -1984,7 +1937,7 @@ dry_run_compare_names() {
                     
                     local anomaly_message=""
                     
-                    # --- VÉRIFICATION D'ANOMALIE ---
+                    # --- VÉRIFICATION D ANOMALIE ---
                     if [[ "$base_name" != "$generated_base_name" ]]; then
                         anomaly_count=$((anomaly_count + 1))
                         anomaly_message="🚨 ANOMALIE DÉTECTÉE : Le nom de base original diffère du nom généré sans suffixe !"
@@ -2068,20 +2021,22 @@ export_variables() {
         _finalize_conversion_success _finalize_try_move _finalize_log_and_verify _finalize_conversion_error is_excluded _get_temp_filename \
         _handle_custom_queue _handle_existing_index _count_total_video_files _index_video_files \
         _generate_index _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty \
-        _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy update_queue \
-        prepare_dynamic_queue start_fifo_writer start_consumer finalize_processing start_processing_info
+        _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy \
+        prepare_dynamic_queue count_null_separated compute_md5_prefix nproc_compat now_ts \
+        increment_processed_count
     export DRYRUN LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE LOG_DIR
     export TMP_DIR ENCODER_PRESET CRF IO_PRIORITY_CMD SOURCE OUTPUT_DIR FFMPEG_MIN_VERSION
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS HWACCEL
-    export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE 
+    export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE AWK_PROGRESS_SCRIPT
     export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG SCRIPT_DIR
     export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE EXECUTION_TIMESTAMP QUEUE INDEX INDEX_READABLE
-    export MASTER_QUEUE WORKFIFO NEXT_MASTER_POS_FILE TOTAL_MASTER_FILE
+    export WORKFIFO
     export FIFO_WRITER_PID FIFO_WRITER_READY
-    export CONVERSION_MODE KEEP_INDEX SORT_MODE
-    # declare -gx EXCLUDES="${EXCLUDES[@]}"
+    export PROCESSED_COUNT_FILE TARGET_COUNT_FILE
+    export CONVERSION_MODE KEEP_INDEX SORT_MODE EXCLUDES_REGEX
+    export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     ( IFS=:; export EXCLUDES="${EXCLUDES[*]}" )
 }
 
@@ -2104,27 +2059,23 @@ main() {
     check_plexignore
     check_output_suffix
     
-    # Détecter le hwaccel avant d'indexer / construire la queue
+    # Détecter le hwaccel avant d indexer / construire la queue
     detect_hwaccel
 
     build_queue
     
     export_variables
 
-    # Préparer la queue dynamique (FIFO) pour permettre l'ajout de candidats lorsque des fichiers sont skip
+    # Préparer la queue dynamique, lancer le traitement et attendre la fin
     prepare_dynamic_queue
 
-    # Créer la FIFO et lancer le writer persistant en arrière-plan
-    start_fifo_writer
-
-    # Traitement des fichiers (affichage d'information)
-    start_processing_info
-
-    # Lancer le consumer en arrière-plan
-    start_consumer
-
-    # Attendre la fin et effectuer les actions de finalisation
-    finalize_processing
+    # Afficher le résumé final
+    if [[ "$DRYRUN" == true ]]; then
+        echo -e "${GREEN}Dry run terminé${NOCOLOR}"
+        dry_run_compare_names
+    else
+        show_summary
+    fi
 }
 
 ###########################################################
