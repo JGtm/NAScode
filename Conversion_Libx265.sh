@@ -111,7 +111,7 @@ CUSTOM_QUEUE=""
 SOURCE="../"
 OUTPUT_DIR="$SCRIPT_DIR/Converted"
 FORCE_NO_SUFFIX=false
-PARALLEL_JOBS=3
+PARALLEL_JOBS=1
 NO_PROGRESS=false
 CONVERSION_MODE="serie"
 
@@ -121,7 +121,7 @@ CONVERSION_MODE="serie"
 #   - size_asc   : Trier par taille croissante
 #   - name_asc   : Trier par nom de fichier (ordre alphabétique ascendant)
 #   - name_desc  : Trier par nom de fichier (ordre alphabétique descendant)
-SORT_MODE="size_asc"
+SORT_MODE="name_asc"
 
 # Conserver l index existant sans demander confirmation
 KEEP_INDEX=false
@@ -433,7 +433,6 @@ check_lock() {
     echo $$ > "$LOCKFILE"
 }
 
-################## IDENTIFIER LE BESOIN ##################
 # Helpers portables pour verrou (lock) / déverrouillage (unlock)
 # Utilisation : lock <chemin> [timeout_seconds]
 # Si `flock` est disponible il est privilégié, sinon on utilise un verrou par répertoire (mkdir).
@@ -920,7 +919,7 @@ _handle_existing_index() {
         return 1
     fi
     
-    local index_date=$(stat -c '%y' "$INDEX" | cut -d' ' -f1-2)
+    local index_date=$(stat -c '%y' "$INDEX" | cut -d'.' -f1)
     # Si l utilisateur a demandé de conserver l index, on l accepte sans demander
     if [[ "$KEEP_INDEX" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
@@ -1195,7 +1194,7 @@ update_queue() {
 }
 
 ###########################################################
-# SOUS-FONCTIONS DE CONVERSION
+# SOUS-FONCTIONS DE PRE-CONVERSION
 ###########################################################
 
 _prepare_file_paths() {
@@ -1360,6 +1359,10 @@ _copy_to_temp_storage() {
     return 0
 }
 
+###########################################################
+# CONVERSION
+###########################################################
+
 _execute_conversion() {
     local tmp_input="$1"
     local tmp_output="$2"
@@ -1517,7 +1520,9 @@ _execute_conversion() {
     fi
 }
 
-### Finalisation refactorisée : petites fonctions responsables chacune d une tâche.
+###########################################################
+# RESULTATS ET FINALISATION
+###########################################################
 
 # Essayer de déplacer le fichier produit vers la destination finale.
 # Renvoie le chemin réel utilisé pour le fichier final sur stdout.
@@ -1707,8 +1712,53 @@ _finalize_conversion_error() {
     rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null
 }
 
+###########################################################
+# TRAITEMENT DE LA FILE d ATTENTE
+###########################################################
+
 # Préparer une queue dynamique (FIFO) pour le traitement parallèle
-prepare_dynamic_queue() {
+# Traitement simple sans FIFO (quand pas de limite)
+_process_queue_simple() {
+    local nb_files=0
+    if [[ -f "$QUEUE" ]]; then
+        nb_files=$(count_null_separated "$QUEUE")
+    fi
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
+    fi
+    
+    # Lire la queue et traiter en parallèle
+    local file
+    local -a _pids=()
+    while IFS= read -r -d '' file; do
+        convert_file "$file" "$OUTPUT_DIR" &
+        _pids+=("$!")
+        if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
+            if ! wait -n 2>/dev/null; then
+                wait "${_pids[0]}" 2>/dev/null || true
+            fi
+            local -a _still=()
+            for p in "${_pids[@]}"; do
+                if kill -0 "$p" 2>/dev/null; then
+                    _still+=("$p")
+                fi
+            done
+            _pids=("${_still[@]}")
+        fi
+    done < "$QUEUE"
+    
+    # Attendre tous les jobs restants
+    for p in "${_pids[@]}"; do
+        wait "$p" || true
+    done
+    
+    wait 2>/dev/null || true
+    sleep 1
+}
+
+# Traitement avec FIFO (quand limite active - permet le remplacement dynamique)
+_process_queue_with_fifo() {
     WORKFIFO="$LOG_DIR/queue_fifo_${EXECUTION_TIMESTAMP}"
     FIFO_WRITER_PID="$LOG_DIR/fifo_writer_pid_${EXECUTION_TIMESTAMP}"
     FIFO_WRITER_READY="$LOG_DIR/fifo_writer.ready_${EXECUTION_TIMESTAMP}"
@@ -1741,7 +1791,7 @@ prepare_dynamic_queue() {
     # Fichier cible pour le writer
     TARGET_COUNT_FILE="$LOG_DIR/target_count_${EXECUTION_TIMESTAMP}"
     echo "$target_count" > "$TARGET_COUNT_FILE"
-    export TARGET_COUNT_FILE QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE
+    export TARGET_COUNT_FILE QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE WORKFIFO
 
     # Créer le FIFO et lancer un writer de fond
     rm -f "$WORKFIFO" 2>/dev/null || true
@@ -1777,9 +1827,6 @@ prepare_dynamic_queue() {
     ) &
     printf "%d" "$!" > "$FIFO_WRITER_PID" 2>/dev/null || true
     
-    # Exporter la variable WORKFIFO pour les workers
-    export WORKFIFO
-    
     # Traitement des fichiers
     local nb_files=$target_count
     if [[ "$NO_PROGRESS" != true ]]; then
@@ -1798,16 +1845,16 @@ prepare_dynamic_queue() {
                     wait "${_pids[0]}" 2>/dev/null || true
                 fi
                 local -a _still=()
-                for file in "${_pids[@]}"; do
-                    if kill -0 "$file" 2>/dev/null; then
-                        _still+=("$file")
+                for p in "${_pids[@]}"; do
+                    if kill -0 "$p" 2>/dev/null; then
+                        _still+=("$p")
                     fi
                 done
                 _pids=("${_still[@]}")
             fi
         done < "$WORKFIFO"
-        for file in "${_pids[@]}"; do
-            wait "$file" || true
+        for p in "${_pids[@]}"; do
+            wait "$p" || true
         done
     }
     _consumer_run &
@@ -1825,7 +1872,6 @@ prepare_dynamic_queue() {
         _writer_pid=$(cat "$FIFO_WRITER_PID" 2>/dev/null || echo "")
         if [[ -n "$_writer_pid" ]] && [[ "$_writer_pid" != "" ]]; then
             kill "$_writer_pid" 2>/dev/null || true
-            # attendre sa terminaison
             wait "$_writer_pid" 2>/dev/null || true
         fi
     fi
@@ -1833,16 +1879,16 @@ prepare_dynamic_queue() {
     # Nettoyer les artefacts FIFO
     rm -f "$WORKFIFO" "$FIFO_WRITER_PID" "$FIFO_WRITER_READY" 2>/dev/null || true
     rm -f "$PROCESSED_COUNT_FILE" "$TARGET_COUNT_FILE" 2>/dev/null || true
+    rm -f "$NEXT_QUEUE_POS_FILE" "$TOTAL_QUEUE_FILE" 2>/dev/null || true
+    
     # Tentative de terminaison des processus enfants éventuels restants
     _reap_children() {
         local children=""
         if command -v pgrep >/dev/null 2>&1; then
             children=$(pgrep -P $$ 2>/dev/null || true)
         elif ps -o pid=,ppid= >/dev/null 2>&1; then
-            # Linux/macOS standard ps
             children=$(ps -o pid=,ppid= | awk -v p=$$ '$2==p {print $1}' || true)
         fi
-        # Si aucune méthode ne fonctionne (Windows/Git Bash), on skip silencieusement
         for c in $children; do
             if [[ -n "$c" ]] && [[ "$c" != "$$" ]]; then
                 kill "$c" 2>/dev/null || true
@@ -1852,9 +1898,19 @@ prepare_dynamic_queue() {
     }
     _reap_children 2>/dev/null || true
 
-    # Attendre les autres jobs éventuels
     wait 2>/dev/null || true
     sleep 1
+}
+
+# Point d entrée : choisit le mode de traitement selon la présence d une limite
+prepare_dynamic_queue() {
+    if [[ "$LIMIT_FILES" -gt 0 ]]; then
+        # Mode FIFO : permet le remplacement dynamique des fichiers skippés
+        _process_queue_with_fifo
+    else
+        # Mode simple : traitement direct sans overhead FIFO
+        _process_queue_simple
+    fi
 }
 
 ###########################################################
@@ -2105,7 +2161,8 @@ export_variables() {
         _handle_custom_queue _handle_existing_index _count_total_video_files _index_video_files \
         _generate_index _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty \
         _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy \
-        prepare_dynamic_queue count_null_separated compute_md5_prefix nproc_compat now_ts \
+        prepare_dynamic_queue _process_queue_simple _process_queue_with_fifo \
+        count_null_separated compute_md5_prefix nproc_compat now_ts \
         increment_processed_count update_queue
     export DRYRUN LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE LOG_DIR
     export TMP_DIR ENCODER_PRESET CRF IO_PRIORITY_CMD SOURCE OUTPUT_DIR FFMPEG_MIN_VERSION
