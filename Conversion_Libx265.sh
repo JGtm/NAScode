@@ -2192,6 +2192,8 @@ main() {
     
     # Convertir SOURCE en chemin absolu pour éviter les problèmes de répertoire courant
     SOURCE=$(cd "$SOURCE" && pwd)
+
+    echo "coucou tu veux voir ma bite"
     
     check_lock
     check_dependencies
