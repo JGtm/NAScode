@@ -236,7 +236,7 @@ set_conversion_mode_parameters() {
             ;;
         serie)
             CRF=20.7
-            ENCODER_PRESET="slow"
+            ENCODER_PRESET="medium"
             # Plafond pour les séries (par défaut identique)
             MAXRATE_KBPS=2800
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
@@ -1147,6 +1147,53 @@ increment_processed_count() {
     rmdir "$lockdir" 2>/dev/null || true
 }
 
+# Quand un fichier est skip, ajouter le prochain candidat de la queue complète
+# pour maintenir le nombre de fichiers demandés par --limit
+update_queue() {
+    # Ne rien faire si pas de limitation
+    if [[ "$LIMIT_FILES" -le 0 ]]; then
+        return 0
+    fi
+    
+    # Vérifier que la FIFO existe
+    if [[ -z "${WORKFIFO:-}" ]] || [[ ! -p "$WORKFIFO" ]]; then
+        return 0
+    fi
+
+    local lockdir="$LOG_DIR/update_queue.lock"
+    # Mutex simple via mkdir
+    while ! mkdir "$lockdir" 2>/dev/null; do sleep 0.01; done
+
+    local nextpos=0
+    if [[ -f "$NEXT_QUEUE_POS_FILE" ]]; then
+        nextpos=$(cat "$NEXT_QUEUE_POS_FILE" 2>/dev/null) || nextpos=0
+    fi
+    local total=0
+    if [[ -f "$TOTAL_QUEUE_FILE" ]]; then
+        total=$(cat "$TOTAL_QUEUE_FILE" 2>/dev/null) || total=0
+    fi
+
+    if [[ $nextpos -lt $total ]]; then
+        # Récupérer l élément suivant
+        local candidate
+        candidate=$(tr '\0' '\n' < "$QUEUE_FULL" | sed -n "$((nextpos+1))p") || candidate=""
+        if [[ -n "$candidate" ]]; then
+            # Incrémenter aussi target_count pour que le writer attende ce fichier supplémentaire
+            local current_target=0
+            if [[ -f "$TARGET_COUNT_FILE" ]]; then
+                current_target=$(cat "$TARGET_COUNT_FILE" 2>/dev/null || echo 0)
+            fi
+            echo $((current_target + 1)) > "$TARGET_COUNT_FILE"
+            
+            # Ecrire le nouveau fichier dans la FIFO
+            printf '%s\0' "$candidate" > "$WORKFIFO" || true
+        fi
+        echo $((nextpos + 1)) > "$NEXT_QUEUE_POS_FILE"
+    fi
+
+    rmdir "$lockdir" 2>/dev/null || true
+}
+
 ###########################################################
 # SOUS-FONCTIONS DE CONVERSION
 ###########################################################
@@ -1190,6 +1237,10 @@ _check_output_exists() {
         echo -e "${BLUE}⏭️ SKIPPED (Fichier de sortie existe déjà) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SKIPPED" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+        fi
+        # Alimenter la queue avec le prochain candidat si limite active
+        if [[ "$LIMIT_FILES" -gt 0 ]]; then
+            update_queue || true
         fi
         return 0
     fi
@@ -1667,15 +1718,30 @@ prepare_dynamic_queue() {
     echo "0" > "$PROCESSED_COUNT_FILE"
     export PROCESSED_COUNT_FILE
     
-    # Nombre de fichiers à traiter
+    # Queue complète et position pour alimentation dynamique
+    QUEUE_FULL="$QUEUE.full"
+    NEXT_QUEUE_POS_FILE="$LOG_DIR/next_queue_pos_${EXECUTION_TIMESTAMP}"
+    TOTAL_QUEUE_FILE="$LOG_DIR/total_queue_${EXECUTION_TIMESTAMP}"
+    
+    # Calculer le total de la queue complète
+    local total_full=0
+    if [[ -f "$QUEUE_FULL" ]]; then
+        total_full=$(count_null_separated "$QUEUE_FULL")
+    fi
+    echo "$total_full" > "$TOTAL_QUEUE_FILE"
+    
+    # Nombre de fichiers à traiter (queue limitée)
     local target_count=0
     if [[ -f "$QUEUE" ]]; then
         target_count=$(count_null_separated "$QUEUE")
     fi
+    # Position initiale = nombre de fichiers déjà dans la queue limitée
+    echo "$target_count" > "$NEXT_QUEUE_POS_FILE"
+    
     # Fichier cible pour le writer
     TARGET_COUNT_FILE="$LOG_DIR/target_count_${EXECUTION_TIMESTAMP}"
     echo "$target_count" > "$TARGET_COUNT_FILE"
-    export TARGET_COUNT_FILE
+    export TARGET_COUNT_FILE QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE
 
     # Créer le FIFO et lancer un writer de fond
     rm -f "$WORKFIFO" 2>/dev/null || true
@@ -1811,6 +1877,9 @@ build_queue() {
     
     # Étape 2 : Construire la QUEUE à partir de l INDEX (tri par taille décroissante)
     _build_queue_from_index
+    
+    # Sauvegarder la queue complète avant limitation (pour alimentation dynamique)
+    cp -f "$QUEUE" "$QUEUE.full" 2>/dev/null || true
     
     # Étape 3 : Appliquer les limitations (limit, random)
     _apply_queue_limitations
@@ -2001,13 +2070,13 @@ show_summary() {
     # Anomalies : fichiers plus lourds après conversion
     local size_anomalies=0
     if [[ -f "$LOG_SKIPPED" && -s "$LOG_SKIPPED" ]]; then
-        size_anomalies=$(grep -c 'WARNING: FICHIER PLUS LOURD' "$LOG_SKIPPED" 2>/dev/null || echo 0)
+        size_anomalies=$(grep -c 'WARNING: FICHIER PLUS LOURD' "$LOG_SKIPPED" 2>/dev/null | tr -d '\r\n') || size_anomalies=0
     fi
 
     # Anomalies : erreurs de vérification checksum/taille lors du transfert
     local checksum_anomalies=0
     if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
-        checksum_anomalies=$(grep -cE ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' "$LOG_ERROR" 2>/dev/null || echo 0)
+        checksum_anomalies=$(grep -cE ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' "$LOG_ERROR" 2>/dev/null | tr -d '\r\n') || checksum_anomalies=0
     fi
     
     {
@@ -2019,7 +2088,7 @@ show_summary() {
         echo "Succès    : $succ"
         echo "Ignorés   : $skip"
         echo "Erreurs   : $err"
-        echo "Anomalies -> Taille : $size_anomalies  Intégrité : $checksum_anomalies"
+        echo "Anomalies : Taille : $size_anomalies  Intégrité : $checksum_anomalies"
         echo "-------------------------------------------"
     } | tee "$SUMMARY_FILE"
 }
@@ -2037,7 +2106,7 @@ export_variables() {
         _generate_index _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty \
         _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy \
         prepare_dynamic_queue count_null_separated compute_md5_prefix nproc_compat now_ts \
-        increment_processed_count
+        increment_processed_count update_queue
     export DRYRUN LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE LOG_DIR
     export TMP_DIR ENCODER_PRESET CRF IO_PRIORITY_CMD SOURCE OUTPUT_DIR FFMPEG_MIN_VERSION
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
@@ -2046,7 +2115,7 @@ export_variables() {
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE AWK_PROGRESS_SCRIPT
     export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG SCRIPT_DIR
     export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE EXECUTION_TIMESTAMP QUEUE INDEX INDEX_READABLE
-    export WORKFIFO
+    export WORKFIFO QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE
     export FIFO_WRITER_PID FIFO_WRITER_READY
     export PROCESSED_COUNT_FILE TARGET_COUNT_FILE
     export CONVERSION_MODE KEEP_INDEX SORT_MODE EXCLUDES_REGEX
