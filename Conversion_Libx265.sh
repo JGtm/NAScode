@@ -20,7 +20,7 @@ readonly STOP_FLAG="/tmp/conversion_stop_flag"
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # ----- Aides de compatibilité pour macOS / Homebrew -----
-# Si l'utilisateur a installé GNU coreutils / gawk via Homebrew, privilégier leur répertoire gnubin
+# Si l utilisateur a installé GNU coreutils / gawk via Homebrew, privilégier leur répertoire gnubin
 if command -v brew >/dev/null 2>&1; then
     core_gnubin="$(brew --prefix coreutils 2>/dev/null)/libexec/gnubin"
     if [[ -d "$core_gnubin" ]]; then
@@ -95,7 +95,7 @@ PARALLEL_JOBS=3
 NO_PROGRESS=false
 CONVERSION_MODE="serie"
 
-# Mode de tri pour la construction de la file d'attente (optionnel)
+# Mode de tri pour la construction de la file d attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
 #   - size_desc  : Trier par taille décroissante (par défaut, privilégie gros fichiers)
 #   - size_asc   : Trier par taille croissante
@@ -200,7 +200,7 @@ set_conversion_mode_parameters() {
             exit 1
             ;;
     esac
-    # Valeurs dérivées utilisées par ffmpeg/x265 (ffmpeg attend suffixe 'k', x265 attend kbps sans suffixe)
+    # Valeurs dérivées utilisées par ffmpeg/x265 (ffmpeg attend suffixe k, x265 attend kbps sans suffixe)
     MAXRATE_FFMPEG="${MAXRATE_KBPS}k"
     BUFSIZE_FFMPEG="${BUFSIZE_KBPS}k"
     X265_VBV_PARAMS="vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}"
@@ -346,7 +346,7 @@ EOF
 ###########################################################
 
 cleanup() {
-    # Afficher le message d'interruption immédiatement (avant de rendre la main au shell)
+    # Afficher le message d interruption immédiatement (avant de rendre la main au shell)
     if [[ ! -f "$STOP_FLAG" ]]; then
         echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
     fi
@@ -544,7 +544,7 @@ initialize_directories() {
     for log_file in "$LOG_SUCCESS" "$LOG_SKIPPED" "$LOG_ERROR" "$SUMMARY_FILE" "$LOG_PROGRESS"; do
         touch "$log_file"
     done
-    # Le log de comparaison dry-run n'est créé que si on est en mode dry-run
+    # Le log de comparaison dry-run n est créé que si on est en mode dry-run
     if [[ "$DRYRUN" == true ]]; then
         touch "$LOG_DRYRUN_COMPARISON"
     fi
@@ -600,7 +600,7 @@ custom_pv() {
 
     start_ts=$(now_ts)
 
-    # Interroger la progression pendant l'exécution de dd
+    # Interroger la progression pendant l exécution de dd
     while kill -0 "$dd_pid" 2>/dev/null; do
         copied=$(stat -c%s -- "$dst" 2>/dev/null || echo 0)
         current_ts=$(now_ts)
@@ -1216,7 +1216,7 @@ _get_temp_filename() {
     echo "$TMP_DIR/tmp_${md5p}_${RANDOM}${suffix}"
 }
 
-# Calculer le checksum SHA256 d'un fichier en utilisant les outils disponibles (portable)
+# Calculer le checksum SHA256 d un fichier en utilisant les outils disponibles (portable)
 compute_sha256() {
     local file="$1"
     if [[ ! -f "$file" ]]; then
@@ -1247,7 +1247,7 @@ PY
         return 0
     fi
 
-    # fallback: vide si aucun outil n'est disponible
+    # fallback: vide si aucun outil n est disponible
     echo ""
 }
 
@@ -1326,11 +1326,11 @@ _execute_conversion() {
     local base_name="$5"
 
     # Calcul du nombre de threads à allouer par job.
-    # Principe : répartir les coeurs CPU disponibles (`nproc_compat`)
-    # entre le nombre de jobs parallèles souhaités (`PARALLEL_JOBS`).
-    # Si l'utilisateur a fixé `LIMIT_FILES` et que ce nombre est inférieur
-    # à `PARALLEL_JOBS`, on réduit le nombre de jobs concurrents afin
-    # d'allouer plus de threads par job (meilleure utilisation CPU).
+    # Principe : répartir les coeurs CPU disponibles (nproc_compat)
+    # entre le nombre de jobs parallèles souhaités (PARALLEL_JOBS).
+    # Si l utilisateur a fixé LIMIT_FILES et que ce nombre est inférieur
+    # à PARALLEL_JOBS, on réduit le nombre de jobs concurrents afin
+    # d allouer plus de threads par job (meilleure utilisation CPU).
     local cores
     local parallel_jobs
 
@@ -1358,15 +1358,15 @@ _execute_conversion() {
         threads_per_job=1
     fi
        
-    # Options de l'encodage (principales) :
-    #  -g 600               : taille GOP (nombre d'images entre I-frames)
+    # Options de l encodage (principales) :
+    #  -g 600               : taille GOP (nombre d images entre I-frames)
     #  -keyint_min 600      : intervalle minimum entre keyframes (force des I-frames régulières)
     #  -c:v libx265         : encodeur logiciel x265 (HEVC)
     #  -preset slow         : préréglage qualité/temps (lent = meilleure compression)
-    #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
+    #  -tune fastdecode     : optimiser l encodeur pour un décodage plus rapide
     #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits
 
-    # timestamp de départ portable (utilise `date` uniquement, pas de python)
+    # timestamp de départ portable
     START_TS="$(date +%s)"
 
     # Exécute ffmpeg et pipe vers awk pour affichage de progression.
@@ -1435,7 +1435,7 @@ _execute_conversion() {
         /progress=end/ {
             if (NOPROG != "true") {
                 printf "  ... [%-40.40s] %5s | ETA: 00:00:00 | Speed: %.2fx\n",
-                    CURRENT_FILE_NAME, "100%", speed;
+                    CURRENT_FILE_NAME, "100%  ", speed;
                 fflush();
             }
         }
@@ -1512,7 +1512,7 @@ _finalize_try_move() {
         return 0
     fi
 
-    # Ultime repli : laisser le temporaire et l'utiliser
+    # Ultime repli : laisser le temporaire et l utiliser
     printf "%s" "$tmp_output"
     return 2
 }
@@ -1527,7 +1527,7 @@ _finalize_log_and_verify() {
     local checksum_before="$5"
     local sizeBeforeMB="$6"
 
-    # Nettoyer les artefacts temporaires liés à l'entrée et au log ffmpeg
+    # Nettoyer les artefacts temporaires liés à l entrée et au log ffmpeg
     rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
 
     # Taille après (en MB)
@@ -1571,7 +1571,7 @@ _finalize_log_and_verify() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeMB}MB->${sizeAfterMB}MB | checksum_before:${checksum_before:-NA} | checksum_after:${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
-    # En cas de mismatch, journaliser dans le log d'erreur
+    # En cas de mismatch, journaliser dans le log d erreur
     if [[ "$verify_status" == "MISMATCH" ]]; then
         if [[ -n "$LOG_ERROR" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR verify_mismatch | $file_original -> $final_actual | before=$checksum_before after=$checksum_after" >> "$LOG_ERROR" 2>/dev/null || true
@@ -1579,7 +1579,7 @@ _finalize_log_and_verify() {
     fi
 }
 
-# Fonction principale de finalisation (regroupe l'affichage, le déplacement, le logging)
+# Fonction principale de finalisation (regroupe l affichage, le déplacement, le logging)
 _finalize_conversion_success() {
     local filename="$1"
     local file_original="$2"
@@ -1589,14 +1589,14 @@ _finalize_conversion_success() {
     local ffmpeg_log_temp="$6"
     local sizeBeforeMB="$7"
 
-    # Si un marqueur d'arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
+    # Si un marqueur d arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
     if [[ -f "$STOP_FLAG" ]]; then
         rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
         return 1
     fi
 
     if [[ "$NO_PROGRESS" != true ]]; then
-        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
+        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l appel à ffmpeg)
         local elapsed_str="N/A"
         if [[ -n "${START_TS:-}" ]]; then
             local end_ts
@@ -1648,7 +1648,7 @@ _finalize_conversion_error() {
     rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null
 }
 
-# Préparer une queue dynamique (FIFO) pour permettre l'ajout de candidats lorsque des fichiers sont skip
+# Préparer une queue dynamique (FIFO) pour permettre l ajout de candidats lorsque des fichiers sont skip
 prepare_dynamic_queue() {
     MASTER_QUEUE="$QUEUE.full"
     NEXT_MASTER_POS_FILE="$LOG_DIR/next_master_pos_${EXECUTION_TIMESTAMP}"
@@ -1657,7 +1657,7 @@ prepare_dynamic_queue() {
     FIFO_WRITER_PID="$LOG_DIR/fifo_writer_pid_${EXECUTION_TIMESTAMP}"
     FIFO_WRITER_READY="$LOG_DIR/fifo_writer.ready_${EXECUTION_TIMESTAMP}"
 
-    # Total d'éléments dans la master queue
+    # Total d éléments dans la master queue
     local total_master=0
     if [[ -f "$MASTER_QUEUE" ]]; then
         total_master=$(tr -cd '\0' < "$MASTER_QUEUE" | wc -c) || total_master=0
@@ -1668,7 +1668,7 @@ prepare_dynamic_queue() {
         printf "%s | main: TOTAL_MASTER_FILE='%s' value=%d\n" "$(date +'%Y-%m-%d %H:%M:%S')" "$TOTAL_MASTER_FILE" "$total_master" >> "$LOG_DIR/update_queue.log" 2>/dev/null || true
     fi
 
-    # Position initiale (nombre d'éléments déjà présents dans la queue limitée)
+    # Position initiale (nombre d éléments déjà présents dans la queue limitée)
     local initial_in_queue=0
     if [[ -f "$QUEUE" ]]; then
         initial_in_queue=$(tr -cd '\0' < "$QUEUE" | wc -c) || initial_in_queue=0
@@ -1683,7 +1683,7 @@ prepare_dynamic_queue() {
     rm -f "$WORKFIFO" 2>/dev/null || true
     mkfifo "$WORKFIFO"
     # Writer persistant : ouvre la FIFO en écriture, injecte la queue initiale,
-    # puis garde la FD ouverte jusqu'à l'arrêt du script (évite EOF prématuré)
+    # puis garde la FD ouverte jusqu à l arrêt du script (évite EOF prématuré)
     (
         # Open FIFO read-write to avoid blocking when no reader is present
         exec 3<> "$WORKFIFO"
@@ -1751,7 +1751,7 @@ prepare_dynamic_queue() {
     # Attendre que le consumer termine
     wait "$consumer_pid" 2>/dev/null || true
     
-    # Signaler au writer FIFO qu'il doit se terminer
+    # Signaler au writer FIFO qu il doit se terminer
     touch "$STOP_FLAG" 2>/dev/null || true
     
     # Attendre que le writer se termine proprement
@@ -1772,9 +1772,9 @@ start_fifo_writer() {
         fi
     fi
 
-    # S'assurer que les répertoires de logs existent et créer des marqueurs
+    # S assurer que les répertoires de logs existent et créer des marqueurs
     mkdir -p "$LOG_DIR" 2>/dev/null || true
-    # Créer des fichiers vides pour que l'utilisateur voie immédiatement l'intention
+    # Créer des fichiers vides pour que l'utilisateur voie immédiatement l intention
     # Le subshell du writer écrira ensuite son PID réel dans $FIFO_WRITER_PID
     if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
         : > "$FIFO_WRITER_PID" 2>/dev/null || true
@@ -1907,9 +1907,9 @@ start_consumer() {
         local -a _pids=()
         local LOCKDIR="$LOG_DIR/file_queue.lock"
         while [[ ! -f "$STOP_FLAG" ]]; do
-            # Si la queue existe, l'atomiser pour traitement
+            # Si la queue existe, l atomiser pour traitement
             if [[ -f "$QUEUE" ]]; then
-                # Essayer d'obtenir le lock pour déplacer la queue
+                # Essayer d obtenir le lock pour déplacer la queue
                 if mkdir "$LOCKDIR" 2>/dev/null; then
                     if [[ -f "$QUEUE" ]]; then
                         mv "$QUEUE" "${QUEUE}.processing" 2>/dev/null || true
@@ -1975,7 +1975,7 @@ start_processing_info() {
 
 # Attendre la fin du traitement et exécuter la finalisation
 finalize_processing() {
-    # Signaler au writer FIFO qu'il doit se terminer (évite un deadlock wait <-> writer)
+    # Signaler au writer FIFO qu il doit se terminer (évite un deadlock wait <-> writer)
     touch "$STOP_FLAG" 2>/dev/null || true
 
     # Attendre que les tâches en arrière-plan (consumer, writer, conversions) se terminent
@@ -2055,7 +2055,7 @@ convert_file() {
     
     local metadata_info
     if ! metadata_info=$(_analyze_video "$file_original" "$filename"); then
-        # analyse a indiqué qu'on doit skip ce fichier -> alimenter la queue si nécessaire
+        # analyse a indiqué qu on doit skip ce fichier -> alimenter la queue si nécessaire
         if [[ "$LIMIT_FILES" -gt 0 ]]; then
             update_queue "skip" || true
         fi
@@ -2071,7 +2071,7 @@ convert_file() {
         _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$sizeBeforeMB"
     else
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
-        # En cas d'erreur de conversion, si on a une limite, alimenter la queue pour compenser
+        # En cas d erreur de conversion, si on a une limite, alimenter la queue pour compenser
         if [[ "$LIMIT_FILES" -gt 0 ]]; then
             update_queue "skip" || true
         fi
@@ -2140,7 +2140,7 @@ dry_run_compare_names() {
                     
                     local anomaly_message=""
                     
-                    # --- VÉRIFICATION D'ANOMALIE ---
+                    # --- VÉRIFICATION D ANOMALIE ---
                     if [[ "$base_name" != "$generated_base_name" ]]; then
                         anomaly_count=$((anomaly_count + 1))
                         anomaly_message="🚨 ANOMALIE DÉTECTÉE : Le nom de base original diffère du nom généré sans suffixe !"
@@ -2260,20 +2260,20 @@ main() {
     check_plexignore
     check_output_suffix
     
-    # Détecter le hwaccel avant d'indexer / construire la queue
+    # Détecter le hwaccel avant d indexer / construire la queue
     detect_hwaccel
 
     build_queue
     
     export_variables
 
-    # Préparer la queue dynamique (FIFO) pour permettre l'ajout de candidats lorsque des fichiers sont skip
+    # Préparer la queue dynamique (FIFO) pour permettre l ajout de candidats lorsque des fichiers sont skip
     prepare_dynamic_queue
 
     # Créer la FIFO et lancer le writer persistant en arrière-plan
     start_fifo_writer
 
-    # Traitement des fichiers (affichage d'information)
+    # Traitement des fichiers (affichage d information)
     start_processing_info
 
     # Lancer le consumer en arrière-plan
