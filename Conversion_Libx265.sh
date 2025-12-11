@@ -60,7 +60,7 @@ compute_md5_prefix() {
     if [[ "$HAS_MD5SUM" -eq 1 ]]; then
         printf "%s" "$input" | md5sum | awk '{print substr($1,1,8)}'
     elif [[ "$HAS_MD5" -eq 1 ]]; then
-        # Sur macOS, `md5` n'affiche que le digest pour stdin ; gestion robuste
+        # Sur macOS, md5 n affiche que le digest pour stdin ; gestion robuste
         printf "%s" "$input" | md5 | awk '{print substr($1,1,8)}'
     elif [[ "$HAS_PYTHON3" -eq 1 ]]; then
         printf "%s" "$input" | python3 - <<PY | head -1
@@ -619,7 +619,7 @@ clean_number() {
 # Remarques : utilise `dd` et `stat` ; affiche la progression sur `stderr` (colorée) et termine
 # à 100% à la fin.
 
-# Script AWK partagé pour l'affichage de progression (évite la duplication)
+# Script AWK partagé pour l affichage de progression (évite la duplication)
 # Arguments attendus: copied, total, start, now, width, color, nocolor, newline (0 ou 1)
 readonly AWK_PROGRESS_SCRIPT='
 function hr(bytes,   units,i,div,val){
@@ -1466,7 +1466,7 @@ _execute_conversion() {
     fi
 }
 
-### Finalisation refactorisée : petites fonctions responsables chacune d'une tâche.
+### Finalisation refactorisée : petites fonctions responsables chacune d une tâche.
 
 # Essayer de déplacer le fichier produit vers la destination finale.
 # Renvoie le chemin réel utilisé pour le fichier final sur stdout.
@@ -1856,7 +1856,7 @@ convert_file() {
     
     local metadata_info
     if ! metadata_info=$(_analyze_video "$file_original" "$filename"); then
-        # Analyse a indiqué qu'on doit skip ce fichier
+        # Analyse a indiqué qu on doit skip ce fichier
         increment_processed_count || true
         return 0
     fi
@@ -1918,7 +1918,7 @@ dry_run_compare_names() {
                 local final_output="$final_dir/${base_name}${effective_suffix}.mkv"
                 local final_output_basename=$(basename "$final_output")
 
-                # --- PRÉPARATION POUR LA VÉRIFICATION D'ANOMALIE ---
+                # --- PRÉPARATION POUR LA VÉRIFICATION D ANOMALIE ---
                 local generated_base_name="${final_output_basename%.mkv}"
                 
                 # 1. RETRAIT DU SUFFIXE DRY RUN (toujours en premier car il est le dernier ajouté)
@@ -1926,7 +1926,7 @@ dry_run_compare_names() {
                     generated_base_name="${generated_base_name%"$DRYRUN_SUFFIX"}"
                 fi
                 
-                # 2. RETRAIT DU SUFFIXE D'ORIGINE ($SUFFIX_STRING)
+                # 2. RETRAIT DU SUFFIXE D ORIGINE ($SUFFIX_STRING)
                 if [[ -n "$SUFFIX_STRING" ]]; then
                     generated_base_name="${generated_base_name%"$SUFFIX_STRING"}"
                 fi
@@ -1997,16 +1997,29 @@ show_summary() {
     if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
         err=$(grep -c ' | ERROR ffmpeg | ' "$LOG_ERROR" 2>/dev/null || echo 0)
     fi
+
+    # Anomalies : fichiers plus lourds après conversion
+    local size_anomalies=0
+    if [[ -f "$LOG_SKIPPED" && -s "$LOG_SKIPPED" ]]; then
+        size_anomalies=$(grep -c 'WARNING: FICHIER PLUS LOURD' "$LOG_SKIPPED" 2>/dev/null || echo 0)
+    fi
+
+    # Anomalies : erreurs de vérification checksum/taille lors du transfert
+    local checksum_anomalies=0
+    if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
+        checksum_anomalies=$(grep -cE ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' "$LOG_ERROR" 2>/dev/null || echo 0)
+    fi
     
     {
         echo ""
         echo "-------------------------------------------"
         echo "           RÉSUMÉ DE CONVERSION            "
         echo "-------------------------------------------"
-        echo "Date fin : $(date +"%Y-%m-%d %H:%M:%S")"
-        echo "Succès   : $succ"
-        echo "Ignorés  : $skip"
-        echo "Erreurs  : $err"
+        echo "Date fin  : $(date +"%Y-%m-%d %H:%M:%S")"
+        echo "Succès    : $succ"
+        echo "Ignorés   : $skip"
+        echo "Erreurs   : $err"
+        echo "Anomalies -> Taille : $size_anomalies  Intégrité : $checksum_anomalies"
         echo "-------------------------------------------"
     } | tee "$SUMMARY_FILE"
 }
