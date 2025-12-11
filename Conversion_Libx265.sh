@@ -49,6 +49,10 @@ HAS_DATE_NANO=$(date +%s.%N >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_PERL_HIRES=$(perl -MTime::HiRes -e '1' 2>/dev/null && echo 1 || echo 0)
 # Détecter si awk supporte systime() (GNU awk)
 HAS_GAWK=$(awk 'BEGIN { print systime() }' 2>/dev/null | grep -qE '^[0-9]+$' && echo 1 || echo 0)
+# Outils pour calcul SHA256 (vérification intégrité transfert)
+HAS_SHA256SUM=$(command -v sha256sum >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_SHASUM=$(command -v shasum >/dev/null 2>&1 && echo 1 || echo 0)
+HAS_OPENSSL=$(command -v openssl >/dev/null 2>&1 && echo 1 || echo 0)
 
 # préfixe md5 portable (8 premiers caractères) pour créer les noms temporaires
 compute_md5_prefix() {
@@ -1220,31 +1224,22 @@ compute_sha256() {
         return 0
     fi
 
-    if command -v sha256sum >/dev/null 2>&1; then
+    if [[ "$HAS_SHA256SUM" -eq 1 ]]; then
         sha256sum -- "$file" | awk '{print $1}'
-        return 0
-    fi
-    if command -v shasum >/dev/null 2>&1; then
+    elif [[ "$HAS_SHASUM" -eq 1 ]]; then
         shasum -a 256 -- "$file" | awk '{print $1}'
-        return 0
-    fi
-    if command -v openssl >/dev/null 2>&1; then
-        openssl dgst -sha256 -- "$file" | awk '{print $2}'
-        return 0
-    fi
-    if command -v python3 >/dev/null 2>&1; then
+    elif [[ "$HAS_OPENSSL" -eq 1 ]]; then
+        openssl dgst -sha256 -- "$file" | awk '{print $NF}'
+    elif [[ "$HAS_PYTHON3" -eq 1 ]]; then
         python3 - <<PY "$file"
 import sys,hashlib
-f=sys.argv[1]
-with open(f,'rb') as fh:
-    h=hashlib.sha256(fh.read()).hexdigest()
-print(h)
+with open(sys.argv[1],'rb') as fh:
+    print(hashlib.sha256(fh.read()).hexdigest())
 PY
-        return 0
+    else
+        # fallback: vide si aucun outil n est disponible
+        echo ""
     fi
-
-    # fallback: vide si aucun outil n est disponible
-    echo ""
 }
 
 _setup_temp_files_and_logs() {
@@ -1525,7 +1520,7 @@ _finalize_try_move() {
 }
 
 # Nettoyage local des artefacts temporaires et calculs de taille/checksum.
-# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <sizeBeforeMB>
+# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <sizeBeforeMB> <sizeBeforeBytes>
 _finalize_log_and_verify() {
     local file_original="$1"
     local final_actual="$2"
@@ -1533,14 +1528,17 @@ _finalize_log_and_verify() {
     local ffmpeg_log_temp="$4"
     local checksum_before="$5"
     local sizeBeforeMB="$6"
+    local sizeBeforeBytes="${7:-0}"
 
     # Nettoyer les artefacts temporaires liés à l entrée et au log ffmpeg
     rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
 
-    # Taille après (en MB)
-    local sizeAfterMB=0
+    # Taille après (en MB et en octets)
+    local sizeAfterMB=0 sizeAfterBytes=0
     if [[ -e "$final_actual" ]]; then
         sizeAfterMB=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
+        # Taille exacte en octets (stat -c%s sur Linux, stat -f%z sur macOS)
+        sizeAfterBytes=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo 0)
     fi
 
     local size_comparison="${sizeBeforeMB}MB → ${sizeAfterMB}MB"
@@ -1556,32 +1554,34 @@ _finalize_log_and_verify() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
-    # calculer le checksum après le déplacement (sur le chemin réellement utilisé)
-    local checksum_after
-    checksum_after=$(compute_sha256 "$final_actual" 2>/dev/null || echo "")
-
-    local verify_status="UNKNOWN"
-    if [[ -n "$checksum_before" && -n "$checksum_after" ]]; then
-        if [[ "$checksum_before" == "$checksum_after" ]]; then
-            verify_status="OK"
-        else
+    # Vérification d intégrité : d abord comparer la taille exacte (rapide), puis checksum si nécessaire
+    local verify_status="OK"
+    local checksum_after=""
+    
+    if [[ "$sizeBeforeBytes" -gt 0 && "$sizeAfterBytes" -gt 0 && "$sizeBeforeBytes" -ne "$sizeAfterBytes" ]]; then
+        # Taille différente = transfert incomplet ou corrompu
+        verify_status="SIZE_MISMATCH"
+    elif [[ -n "$checksum_before" ]]; then
+        # Taille identique, vérifier le checksum
+        checksum_after=$(compute_sha256 "$final_actual" 2>/dev/null || echo "")
+        if [[ -z "$checksum_after" ]]; then
+            verify_status="NO_CHECKSUM"
+        elif [[ "$checksum_before" != "$checksum_after" ]]; then
             verify_status="MISMATCH"
         fi
-    elif [[ -n "$checksum_after" ]]; then
-        verify_status="AFTER_ONLY"
-    else
-        verify_status="NO_CHECKSUM"
+    elif [[ -z "$checksum_before" ]]; then
+        verify_status="SKIPPED"
     fi
 
     # Écrire uniquement dans les logs : VERIFY
     if [[ -n "$LOG_SUCCESS" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeMB}MB->${sizeAfterMB}MB | checksum_before:${checksum_before:-NA} | checksum_after:${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
-    # En cas de mismatch, journaliser dans le log d erreur
-    if [[ "$verify_status" == "MISMATCH" ]]; then
+    # En cas de problème, journaliser dans le log d erreur
+    if [[ "$verify_status" == "MISMATCH" || "$verify_status" == "SIZE_MISMATCH" ]]; then
         if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR verify_mismatch | $file_original -> $final_actual | before=$checksum_before after=$checksum_after" >> "$LOG_ERROR" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
         fi
     fi
 }
@@ -1618,16 +1618,17 @@ _finalize_conversion_success() {
         echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
     fi
 
-    # checksum avant déplacement (si possible)
-    local checksum_before
+    # checksum et taille exacte avant déplacement (pour vérification intégrité)
+    local checksum_before sizeBeforeBytes
     checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
+    sizeBeforeBytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
 
     # Déplacer / copier / fallback et récupérer le chemin réel
     local final_actual
     final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
 
     # Nettoyage, logs et vérifications
-    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB"
+    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB" "$sizeBeforeBytes"
 }
 
 _finalize_conversion_error() {
@@ -2037,6 +2038,7 @@ export_variables() {
     export PROCESSED_COUNT_FILE TARGET_COUNT_FILE
     export CONVERSION_MODE KEEP_INDEX SORT_MODE EXCLUDES_REGEX
     export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
+    export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
     ( IFS=:; export EXCLUDES="${EXCLUDES[*]}" )
 }
 
