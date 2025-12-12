@@ -124,6 +124,91 @@ compute_vmaf_score() {
     fi
 }
 
+# Lancer le calcul VMAF en arrière-plan
+# Usage : _compute_vmaf_background <fichier_original> <fichier_converti>
+# Le résultat sera loggé dans LOG_SUCCESS une fois terminé
+_compute_vmaf_background() {
+    local file_original="$1"
+    local final_actual="$2"
+    
+    # Vérifier que libvmaf est disponible
+    if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
+        return 0
+    fi
+    
+    # Vérifier que les deux fichiers existent
+    if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
+        return 0
+    fi
+    
+    # Lancer le calcul en background
+    (
+        local vmaf_score
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual")
+        
+        # Interpréter le score VMAF
+        local vmaf_quality=""
+        if [[ "$vmaf_score" != "NA" ]]; then
+            local vmaf_int=${vmaf_score%.*}
+            if [[ "$vmaf_int" -ge 90 ]]; then
+                vmaf_quality="EXCELLENT"
+            elif [[ "$vmaf_int" -ge 80 ]]; then
+                vmaf_quality="TRES_BON"
+            elif [[ "$vmaf_int" -ge 70 ]]; then
+                vmaf_quality="BON"
+            else
+                vmaf_quality="DEGRADE"
+            fi
+        fi
+        
+        # Logger le score VMAF (utiliser un lock pour éviter les écritures concurrentes)
+        if [[ -n "$LOG_SUCCESS" ]]; then
+            (
+                flock -x 200
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS"
+            ) 200>"${LOG_SUCCESS}.lock"
+        fi
+    ) &
+    
+    # Enregistrer le PID du job VMAF
+    local vmaf_pid=$!
+    echo "$vmaf_pid" >> "$VMAF_PIDS_FILE" 2>/dev/null || true
+}
+
+# Attendre la fin de tous les calculs VMAF en arrière-plan
+wait_vmaf_jobs() {
+    if [[ ! -f "$VMAF_PIDS_FILE" ]]; then
+        return 0
+    fi
+    
+    local vmaf_count=0
+    vmaf_count=$(wc -l < "$VMAF_PIDS_FILE" 2>/dev/null | tr -d ' ') || vmaf_count=0
+    
+    if [[ "$vmaf_count" -gt 0 ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${CYAN}📊 Attente de $vmaf_count analyse(s) VMAF en cours...${NOCOLOR}"
+        fi
+        
+        local finished=0
+        while IFS= read -r pid; do
+            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+                wait "$pid" 2>/dev/null || true
+            fi
+            ((finished++))
+            if [[ "$NO_PROGRESS" != true ]] && [[ $((finished % 5)) -eq 0 ]]; then
+                echo -e "  ${GREEN}✓${NOCOLOR} $finished/$vmaf_count analyses terminées"
+            fi
+        done < "$VMAF_PIDS_FILE"
+        
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${GREEN}✅ Toutes les analyses VMAF sont terminées${NOCOLOR}"
+        fi
+    fi
+    
+    # Nettoyer les fichiers temporaires
+    rm -f "$VMAF_PIDS_FILE" "${LOG_SUCCESS}.lock" 2>/dev/null || true
+}
+
 # compatibilité pour `nproc`
 nproc_compat() {
     if [[ "$HAS_NPROC" -eq 1 ]]; then
@@ -244,6 +329,7 @@ readonly INDEX="$LOG_DIR/Index"
 readonly INDEX_READABLE="$LOG_DIR/Index_readable_${EXECUTION_TIMESTAMP}.txt"
 readonly QUEUE="$LOG_DIR/Queue"
 readonly LOG_DRYRUN_COMPARISON="$LOG_DIR/DryRun_Comparison_${EXECUTION_TIMESTAMP}.log"
+readonly VMAF_PIDS_FILE="$LOG_DIR/.vmaf_pids_${EXECUTION_TIMESTAMP}"
 
 ###########################################################
 # PARAMÈTRES TECHNIQUES
@@ -1693,30 +1779,9 @@ _finalize_log_and_verify() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
-    # Évaluation de la qualité VMAF (compare l original avec le fichier converti)
-    local vmaf_score="NA"
-    if [[ "$HAS_LIBVMAF" -eq 1 ]] && [[ -f "$file_original" ]] && [[ -f "$final_actual" ]]; then
-        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual")
-    fi
-    
-    # Logger le score VMAF
-    if [[ -n "$LOG_SUCCESS" ]]; then
-        local vmaf_quality=""
-        if [[ "$vmaf_score" != "NA" ]]; then
-            # Interpréter le score VMAF
-            local vmaf_int=${vmaf_score%.*}
-            if [[ "$vmaf_int" -ge 90 ]]; then
-                vmaf_quality="EXCELLENT"
-            elif [[ "$vmaf_int" -ge 80 ]]; then
-                vmaf_quality="TRES_BON"
-            elif [[ "$vmaf_int" -ge 70 ]]; then
-                vmaf_quality="BON"
-            else
-                vmaf_quality="DEGRADE"
-            fi
-        fi
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS" 2>/dev/null || true
-    fi
+    # Évaluation de la qualité VMAF en arrière-plan (ne bloque pas la conversion suivante)
+    # Le score sera loggé de manière asynchrone une fois le calcul terminé
+    _compute_vmaf_background "$file_original" "$final_actual"
 
     # En cas de problème, journaliser dans le log d erreur
     if [[ "$verify_status" == "MISMATCH" || "$verify_status" == "SIZE_MISMATCH" ]]; then
@@ -2192,6 +2257,9 @@ dry_run_compare_names() {
 ###########################################################
 
 show_summary() {
+    # Attendre que toutes les analyses VMAF en arrière-plan soient terminées
+    wait_vmaf_jobs
+    
     local succ=0
     if [[ -f "$LOG_SUCCESS" && -s "$LOG_SUCCESS" ]]; then
         succ=$(grep -c ' | SUCCESS' "$LOG_SUCCESS" 2>/dev/null || echo 0)
@@ -2266,6 +2334,9 @@ export_variables() {
     # --- Fonctions utilitaires ---
     export -f is_excluded count_null_separated compute_md5_prefix nproc_compat now_ts
     
+    # --- Fonctions VMAF (qualité vidéo) ---
+    export -f compute_vmaf_score _compute_vmaf_background wait_vmaf_jobs
+    
     # --- Variables de configuration ---
     export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
     export ENCODER_PRESET CRF HWACCEL
@@ -2296,6 +2367,7 @@ export_variables() {
     export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
+    export HAS_LIBVMAF VMAF_PIDS_FILE
     
     # --- Export du tableau EXCLUDES ---
     ( IFS=:; export EXCLUDES="${EXCLUDES[*]}" )
