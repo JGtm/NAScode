@@ -94,27 +94,41 @@ compute_vmaf_score() {
         return 0
     fi
     
+    # Fichier temporaire pour le log VMAF (compatible Windows/Linux)
+    local vmaf_log_file="${TMP_DIR}/vmaf_result_$$.json"
+    mkdir -p "$TMP_DIR" 2>/dev/null || true
+    
     # Calculer le score VMAF
     # On utilise le modèle par défaut vmaf_v0.6.1
     # Le filtre libvmaf compare la vidéo distordue (input 0) à la référence (input 1)
-    local vmaf_output
-    vmaf_output=$(ffmpeg -hide_banner -i "$converted" -i "$original" \
-        -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=/dev/stdout" \
-        -f null - 2>/dev/null)
+    # Note: On redirige stderr vers stdout pour capturer le score affiché par ffmpeg
+    local vmaf_stderr
+    vmaf_stderr=$(ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
+        -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file" \
+        -f null - 2>&1)
     
-    if [[ $? -ne 0 ]] || [[ -z "$vmaf_output" ]]; then
-        echo "NA"
-        return 0
+    local ffmpeg_exit=$?
+    
+    # Extraire le score VMAF depuis le fichier JSON ou depuis stderr
+    local vmaf_score=""
+    
+    # Méthode 1: Lire depuis le fichier JSON généré
+    if [[ -f "$vmaf_log_file" ]] && [[ -s "$vmaf_log_file" ]]; then
+        vmaf_score=$(grep -o '"mean"[[:space:]]*:[[:space:]]*[0-9.]*' "$vmaf_log_file" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
     fi
     
-    # Extraire le score VMAF moyen du JSON
-    local vmaf_score
-    vmaf_score=$(echo "$vmaf_output" | grep -o '"mean":[0-9.]*' | head -1 | cut -d':' -f2)
-    
+    # Méthode 2: Extraire depuis la sortie stderr de ffmpeg (affiche le score à la fin)
     if [[ -z "$vmaf_score" ]]; then
-        # Essayer avec un autre pattern (format peut varier selon la version)
-        vmaf_score=$(echo "$vmaf_output" | grep -oE 'VMAF score:\s*[0-9.]+' | grep -oE '[0-9.]+')
+        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score:[[:space:]]*[0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
     fi
+    
+    # Méthode 3: Pattern alternatif
+    if [[ -z "$vmaf_score" ]]; then
+        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score = [0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    fi
+    
+    # Nettoyer le fichier temporaire
+    rm -f "$vmaf_log_file" 2>/dev/null || true
     
     if [[ -n "$vmaf_score" ]]; then
         # Arrondir à 2 décimales
