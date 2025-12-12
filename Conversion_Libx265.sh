@@ -985,6 +985,23 @@ check_output_suffix() {
 }
 
 ###########################################################
+# VÉRIFICATION VMAF
+###########################################################
+
+check_vmaf() {
+    if [[ "$VMAF_ENABLED" != true ]]; then
+        return 0
+    fi
+    
+    if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
+        echo -e "${CYAN}📊 Évaluation VMAF activée${NOCOLOR}"
+    else
+        echo -e "${YELLOW}⚠️ Évaluation VMAF demandée mais libvmaf non disponible dans FFmpeg${NOCOLOR}"
+        VMAF_ENABLED=false
+    fi
+}
+
+###########################################################
 # ANALYSE DES MÉTADONNÉES VIDÉO
 ###########################################################
 
@@ -2458,15 +2475,8 @@ main() {
     # Détecter le hwaccel avant d indexer / construire la queue
     detect_hwaccel
 
-    # Afficher si l'évaluation VMAF est activée
-    if [[ "$VMAF_ENABLED" == true ]]; then
-        if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
-            echo -e "${CYAN}📊 Évaluation VMAF activée${NOCOLOR}"
-        else
-            echo -e "${YELLOW}⚠️ Évaluation VMAF demandée mais libvmaf non disponible dans FFmpeg${NOCOLOR}"
-            VMAF_ENABLED=false
-        fi
-    fi
+    # Vérifier si VMAF est activé et disponible
+    check_vmaf
 
     build_queue
     
