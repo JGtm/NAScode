@@ -1459,7 +1459,7 @@ _execute_conversion() {
             if (duration < 1) exit;
             start = START + 0;
             last_update = 0;
-            refresh_interval = 10;
+            refresh_interval = 2;
             speed = 1;
         }
 
@@ -1487,20 +1487,32 @@ _execute_conversion() {
 
             eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
 
-            # Contrôle des rafraîchissements (une seule lecture de now suffit)
+            # Construction de la barre de progression visuelle
+            bar_width = 30;
+            filled = int(percent * bar_width / 100);
+            bar = \"\";
+            for (i = 0; i < filled; i++) bar = bar \"=\";
+            if (filled < bar_width) bar = bar \">\";
+            for (i = filled + 1; i < bar_width; i++) bar = bar \" \";
+
+            # Rafraîchissement sur une seule ligne avec \\r (retour chariot)
             if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
-                printf \"  ... [%-40.40s] %5.1f%% | ETA: %s | Speed: %.2fx\\n\",
-                       CURRENT_FILE_NAME, percent, eta_str, speed;
-                fflush();
+                # \\r retourne au début de ligne, \\033[K efface jusqu à la fin
+                printf \"\\r\\033[K  🎬 [%-30.30s] [%s] %5.1f%% | ETA: %s | x%.2f\",
+                       CURRENT_FILE_NAME, bar, percent, eta_str, speed > \"/dev/stderr\";
+                fflush(\"/dev/stderr\");
                 last_update = now;
             }
         }
 
         /progress=end/ {
             if (NOPROG != \"true\") {
-                printf \"  ... [%-40.40s] %5s | ETA: 00:00:00 | Speed: %.2fx\\n\",
-                    CURRENT_FILE_NAME, \"  100%\", speed;
-                fflush();
+                # Ligne finale avec saut de ligne pour passer à la suite
+                bar_complete = \"\";
+                for (i = 0; i < 30; i++) bar_complete = bar_complete \"=\";
+                printf \"\\r\\033[K  ✅ [%-30.30s] [%s] 100.0%% | Terminé | x%.2f\\n\",
+                    CURRENT_FILE_NAME, bar_complete, speed > \"/dev/stderr\";
+                fflush(\"/dev/stderr\");
             }
         }
     "
