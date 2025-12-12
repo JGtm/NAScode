@@ -53,6 +53,8 @@ HAS_GAWK=$(awk 'BEGIN { print systime() }' 2>/dev/null | grep -qE '^[0-9]+$' && 
 HAS_SHA256SUM=$(command -v sha256sum >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_SHASUM=$(command -v shasum >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_OPENSSL=$(command -v openssl >/dev/null 2>&1 && echo 1 || echo 0)
+# Détection de libvmaf dans FFmpeg (pour évaluation qualité vidéo)
+HAS_LIBVMAF=$(ffmpeg -hide_banner -filters 2>/dev/null | grep -q libvmaf && echo 1 || echo 0)
 
 # préfixe md5 portable (8 premiers caractères) pour créer les noms temporaires
 compute_md5_prefix() {
@@ -70,6 +72,55 @@ PY
     else
         # repli : utiliser un hash shell simple (non cryptographique mais stable)
         printf "%s" "$input" | awk '{s=0; for(i=1;i<=length($0);i++){s=(s*31+and(255, ord=ord(substr($0,i,1))));} printf "%08x", s}' 2>/dev/null || echo "00000000"
+    fi
+}
+
+# Calcul du score VMAF (qualité vidéo perceptuelle)
+# Usage : compute_vmaf_score <fichier_original> <fichier_converti>
+# Retourne le score VMAF moyen (0-100) ou "NA" si indisponible
+compute_vmaf_score() {
+    local original="$1"
+    local converted="$2"
+    
+    # Vérifier que libvmaf est disponible
+    if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
+        echo "NA"
+        return 0
+    fi
+    
+    # Vérifier que les deux fichiers existent
+    if [[ ! -f "$original" ]] || [[ ! -f "$converted" ]]; then
+        echo "NA"
+        return 0
+    fi
+    
+    # Calculer le score VMAF
+    # On utilise le modèle par défaut vmaf_v0.6.1
+    # Le filtre libvmaf compare la vidéo distordue (input 0) à la référence (input 1)
+    local vmaf_output
+    vmaf_output=$(ffmpeg -hide_banner -i "$converted" -i "$original" \
+        -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=/dev/stdout" \
+        -f null - 2>/dev/null)
+    
+    if [[ $? -ne 0 ]] || [[ -z "$vmaf_output" ]]; then
+        echo "NA"
+        return 0
+    fi
+    
+    # Extraire le score VMAF moyen du JSON
+    local vmaf_score
+    vmaf_score=$(echo "$vmaf_output" | grep -o '"mean":[0-9.]*' | head -1 | cut -d':' -f2)
+    
+    if [[ -z "$vmaf_score" ]]; then
+        # Essayer avec un autre pattern (format peut varier selon la version)
+        vmaf_score=$(echo "$vmaf_output" | grep -oE 'VMAF score:\s*[0-9.]+' | grep -oE '[0-9.]+')
+    fi
+    
+    if [[ -n "$vmaf_score" ]]; then
+        # Arrondir à 2 décimales
+        printf "%.2f" "$vmaf_score"
+    else
+        echo "NA"
     fi
 }
 
@@ -1640,6 +1691,31 @@ _finalize_log_and_verify() {
     # Écrire uniquement dans les logs : VERIFY
     if [[ -n "$LOG_SUCCESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
+    fi
+
+    # Évaluation de la qualité VMAF (compare l original avec le fichier converti)
+    local vmaf_score="NA"
+    if [[ "$HAS_LIBVMAF" -eq 1 ]] && [[ -f "$file_original" ]] && [[ -f "$final_actual" ]]; then
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual")
+    fi
+    
+    # Logger le score VMAF
+    if [[ -n "$LOG_SUCCESS" ]]; then
+        local vmaf_quality=""
+        if [[ "$vmaf_score" != "NA" ]]; then
+            # Interpréter le score VMAF
+            local vmaf_int=${vmaf_score%.*}
+            if [[ "$vmaf_int" -ge 90 ]]; then
+                vmaf_quality="EXCELLENT"
+            elif [[ "$vmaf_int" -ge 80 ]]; then
+                vmaf_quality="TRES_BON"
+            elif [[ "$vmaf_int" -ge 70 ]]; then
+                vmaf_quality="BON"
+            else
+                vmaf_quality="DEGRADE"
+            fi
+        fi
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
     # En cas de problème, journaliser dans le log d erreur
