@@ -823,9 +823,9 @@ check_vmaf() {
     fi
     
     if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
-        echo -e "${BLUE}📊 Évaluation VMAF activée${NOCOLOR}"
+        echo -e "${YELLOW}📊 Évaluation VMAF activée${NOCOLOR}"
     else
-        echo -e "${YELLOW}⚠️ Évaluation VMAF demandée mais libvmaf non disponible dans FFmpeg${NOCOLOR}"
+        echo -e "${RED}⚠️ Évaluation VMAF demandée mais libvmaf non disponible dans FFmpeg${NOCOLOR}"
         VMAF_ENABLED=false
     fi
 }
