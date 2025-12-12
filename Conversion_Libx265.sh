@@ -2304,6 +2304,12 @@ show_summary() {
     if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
         checksum_anomalies=$(grep -cE ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' "$LOG_ERROR" 2>/dev/null | tr -d '\r\n') || checksum_anomalies=0
     fi
+
+    # Anomalies VMAF : fichiers avec qualité dégradée (score < 70)
+    local vmaf_anomalies=0
+    if [[ -f "$LOG_SUCCESS" && -s "$LOG_SUCCESS" ]]; then
+        vmaf_anomalies=$(grep -c ' | VMAF | .* | quality:DEGRADE' "$LOG_SUCCESS" 2>/dev/null | tr -d '\r\n') || vmaf_anomalies=0
+    fi
     
     {
         echo ""
@@ -2314,7 +2320,12 @@ show_summary() {
         echo "Succès    : $succ"
         echo "Ignorés   : $skip"
         echo "Erreurs   : $err"
-        echo "Anomalies : Taille : $size_anomalies  Intégrité : $checksum_anomalies"
+        echo "-------------------------------------------"
+        echo "           ANOMALIES DÉTECTÉES             "
+        echo "-------------------------------------------"
+        echo "Taille    : $size_anomalies"
+        echo "Intégrité : $checksum_anomalies"
+        echo "VMAF      : $vmaf_anomalies"
         echo "-------------------------------------------"
     } | tee "$SUMMARY_FILE"
 }
