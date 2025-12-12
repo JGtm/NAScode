@@ -1,3 +1,22 @@
+# Logs et fichiers temporaires
 logs/
 Converted/
+.temp_processing/
+
+# Dossiers de travail (contiennent les fichiers utilisateur)
+Input/
+Output/
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Thumbnails
+Thumbs.db
+
+# Fichiers temporaires
+*.tmp
+*.temp
+*~
