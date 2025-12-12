@@ -2447,8 +2447,6 @@ main() {
     
     # Convertir SOURCE en chemin absolu pour éviter les problèmes de répertoire courant
     SOURCE=$(cd "$SOURCE" && pwd)
-
-    echo "coucou tu veux voir ma bite"
     
     check_lock
     check_dependencies
@@ -2459,6 +2457,16 @@ main() {
     
     # Détecter le hwaccel avant d indexer / construire la queue
     detect_hwaccel
+
+    # Afficher si l'évaluation VMAF est activée
+    if [[ "$VMAF_ENABLED" == true ]]; then
+        if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
+            echo -e "${CYAN}📊 Évaluation VMAF activée${NOCOLOR}"
+        else
+            echo -e "${YELLOW}⚠️ Évaluation VMAF demandée mais libvmaf non disponible dans FFmpeg${NOCOLOR}"
+            VMAF_ENABLED=false
+        fi
+    fi
 
     build_queue
     
