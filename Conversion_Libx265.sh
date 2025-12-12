@@ -161,12 +161,21 @@ _compute_vmaf_background() {
             fi
         fi
         
-        # Logger le score VMAF (utiliser un lock pour éviter les écritures concurrentes)
+        # Logger le score VMAF (utiliser un lock portable pour éviter les écritures concurrentes)
         if [[ -n "$LOG_SUCCESS" ]]; then
-            (
-                flock -x 200
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS"
-            ) 200>"${LOG_SUCCESS}.lock"
+            local lockfile="${LOG_SUCCESS}.vmaf.lock"
+            local lockdir="${lockfile}.dir"
+            # Attendre le verrou (max 30s)
+            local wait_count=0
+            while ! mkdir "$lockdir" 2>/dev/null; do
+                sleep 0.1
+                ((wait_count++))
+                if [[ $wait_count -ge 300 ]]; then
+                    break  # Timeout, on écrit quand même
+                fi
+            done
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS" 2>/dev/null || true
+            rm -rf "$lockdir" 2>/dev/null || true
         fi
     ) &
     
@@ -531,9 +540,10 @@ EOF
 
 cleanup() {
     local exit_code=$?
-    # Afficher le message d interruption seulement si terminaison anormale (signal ou erreur)
+    # Afficher le message d interruption seulement si terminaison par signal (INT/TERM)
     # et pas déjà signalé par STOP_FLAG
-    if [[ $exit_code -ne 0 ]] && [[ ! -f "$STOP_FLAG" ]]; then
+    # Note: On utilise une variable pour détecter les signaux plutôt que le code de sortie
+    if [[ "${_INTERRUPTED:-}" == "1" ]] && [[ ! -f "$STOP_FLAG" ]]; then
         echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
     fi
     touch "$STOP_FLAG"
@@ -553,7 +563,15 @@ cleanup() {
     fi
 }
 
-trap cleanup EXIT INT TERM
+# Variable pour détecter une vraie interruption (Ctrl+C ou kill)
+_INTERRUPTED=0
+_handle_interrupt() {
+    _INTERRUPTED=1
+    exit 130
+}
+
+trap cleanup EXIT
+trap _handle_interrupt INT TERM
 
 check_lock() {
     if [[ -f "$LOCKFILE" ]]; then
