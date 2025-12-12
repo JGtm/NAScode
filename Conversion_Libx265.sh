@@ -393,8 +393,10 @@ EOF
 ###########################################################
 
 cleanup() {
-    # Afficher le message d interruption immédiatement (avant de rendre la main au shell)
-    if [[ ! -f "$STOP_FLAG" ]]; then
+    local exit_code=$?
+    # Afficher le message d interruption seulement si terminaison anormale (signal ou erreur)
+    # et pas déjà signalé par STOP_FLAG
+    if [[ $exit_code -ne 0 ]] && [[ ! -f "$STOP_FLAG" ]]; then
         echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
     fi
     touch "$STOP_FLAG"
@@ -1127,7 +1129,13 @@ _create_readable_queue_copy() {
 }
 
 # Incrémenter le compteur de fichiers traités (thread-safe via lock)
+# Incrémenter le compteur de fichiers traités (utilisé seulement en mode FIFO avec limite)
 increment_processed_count() {
+    # Ne rien faire si pas en mode FIFO (pas de limite)
+    if [[ -z "${PROCESSED_COUNT_FILE:-}" ]] || [[ ! -f "${PROCESSED_COUNT_FILE:-}" ]]; then
+        return 0
+    fi
+    
     local lockdir="$LOG_DIR/processed_count.lock"
     # Mutex simple via mkdir
     local attempts=0
@@ -2154,30 +2162,66 @@ show_summary() {
 ###########################################################
 
 export_variables() {
-    export -f convert_file get_video_metadata should_skip_conversion clean_number \
-        _prepare_file_paths _check_output_exists _handle_dryrun_mode _setup_temp_files_and_logs \
-        _check_disk_space _analyze_video _copy_to_temp_storage _execute_conversion custom_pv \
-        _finalize_conversion_success _finalize_try_move _finalize_log_and_verify _finalize_conversion_error is_excluded _get_temp_filename \
-        _handle_custom_queue _handle_existing_index _count_total_video_files _index_video_files \
-        _generate_index _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty \
-        _display_random_mode_selection build_queue validate_queue_file _create_readable_queue_copy \
-        prepare_dynamic_queue _process_queue_simple _process_queue_with_fifo \
-        count_null_separated compute_md5_prefix nproc_compat now_ts \
-        increment_processed_count update_queue
-    export DRYRUN LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE LOG_DIR
-    export TMP_DIR ENCODER_PRESET CRF IO_PRIORITY_CMD SOURCE OUTPUT_DIR FFMPEG_MIN_VERSION
+    # --- Fonctions de conversion ---
+    export -f convert_file get_video_metadata should_skip_conversion clean_number custom_pv
+    
+    # --- Fonctions de préparation fichiers ---
+    export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
+    export -f _setup_temp_files_and_logs _check_disk_space _get_temp_filename
+    
+    # --- Fonctions d analyse et copie ---
+    export -f _analyze_video _copy_to_temp_storage _execute_conversion
+    
+    # --- Fonctions de finalisation ---
+    export -f _finalize_conversion_success _finalize_try_move
+    export -f _finalize_log_and_verify _finalize_conversion_error
+    
+    # --- Fonctions de gestion de queue ---
+    export -f _handle_custom_queue _handle_existing_index
+    export -f _count_total_video_files _index_video_files _generate_index
+    export -f _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty
+    export -f _display_random_mode_selection _create_readable_queue_copy
+    export -f build_queue validate_queue_file
+    
+    # --- Fonctions de traitement parallèle ---
+    export -f prepare_dynamic_queue _process_queue_simple _process_queue_with_fifo
+    export -f increment_processed_count update_queue
+    
+    # --- Fonctions utilitaires ---
+    export -f is_excluded count_null_separated compute_md5_prefix nproc_compat now_ts
+    
+    # --- Variables de configuration ---
+    export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
+    export ENCODER_PRESET CRF HWACCEL
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
-    export MIN_TMP_FREE_MB PARALLEL_JOBS HWACCEL
-    export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE AWK_PROGRESS_SCRIPT
-    export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG SCRIPT_DIR
-    export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE EXECUTION_TIMESTAMP QUEUE INDEX INDEX_READABLE
+    export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
+    
+    # --- Variables de chemins ---
+    export SOURCE OUTPUT_DIR TMP_DIR SCRIPT_DIR
+    export LOG_DIR LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE
+    export QUEUE INDEX INDEX_READABLE
+    
+    # --- Variables de queue dynamique (mode FIFO) ---
     export WORKFIFO QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE
     export FIFO_WRITER_PID FIFO_WRITER_READY
     export PROCESSED_COUNT_FILE TARGET_COUNT_FILE
-    export CONVERSION_MODE KEEP_INDEX SORT_MODE EXCLUDES_REGEX
-    export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
+    
+    # --- Variables d options ---
+    export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG
+    export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE
+    export EXECUTION_TIMESTAMP EXCLUDES_REGEX
+    
+    # --- Variables de couleurs et affichage ---
+    export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE
+    export AWK_PROGRESS_SCRIPT IO_PRIORITY_CMD
+    
+    # --- Variables de détection d outils ---
+    export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL
+    export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
+    
+    # --- Export du tableau EXCLUDES ---
     ( IFS=:; export EXCLUDES="${EXCLUDES[*]}" )
 }
 
