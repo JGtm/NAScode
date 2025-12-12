@@ -75,177 +75,6 @@ PY
     fi
 }
 
-# Calcul du score VMAF (qualité vidéo perceptuelle)
-# Usage : compute_vmaf_score <fichier_original> <fichier_converti>
-# Retourne le score VMAF moyen (0-100) ou "NA" si indisponible
-compute_vmaf_score() {
-    local original="$1"
-    local converted="$2"
-    
-    # Vérifier que libvmaf est disponible
-    if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
-        echo "NA"
-        return 0
-    fi
-    
-    # Vérifier que les deux fichiers existent
-    if [[ ! -f "$original" ]] || [[ ! -f "$converted" ]]; then
-        echo "NA"
-        return 0
-    fi
-    
-    # Fichier temporaire pour le log VMAF (compatible Windows/Linux)
-    local vmaf_log_file="${TMP_DIR}/vmaf_result_$$.json"
-    mkdir -p "$TMP_DIR" 2>/dev/null || true
-    
-    # Calculer le score VMAF
-    # On utilise le modèle par défaut vmaf_v0.6.1
-    # Le filtre libvmaf compare la vidéo distordue (input 0) à la référence (input 1)
-    # Note: On redirige stderr vers stdout pour capturer le score affiché par ffmpeg
-    local vmaf_stderr
-    vmaf_stderr=$(ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
-        -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file" \
-        -f null - 2>&1)
-    
-    local ffmpeg_exit=$?
-    
-    # Extraire le score VMAF depuis le fichier JSON ou depuis stderr
-    local vmaf_score=""
-    
-    # Méthode 1: Lire depuis le fichier JSON généré
-    if [[ -f "$vmaf_log_file" ]] && [[ -s "$vmaf_log_file" ]]; then
-        vmaf_score=$(grep -o '"mean"[[:space:]]*:[[:space:]]*[0-9.]*' "$vmaf_log_file" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    fi
-    
-    # Méthode 2: Extraire depuis la sortie stderr de ffmpeg (affiche le score à la fin)
-    if [[ -z "$vmaf_score" ]]; then
-        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score:[[:space:]]*[0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    fi
-    
-    # Méthode 3: Pattern alternatif
-    if [[ -z "$vmaf_score" ]]; then
-        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score = [0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    fi
-    
-    # Nettoyer le fichier temporaire
-    rm -f "$vmaf_log_file" 2>/dev/null || true
-    
-    if [[ -n "$vmaf_score" ]]; then
-        # Arrondir à 2 décimales
-        printf "%.2f" "$vmaf_score"
-    else
-        echo "NA"
-    fi
-}
-
-# Enregistrer une paire de fichiers pour analyse VMAF ultérieure
-# Usage : _queue_vmaf_analysis <fichier_original> <fichier_converti>
-# Les analyses seront effectuées à la fin de toutes les conversions
-_queue_vmaf_analysis() {
-    local file_original="$1"
-    local final_actual="$2"
-    
-    # Vérifier que l'évaluation VMAF est activée
-    if [[ "$VMAF_ENABLED" != true ]]; then
-        return 0
-    fi
-    
-    # Vérifier que libvmaf est disponible
-    if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
-        return 0
-    fi
-    
-    # Vérifier que les deux fichiers existent
-    if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
-        return 0
-    fi
-    
-    # Enregistrer la paire dans le fichier de queue (format: original|converti)
-    echo "${file_original}|${final_actual}" >> "$VMAF_QUEUE_FILE" 2>/dev/null || true
-}
-
-# Traiter toutes les analyses VMAF en attente
-# Appelé à la fin de toutes les conversions, avant le résumé
-process_vmaf_queue() {
-    if [[ ! -f "$VMAF_QUEUE_FILE" ]] || [[ ! -s "$VMAF_QUEUE_FILE" ]]; then
-        return 0
-    fi
-    
-    local vmaf_count
-    vmaf_count=$(wc -l < "$VMAF_QUEUE_FILE" 2>/dev/null | tr -d ' ') || vmaf_count=0
-    
-    if [[ "$vmaf_count" -eq 0 ]]; then
-        return 0
-    fi
-    
-    if [[ "$NO_PROGRESS" != true ]]; then
-        echo ""
-        echo -e "${CYAN}📊 Analyse VMAF de $vmaf_count fichier(s)...${NOCOLOR}"
-    fi
-    
-    local current=0
-    while IFS='|' read -r file_original final_actual; do
-        ((current++))
-        
-        # Vérifier que les fichiers existent toujours
-        if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
-            if [[ "$NO_PROGRESS" != true ]]; then
-                echo -e "  ${YELLOW}⚠${NOCOLOR} [$current/$vmaf_count] Fichier(s) introuvable(s), ignoré"
-            fi
-            continue
-        fi
-        
-        local filename
-        filename=$(basename "$final_actual")
-        
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -ne "  ${CYAN}▶${NOCOLOR} [$current/$vmaf_count] Analyse: $filename...\r"
-        fi
-        
-        # Calculer le score VMAF
-        local vmaf_score
-        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual")
-        
-        # Interpréter le score VMAF
-        local vmaf_quality=""
-        if [[ "$vmaf_score" != "NA" ]]; then
-            local vmaf_int=${vmaf_score%.*}
-            if [[ "$vmaf_int" -ge 90 ]]; then
-                vmaf_quality="EXCELLENT"
-            elif [[ "$vmaf_int" -ge 80 ]]; then
-                vmaf_quality="TRES_BON"
-            elif [[ "$vmaf_int" -ge 70 ]]; then
-                vmaf_quality="BON"
-            else
-                vmaf_quality="DEGRADE"
-            fi
-        fi
-        
-        # Logger le score VMAF
-        if [[ -n "$LOG_SUCCESS" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS" 2>/dev/null || true
-        fi
-        
-        if [[ "$NO_PROGRESS" != true ]]; then
-            local status_icon="${GREEN}✓${NOCOLOR}"
-            if [[ "$vmaf_score" == "NA" ]]; then
-                status_icon="${YELLOW}?${NOCOLOR}"
-            elif [[ "$vmaf_quality" == "DEGRADE" ]]; then
-                status_icon="${RED}✗${NOCOLOR}"
-            fi
-            echo -e "  $status_icon [$current/$vmaf_count] $filename: ${vmaf_score} (${vmaf_quality:-NA})          "
-        fi
-        
-    done < "$VMAF_QUEUE_FILE"
-    
-    if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${GREEN}✅ Analyses VMAF terminées${NOCOLOR}"
-    fi
-    
-    # Nettoyer le fichier de queue
-    rm -f "$VMAF_QUEUE_FILE" 2>/dev/null || true
-}
-
 # compatibilité pour `nproc`
 nproc_compat() {
     if [[ "$HAS_NPROC" -eq 1 ]]; then
@@ -985,7 +814,7 @@ check_output_suffix() {
 }
 
 ###########################################################
-# VÉRIFICATION VMAF
+# VÉRIFICATION LIBRAIRIE VMAF
 ###########################################################
 
 check_vmaf() {
@@ -994,7 +823,7 @@ check_vmaf() {
     fi
     
     if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
-        echo -e "${CYAN}📊 Évaluation VMAF activée${NOCOLOR}"
+        echo -e "${BLUE}📊 Évaluation VMAF activée${NOCOLOR}"
     else
         echo -e "${YELLOW}⚠️ Évaluation VMAF demandée mais libvmaf non disponible dans FFmpeg${NOCOLOR}"
         VMAF_ENABLED=false
@@ -1736,201 +1565,6 @@ _execute_conversion() {
 }
 
 ###########################################################
-# RESULTATS ET FINALISATION
-###########################################################
-
-# Essayer de déplacer le fichier produit vers la destination finale.
-# Renvoie le chemin réel utilisé pour le fichier final sur stdout.
-# Usage : _finalize_try_move <tmp_output> <final_output> <file_original>
-_finalize_try_move() {
-    local tmp_output="$1"
-    local final_output="$2"
-    local file_original="$3"
-
-    local max_try=3
-    local try=0
-
-    # Tentative mv (3 essais)
-    while [[ $try -lt $max_try ]]; do
-        if mv "$tmp_output" "$final_output" 2>/dev/null; then
-            printf "%s" "$final_output"
-            return 0
-        fi
-        try=$((try+1))
-        sleep 2
-    done
-
-    # Essayer cp + rm (3 essais)
-    try=0
-    while [[ $try -lt $max_try ]]; do
-        if cp "$tmp_output" "$final_output" 2>/dev/null; then
-            rm -f "$tmp_output" 2>/dev/null || true
-            printf "%s" "$final_output"
-            return 0
-        fi
-        try=$((try+1))
-        sleep 2
-    done
-
-    # Repli local : dossier fallback
-    local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
-    mkdir -p "$local_fallback_dir" 2>/dev/null || true
-    if mv "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
-        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
-        return 0
-    fi
-    if cp "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
-        rm -f "$tmp_output" 2>/dev/null || true
-        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
-        return 0
-    fi
-
-    # Ultime repli : laisser le temporaire et l utiliser
-    printf "%s" "$tmp_output"
-    return 2
-}
-
-# Nettoyage local des artefacts temporaires et calculs de taille/checksum.
-# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <sizeBeforeMB> <sizeBeforeBytes>
-_finalize_log_and_verify() {
-    local file_original="$1"
-    local final_actual="$2"
-    local tmp_input="$3"
-    local ffmpeg_log_temp="$4"
-    local checksum_before="$5"
-    local sizeBeforeMB="$6"
-    local sizeBeforeBytes="${7:-0}"
-
-    # Nettoyer les artefacts temporaires liés à l entrée et au log ffmpeg
-    rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
-
-    # Taille après (en MB et en octets)
-    local sizeAfterMB=0 sizeAfterBytes=0
-    if [[ -e "$final_actual" ]]; then
-        sizeAfterMB=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
-        # Taille exacte en octets (stat -c%s sur Linux, stat -f%z sur macOS)
-        sizeAfterBytes=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo 0)
-    fi
-
-    local size_comparison="${sizeBeforeMB}MB → ${sizeAfterMB}MB"
-
-    if [[ "$sizeAfterMB" -ge "$sizeBeforeMB" ]]; then
-        if [[ -n "$LOG_SKIPPED" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: FICHIER PLUS LOURD ($size_comparison). | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
-        fi
-    fi
-
-    # Log success
-    if [[ -n "$LOG_SUCCESS" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
-    fi
-
-    # Vérification d intégrité : d abord comparer la taille exacte (rapide), puis checksum si nécessaire
-    local verify_status="OK"
-    local checksum_after=""
-    
-    if [[ "$sizeBeforeBytes" -gt 0 && "$sizeAfterBytes" -gt 0 && "$sizeBeforeBytes" -ne "$sizeAfterBytes" ]]; then
-        # Taille différente = transfert incomplet ou corrompu
-        verify_status="SIZE_MISMATCH"
-    elif [[ -n "$checksum_before" ]]; then
-        # Taille identique, vérifier le checksum
-        checksum_after=$(compute_sha256 "$final_actual" 2>/dev/null || echo "")
-        if [[ -z "$checksum_after" ]]; then
-            verify_status="NO_CHECKSUM"
-        elif [[ "$checksum_before" != "$checksum_after" ]]; then
-            verify_status="MISMATCH"
-        fi
-    elif [[ -z "$checksum_before" ]]; then
-        verify_status="SKIPPED"
-    fi
-
-    # Écrire uniquement dans les logs : VERIFY
-    if [[ -n "$LOG_SUCCESS" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
-    fi
-
-    # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)
-    _queue_vmaf_analysis "$file_original" "$final_actual"
-
-    # En cas de problème, journaliser dans le log d erreur
-    if [[ "$verify_status" == "MISMATCH" || "$verify_status" == "SIZE_MISMATCH" ]]; then
-        if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
-        fi
-    fi
-}
-
-# Fonction principale de finalisation (regroupe l affichage, le déplacement, le logging)
-_finalize_conversion_success() {
-    local filename="$1"
-    local file_original="$2"
-    local tmp_input="$3"
-    local tmp_output="$4"
-    local final_output="$5"
-    local ffmpeg_log_temp="$6"
-    local sizeBeforeMB="$7"
-
-    # Si un marqueur d arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
-    if [[ -f "$STOP_FLAG" ]]; then
-        rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
-        return 1
-    fi
-
-    if [[ "$NO_PROGRESS" != true ]]; then
-        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l appel à ffmpeg)
-        local elapsed_str="N/A"
-        if [[ -n "${START_TS:-}" ]]; then
-            local end_ts
-            end_ts=$(date +%s)
-            local elapsed=$((end_ts - START_TS))
-            local eh=$((elapsed / 3600))
-            local em=$(((elapsed % 3600) / 60))
-            local es=$((elapsed % 60))
-            elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
-        fi
-
-        echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
-    fi
-
-    # checksum et taille exacte avant déplacement (pour vérification intégrité)
-    local checksum_before sizeBeforeBytes
-    checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
-    sizeBeforeBytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
-
-    # Déplacer / copier / fallback et récupérer le chemin réel
-    local final_actual
-    final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
-
-    # Nettoyage, logs et vérifications
-    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB" "$sizeBeforeBytes"
-}
-
-_finalize_conversion_error() {
-    local filename="$1"
-    local file_original="$2"
-    local tmp_input="$3"
-    local tmp_output="$4"
-    local ffmpeg_log_temp="$5"
-    
-    if [[ ! -f "$STOP_FLAG" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${RED}❌ Échec de la conversion : $filename${NOCOLOR}"
-        fi
-    fi
-    if [[ -n "$LOG_ERROR" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_ERROR" 2>/dev/null || true
-        echo "--- Erreur détaillée FFMPEG ---" >> "$LOG_ERROR" 2>/dev/null || true
-        if [[ -n "$ffmpeg_log_temp" ]] && [[ -f "$ffmpeg_log_temp" ]] && [[ -s "$ffmpeg_log_temp" ]]; then
-            cat "$ffmpeg_log_temp" >> "$LOG_ERROR" 2>/dev/null || true
-        else
-            echo "(Log d'erreur : ffmpeg_log_temp='$ffmpeg_log_temp' exists=$([ -f "$ffmpeg_log_temp" ] && echo 'OUI' || echo 'NON'))" >> "$LOG_ERROR" 2>/dev/null || true
-        fi
-        echo "-------------------------------" >> "$LOG_ERROR" 2>/dev/null || true
-    fi
-    rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null
-}
-
-###########################################################
 # TRAITEMENT DE LA FILE d ATTENTE
 ###########################################################
 
@@ -2218,6 +1852,377 @@ convert_file() {
     # Incrémenter le compteur de fichiers traités (signal pour le FIFO writer)
     increment_processed_count || true
 }
+
+###########################################################
+# ANALYSE VMAF
+###########################################################
+
+# Calcul du score VMAF (qualité vidéo perceptuelle)
+# Usage : compute_vmaf_score <fichier_original> <fichier_converti>
+# Retourne le score VMAF moyen (0-100) ou "NA" si indisponible
+compute_vmaf_score() {
+    local original="$1"
+    local converted="$2"
+    
+    # Vérifier que libvmaf est disponible
+    if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
+        echo "NA"
+        return 0
+    fi
+    
+    # Vérifier que les deux fichiers existent
+    if [[ ! -f "$original" ]] || [[ ! -f "$converted" ]]; then
+        echo "NA"
+        return 0
+    fi
+    
+    # Fichier temporaire pour le log VMAF (compatible Windows/Linux)
+    local vmaf_log_file="${TMP_DIR}/vmaf_result_$$.json"
+    mkdir -p "$TMP_DIR" 2>/dev/null || true
+    
+    # Calculer le score VMAF
+    # On utilise le modèle par défaut vmaf_v0.6.1
+    # Le filtre libvmaf compare la vidéo distordue (input 0) à la référence (input 1)
+    # Note: On redirige stderr vers stdout pour capturer le score affiché par ffmpeg
+    local vmaf_stderr
+    vmaf_stderr=$(ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
+        -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file" \
+        -f null - 2>&1)
+    
+    local ffmpeg_exit=$?
+    
+    # Extraire le score VMAF depuis le fichier JSON ou depuis stderr
+    local vmaf_score=""
+    
+    # Méthode 1: Lire depuis le fichier JSON généré
+    if [[ -f "$vmaf_log_file" ]] && [[ -s "$vmaf_log_file" ]]; then
+        vmaf_score=$(grep -o '"mean"[[:space:]]*:[[:space:]]*[0-9.]*' "$vmaf_log_file" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    fi
+    
+    # Méthode 2: Extraire depuis la sortie stderr de ffmpeg (affiche le score à la fin)
+    if [[ -z "$vmaf_score" ]]; then
+        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score:[[:space:]]*[0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    fi
+    
+    # Méthode 3: Pattern alternatif
+    if [[ -z "$vmaf_score" ]]; then
+        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score = [0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
+    fi
+    
+    # Nettoyer le fichier temporaire
+    rm -f "$vmaf_log_file" 2>/dev/null || true
+    
+    if [[ -n "$vmaf_score" ]]; then
+        # Arrondir à 2 décimales
+        printf "%.2f" "$vmaf_score"
+    else
+        echo "NA"
+    fi
+}
+
+# Enregistrer une paire de fichiers pour analyse VMAF ultérieure
+# Usage : _queue_vmaf_analysis <fichier_original> <fichier_converti>
+# Les analyses seront effectuées à la fin de toutes les conversions
+_queue_vmaf_analysis() {
+    local file_original="$1"
+    local final_actual="$2"
+    
+    # Vérifier que l'évaluation VMAF est activée
+    if [[ "$VMAF_ENABLED" != true ]]; then
+        return 0
+    fi
+    
+    # Vérifier que libvmaf est disponible
+    if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
+        return 0
+    fi
+    
+    # Vérifier que les deux fichiers existent
+    if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
+        return 0
+    fi
+    
+    # Enregistrer la paire dans le fichier de queue (format: original|converti)
+    echo "${file_original}|${final_actual}" >> "$VMAF_QUEUE_FILE" 2>/dev/null || true
+}
+
+# Traiter toutes les analyses VMAF en attente
+# Appelé à la fin de toutes les conversions, avant le résumé
+process_vmaf_queue() {
+    if [[ ! -f "$VMAF_QUEUE_FILE" ]] || [[ ! -s "$VMAF_QUEUE_FILE" ]]; then
+        return 0
+    fi
+    
+    local vmaf_count
+    vmaf_count=$(wc -l < "$VMAF_QUEUE_FILE" 2>/dev/null | tr -d ' ') || vmaf_count=0
+    
+    if [[ "$vmaf_count" -eq 0 ]]; then
+        return 0
+    fi
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        echo ""
+        echo -e "${MAGENTA}📊 Analyse VMAF de $vmaf_count fichier(s)...${NOCOLOR}"
+    fi
+    
+    local current=0
+    while IFS='|' read -r file_original final_actual; do
+        ((current++))
+        
+        # Vérifier que les fichiers existent toujours
+        if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
+            if [[ "$NO_PROGRESS" != true ]]; then
+                echo -e "  ${YELLOW}⚠${NOCOLOR} [$current/$vmaf_count] Fichier(s) introuvable(s), ignoré"
+            fi
+            continue
+        fi
+        
+        local filename
+        filename=$(basename "$final_actual")
+        
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -ne "  ${CYAN}▶${NOCOLOR} [$current/$vmaf_count] Analyse: $filename...\r"
+        fi
+        
+        # Calculer le score VMAF
+        local vmaf_score
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual")
+        
+        # Interpréter le score VMAF
+        local vmaf_quality=""
+        if [[ "$vmaf_score" != "NA" ]]; then
+            local vmaf_int=${vmaf_score%.*}
+            if [[ "$vmaf_int" -ge 90 ]]; then
+                vmaf_quality="EXCELLENT"
+            elif [[ "$vmaf_int" -ge 80 ]]; then
+                vmaf_quality="TRES_BON"
+            elif [[ "$vmaf_int" -ge 70 ]]; then
+                vmaf_quality="BON"
+            else
+                vmaf_quality="DEGRADE"
+            fi
+        fi
+        
+        # Logger le score VMAF
+        if [[ -n "$LOG_SUCCESS" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS" 2>/dev/null || true
+        fi
+        
+        if [[ "$NO_PROGRESS" != true ]]; then
+            local status_icon="${GREEN}✓${NOCOLOR}"
+            if [[ "$vmaf_score" == "NA" ]]; then
+                status_icon="${YELLOW}?${NOCOLOR}"
+            elif [[ "$vmaf_quality" == "DEGRADE" ]]; then
+                status_icon="${RED}✗${NOCOLOR}"
+            fi
+            echo -e "  $status_icon [$current/$vmaf_count] $filename: ${vmaf_score} (${vmaf_quality:-NA})          "
+        fi
+        
+    done < "$VMAF_QUEUE_FILE"
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        echo -e "${GREEN}✅ Analyses VMAF terminées${NOCOLOR}"
+    fi
+    
+    # Nettoyer le fichier de queue
+    rm -f "$VMAF_QUEUE_FILE" 2>/dev/null || true
+}
+
+###########################################################
+# RESULTATS ET FINALISATION
+###########################################################
+
+# Essayer de déplacer le fichier produit vers la destination finale.
+# Renvoie le chemin réel utilisé pour le fichier final sur stdout.
+# Usage : _finalize_try_move <tmp_output> <final_output> <file_original>
+_finalize_try_move() {
+    local tmp_output="$1"
+    local final_output="$2"
+    local file_original="$3"
+
+    local max_try=3
+    local try=0
+
+    # Tentative mv (3 essais)
+    while [[ $try -lt $max_try ]]; do
+        if mv "$tmp_output" "$final_output" 2>/dev/null; then
+            printf "%s" "$final_output"
+            return 0
+        fi
+        try=$((try+1))
+        sleep 2
+    done
+
+    # Essayer cp + rm (3 essais)
+    try=0
+    while [[ $try -lt $max_try ]]; do
+        if cp "$tmp_output" "$final_output" 2>/dev/null; then
+            rm -f "$tmp_output" 2>/dev/null || true
+            printf "%s" "$final_output"
+            return 0
+        fi
+        try=$((try+1))
+        sleep 2
+    done
+
+    # Repli local : dossier fallback
+    local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
+    mkdir -p "$local_fallback_dir" 2>/dev/null || true
+    if mv "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
+        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
+        return 0
+    fi
+    if cp "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
+        rm -f "$tmp_output" 2>/dev/null || true
+        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
+        return 0
+    fi
+
+    # Ultime repli : laisser le temporaire et l utiliser
+    printf "%s" "$tmp_output"
+    return 2
+}
+
+# Nettoyage local des artefacts temporaires et calculs de taille/checksum.
+# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <sizeBeforeMB> <sizeBeforeBytes>
+_finalize_log_and_verify() {
+    local file_original="$1"
+    local final_actual="$2"
+    local tmp_input="$3"
+    local ffmpeg_log_temp="$4"
+    local checksum_before="$5"
+    local sizeBeforeMB="$6"
+    local sizeBeforeBytes="${7:-0}"
+
+    # Nettoyer les artefacts temporaires liés à l entrée et au log ffmpeg
+    rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+
+    # Taille après (en MB et en octets)
+    local sizeAfterMB=0 sizeAfterBytes=0
+    if [[ -e "$final_actual" ]]; then
+        sizeAfterMB=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
+        # Taille exacte en octets (stat -c%s sur Linux, stat -f%z sur macOS)
+        sizeAfterBytes=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo 0)
+    fi
+
+    local size_comparison="${sizeBeforeMB}MB → ${sizeAfterMB}MB"
+
+    if [[ "$sizeAfterMB" -ge "$sizeBeforeMB" ]]; then
+        if [[ -n "$LOG_SKIPPED" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: FICHIER PLUS LOURD ($size_comparison). | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+        fi
+    fi
+
+    # Log success
+    if [[ -n "$LOG_SUCCESS" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
+    fi
+
+    # Vérification d intégrité : d abord comparer la taille exacte (rapide), puis checksum si nécessaire
+    local verify_status="OK"
+    local checksum_after=""
+    
+    if [[ "$sizeBeforeBytes" -gt 0 && "$sizeAfterBytes" -gt 0 && "$sizeBeforeBytes" -ne "$sizeAfterBytes" ]]; then
+        # Taille différente = transfert incomplet ou corrompu
+        verify_status="SIZE_MISMATCH"
+    elif [[ -n "$checksum_before" ]]; then
+        # Taille identique, vérifier le checksum
+        checksum_after=$(compute_sha256 "$final_actual" 2>/dev/null || echo "")
+        if [[ -z "$checksum_after" ]]; then
+            verify_status="NO_CHECKSUM"
+        elif [[ "$checksum_before" != "$checksum_after" ]]; then
+            verify_status="MISMATCH"
+        fi
+    elif [[ -z "$checksum_before" ]]; then
+        verify_status="SKIPPED"
+    fi
+
+    # Écrire uniquement dans les logs : VERIFY
+    if [[ -n "$LOG_SUCCESS" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
+    fi
+
+    # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)
+    _queue_vmaf_analysis "$file_original" "$final_actual"
+
+    # En cas de problème, journaliser dans le log d erreur
+    if [[ "$verify_status" == "MISMATCH" || "$verify_status" == "SIZE_MISMATCH" ]]; then
+        if [[ -n "$LOG_ERROR" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
+        fi
+    fi
+}
+
+# Fonction principale de finalisation (regroupe l affichage, le déplacement, le logging)
+_finalize_conversion_success() {
+    local filename="$1"
+    local file_original="$2"
+    local tmp_input="$3"
+    local tmp_output="$4"
+    local final_output="$5"
+    local ffmpeg_log_temp="$6"
+    local sizeBeforeMB="$7"
+
+    # Si un marqueur d arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
+    if [[ -f "$STOP_FLAG" ]]; then
+        rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
+        return 1
+    fi
+
+    if [[ "$NO_PROGRESS" != true ]]; then
+        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l appel à ffmpeg)
+        local elapsed_str="N/A"
+        if [[ -n "${START_TS:-}" ]]; then
+            local end_ts
+            end_ts=$(date +%s)
+            local elapsed=$((end_ts - START_TS))
+            local eh=$((elapsed / 3600))
+            local em=$(((elapsed % 3600) / 60))
+            local es=$((elapsed % 60))
+            elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
+        fi
+
+        echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
+    fi
+
+    # checksum et taille exacte avant déplacement (pour vérification intégrité)
+    local checksum_before sizeBeforeBytes
+    checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
+    sizeBeforeBytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
+
+    # Déplacer / copier / fallback et récupérer le chemin réel
+    local final_actual
+    final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
+
+    # Nettoyage, logs et vérifications
+    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB" "$sizeBeforeBytes"
+}
+
+_finalize_conversion_error() {
+    local filename="$1"
+    local file_original="$2"
+    local tmp_input="$3"
+    local tmp_output="$4"
+    local ffmpeg_log_temp="$5"
+    
+    if [[ ! -f "$STOP_FLAG" ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "  ${RED}❌ Échec de la conversion : $filename${NOCOLOR}"
+        fi
+    fi
+    if [[ -n "$LOG_ERROR" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_ERROR" 2>/dev/null || true
+        echo "--- Erreur détaillée FFMPEG ---" >> "$LOG_ERROR" 2>/dev/null || true
+        if [[ -n "$ffmpeg_log_temp" ]] && [[ -f "$ffmpeg_log_temp" ]] && [[ -s "$ffmpeg_log_temp" ]]; then
+            cat "$ffmpeg_log_temp" >> "$LOG_ERROR" 2>/dev/null || true
+        else
+            echo "(Log d'erreur : ffmpeg_log_temp='$ffmpeg_log_temp' exists=$([ -f "$ffmpeg_log_temp" ] && echo 'OUI' || echo 'NON'))" >> "$LOG_ERROR" 2>/dev/null || true
+        fi
+        echo "-------------------------------" >> "$LOG_ERROR" 2>/dev/null || true
+    fi
+    rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null
+}
+
 
 ###########################################################
 # DRY RUN AVANCÉ (Comparaison et Anomalies de nommage)
