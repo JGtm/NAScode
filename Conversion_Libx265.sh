@@ -2415,7 +2415,7 @@ export_variables() {
     export -f is_excluded count_null_separated compute_md5_prefix nproc_compat now_ts
     
     # --- Fonctions VMAF (qualité vidéo) ---
-    export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue
+    export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
     
     # --- Variables de configuration ---
     export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
