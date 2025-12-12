@@ -195,6 +195,61 @@ readonly QUEUE="$LOG_DIR/Queue"
 readonly LOG_DRYRUN_COMPARISON="$LOG_DIR/DryRun_Comparison_${EXECUTION_TIMESTAMP}.log"
 
 ###########################################################
+# SYSTÈME DE SLOTS POUR PROGRESSION PARALLÈLE
+###########################################################
+
+# Répertoire pour les fichiers de verrouillage des slots
+readonly SLOTS_DIR="/tmp/video_convert_slots_${EXECUTION_TIMESTAMP}"
+
+# Acquérir un slot libre pour l'affichage de progression
+# Usage: acquire_progress_slot
+# Retourne le numéro de slot (1 à PARALLEL_JOBS) sur stdout
+acquire_progress_slot() {
+    mkdir -p "$SLOTS_DIR" 2>/dev/null || true
+    local max_slots=${PARALLEL_JOBS:-1}
+    local slot=1
+    while [[ $slot -le $max_slots ]]; do
+        local slot_file="$SLOTS_DIR/slot_$slot"
+        if mkdir "$slot_file" 2>/dev/null; then
+            echo "$$" > "$slot_file/pid"
+            echo "$slot"
+            return 0
+        fi
+        ((slot++))
+    done
+    # Aucun slot libre, retourner 0 (mode dégradé)
+    echo "0"
+}
+
+# Libérer un slot de progression
+# Usage: release_progress_slot <slot_number>
+release_progress_slot() {
+    local slot="$1"
+    if [[ -n "$slot" && "$slot" -gt 0 ]]; then
+        rm -rf "$SLOTS_DIR/slot_$slot" 2>/dev/null || true
+    fi
+}
+
+# Nettoyer tous les slots (appelé en fin de script)
+cleanup_progress_slots() {
+    rm -rf "$SLOTS_DIR" 2>/dev/null || true
+}
+
+# Préparer l'espace d'affichage pour les workers parallèles
+# Usage: setup_progress_display
+setup_progress_display() {
+    local max_slots=${PARALLEL_JOBS:-1}
+    if [[ "$max_slots" -gt 1 && "$NO_PROGRESS" != true ]]; then
+        # Réserver des lignes vides pour chaque slot
+        for ((i=1; i<=max_slots; i++)); do
+            echo ""
+        done
+        # Ligne séparatrice
+        echo -e "${CYAN}─────────────────────────────────────────────────────────────────────────${NOCOLOR}"
+    fi
+}
+
+###########################################################
 # PARAMÈTRES TECHNIQUES
 ###########################################################
 
@@ -414,6 +469,8 @@ cleanup() {
     if [[ -n "${FIFO_WRITER_PID:-}" ]]; then
         rm -f "${FIFO_WRITER_PID}" "${FIFO_WRITER_READY:-}" 2>/dev/null || true
     fi
+    # Nettoyage des slots de progression parallèle
+    cleanup_progress_slots
 }
 
 trap cleanup EXIT INT TERM
@@ -1441,6 +1498,14 @@ _execute_conversion() {
         awk_time_func='function get_time() { cmd="date +%s"; cmd | getline t; close(cmd); return t }'
     fi
 
+    # Acquérir un slot pour l'affichage de progression en mode parallèle
+    local progress_slot=0
+    local is_parallel=0
+    if [[ "${PARALLEL_JOBS:-1}" -gt 1 ]]; then
+        is_parallel=1
+        progress_slot=$(acquire_progress_slot)
+    fi
+
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         -hwaccel $HWACCEL \
         -i "$tmp_input" -pix_fmt yuv420p10le \
@@ -1452,15 +1517,18 @@ _execute_conversion() {
         -map 0 -f matroska \
         "$tmp_output" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" "
+    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" -v MAX_SLOTS="${PARALLEL_JOBS:-1}" "
         $awk_time_func
         BEGIN {
             duration = DURATION + 0;
             if (duration < 1) exit;
             start = START + 0;
             last_update = 0;
-            refresh_interval = 10;
+            refresh_interval = 2;
             speed = 1;
+            slot = SLOT + 0;
+            is_parallel = PARALLEL + 0;
+            max_slots = MAX_SLOTS + 0;
         }
 
         /out_time_us=/ {
@@ -1487,23 +1555,55 @@ _execute_conversion() {
 
             eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
 
-            # Contrôle des rafraîchissements (une seule lecture de now suffit)
+            # Construction de la barre de progression visuelle
+            bar_width = 25;
+            filled = int(percent * bar_width / 100);
+            bar = \"\";
+            for (i = 0; i < filled; i++) bar = bar \"=\";
+            if (filled < bar_width) bar = bar \">\";
+            for (i = filled + 1; i < bar_width; i++) bar = bar \" \";
+
+            # Rafraîchissement
             if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
-                printf \"  ... [%-40.40s] %5.1f%% | ETA: %s | Speed: %.2fx\\n\",
-                       CURRENT_FILE_NAME, percent, eta_str, speed;
-                fflush();
+                if (is_parallel && slot > 0) {
+                    # Mode parallèle : positionner le curseur sur la ligne du slot
+                    # Déplacer vers le haut de (max_slots - slot + 2) lignes puis écrire
+                    lines_up = max_slots - slot + 2;
+                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] [%-25.25s] [%s] %5.1f%% | ETA: %s | x%.2f\\033[%dB\\r\",
+                           lines_up, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > \"/dev/stderr\";
+                } else {
+                    # Mode séquentiel : simple retour chariot
+                    printf \"\\r\\033[K  🎬 [%-30.30s] [%s] %5.1f%% | ETA: %s | x%.2f\",
+                           CURRENT_FILE_NAME, bar, percent, eta_str, speed > \"/dev/stderr\";
+                }
+                fflush(\"/dev/stderr\");
                 last_update = now;
             }
         }
 
         /progress=end/ {
             if (NOPROG != \"true\") {
-                printf \"  ... [%-40.40s] %5s | ETA: 00:00:00 | Speed: %.2fx\\n\",
-                    CURRENT_FILE_NAME, \"  100%\", speed;
-                fflush();
+                bar_complete = \"\";
+                for (i = 0; i < 25; i++) bar_complete = bar_complete \"=\";
+                if (is_parallel && slot > 0) {
+                    # Mode parallèle : effacer la ligne du slot
+                    lines_up = max_slots - slot + 2;
+                    printf \"\\033[%dA\\r\\033[K  ✅ [%d] [%-25.25s] [%s] 100.0%% | Terminé | x%.2f\\033[%dB\\r\",
+                           lines_up, slot, CURRENT_FILE_NAME, bar_complete, speed, lines_up > \"/dev/stderr\";
+                } else {
+                    # Mode séquentiel : nouvelle ligne
+                    printf \"\\r\\033[K  ✅ [%-30.30s] [%s] 100.0%% | Terminé | x%.2f\\n\",
+                           CURRENT_FILE_NAME, bar_complete, speed > \"/dev/stderr\";
+                }
+                fflush(\"/dev/stderr\");
             }
         }
     "
+
+    # Libérer le slot de progression
+    if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+        release_progress_slot "$progress_slot"
+    fi
 
     # Récupère les codes de sortie du pipeline (0 = succès).
     local ffmpeg_rc=0
@@ -1734,6 +1834,8 @@ _process_queue_simple() {
     
     if [[ "$NO_PROGRESS" != true ]]; then
         echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
+        # Réserver l'espace d'affichage pour les workers parallèles
+        setup_progress_display
     fi
     
     # Lire la queue et traiter en parallèle
@@ -1839,6 +1941,8 @@ _process_queue_with_fifo() {
     local nb_files=$target_count
     if [[ "$NO_PROGRESS" != true ]]; then
         echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
+        # Réserver l'espace d'affichage pour les workers parallèles
+        setup_progress_display
     fi
     
     # Consumer : lire les noms de fichiers séparés par NUL et lancer les conversions en parallèle
@@ -2215,6 +2319,10 @@ export_variables() {
     # --- Variables de couleurs et affichage ---
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE
     export AWK_PROGRESS_SCRIPT IO_PRIORITY_CMD
+    
+    # --- Fonctions et variables de progression parallèle ---
+    export -f acquire_progress_slot release_progress_slot cleanup_progress_slots setup_progress_display
+    export SLOTS_DIR
     
     # --- Variables de détection d outils ---
     export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL
