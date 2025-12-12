@@ -131,6 +131,11 @@ _queue_vmaf_analysis() {
     local file_original="$1"
     local final_actual="$2"
     
+    # Vérifier que l'évaluation VMAF est activée
+    if [[ "$VMAF_ENABLED" != true ]]; then
+        return 0
+    fi
+    
     # Vérifier que libvmaf est disponible
     if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
         return 0
@@ -268,6 +273,7 @@ FORCE_NO_SUFFIX=false
 PARALLEL_JOBS=1
 NO_PROGRESS=false
 CONVERSION_MODE="serie"
+VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
 
 # Mode de tri pour la construction de la file d attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
@@ -473,6 +479,10 @@ parse_arguments() {
                 KEEP_INDEX=true
                 shift
                 ;;
+            -v|--vmaf)
+                VMAF_ENABLED=true
+                shift
+                ;;
             -*) 
                 # On vérifie si l argument est une option courte groupée
                 if [[ "$1" =~ ^-[a-zA-Z]{2,}$ ]]; then
@@ -520,6 +530,7 @@ Options :
     -n, --no-progress            Désactiver l'affichage des indicateurs de progression (FLAG)
     -h, --help                   Afficher cette aide (FLAG)
     -k, --keep-index             Conserver l'index existant sans demande interactive (FLAG)
+    -v, --vmaf                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
 
 Remarque sur les options courtes groupées :
     - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
@@ -540,6 +551,7 @@ Exemples :
   ./conversion.sh --mode serie --no-progress
   ./conversion.sh -xdrk -l 5      -x (no-suffix) -d (dry-run) -r (random) -k (keep-index) puis -l 5
   ./conversion.sh -dnr            -d (dry-run) -n (no-progress) -r (random)
+  ./conversion.sh --vmaf          Activer l'évaluation VMAF après conversion
 EOF
 }
 
@@ -2394,7 +2406,7 @@ export_variables() {
     # --- Variables d options ---
     export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG
     export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE
-    export EXECUTION_TIMESTAMP EXCLUDES_REGEX
+    export EXECUTION_TIMESTAMP EXCLUDES_REGEX VMAF_ENABLED
     
     # --- Variables de couleurs et affichage ---
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE
