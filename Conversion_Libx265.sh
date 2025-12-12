@@ -124,10 +124,10 @@ compute_vmaf_score() {
     fi
 }
 
-# Lancer le calcul VMAF en arrière-plan
-# Usage : _compute_vmaf_background <fichier_original> <fichier_converti>
-# Le résultat sera loggé dans LOG_SUCCESS une fois terminé
-_compute_vmaf_background() {
+# Enregistrer une paire de fichiers pour analyse VMAF ultérieure
+# Usage : _queue_vmaf_analysis <fichier_original> <fichier_converti>
+# Les analyses seront effectuées à la fin de toutes les conversions
+_queue_vmaf_analysis() {
     local file_original="$1"
     local final_actual="$2"
     
@@ -141,8 +141,49 @@ _compute_vmaf_background() {
         return 0
     fi
     
-    # Lancer le calcul en background
-    (
+    # Enregistrer la paire dans le fichier de queue (format: original|converti)
+    echo "${file_original}|${final_actual}" >> "$VMAF_QUEUE_FILE" 2>/dev/null || true
+}
+
+# Traiter toutes les analyses VMAF en attente
+# Appelé à la fin de toutes les conversions, avant le résumé
+process_vmaf_queue() {
+    if [[ ! -f "$VMAF_QUEUE_FILE" ]] || [[ ! -s "$VMAF_QUEUE_FILE" ]]; then
+        return 0
+    fi
+    
+    local vmaf_count
+    vmaf_count=$(wc -l < "$VMAF_QUEUE_FILE" 2>/dev/null | tr -d ' ') || vmaf_count=0
+    
+    if [[ "$vmaf_count" -eq 0 ]]; then
+        return 0
+    fi
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        echo ""
+        echo -e "${CYAN}📊 Analyse VMAF de $vmaf_count fichier(s)...${NOCOLOR}"
+    fi
+    
+    local current=0
+    while IFS='|' read -r file_original final_actual; do
+        ((current++))
+        
+        # Vérifier que les fichiers existent toujours
+        if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
+            if [[ "$NO_PROGRESS" != true ]]; then
+                echo -e "  ${YELLOW}⚠${NOCOLOR} [$current/$vmaf_count] Fichier(s) introuvable(s), ignoré"
+            fi
+            continue
+        fi
+        
+        local filename
+        filename=$(basename "$final_actual")
+        
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -ne "  ${CYAN}▶${NOCOLOR} [$current/$vmaf_count] Analyse: $filename...\r"
+        fi
+        
+        # Calculer le score VMAF
         local vmaf_score
         vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual")
         
@@ -161,61 +202,29 @@ _compute_vmaf_background() {
             fi
         fi
         
-        # Logger le score VMAF (utiliser un lock portable pour éviter les écritures concurrentes)
+        # Logger le score VMAF
         if [[ -n "$LOG_SUCCESS" ]]; then
-            local lockfile="${LOG_SUCCESS}.vmaf.lock"
-            local lockdir="${lockfile}.dir"
-            # Attendre le verrou (max 30s)
-            local wait_count=0
-            while ! mkdir "$lockdir" 2>/dev/null; do
-                sleep 0.1
-                ((wait_count++))
-                if [[ $wait_count -ge 300 ]]; then
-                    break  # Timeout, on écrit quand même
-                fi
-            done
             echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS" 2>/dev/null || true
-            rm -rf "$lockdir" 2>/dev/null || true
-        fi
-    ) &
-    
-    # Enregistrer le PID du job VMAF
-    local vmaf_pid=$!
-    echo "$vmaf_pid" >> "$VMAF_PIDS_FILE" 2>/dev/null || true
-}
-
-# Attendre la fin de tous les calculs VMAF en arrière-plan
-wait_vmaf_jobs() {
-    if [[ ! -f "$VMAF_PIDS_FILE" ]]; then
-        return 0
-    fi
-    
-    local vmaf_count=0
-    vmaf_count=$(wc -l < "$VMAF_PIDS_FILE" 2>/dev/null | tr -d ' ') || vmaf_count=0
-    
-    if [[ "$vmaf_count" -gt 0 ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${CYAN}📊 Attente de $vmaf_count analyse(s) VMAF en cours...${NOCOLOR}"
         fi
         
-        local finished=0
-        while IFS= read -r pid; do
-            if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
-                wait "$pid" 2>/dev/null || true
-            fi
-            ((finished++))
-            if [[ "$NO_PROGRESS" != true ]] && [[ $((finished % 5)) -eq 0 ]]; then
-                echo -e "  ${GREEN}✓${NOCOLOR} $finished/$vmaf_count analyses terminées"
-            fi
-        done < "$VMAF_PIDS_FILE"
-        
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${GREEN}✅ Toutes les analyses VMAF sont terminées${NOCOLOR}"
+            local status_icon="${GREEN}✓${NOCOLOR}"
+            if [[ "$vmaf_score" == "NA" ]]; then
+                status_icon="${YELLOW}?${NOCOLOR}"
+            elif [[ "$vmaf_quality" == "DEGRADE" ]]; then
+                status_icon="${RED}✗${NOCOLOR}"
+            fi
+            echo -e "  $status_icon [$current/$vmaf_count] $filename: ${vmaf_score} (${vmaf_quality:-NA})          "
         fi
+        
+    done < "$VMAF_QUEUE_FILE"
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        echo -e "${GREEN}✅ Analyses VMAF terminées${NOCOLOR}"
     fi
     
-    # Nettoyer les fichiers temporaires
-    rm -f "$VMAF_PIDS_FILE" "${LOG_SUCCESS}.lock" 2>/dev/null || true
+    # Nettoyer le fichier de queue
+    rm -f "$VMAF_QUEUE_FILE" 2>/dev/null || true
 }
 
 # compatibilité pour `nproc`
@@ -338,7 +347,7 @@ readonly INDEX="$LOG_DIR/Index"
 readonly INDEX_READABLE="$LOG_DIR/Index_readable_${EXECUTION_TIMESTAMP}.txt"
 readonly QUEUE="$LOG_DIR/Queue"
 readonly LOG_DRYRUN_COMPARISON="$LOG_DIR/DryRun_Comparison_${EXECUTION_TIMESTAMP}.log"
-readonly VMAF_PIDS_FILE="$LOG_DIR/.vmaf_pids_${EXECUTION_TIMESTAMP}"
+readonly VMAF_QUEUE_FILE="$LOG_DIR/.vmaf_queue_${EXECUTION_TIMESTAMP}"
 
 ###########################################################
 # PARAMÈTRES TECHNIQUES
@@ -1797,9 +1806,8 @@ _finalize_log_and_verify() {
         echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
-    # Évaluation de la qualité VMAF en arrière-plan (ne bloque pas la conversion suivante)
-    # Le score sera loggé de manière asynchrone une fois le calcul terminé
-    _compute_vmaf_background "$file_original" "$final_actual"
+    # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)
+    _queue_vmaf_analysis "$file_original" "$final_actual"
 
     # En cas de problème, journaliser dans le log d erreur
     if [[ "$verify_status" == "MISMATCH" || "$verify_status" == "SIZE_MISMATCH" ]]; then
@@ -2275,8 +2283,8 @@ dry_run_compare_names() {
 ###########################################################
 
 show_summary() {
-    # Attendre que toutes les analyses VMAF en arrière-plan soient terminées
-    wait_vmaf_jobs
+    # Traiter toutes les analyses VMAF en attente
+    process_vmaf_queue
     
     local succ=0
     if [[ -f "$LOG_SUCCESS" && -s "$LOG_SUCCESS" ]]; then
@@ -2364,7 +2372,7 @@ export_variables() {
     export -f is_excluded count_null_separated compute_md5_prefix nproc_compat now_ts
     
     # --- Fonctions VMAF (qualité vidéo) ---
-    export -f compute_vmaf_score _compute_vmaf_background wait_vmaf_jobs
+    export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue
     
     # --- Variables de configuration ---
     export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
@@ -2396,7 +2404,7 @@ export_variables() {
     export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
-    export HAS_LIBVMAF VMAF_PIDS_FILE
+    export HAS_LIBVMAF VMAF_QUEUE_FILE
     
     # --- Export du tableau EXCLUDES ---
     ( IFS=:; export EXCLUDES="${EXCLUDES[*]}" )
