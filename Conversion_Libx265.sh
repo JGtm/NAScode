@@ -1967,7 +1967,7 @@ process_vmaf_queue() {
     
     local current=0
     while IFS='|' read -r file_original final_actual; do
-        ((current++))
+        ((current++)) || true
         
         # Vérifier que les fichiers existent toujours
         if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
