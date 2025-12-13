@@ -728,9 +728,9 @@ custom_pv() {
 # Répertoire pour les fichiers de verrouillage des slots
 readonly SLOTS_DIR="/tmp/video_convert_slots_${EXECUTION_TIMESTAMP}"
 
-# Acquérir un slot libre pour l'affichage de progression
+# Acquerir un slot libre pour affichage de progression
 # Usage: acquire_progress_slot
-# Retourne le numéro de slot (1 à PARALLEL_JOBS) sur stdout
+# Retourne le numero de slot (1 a PARALLEL_JOBS) sur stdout
 acquire_progress_slot() {
     mkdir -p "$SLOTS_DIR" 2>/dev/null || true
     local max_slots=${PARALLEL_JOBS:-1}
@@ -762,7 +762,7 @@ cleanup_progress_slots() {
     rm -rf "$SLOTS_DIR" 2>/dev/null || true
 }
 
-# Préparer l'espace d'affichage pour les workers parallèles
+# Preparer espace affichage pour les workers paralleles
 # Usage: setup_progress_display
 setup_progress_display() {
     local max_slots=${PARALLEL_JOBS:-1}
@@ -963,7 +963,7 @@ should_skip_conversion() {
     # Validation du format x265 et du bitrate
     if [[ "$codec" == "hevc" || "$codec" == "h265" ]]; then
         if [[ "$bitrate" =~ ^[0-9]+$ ]] && [[ "$bitrate" -le "$max_tolerated_bits" ]]; then
-            echo -e "${BLUE}⏭️ SKIPPED (Déjà x265 & bitrate optimisé) : $filename${NOCOLOR}" >&2
+            echo -e "${BLUE}⏭️  SKIPPED (Déjà x265 & bitrate optimisé) : $filename${NOCOLOR}" >&2
             if [[ -n "$LOG_SKIPPED" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà x265 et bitrate optimisé) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
             fi
@@ -1334,7 +1334,7 @@ _check_output_exists() {
     local final_output="$3"
     
     if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
-        echo -e "${BLUE}⏭️ SKIPPED (Fichier de sortie existe déjà) : $filename${NOCOLOR}" >&2
+        echo -e "${BLUE}⏭️  SKIPPED (Fichier de sortie existe déjà) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SKIPPED" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
         fi
@@ -1534,7 +1534,7 @@ _execute_conversion() {
         awk_time_func='function get_time() { cmd="date +%s"; cmd | getline t; close(cmd); return t }'
     fi
 
-    # Acquérir un slot pour l'affichage de progression en mode parallèle
+    # Acquerir un slot pour affichage de progression en mode parallele
     local progress_slot=0
     local is_parallel=0
     if [[ "${PARALLEL_JOBS:-1}" -gt 1 ]]; then
@@ -1592,12 +1592,11 @@ _execute_conversion() {
             eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
 
             # Construction de la barre de progression visuelle
-            bar_width = 25;
+            bar_width = 20;
             filled = int(percent * bar_width / 100);
             bar = \"\";
-            for (i = 0; i < filled; i++) bar = bar \"=\";
-            if (filled < bar_width) bar = bar \">\";
-            for (i = filled + 1; i < bar_width; i++) bar = bar \" \";
+            for (i = 0; i < filled; i++) bar = bar \"█\";
+            for (i = filled; i < bar_width; i++) bar = bar \"░\";
 
             # Rafraîchissement
             if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
@@ -1605,11 +1604,11 @@ _execute_conversion() {
                     # Mode parallèle : positionner le curseur sur la ligne du slot
                     # Déplacer vers le haut de (max_slots - slot + 2) lignes puis écrire
                     lines_up = max_slots - slot + 2;
-                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] [%-25.25s] [%s] %5.1f%% | ETA: %s | x%.2f\\033[%dB\\r\",
+                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] %-25.25s [%s] %5.1f%% | ETA: %s | x%.2f\\033[%dB\\r\",
                            lines_up, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > \"/dev/stderr\";
                 } else {
                     # Mode séquentiel : simple retour chariot
-                    printf \"\\r\\033[K  🎬 [%-30.30s] [%s] %5.1f%% | ETA: %s | x%.2f\",
+                    printf \"\\r\\033[K  🎬 %-30.30s [%s] %5.1f%% | ETA: %s | x%.2f\",
                            CURRENT_FILE_NAME, bar, percent, eta_str, speed > \"/dev/stderr\";
                 }
                 fflush(\"/dev/stderr\");
@@ -1620,15 +1619,15 @@ _execute_conversion() {
         /progress=end/ {
             if (NOPROG != \"true\") {
                 bar_complete = \"\";
-                for (i = 0; i < 25; i++) bar_complete = bar_complete \"=\";
+                for (i = 0; i < 20; i++) bar_complete = bar_complete \"█\";
                 if (is_parallel && slot > 0) {
                     # Mode parallèle : effacer la ligne du slot
                     lines_up = max_slots - slot + 2;
-                    printf \"\\033[%dA\\r\\033[K  ✅ [%d] [%-25.25s] [%s] 100.0%% | Terminé | x%.2f\\033[%dB\\r\",
+                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] %-25.25s [%s] 100.0%% | Terminé | x%.2f\\033[%dB\\r\",
                            lines_up, slot, CURRENT_FILE_NAME, bar_complete, speed, lines_up > \"/dev/stderr\";
                 } else {
                     # Mode séquentiel : nouvelle ligne
-                    printf \"\\r\\033[K  ✅ [%-30.30s] [%s] 100.0%% | Terminé | x%.2f\\n\",
+                    printf \"\\r\\033[K  ✅ %-30.30s [%s] 100.0%% | Terminé | x%.2f\\n\",
                            CURRENT_FILE_NAME, bar_complete, speed > \"/dev/stderr\";
                 }
                 fflush(\"/dev/stderr\");
@@ -1678,11 +1677,11 @@ _process_queue_simple() {
     
     if [[ "$NO_PROGRESS" != true ]]; then
         echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
-        # Réserver l'espace d'affichage pour les workers parallèles
+        # Reserver espace affichage pour les workers paralleles
         setup_progress_display
     fi
     
-    # Lire la queue et traiter en parallèle
+    # Lire la queue et traiter en parallele
     local file
     local -a _pids=()
     while IFS= read -r -d '' file; do
@@ -1785,11 +1784,11 @@ _process_queue_with_fifo() {
     local nb_files=$target_count
     if [[ "$NO_PROGRESS" != true ]]; then
         echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
-        # Réserver l'espace d'affichage pour les workers parallèles
+        # Reserver espace affichage pour les workers paralleles
         setup_progress_display
     fi
     
-    # Consumer : lire les noms de fichiers séparés par NUL et lancer les conversions en parallèle
+    # Consumer : lire les noms de fichiers separes par NUL et lancer les conversions en parallele
     _consumer_run() {
         local file
         local -a _pids=()
@@ -2024,15 +2023,20 @@ compute_vmaf_score() {
                         local bar=""
                         for ((i=0; i<filled; i++)); do bar+="█"; done
                         for ((i=0; i<empty; i++)); do bar+="░"; done
-                        # Écrire sur stderr (fd 2) pour éviter capture par $()
-                        printf "\r    \033[0;36mVMAF\033[0m [%s] %3d%% - %s" "$bar" "$percent" "$filename_display" >&2
+                        # Tronquer le titre a 30 caracteres max
+                        local short_name="$filename_display"
+                        if [[ ${#short_name} -gt 30 ]]; then
+                            short_name="${short_name:0:27}..."
+                        fi
+                        # Ecrire sur stderr (fd 2) pour eviter capture par $()
+                        printf "\r    %-30s \033[0;36mVMAF\033[0m [%s] %3d%%" "$short_name" "$bar" "$percent" >&2
                     fi
                 fi
             fi
             sleep 0.2
         done
         wait "$ffmpeg_pid" 2>/dev/null
-        printf "\r%80s\r" "" >&2  # Effacer la ligne de progression
+        printf "\r%100s\r" "" >&2  # Effacer la ligne de progression
     else
         # Sans barre de progression
         ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
@@ -2067,7 +2071,7 @@ _queue_vmaf_analysis() {
     local file_original="$1"
     local final_actual="$2"
     
-    # Vérifier que l'évaluation VMAF est activée
+    # Verifier que evaluation VMAF est activee
     if [[ "$VMAF_ENABLED" != true ]]; then
         return 0
     fi
@@ -2122,7 +2126,7 @@ process_vmaf_queue() {
         
         # Calculer le score VMAF (avec barre de progression intégrée)
         local vmaf_score
-        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "[$current/$vmaf_count] $filename")
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename")
         
         # Interpréter le score VMAF
         local vmaf_quality=""
@@ -2151,7 +2155,12 @@ process_vmaf_queue() {
             elif [[ "$vmaf_quality" == "DEGRADE" ]]; then
                 status_icon="${RED}✗${NOCOLOR}"
             fi
-            echo -e "  $status_icon [$current/$vmaf_count] $filename: ${vmaf_score} (${vmaf_quality:-NA})          "
+            # Tronquer le nom de fichier a 30 caracteres pour aligner
+            local short_fn="$filename"
+            if [[ ${#short_fn} -gt 30 ]]; then
+                short_fn="${short_fn:0:27}..."
+            fi
+            printf "\r  %s [%d/%d] %-30s : %s (%s)%20s\n" "$status_icon" "$current" "$vmaf_count" "$short_fn" "$vmaf_score" "${vmaf_quality:-NA}" "" >&2
         fi
         
     done < "$VMAF_QUEUE_FILE"
