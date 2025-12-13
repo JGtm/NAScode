@@ -948,7 +948,7 @@ should_skip_conversion() {
     
     # --- Validation fichier vidéo ---
     if [[ -z "$codec" ]]; then
-        echo -e "${BLUE}⏭️ SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
+        echo -e "${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SKIPPED" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
         fi
@@ -1400,7 +1400,7 @@ _setup_temp_files_and_logs() {
     
     mkdir -p "$final_dir" 2>/dev/null || true
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "▶️ Démarrage du fichier : $filename"
+        echo -e "▶️  Démarrage du fichier : $filename"
     fi
     if [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
@@ -2006,27 +2006,33 @@ compute_vmaf_score() {
             -f null - >/dev/null 2>&1 &
         local ffmpeg_pid=$!
         
-        # Afficher la progression en lisant le fichier
+        local last_percent=-1
+        # Afficher la progression en lisant le fichier (écrire sur /dev/tty pour éviter capture)
         while kill -0 "$ffmpeg_pid" 2>/dev/null; do
             if [[ -f "$progress_file" ]]; then
                 local out_time_us
                 out_time_us=$(grep -o 'out_time_us=[0-9]*' "$progress_file" 2>/dev/null | tail -1 | cut -d'=' -f2)
-                if [[ -n "$out_time_us" ]] && [[ "$out_time_us" =~ ^[0-9]+$ ]]; then
+                if [[ -n "$out_time_us" ]] && [[ "$out_time_us" =~ ^[0-9]+$ ]] && [[ "$out_time_us" -gt 0 ]]; then
                     local percent=$((out_time_us * 100 / duration_us))
                     [[ $percent -gt 100 ]] && percent=100
-                    # Barre de progression
-                    local filled=$((percent / 5))
-                    local empty=$((20 - filled))
-                    local bar=""
-                    for ((i=0; i<filled; i++)); do bar+="█"; done
-                    for ((i=0; i<empty; i++)); do bar+="░"; done
-                    printf "\r    \033[0;36mVMAF\033[0m [%s] %3d%% - %s" "$bar" "$percent" "$filename_display"
+                    # Afficher seulement si le pourcentage a changé
+                    if [[ "$percent" -ne "$last_percent" ]]; then
+                        last_percent=$percent
+                        # Barre de progression
+                        local filled=$((percent / 5))
+                        local empty=$((20 - filled))
+                        local bar=""
+                        for ((i=0; i<filled; i++)); do bar+="█"; done
+                        for ((i=0; i<empty; i++)); do bar+="░"; done
+                        # Écrire sur stderr (fd 2) pour éviter capture par $()
+                        printf "\r    \033[0;36mVMAF\033[0m [%s] %3d%% - %s" "$bar" "$percent" "$filename_display" >&2
+                    fi
                 fi
             fi
-            sleep 0.3
+            sleep 0.2
         done
         wait "$ffmpeg_pid" 2>/dev/null
-        printf "\r%80s\r" ""  # Effacer la ligne de progression
+        printf "\r%80s\r" "" >&2  # Effacer la ligne de progression
     else
         # Sans barre de progression
         ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
