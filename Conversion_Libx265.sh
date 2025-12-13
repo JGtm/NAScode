@@ -60,6 +60,7 @@ compute_md5_prefix() {
         # Sur macOS, md5 n affiche que le digest pour stdin ; gestion robuste
         printf "%s" "$input" | md5 | awk '{print substr($1,1,8)}'
     elif [[ "$HAS_PYTHON3" -eq 1 ]]; then
+        # shellcheck disable=SC2259
         printf "%s" "$input" | python3 - <<PY | head -1
 import sys,hashlib
 print(hashlib.md5(sys.stdin.read().encode()).hexdigest()[:8])
