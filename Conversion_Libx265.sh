@@ -1981,54 +1981,64 @@ compute_vmaf_score() {
         return 0
     fi
     
-    # Fichier temporaire pour le log VMAF (compatible Windows/Linux)
+    # Fichiers temporaires (compatible Windows/Linux)
     local vmaf_log_file="${TMP_DIR}/vmaf_result_$$.json"
+    local progress_file="${TMP_DIR}/vmaf_progress_$$.txt"
     mkdir -p "$TMP_DIR" 2>/dev/null || true
     
-    # Obtenir la durée totale de la vidéo pour la barre de progression
-    local duration_secs
-    duration_secs=$(ffprobe -v error -select_streams v:0 -show_entries format=duration \
-        -of default=noprint_wrappers=1:nokey=1 "$converted" 2>/dev/null | cut -d'.' -f1)
-    duration_secs=${duration_secs:-0}
+    # Obtenir la durée totale de la vidéo en microsecondes pour la progression
+    local duration_us=0
+    local duration_str
+    duration_str=$(ffprobe -v error -select_streams v:0 -show_entries format=duration \
+        -of default=noprint_wrappers=1:nokey=1 "$converted" 2>/dev/null)
+    if [[ -n "$duration_str" ]]; then
+        # Convertir en microsecondes (durée est en secondes avec décimales)
+        duration_us=$(awk "BEGIN {printf \"%.0f\", $duration_str * 1000000}")
+    fi
     
     # Calculer le score VMAF avec subsampling (1 frame sur 5 pour accélérer)
     # n_subsample=5 : analyse seulement 20% des frames (5x plus rapide)
-    # Le filtre libvmaf compare la vidéo distordue (input 0) à la référence (input 1)
-    if [[ "$NO_PROGRESS" != true ]] && [[ "$duration_secs" -gt 0 ]] && [[ -n "$filename_display" ]]; then
-        # Avec barre de progression
+    if [[ "$NO_PROGRESS" != true ]] && [[ "$duration_us" -gt 0 ]] && [[ -n "$filename_display" ]]; then
+        # Lancer ffmpeg en arrière-plan avec progression vers fichier
         ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
             -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5" \
-            -f null - 2>&1 | while IFS= read -r line; do
-                # Extraire le temps actuel depuis la sortie ffmpeg (format: time=00:01:23.45)
-                if [[ "$line" =~ time=([0-9]+):([0-9]+):([0-9]+) ]]; then
-                    local hours="${BASH_REMATCH[1]}"
-                    local mins="${BASH_REMATCH[2]}"
-                    local secs="${BASH_REMATCH[3]}"
-                    local current_secs=$((10#$hours * 3600 + 10#$mins * 60 + 10#$secs))
-                    local percent=$((current_secs * 100 / duration_secs))
+            -progress "$progress_file" \
+            -f null - >/dev/null 2>&1 &
+        local ffmpeg_pid=$!
+        
+        # Afficher la progression en lisant le fichier
+        while kill -0 "$ffmpeg_pid" 2>/dev/null; do
+            if [[ -f "$progress_file" ]]; then
+                local out_time_us
+                out_time_us=$(grep -o 'out_time_us=[0-9]*' "$progress_file" 2>/dev/null | tail -1 | cut -d'=' -f2)
+                if [[ -n "$out_time_us" ]] && [[ "$out_time_us" =~ ^[0-9]+$ ]]; then
+                    local percent=$((out_time_us * 100 / duration_us))
                     [[ $percent -gt 100 ]] && percent=100
                     # Barre de progression
-                    local bar_width=20
-                    local filled=$((percent * bar_width / 100))
-                    local empty=$((bar_width - filled))
-                    local bar=$(printf "%${filled}s" | tr ' ' '█')$(printf "%${empty}s" | tr ' ' '░')
-                    printf "\r    ${CYAN}VMAF${NOCOLOR} [${bar}] %3d%% - %s" "$percent" "$filename_display"
+                    local filled=$((percent / 5))
+                    local empty=$((20 - filled))
+                    local bar=""
+                    for ((i=0; i<filled; i++)); do bar+="█"; done
+                    for ((i=0; i<empty; i++)); do bar+="░"; done
+                    printf "\r    \033[0;36mVMAF\033[0m [%s] %3d%% - %s" "$bar" "$percent" "$filename_display"
                 fi
-            done
+            fi
+            sleep 0.3
+        done
+        wait "$ffmpeg_pid" 2>/dev/null
         printf "\r%80s\r" ""  # Effacer la ligne de progression
     else
         # Sans barre de progression
         ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
             -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5" \
-            -f null - 2>&1 >/dev/null
+            -f null - >/dev/null 2>&1
     fi
     
-    local ffmpeg_exit=$?
+    # Nettoyer le fichier de progression
+    rm -f "$progress_file" 2>/dev/null || true
     
     # Extraire le score VMAF depuis le fichier JSON
     local vmaf_score=""
-    
-    # Méthode 1: Lire depuis le fichier JSON généré
     if [[ -f "$vmaf_log_file" ]] && [[ -s "$vmaf_log_file" ]]; then
         vmaf_score=$(grep -o '"mean"[[:space:]]*:[[:space:]]*[0-9.]*' "$vmaf_log_file" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
     fi
