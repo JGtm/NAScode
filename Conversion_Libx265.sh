@@ -1962,11 +1962,12 @@ convert_file() {
 ###########################################################
 
 # Calcul du score VMAF (qualité vidéo perceptuelle)
-# Usage : compute_vmaf_score <fichier_original> <fichier_converti>
+# Usage : compute_vmaf_score <fichier_original> <fichier_converti> [filename_display]
 # Retourne le score VMAF moyen (0-100) ou "NA" si indisponible
 compute_vmaf_score() {
     local original="$1"
     local converted="$2"
+    local filename_display="${3:-}"
     
     # Vérifier que libvmaf est disponible
     if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
@@ -1984,33 +1985,52 @@ compute_vmaf_score() {
     local vmaf_log_file="${TMP_DIR}/vmaf_result_$$.json"
     mkdir -p "$TMP_DIR" 2>/dev/null || true
     
-    # Calculer le score VMAF
-    # On utilise le modèle par défaut vmaf_v0.6.1
+    # Obtenir la durée totale de la vidéo pour la barre de progression
+    local duration_secs
+    duration_secs=$(ffprobe -v error -select_streams v:0 -show_entries format=duration \
+        -of default=noprint_wrappers=1:nokey=1 "$converted" 2>/dev/null | cut -d'.' -f1)
+    duration_secs=${duration_secs:-0}
+    
+    # Calculer le score VMAF avec subsampling (1 frame sur 5 pour accélérer)
+    # n_subsample=5 : analyse seulement 20% des frames (5x plus rapide)
     # Le filtre libvmaf compare la vidéo distordue (input 0) à la référence (input 1)
-    # Note: On redirige stderr vers stdout pour capturer le score affiché par ffmpeg
-    local vmaf_stderr
-    vmaf_stderr=$(ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
-        -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file" \
-        -f null - 2>&1)
+    if [[ "$NO_PROGRESS" != true ]] && [[ "$duration_secs" -gt 0 ]] && [[ -n "$filename_display" ]]; then
+        # Avec barre de progression
+        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
+            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5" \
+            -f null - 2>&1 | while IFS= read -r line; do
+                # Extraire le temps actuel depuis la sortie ffmpeg (format: time=00:01:23.45)
+                if [[ "$line" =~ time=([0-9]+):([0-9]+):([0-9]+) ]]; then
+                    local hours="${BASH_REMATCH[1]}"
+                    local mins="${BASH_REMATCH[2]}"
+                    local secs="${BASH_REMATCH[3]}"
+                    local current_secs=$((10#$hours * 3600 + 10#$mins * 60 + 10#$secs))
+                    local percent=$((current_secs * 100 / duration_secs))
+                    [[ $percent -gt 100 ]] && percent=100
+                    # Barre de progression
+                    local bar_width=20
+                    local filled=$((percent * bar_width / 100))
+                    local empty=$((bar_width - filled))
+                    local bar=$(printf "%${filled}s" | tr ' ' '█')$(printf "%${empty}s" | tr ' ' '░')
+                    printf "\r    ${CYAN}VMAF${NOCOLOR} [${bar}] %3d%% - %s" "$percent" "$filename_display"
+                fi
+            done
+        printf "\r%80s\r" ""  # Effacer la ligne de progression
+    else
+        # Sans barre de progression
+        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
+            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5" \
+            -f null - 2>&1 >/dev/null
+    fi
     
     local ffmpeg_exit=$?
     
-    # Extraire le score VMAF depuis le fichier JSON ou depuis stderr
+    # Extraire le score VMAF depuis le fichier JSON
     local vmaf_score=""
     
     # Méthode 1: Lire depuis le fichier JSON généré
     if [[ -f "$vmaf_log_file" ]] && [[ -s "$vmaf_log_file" ]]; then
         vmaf_score=$(grep -o '"mean"[[:space:]]*:[[:space:]]*[0-9.]*' "$vmaf_log_file" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    fi
-    
-    # Méthode 2: Extraire depuis la sortie stderr de ffmpeg (affiche le score à la fin)
-    if [[ -z "$vmaf_score" ]]; then
-        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score:[[:space:]]*[0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
-    fi
-    
-    # Méthode 3: Pattern alternatif
-    if [[ -z "$vmaf_score" ]]; then
-        vmaf_score=$(echo "$vmaf_stderr" | grep -oE 'VMAF score = [0-9.]+' | grep -oE '[0-9]+\.[0-9]+' | head -1)
     fi
     
     # Nettoyer le fichier temporaire
@@ -2084,13 +2104,9 @@ process_vmaf_queue() {
         local filename
         filename=$(basename "$final_actual")
         
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -ne "  ${CYAN}▶${NOCOLOR} [$current/$vmaf_count] Analyse: $filename...\r"
-        fi
-        
-        # Calculer le score VMAF
+        # Calculer le score VMAF (avec barre de progression intégrée)
         local vmaf_score
-        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual")
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "[$current/$vmaf_count] $filename")
         
         # Interpréter le score VMAF
         local vmaf_quality=""
