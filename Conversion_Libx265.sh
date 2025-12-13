@@ -3,8 +3,6 @@
 ###########################################################
 # TO DO
 # 1. Erreur à analyser pour le fichier My Dearest Nemesis - 1x12 - Épisode 12 qui echoue a chaque fois
-# 2. Proposer une alternative à AWK pour gérer l affichage de barre de progression dynamique 
-#    de la conversion sur plusieurs lignes pour les traitements en parallèle 
 ###########################################################
 
 set -euo pipefail
