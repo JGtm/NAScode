@@ -120,7 +120,7 @@ readonly DRYRUN_SUFFIX="-dryrun-sample"
 SUFFIX_STRING="_x265"  # Suffixe par défaut pour les fichiers de sortie
 
 # Exclusions par défaut
-EXCLUDES=("./logs" "./*.sh" "./*.txt" "Converted" "$SCRIPT_DIR")
+EXCLUDES=("./logs" "./*.sh" "./*.txt" "Converted")
 
 # Regex pré-compilée des exclusions (construite au démarrage pour optimiser is_excluded)
 _build_excludes_regex() {
@@ -332,9 +332,9 @@ parse_arguments() {
         esac
     done
 
-    if [[ "$OUTPUT_DIR" != /* ]]; then
-        OUTPUT_DIR="$SCRIPT_DIR/$OUTPUT_DIR"
-    fi
+    #if [[ "$OUTPUT_DIR" != /* ]]; then
+    #    OUTPUT_DIR="$SCRIPT_DIR/$OUTPUT_DIR"
+    #fi
     
     # En mode random, appliquer la limite par défaut si aucune limite n a été spécifiée
     if [[ "$RANDOM_MODE" == true ]] && [[ "$LIMIT_FILES" -eq 0 ]]; then
@@ -1054,7 +1054,7 @@ _count_total_video_files() {
     
     # Calcul du nombre total de fichiers candidats (lent, mais nécessaire pour l affichage de progression)
     find "$SOURCE" \
-        -name "$exclude_dir_name" -prune \
+        -wholename "$exclude_dir_name" -prune \
         -o \
         -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null | \
     tr -cd '\0' | wc -c
@@ -1068,7 +1068,7 @@ _index_video_files() {
     
     # Deuxième passe : indexer les fichiers avec leur taille
     find "$SOURCE" \
-        -name "$exclude_dir_name" -prune \
+        -wholename "$exclude_dir_name" -prune \
         -o \
         -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 | \
     while IFS= read -r -d $'\0' f; do
@@ -1090,7 +1090,7 @@ _index_video_files() {
 
 _generate_index() {
     # Génération de l INDEX (fichier permanent contenant tous les fichiers indexés avec tailles)
-    local exclude_dir_name=$(basename "$OUTPUT_DIR")
+    local exclude_dir_name=$OUTPUT_DIR
 
     if [[ "$NO_PROGRESS" != true ]]; then 
         echo "Indexation fichiers..." >&2
