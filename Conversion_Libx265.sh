@@ -2259,6 +2259,8 @@ _finalize_try_move() {
         sleep 2
     done
 
+    echo "Coucou tu veux voir ma bite"
+
     # Essayer cp + rm (3 essais)
     try=0
     while [[ $try -lt $max_try ]]; do
