@@ -2040,10 +2040,13 @@ compute_vmaf_score() {
         return 0
     fi
     
-    # Fichiers temporaires (compatible Windows/Linux)
-    local vmaf_log_file="${TMP_DIR}/vmaf_result_$$.json"
-    local progress_file="${TMP_DIR}/vmaf_progress_$$.txt"
-    mkdir -p "$TMP_DIR" 2>/dev/null || true
+    # Fichiers temporaires dans logs/vmaf/
+    local vmaf_dir="${LOG_DIR}/vmaf"
+    mkdir -p "$vmaf_dir" 2>/dev/null || true
+    local file_hash
+    file_hash=$(compute_md5_prefix "$filename_display")
+    local vmaf_log_file="${vmaf_dir}/vmaf_${file_hash}_${$}_${RANDOM}.json"
+    local progress_file="${vmaf_dir}/vmaf_progress_$$.txt"
     
     # Obtenir la durée totale de la vidéo en microsecondes pour la progression
     local duration_us=0
