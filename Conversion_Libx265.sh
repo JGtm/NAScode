@@ -42,9 +42,6 @@ fi
 HAS_MD5SUM=$(command -v md5sum >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_MD5=$(command -v md5 >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_PYTHON3=$(command -v python3 >/dev/null 2>&1 && echo 1 || echo 0)
-HAS_NPROC=$(command -v nproc >/dev/null 2>&1 && echo 1 || echo 0)
-HAS_GETCONF=$(command -v getconf >/dev/null 2>&1 && echo 1 || echo 0)
-HAS_SYSCTL=$(command -v sysctl >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_DATE_NANO=$(date +%s.%N >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_PERL_HIRES=$(perl -MTime::HiRes -e '1' 2>/dev/null && echo 1 || echo 0)
 # Détecter si awk supporte systime() (GNU awk)
@@ -75,22 +72,7 @@ PY
     fi
 }
 
-# compatibilité pour `nproc`
-nproc_compat() {
-    if [[ "$HAS_NPROC" -eq 1 ]]; then
-        nproc
-        return
-    fi
-    if [[ "$HAS_GETCONF" -eq 1 ]]; then
-        getconf _NPROCESSORS_ONLN 2>/dev/null && return
-    fi
-    if [[ "$HAS_SYSCTL" -eq 1 ]]; then
-        sysctl -n hw.ncpu 2>/dev/null && return
-    fi
-    echo 1
-}
-
-# horodatage haute résolution (secondes avec fraction)
+# horodatage haute resolution (secondes avec fraction)
 now_ts() {
     if [[ "$HAS_DATE_NANO" -eq 1 ]]; then
         date +%s.%N
@@ -1477,39 +1459,6 @@ _execute_conversion() {
     local duration_secs="$4"
     local base_name="$5"
 
-    # Calcul du nombre de threads à allouer par job.
-    # Principe : répartir les coeurs CPU disponibles (nproc_compat)
-    # entre le nombre de jobs parallèles souhaités (PARALLEL_JOBS).
-    # Si l utilisateur a fixé LIMIT_FILES et que ce nombre est inférieur
-    # à PARALLEL_JOBS, on réduit le nombre de jobs concurrents afin
-    # d allouer plus de threads par job (meilleure utilisation CPU).
-    local cores
-    local parallel_jobs
-
-    parallel_jobs=${PARALLEL_JOBS:-3}
-
-    # Si une limite de fichiers est définie et plus petite que le nombre
-    # de jobs parallèles, adapter le parallélisme à cette limite.
-    if [[ "${LIMIT_FILES:-0}" -gt 0 && "${LIMIT_FILES:-0}" -lt "$parallel_jobs" ]]; then
-        parallel_jobs=$LIMIT_FILES
-    fi
-
-    cores=$(nproc_compat)
-
-    # Garanties : valeurs minimales >= 1
-    if [[ "$cores" -lt 1 ]]; then
-        cores=1
-    fi
-    if [[ "$parallel_jobs" -lt 1 ]]; then
-        parallel_jobs=1
-    fi
-
-    # Nombre de threads alloués par job (au moins 1)
-    local threads_per_job=$(( cores / parallel_jobs ))
-    if [[ "$threads_per_job" -lt 1 ]]; then
-        threads_per_job=1
-    fi
-       
     # Options de l encodage (principales) :
     #  -g 600               : taille GOP (nombre d images entre I-frames)
     #  -keyint_min 600      : intervalle minimum entre keyframes (force des I-frames régulières)
@@ -1531,8 +1480,13 @@ _execute_conversion() {
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
     
-    # Fichier de stats pour two-pass (unique par fichier)
-    local stats_file="${TMP_DIR}/x265_stats_$$_$(basename "$tmp_input" | tr ' ' '_')"
+    # Fichier de stats pour two-pass (dans logs/2pass/)
+    # Nom unique : hash du fichier + PID + RANDOM pour eviter conflits en parallele
+    local stats_dir="${LOG_DIR}/2pass"
+    mkdir -p "$stats_dir" 2>/dev/null || true
+    local file_hash
+    file_hash=$(compute_md5_prefix "$base_name")
+    local stats_file_posix="${stats_dir}/x265_2pass_${file_hash}_${$}_${RANDOM}"
 
     # Script AWK adapte selon la disponibilite de systime() (gawk vs awk BSD)
     local awk_time_func
@@ -1551,7 +1505,8 @@ _execute_conversion() {
     fi
 
     # ==================== PASS 1 : ANALYSE ====================
-    local x265_params_pass1="pools=${threads_per_job}:pass=1:stats=${stats_file}:${x265_vbv}"
+    # Utiliser -passlogfile de ffmpeg (gere les chemins Windows correctement)
+    local x265_params_pass1="pass=1:${x265_vbv}"
     
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         -hwaccel $HWACCEL \
@@ -1559,6 +1514,7 @@ _execute_conversion() {
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
+        -passlogfile "$stats_file_posix" \
         -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
         -an \
         -f null /dev/null \
@@ -1601,8 +1557,8 @@ _execute_conversion() {
             bar_width = 20;
             filled = int(percent * bar_width / 100);
             bar = \"\";
-            for (i = 0; i < filled; i++) bar = bar \"█\";
-            for (i = filled; i < bar_width; i++) bar = bar \"░\";
+            for (i = 0; i < filled; i++) bar = bar \"━\";
+            for (i = filled; i < bar_width; i++) bar = bar \"┄\";
 
             if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
                 if (is_parallel && slot > 0) {
@@ -1621,7 +1577,7 @@ _execute_conversion() {
         /progress=end/ {
             if (NOPROG != \"true\") {
                 bar_complete = \"\";
-                for (i = 0; i < 20; i++) bar_complete = bar_complete \"█\";
+                for (i = 0; i < 20; i++) bar_complete = bar_complete \"━\";
                 if (is_parallel && slot > 0) {
                     lines_up = max_slots - slot + 2;
                     printf \"\\033[%dA\\r\\033[K  🔍 [%d] %-25.25s [%s] 100.0%% | Analyse OK\\033[%dB\\r\",
@@ -1642,7 +1598,7 @@ _execute_conversion() {
         if [[ -f "${ffmpeg_log_temp}.pass1" ]]; then
             tail -n 40 "${ffmpeg_log_temp}.pass1" >&2 || true
         fi
-        rm -f "$stats_file" "${stats_file}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
+        rm -f "$stats_file_posix" "${stats_file_posix}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
         if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
             release_progress_slot "$progress_slot"
         fi
@@ -1651,7 +1607,7 @@ _execute_conversion() {
 
     # ==================== PASS 2 : ENCODAGE ====================
     START_TS="$(date +%s)"
-    local x265_params_pass2="pools=${threads_per_job}:pass=2:stats=${stats_file}:${x265_vbv}"
+    local x265_params_pass2="pass=2:${x265_vbv}"
 
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         -hwaccel $HWACCEL \
@@ -1659,6 +1615,7 @@ _execute_conversion() {
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
+        -passlogfile "$stats_file_posix" \
         -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
         -c:a copy \
         -map 0 -f matroska \
@@ -1737,7 +1694,7 @@ _execute_conversion() {
     "
 
     # Nettoyer les fichiers de stats
-    rm -f "$stats_file" "${stats_file}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
+    rm -f "$stats_file_posix" "${stats_file_posix}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
 
     # Liberer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
@@ -2665,7 +2622,7 @@ export_variables() {
     export -f increment_processed_count update_queue
     
     # --- Fonctions utilitaires ---
-    export -f is_excluded count_null_separated compute_md5_prefix nproc_compat now_ts
+    export -f is_excluded count_null_separated compute_md5_prefix now_ts
     
     # --- Fonctions VMAF (qualité vidéo) ---
     export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
@@ -2700,8 +2657,8 @@ export_variables() {
     export -f acquire_progress_slot release_progress_slot cleanup_progress_slots setup_progress_display
     export SLOTS_DIR
     
-    # --- Variables de détection d outils ---
-    export HAS_MD5SUM HAS_MD5 HAS_PYTHON3 HAS_NPROC HAS_GETCONF HAS_SYSCTL
+    # --- Variables de detection d outils ---
+    export HAS_MD5SUM HAS_MD5 HAS_PYTHON3
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
     export HAS_LIBVMAF VMAF_QUEUE_FILE
