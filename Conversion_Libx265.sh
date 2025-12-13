@@ -208,9 +208,9 @@ readonly TMP_DIR="/tmp/video_convert"
 readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans /tmp
 
 
-# PARAMÈTRES DE CONVERSION (encodeur générique - HEVC/x265)
-# CRF (-cq) : Facteur de qualité constante. Plus bas = meilleure qualité / plus de taille.
-# ENCODER_PRESET : Préréglage générique de l encodeur. Pour libx265 utiliser (ultrafast..veryslow),
+# PARAMETRES DE CONVERSION (encodeur generique - HEVC/x265)
+# Two-pass encoding : bitrate cible au lieu de CRF pour taille previsible
+# ENCODER_PRESET : Prereglage generique de l encodeur. Pour libx265 utiliser (ultrafast..veryslow),
 ENCODER_PRESET=""
 
 # SEUIL DE BITRATE DE CONVERSION (KBPS)
@@ -229,19 +229,24 @@ fi
 # GESTION DES MODES DE CONVERSION
 ###########################################################
 
+# Two-pass encoding : bitrate cible pour 1,1 Go/h en 1080p
+# Calcul : 1,1 Go = 1,1 * 1024 * 8 Mbits = 9011 Mbits
+#          9011 / 3600s = 2503 kbps total
+#          Video = ~2300-2400 kbps (audio ~128 kbps)
+
 set_conversion_mode_parameters() {
     case "$CONVERSION_MODE" in
         film)
-            CRF=20.6
+            # Films : bitrate plus eleve pour meilleure qualite
+            TARGET_BITRATE_KBPS=2500
             ENCODER_PRESET="slow"
-            # Plafond pour les films (en kbps). Ajuste si tu veux différencier film/serie.
             MAXRATE_KBPS=4000
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             ;;
         serie)
-            CRF=20.7
+            # Series : bitrate optimise pour ~1,1 Go/h
+            TARGET_BITRATE_KBPS=2300
             ENCODER_PRESET="medium"
-            # Plafond pour les séries (par défaut identique)
             MAXRATE_KBPS=2800
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             ;;
@@ -251,7 +256,8 @@ set_conversion_mode_parameters() {
             exit 1
             ;;
     esac
-    # Valeurs dérivées utilisées par ffmpeg/x265 (ffmpeg attend suffixe k, x265 attend kbps sans suffixe)
+    # Valeurs derivees utilisees par ffmpeg/x265
+    TARGET_BITRATE_FFMPEG="${TARGET_BITRATE_KBPS}k"
     MAXRATE_FFMPEG="${MAXRATE_KBPS}k"
     BUFSIZE_FFMPEG="${BUFSIZE_KBPS}k"
     X265_VBV_PARAMS="vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}"
@@ -556,7 +562,7 @@ check_dependencies() {
         exit 1
     fi
 
-    echo -e "   - Mode conversion : ${CYAN}$CONVERSION_MODE${NOCOLOR} (CRF=$CRF)"
+    echo -e "   - Mode conversion : ${CYAN}$CONVERSION_MODE${NOCOLOR} (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)"
     echo -e "${GREEN}Environnement validé.${NOCOLOR}"
 }
 
@@ -1512,25 +1518,27 @@ _execute_conversion() {
     #  -tune fastdecode     : optimiser l encodeur pour un décodage plus rapide
     #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits
 
-    # timestamp de départ portable
+    # timestamp de depart portable
     START_TS="$(date +%s)"
 
-    # Exécute ffmpeg et pipe vers awk pour affichage de progression.
-    # On récupère ensuite les codes de sortie via PIPESTATUS pour diagnostiquer précisément.
+    # Two-pass encoding : analyse puis encodage
+    # Pass 1 : analyse rapide pour generer les statistiques
+    # Pass 2 : encodage final avec repartition optimale du bitrate
 
-    # Préparer les paramètres VBV / maxrate/bufsize en local (utilise les valeurs calculées par set_conversion_mode_parameters)
+    # Preparer les parametres
+    local ff_bitrate="${TARGET_BITRATE_FFMPEG:-${TARGET_BITRATE_KBPS}k}"
     local ff_maxrate="${MAXRATE_FFMPEG:-${MAXRATE_KBPS}k}"
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
-    local x265_params="pools=${threads_per_job}:${x265_vbv}"
+    
+    # Fichier de stats pour two-pass (unique par fichier)
+    local stats_file="${TMP_DIR}/x265_stats_$$_$(basename "$tmp_input" | tr ' ' '_')"
 
-    # Script AWK adapté selon la disponibilité de systime() (gawk vs awk BSD)
+    # Script AWK adapte selon la disponibilite de systime() (gawk vs awk BSD)
     local awk_time_func
     if [[ "$HAS_GAWK" -eq 1 ]]; then
-        # GNU awk : utilise systime() (pas de fork)
         awk_time_func='function get_time() { return systime() }'
     else
-        # awk BSD (macOS) : fallback vers fork date (moins optimal mais compatible)
         awk_time_func='function get_time() { cmd="date +%s"; cmd | getline t; close(cmd); return t }'
     fi
 
@@ -1542,12 +1550,115 @@ _execute_conversion() {
         progress_slot=$(acquire_progress_slot)
     fi
 
+    # ==================== PASS 1 : ANALYSE ====================
+    local x265_params_pass1="pools=${threads_per_job}:pass=1:stats=${stats_file}:${x265_vbv}"
+    
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         -hwaccel $HWACCEL \
         -i "$tmp_input" -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode -crf "$CRF" -x265-params "$x265_params" \
+        -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
+        -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
+        -an \
+        -f null /dev/null \
+        -progress pipe:1 -nostats 2> "${ffmpeg_log_temp}.pass1" | \
+    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v PASS_LABEL="Analyse" "
+        $awk_time_func
+        BEGIN {
+            duration = DURATION + 0;
+            if (duration < 1) exit;
+            start = START + 0;
+            last_update = 0;
+            refresh_interval = 2;
+            speed = 1;
+            slot = SLOT + 0;
+            is_parallel = PARALLEL + 0;
+            max_slots = MAX_SLOTS + 0;
+        }
+
+        /out_time_us=/ {
+            if (match(\$0, /[0-9]+/)) {
+                current_time = substr(\$0, RSTART, RLENGTH) / 1000000;
+            } else {
+                current_time = 0;
+            }
+
+            percent = (current_time / duration) * 100;
+            if (percent > 100) percent = 100;
+
+            now = get_time();
+            elapsed = now - start;
+            speed = (elapsed > 0 ? current_time / elapsed : 1);
+            remaining = duration - current_time;
+            eta = (speed > 0 ? remaining / speed : 0);
+
+            h = int(eta / 3600);
+            m = int((eta % 3600) / 60);
+            s = int(eta % 60);
+            eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
+
+            bar_width = 20;
+            filled = int(percent * bar_width / 100);
+            bar = \"\";
+            for (i = 0; i < filled; i++) bar = bar \"█\";
+            for (i = filled; i < bar_width; i++) bar = bar \"░\";
+
+            if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
+                if (is_parallel && slot > 0) {
+                    lines_up = max_slots - slot + 2;
+                    printf \"\\033[%dA\\r\\033[K  🔍 [%d] %-25.25s [%s] %5.1f%% | ETA: %s | x%.2f\\033[%dB\\r\",
+                           lines_up, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > \"/dev/stderr\";
+                } else {
+                    printf \"\\r\\033[K  🔍 %-30.30s [%s] %5.1f%% | ETA: %s | x%.2f\",
+                           CURRENT_FILE_NAME, bar, percent, eta_str, speed > \"/dev/stderr\";
+                }
+                fflush(\"/dev/stderr\");
+                last_update = now;
+            }
+        }
+
+        /progress=end/ {
+            if (NOPROG != \"true\") {
+                bar_complete = \"\";
+                for (i = 0; i < 20; i++) bar_complete = bar_complete \"█\";
+                if (is_parallel && slot > 0) {
+                    lines_up = max_slots - slot + 2;
+                    printf \"\\033[%dA\\r\\033[K  🔍 [%d] %-25.25s [%s] 100.0%% | Analyse OK\\033[%dB\\r\",
+                           lines_up, slot, CURRENT_FILE_NAME, bar_complete, lines_up > \"/dev/stderr\";
+                } else {
+                    printf \"\\r\\033[K  🔍 %-30.30s [%s] 100.0%% | Analyse OK\\n\",
+                           CURRENT_FILE_NAME, bar_complete > \"/dev/stderr\";
+                }
+                fflush(\"/dev/stderr\");
+            }
+        }
+    "
+
+    # Verifier le succes du pass 1
+    local pass1_rc=${PIPESTATUS[0]:-0}
+    if [[ "$pass1_rc" -ne 0 ]]; then
+        echo -e "${RED}❌ Erreur lors de l'analyse (pass 1)${NOCOLOR}" >&2
+        if [[ -f "${ffmpeg_log_temp}.pass1" ]]; then
+            tail -n 40 "${ffmpeg_log_temp}.pass1" >&2 || true
+        fi
+        rm -f "$stats_file" "${stats_file}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
+        if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+            release_progress_slot "$progress_slot"
+        fi
+        return 1
+    fi
+
+    # ==================== PASS 2 : ENCODAGE ====================
+    START_TS="$(date +%s)"
+    local x265_params_pass2="pools=${threads_per_job}:pass=2:stats=${stats_file}:${x265_vbv}"
+
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        -hwaccel $HWACCEL \
+        -i "$tmp_input" -pix_fmt yuv420p10le \
+        -g 600 -keyint_min 600 \
+        -c:v libx265 -preset "$ENCODER_PRESET" \
+        -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
         -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
         -c:a copy \
         -map 0 -f matroska \
@@ -1579,35 +1690,27 @@ _execute_conversion() {
 
             now = get_time();
             elapsed = now - start;
-
             speed = (elapsed > 0 ? current_time / elapsed : 1);
-
             remaining = duration - current_time;
             eta = (speed > 0 ? remaining / speed : 0);
 
             h = int(eta / 3600);
             m = int((eta % 3600) / 60);
             s = int(eta % 60);
-
             eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
 
-            # Construction de la barre de progression visuelle
             bar_width = 20;
             filled = int(percent * bar_width / 100);
             bar = \"\";
             for (i = 0; i < filled; i++) bar = bar \"█\";
             for (i = filled; i < bar_width; i++) bar = bar \"░\";
 
-            # Rafraîchissement
             if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
                 if (is_parallel && slot > 0) {
-                    # Mode parallèle : positionner le curseur sur la ligne du slot
-                    # Déplacer vers le haut de (max_slots - slot + 2) lignes puis écrire
                     lines_up = max_slots - slot + 2;
                     printf \"\\033[%dA\\r\\033[K  🎬 [%d] %-25.25s [%s] %5.1f%% | ETA: %s | x%.2f\\033[%dB\\r\",
                            lines_up, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > \"/dev/stderr\";
                 } else {
-                    # Mode séquentiel : simple retour chariot
                     printf \"\\r\\033[K  🎬 %-30.30s [%s] %5.1f%% | ETA: %s | x%.2f\",
                            CURRENT_FILE_NAME, bar, percent, eta_str, speed > \"/dev/stderr\";
                 }
@@ -1621,26 +1724,27 @@ _execute_conversion() {
                 bar_complete = \"\";
                 for (i = 0; i < 20; i++) bar_complete = bar_complete \"█\";
                 if (is_parallel && slot > 0) {
-                    # Mode parallèle : effacer la ligne du slot
                     lines_up = max_slots - slot + 2;
-                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] %-25.25s [%s] 100.0%% | Terminé | x%.2f\\033[%dB\\r\",
-                           lines_up, slot, CURRENT_FILE_NAME, bar_complete, speed, lines_up > \"/dev/stderr\";
+                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] %-25.25s [%s] 100.0%% | Termine\\033[%dB\\r\",
+                           lines_up, slot, CURRENT_FILE_NAME, bar_complete, lines_up > \"/dev/stderr\";
                 } else {
-                    # Mode séquentiel : nouvelle ligne
-                    printf \"\\r\\033[K  ✅ %-30.30s [%s] 100.0%% | Terminé | x%.2f\\n\",
-                           CURRENT_FILE_NAME, bar_complete, speed > \"/dev/stderr\";
+                    printf \"\\r\\033[K  ✅ %-30.30s [%s] 100.0%% | Termine\\n\",
+                           CURRENT_FILE_NAME, bar_complete > \"/dev/stderr\";
                 }
                 fflush(\"/dev/stderr\");
             }
         }
     "
 
-    # Libérer le slot de progression
+    # Nettoyer les fichiers de stats
+    rm -f "$stats_file" "${stats_file}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
+
+    # Liberer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
         release_progress_slot "$progress_slot"
     fi
 
-    # Récupère les codes de sortie du pipeline (0 = succès).
+    # Recupere les codes de sortie du pipeline (0 = succes).
     local ffmpeg_rc=0
     local awk_rc=0
     if [[ ${#PIPESTATUS[@]} -ge 1 ]]; then
@@ -1651,13 +1755,12 @@ _execute_conversion() {
     if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
         return 0
     else
-        # Affiche les dernières lignes du log ffmpeg pour aider au diagnostic
         if [[ -f "$ffmpeg_log_temp" ]]; then
-            echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log_temp) ---" >&2
+            echo "--- Dernieres lignes du log ffmpeg ($ffmpeg_log_temp) ---" >&2
             tail -n 80 "$ffmpeg_log_temp" >&2 || true
             echo "--- Fin du log ffmpeg ---" >&2
         else
-            echo "(Aucun fichier de log ffmpeg trouvé: $ffmpeg_log_temp)" >&2
+            echo "(Aucun fichier de log ffmpeg trouve: $ffmpeg_log_temp)" >&2
         fi
         return 1
     fi
@@ -2569,7 +2672,7 @@ export_variables() {
     
     # --- Variables de configuration ---
     export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
-    export ENCODER_PRESET CRF HWACCEL
+    export ENCODER_PRESET TARGET_BITRATE_KBPS TARGET_BITRATE_FFMPEG HWACCEL
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
