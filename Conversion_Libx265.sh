@@ -1468,6 +1468,7 @@ _execute_conversion() {
 
     # timestamp de depart portable
     START_TS="$(date +%s)"
+    START_TS_TOTAL="$(date +%s)"
 
     # Two-pass encoding : analyse puis encodage
     # Pass 1 : analyse rapide pour generer les statistiques
@@ -1478,14 +1479,6 @@ _execute_conversion() {
     local ff_maxrate="${MAXRATE_FFMPEG:-${MAXRATE_KBPS}k}"
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
-    
-    # Fichier de stats pour two-pass (dans logs/2pass/)
-    # Nom unique : hash du fichier + PID + RANDOM pour eviter conflits en parallele
-    local stats_dir="${LOG_DIR}/2pass"
-    mkdir -p "$stats_dir" 2>/dev/null || true
-    local file_hash
-    file_hash=$(compute_md5_prefix "$base_name")
-    local stats_file_posix="${stats_dir}/x265_2pass_${file_hash}_${$}_${RANDOM}"
 
     # Script AWK adapte selon la disponibilite de systime() (gawk vs awk BSD)
     local awk_time_func
@@ -1513,7 +1506,6 @@ _execute_conversion() {
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
-        -passlogfile "$stats_file_posix" \
         -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
         -an \
         -f null /dev/null \
@@ -1556,8 +1548,8 @@ _execute_conversion() {
             bar_width = 20;
             filled = int(percent * bar_width / 100);
             bar = \"\";
-            for (i = 0; i < filled; i++) bar = bar \"━\";
-            for (i = filled; i < bar_width; i++) bar = bar \"┄\";
+            for (i = 0; i < filled; i++) bar = bar \"♥\";
+            for (i = filled; i < bar_width; i++) bar = bar \"♡\";
 
             if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
                 if (is_parallel && slot > 0) {
@@ -1576,7 +1568,7 @@ _execute_conversion() {
         /progress=end/ {
             if (NOPROG != \"true\") {
                 bar_complete = \"\";
-                for (i = 0; i < 20; i++) bar_complete = bar_complete \"━\";
+                for (i = 0; i < 1; i++) bar_complete = bar_complete \"8==============D ~~~\";
                 if (is_parallel && slot > 0) {
                     lines_up = max_slots - slot + 2;
                     printf \"\\033[%dA\\r\\033[K  🔍 [%d] %-25.25s [%s] 100.0%% | Analyse OK\\033[%dB\\r\",
@@ -1597,7 +1589,6 @@ _execute_conversion() {
         if [[ -f "${ffmpeg_log_temp}.pass1" ]]; then
             tail -n 40 "${ffmpeg_log_temp}.pass1" >&2 || true
         fi
-        rm -f "$stats_file_posix" "${stats_file_posix}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
         if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
             release_progress_slot "$progress_slot"
         fi
@@ -1614,7 +1605,6 @@ _execute_conversion() {
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
-        -passlogfile "$stats_file_posix" \
         -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
         -c:a copy \
         -map 0 -f matroska \
@@ -1693,7 +1683,8 @@ _execute_conversion() {
     "
 
     # Nettoyer les fichiers de stats
-    rm -f "$stats_file_posix" "${stats_file_posix}.cutree" "${ffmpeg_log_temp}.pass1" 2>/dev/null || true
+    rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+
 
     # Liberer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
@@ -2382,7 +2373,7 @@ _finalize_conversion_success() {
         if [[ -n "${START_TS:-}" ]]; then
             local end_ts
             end_ts=$(date +%s)
-            local elapsed=$((end_ts - START_TS))
+            local elapsed=$((end_ts - START_TS_TOTAL))
             local eh=$((elapsed / 3600))
             local em=$(((elapsed % 3600) / 60))
             local es=$((elapsed % 60))
