@@ -2082,7 +2082,7 @@ compute_vmaf_score() {
                             short_name="${short_name:0:27}..."
                         fi
                         # Ecrire sur stderr (fd 2) pour eviter capture par $()
-                        printf "\r    %-30s \033[0;36mVMAF [%s] %3d%%" "$short_name" "$bar" "$percent" "\033[0m" >&2
+                        printf "\r    %-30s \033[0;36mVMAF\033[0m [%s] %3d%%" "$short_name" "$bar" "$percent" >&2
                     fi
                 fi
             fi
