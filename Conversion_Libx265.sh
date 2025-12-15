@@ -1051,27 +1051,46 @@ _handle_existing_index() {
 }
 
 _count_total_video_files() {
-    local exclude_dir_name="$1"
+    local exclude_dir_name="${1%/}"  # Retirer le slash final s'il existe
+    local source_resolved exclude_resolved
+    source_resolved=$(cd "$SOURCE" 2>/dev/null && pwd -P || echo "$SOURCE")
+    exclude_resolved=$(cd "$exclude_dir_name" 2>/dev/null && pwd -P || echo "$exclude_dir_name")
     
     # Calcul du nombre total de fichiers candidats (lent, mais nécessaire pour l affichage de progression)
-    find "$SOURCE" \
-        -wholename "$exclude_dir_name" -prune \
-        -o \
-        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null | \
-    tr -cd '\0' | wc -c
+    # Si SOURCE == OUTPUT_DIR, ne pas exclure de répertoire
+    if [[ "$source_resolved" == "$exclude_resolved" ]] || [[ -z "$exclude_dir_name" ]]; then
+        find "$SOURCE" \
+            -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null | \
+        tr -cd '\0' | wc -c
+    else
+        find "$SOURCE" \
+            -path "*/${exclude_dir_name##*/}" -prune \
+            -o \
+            -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null | \
+        tr -cd '\0' | wc -c
+    fi
 }
 
 _index_video_files() {
-    local exclude_dir_name="$1"
+    local exclude_dir_name="${1%/}"  # Retirer le slash final s'il existe
     local total_files="$2"
     local queue_tmp="$3"
     local count_file="$4"
+    local source_resolved exclude_resolved
+    source_resolved=$(cd "$SOURCE" 2>/dev/null && pwd -P || echo "$SOURCE")
+    exclude_resolved=$(cd "$exclude_dir_name" 2>/dev/null && pwd -P || echo "$exclude_dir_name")
     
     # Deuxième passe : indexer les fichiers avec leur taille
-    find "$SOURCE" \
-        -wholename "$exclude_dir_name" -prune \
-        -o \
-        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 | \
+    # Si SOURCE == OUTPUT_DIR, ne pas exclure de répertoire
+    if [[ "$source_resolved" == "$exclude_resolved" ]] || [[ -z "$exclude_dir_name" ]]; then
+        find "$SOURCE" \
+            -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0
+    else
+        find "$SOURCE" \
+            -path "*/${exclude_dir_name##*/}" -prune \
+            -o \
+            -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0
+    fi | \
     while IFS= read -r -d $'\0' f; do
         if is_excluded "$f"; then continue; fi
         if [[ "$f" =~ \.(sh|txt)$ ]]; then continue; fi
@@ -1987,6 +2006,10 @@ convert_file() {
     local metadata_info
     if ! metadata_info=$(_analyze_video "$file_original" "$filename"); then
         # Analyse a indiqué qu on doit skip ce fichier
+        # Alimenter la queue avec le prochain candidat si limite active
+        if [[ "$LIMIT_FILES" -gt 0 ]]; then
+            update_queue || true
+        fi
         increment_processed_count || true
         return 0
     fi
