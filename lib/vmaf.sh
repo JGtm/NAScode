@@ -88,7 +88,7 @@ compute_vmaf_score() {
                         fi
                         # Écrire sur stderr (fd 2) pour éviter capture par $()
                         # Compteur et nom de fichier en CYAN, espace initial pour aligner avec l'icône de statut
-                        printf "\r    \033[0;36m%s%-30s\033[0m VMAF [%s] %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
+                        printf "\r    \033[0;36m%s%-30s\033[0m Calcul en cours [%s] %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
                     fi
                 fi
             fi
