@@ -193,7 +193,7 @@ _index_video_files() {
         
         # Affichage de progression
         if [[ "$NO_PROGRESS" != true ]]; then
-            printf "\rIndexation en cours... [%-${#total_files}d/${count}]" "$count" >&2
+            printf "\rIndexation en cours... [%d/%d]" "$count" "$total_files" >&2
         fi
         
         # Stockage de la taille et du chemin (séparé par tab)
