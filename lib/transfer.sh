@@ -124,7 +124,7 @@ wait_all_transfers() {
     
     if [[ "$NO_PROGRESS" != true ]]; then
         echo ""
-        echo -e "${CYAN}⏳ Attente de la fin des transferts en cours ($active_count restants)...${NOCOLOR}"
+        echo -e "${MAGENTA}⏳ Attente de la fin des transferts en cours ($active_count restants)...${NOCOLOR}"
     fi
     
     # Attendre tous les transferts
@@ -136,7 +136,7 @@ wait_all_transfers() {
         # Afficher la progression si le nombre a changé
         if [[ "$new_count" -ne "$active_count" ]] && [[ "$NO_PROGRESS" != true ]]; then
             if [[ "$new_count" -gt 0 ]]; then
-                echo -e "  ${CYAN}⏳ $new_count transfert(s) restant(s)...${NOCOLOR}"
+                echo -e "  ${MAGENTA}⏳ $new_count transfert(s) restant(s)...${NOCOLOR}"
             fi
         fi
         active_count="$new_count"
@@ -177,7 +177,7 @@ start_async_transfer() {
     _add_transfer_pid "$transfer_pid"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "  ${CYAN}📤 Transfert lancé en arrière-plan (PID: $transfer_pid)${NOCOLOR}"
+        echo -e "  ${MAGENTA}📤 Transfert lancé en arrière-plan (PID: $transfer_pid)${NOCOLOR}"
     fi
 }
 

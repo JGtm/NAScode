@@ -5,6 +5,34 @@
 ###########################################################
 
 ###########################################################
+# NETTOYAGE DES FICHIERS TEMPORAIRES X265
+###########################################################
+
+# Nettoyer les fichiers de log x265 two-pass créés par FFmpeg
+# Ces fichiers sont générés dans le répertoire courant lors de l'encodage
+_cleanup_x265_logs() {
+    local found_files=0
+    
+    # Chercher les fichiers x265_2pass.log et .cutree dans le répertoire du script
+    # et dans le répertoire courant
+    for search_dir in "${SCRIPT_DIR:-.}" "$(pwd)"; do
+        if [[ -d "$search_dir" ]]; then
+            # Utiliser find pour trouver les fichiers (plus robuste)
+            while IFS= read -r -d '' log_file; do
+                if [[ -f "$log_file" ]]; then
+                    rm -f "$log_file" 2>/dev/null && found_files=$((found_files + 1))
+                fi
+            done < <(find "$search_dir" -maxdepth 1 -name "x265_2pass.log*" -print0 2>/dev/null)
+        fi
+    done
+    
+    # Afficher un message si des fichiers ont été nettoyés
+    if [[ "$found_files" -gt 0 ]] && [[ "${NO_PROGRESS:-}" != true ]]; then
+        echo -e "${CYAN}🧹 Nettoyage de $found_files fichier(s) x265 temporaire(s)${NOCOLOR}"
+    fi
+}
+
+###########################################################
 # NETTOYAGE À LA SORTIE
 ###########################################################
 
@@ -33,6 +61,10 @@ cleanup() {
     fi
     # Nettoyage des slots de progression parallèle
     cleanup_progress_slots
+    
+    # Nettoyage des fichiers temporaires x265 two-pass (logs d'encodage)
+    # Ces fichiers sont créés dans le répertoire courant par FFmpeg/x265
+    _cleanup_x265_logs
 }
 
 # Variable pour détecter une vraie interruption (Ctrl+C ou kill)
