@@ -177,7 +177,7 @@ start_async_transfer() {
     _add_transfer_pid "$transfer_pid"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "  ${MAGENTA}📤 Transfert lancé en arrière-plan (PID: $transfer_pid)${NOCOLOR}"
+        echo -e "  ${BLUE}📤 Transfert lancé en arrière-plan (PID: $transfer_pid)${NOCOLOR}"
     fi
 }
 

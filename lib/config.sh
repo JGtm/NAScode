@@ -125,7 +125,8 @@ readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans /tmp
 
 # ----- Paramètres de conversion -----
 # SEUIL DE BITRATE DE CONVERSION (KBPS)
-readonly BITRATE_CONVERSION_THRESHOLD_KBPS=2800
+# Fichiers avec bitrate inférieur à ce seuil ne seront pas reconvertis
+readonly BITRATE_CONVERSION_THRESHOLD_KBPS=2520
 
 # TOLÉRANCE DU BITRATE A SKIP (%)
 readonly SKIP_TOLERANCE_PERCENT=10
@@ -160,16 +161,16 @@ set_conversion_mode_parameters() {
     case "$CONVERSION_MODE" in
         film)
             # Films : bitrate plus élevé pour meilleure qualité
-            TARGET_BITRATE_KBPS=2500
+            TARGET_BITRATE_KBPS=2250
             ENCODER_PRESET="slow"
-            MAXRATE_KBPS=4000
+            MAXRATE_KBPS=3600
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             ;;
         serie)
-            # Séries : bitrate optimisé pour ~1,1 Go/h
-            TARGET_BITRATE_KBPS=2300
+            # Séries : bitrate optimisé pour ~1 Go/h
+            TARGET_BITRATE_KBPS=2070
             ENCODER_PRESET="medium"
-            MAXRATE_KBPS=2800
+            MAXRATE_KBPS=2520
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             ;;
         *)
