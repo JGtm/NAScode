@@ -339,8 +339,8 @@ _execute_conversion() {
             bar_width = 20;
             filled = int(percent * bar_width / 100);
             bar = \"\";
-            for (i = 0; i < filled; i++) bar = bar \"♥\";
-            for (i = filled; i < bar_width; i++) bar = bar \"♡\";
+            for (i = 0; i < filled; i++) bar = bar \"█\";
+            for (i = filled; i < bar_width; i++) bar = bar \"░\";
 
             if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
                 if (is_parallel && slot > 0) {
