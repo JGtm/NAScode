@@ -72,8 +72,13 @@ _count_active_transfers() {
         return
     fi
     
-    # Compter les lignes non vides
-    grep -c '[0-9]' "$TRANSFER_PIDS_FILE" 2>/dev/null || echo "0"
+    # Compter les lignes non vides (wc -l plus fiable que grep -c)
+    local count
+    count=$(grep -c '[0-9]' "$TRANSFER_PIDS_FILE" 2>/dev/null) || count=0
+    # Nettoyer les espaces et retours à la ligne
+    count=$(echo "$count" | tr -d '[:space:]')
+    [[ -z "$count" ]] && count=0
+    echo "$count"
 }
 
 ###########################################################
