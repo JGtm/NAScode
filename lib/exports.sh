@@ -71,7 +71,7 @@ export_variables() {
     
     # --- Variables de couleurs et affichage ---
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE
-    export AWK_PROGRESS_SCRIPT IO_PRIORITY_CMD
+    export AWK_PROGRESS_SCRIPT AWK_FFMPEG_PROGRESS_SCRIPT IO_PRIORITY_CMD
     
     # --- Fonctions et variables de progression parallèle ---
     export -f acquire_progress_slot release_progress_slot cleanup_progress_slots setup_progress_display

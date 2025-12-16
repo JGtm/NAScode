@@ -301,76 +301,10 @@ _execute_conversion() {
         -an \
         -f null /dev/null \
         -progress pipe:1 -nostats 2> "${ffmpeg_log_temp}.pass1" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v PASS_LABEL="Analyse" "
-        $awk_time_func
-        BEGIN {
-            duration = DURATION + 0;
-            if (duration < 1) exit;
-            start = START + 0;
-            last_update = 0;
-            refresh_interval = 2;
-            speed = 1;
-            slot = SLOT + 0;
-            is_parallel = PARALLEL + 0;
-            max_slots = MAX_SLOTS + 0;
-        }
-
-        /out_time_us=/ {
-            if (match(\$0, /[0-9]+/)) {
-                current_time = substr(\$0, RSTART, RLENGTH) / 1000000;
-            } else {
-                current_time = 0;
-            }
-
-            percent = (current_time / duration) * 100;
-            if (percent > 100) percent = 100;
-
-            now = get_time();
-            elapsed = now - start;
-            speed = (elapsed > 0 ? current_time / elapsed : 1);
-            remaining = duration - current_time;
-            eta = (speed > 0 ? remaining / speed : 0);
-
-            h = int(eta / 3600);
-            m = int((eta % 3600) / 60);
-            s = int(eta % 60);
-            eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
-
-            bar_width = 20;
-            filled = int(percent * bar_width / 100);
-            bar = \"\";
-            for (i = 0; i < filled; i++) bar = bar \"█\";
-            for (i = filled; i < bar_width; i++) bar = bar \"░\";
-
-            if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
-                if (is_parallel && slot > 0) {
-                    lines_up = max_slots - slot + 2;
-                    printf \"\\033[%dA\\r\\033[K  🔍 [%d] %-25.25s [%s] %5.1f%% | ETA: %s | x%.2f\\033[%dB\\r\",
-                           lines_up, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > \"/dev/stderr\";
-                } else {
-                    printf \"\\r\\033[K  🔍 %-30.30s [%s] %5.1f%% | ETA: %s | x%.2f\",
-                           CURRENT_FILE_NAME, bar, percent, eta_str, speed > \"/dev/stderr\";
-                }
-                fflush(\"/dev/stderr\");
-                last_update = now;
-            }
-        }
-
-        /progress=end/ {
-            if (NOPROG != \"true\") {
-                bar_complete = \"████████████████████\";
-                if (is_parallel && slot > 0) {
-                    lines_up = max_slots - slot + 2;
-                    printf \"\\033[%dA\\r\\033[K  🔍 [%d] %-25.25s [%s] 100.0%% | Analyse OK\\033[%dB\\r\",
-                           lines_up, slot, CURRENT_FILE_NAME, bar_complete, lines_up > \"/dev/stderr\";
-                } else {
-                    printf \"\\r\\033[K  🔍 %-30.30s [%s] 100.0%% | Analyse OK\\n\",
-                           CURRENT_FILE_NAME, bar_complete > \"/dev/stderr\";
-                }
-                fflush(\"/dev/stderr\");
-            }
-        }
-    "
+    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🔍" -v END_MSG="Analyse OK" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
     # Vérifier le succès du pass 1
     local pass1_rc=${PIPESTATUS[0]:-0}
@@ -400,77 +334,10 @@ _execute_conversion() {
         -map 0 -f matroska \
         "$tmp_output" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" -v MAX_SLOTS="${PARALLEL_JOBS:-1}" "
-        $awk_time_func
-        BEGIN {
-            duration = DURATION + 0;
-            if (duration < 1) exit;
-            start = START + 0;
-            last_update = 0;
-            refresh_interval = 2;
-            speed = 1;
-            slot = SLOT + 0;
-            is_parallel = PARALLEL + 0;
-            max_slots = MAX_SLOTS + 0;
-        }
-
-        /out_time_us=/ {
-            if (match(\$0, /[0-9]+/)) {
-                current_time = substr(\$0, RSTART, RLENGTH) / 1000000;
-            } else {
-                current_time = 0;
-            }
-
-            percent = (current_time / duration) * 100;
-            if (percent > 100) percent = 100;
-
-            now = get_time();
-            elapsed = now - start;
-            speed = (elapsed > 0 ? current_time / elapsed : 1);
-            remaining = duration - current_time;
-            eta = (speed > 0 ? remaining / speed : 0);
-
-            h = int(eta / 3600);
-            m = int((eta % 3600) / 60);
-            s = int(eta % 60);
-            eta_str = sprintf(\"%02d:%02d:%02d\", h, m, s);
-
-            bar_width = 20;
-            filled = int(percent * bar_width / 100);
-            bar = \"\";
-            for (i = 0; i < filled; i++) bar = bar \"█\";
-            for (i = filled; i < bar_width; i++) bar = bar \"░\";
-
-            if (NOPROG != \"true\" && (now - last_update >= refresh_interval || percent >= 99)) {
-                if (is_parallel && slot > 0) {
-                    lines_up = max_slots - slot + 2;
-                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] %-25.25s [%s] %5.1f%% | ETA: %s | x%.2f\\033[%dB\\r\",
-                           lines_up, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > \"/dev/stderr\";
-                } else {
-                    printf \"\\r\\033[K  🎬 %-30.30s [%s] %5.1f%% | ETA: %s | x%.2f\",
-                           CURRENT_FILE_NAME, bar, percent, eta_str, speed > \"/dev/stderr\";
-                }
-                fflush(\"/dev/stderr\");
-                last_update = now;
-            }
-        }
-
-        /progress=end/ {
-            if (NOPROG != \"true\") {
-                bar_complete = \"\";
-                for (i = 0; i < 20; i++) bar_complete = bar_complete \"█\";
-                if (is_parallel && slot > 0) {
-                    lines_up = max_slots - slot + 2;
-                    printf \"\\033[%dA\\r\\033[K  🎬 [%d] %-25.25s [%s] 100.0%% | Termine\\033[%dB\\r\",
-                           lines_up, slot, CURRENT_FILE_NAME, bar_complete, lines_up > \"/dev/stderr\";
-                } else {
-                    printf \"\\r\\033[K  ✅ %-30.30s [%s] 100.0%% | Termine\\n\",
-                           CURRENT_FILE_NAME, bar_complete > \"/dev/stderr\";
-                }
-                fflush(\"/dev/stderr\");
-            }
-        }
-    "
+    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🎬" -v END_MSG="Terminé ✅" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
     # Nettoyer les fichiers de stats
     rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
