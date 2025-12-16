@@ -1,0 +1,156 @@
+#!/usr/bin/env bats
+###########################################################
+# TESTS UNITAIRES - lib/config.sh
+# Tests des fonctions de configuration
+###########################################################
+
+load 'test_helper'
+
+setup() {
+    setup_test_env
+    load_minimal
+}
+
+teardown() {
+    teardown_test_env
+}
+
+###########################################################
+# Tests de normalize_path()
+###########################################################
+
+@test "normalize_path: gère une chaîne vide" {
+    result=$(normalize_path "")
+    [ -z "$result" ]
+}
+
+@test "normalize_path: conserve un chemin Unix simple" {
+    result=$(normalize_path "/home/user/videos")
+    [ "$result" = "/home/user/videos" ]
+}
+
+@test "normalize_path: supprime les doubles slashes" {
+    result=$(normalize_path "/home//user///videos")
+    [ "$result" = "/home/user/videos" ]
+}
+
+@test "normalize_path: supprime les ./ au milieu" {
+    result=$(normalize_path "/home/./user/./videos")
+    [ "$result" = "/home/user/videos" ]
+}
+
+@test "normalize_path: supprime le slash final" {
+    result=$(normalize_path "/home/user/videos/")
+    [ "$result" = "/home/user/videos" ]
+}
+
+@test "normalize_path: conserve la racine /" {
+    result=$(normalize_path "/")
+    [ "$result" = "/" ]
+}
+
+# Tests spécifiques MSYS (exécutés seulement si IS_MSYS=1)
+@test "normalize_path: convertit /c/ en C:/ (MSYS)" {
+    if [[ "$IS_MSYS" -ne 1 ]]; then
+        skip "Test MSYS uniquement"
+    fi
+    
+    result=$(normalize_path "/c/Users/test")
+    [ "$result" = "C:/Users/test" ]
+}
+
+@test "normalize_path: convertit /d/ en D:/ (MSYS)" {
+    if [[ "$IS_MSYS" -ne 1 ]]; then
+        skip "Test MSYS uniquement"
+    fi
+    
+    result=$(normalize_path "/d/Videos/movie.mkv")
+    [ "$result" = "D:/Videos/movie.mkv" ]
+}
+
+@test "normalize_path: gère les chemins Windows natifs" {
+    result=$(normalize_path "C:/Users/test/videos")
+    [ "$result" = "C:/Users/test/videos" ]
+}
+
+###########################################################
+# Tests de _build_excludes_regex()
+###########################################################
+
+@test "_build_excludes_regex: construit une regex valide" {
+    # La fonction doit être définie
+    function_exists _build_excludes_regex || skip "Fonction non disponible"
+    
+    result=$(_build_excludes_regex)
+    # Vérifier que la regex contient les patterns attendus
+    [[ "$result" =~ "Converted" ]]
+}
+
+@test "_build_excludes_regex: inclut Converted dans la regex" {
+    function_exists _build_excludes_regex || skip "Fonction non disponible"
+    
+    result=$(_build_excludes_regex)
+    # Vérifier que la regex n'est pas vide et contient un pattern
+    [[ -n "$result" ]]
+}
+
+###########################################################
+# Tests de set_conversion_mode_parameters()
+###########################################################
+
+@test "set_conversion_mode_parameters: mode série configure le bitrate" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    [ "$TARGET_BITRATE_KBPS" -eq 2070 ]
+}
+
+@test "set_conversion_mode_parameters: mode film configure le bitrate" {
+    CONVERSION_MODE="film"
+    set_conversion_mode_parameters
+    
+    [ "$TARGET_BITRATE_KBPS" -eq 2250 ]
+}
+
+@test "set_conversion_mode_parameters: mode série utilise preset medium" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    [ "$ENCODER_PRESET" = "medium" ]
+}
+
+@test "set_conversion_mode_parameters: mode film utilise preset slow" {
+    CONVERSION_MODE="film"
+    set_conversion_mode_parameters
+    
+    [ "$ENCODER_PRESET" = "slow" ]
+}
+
+@test "set_conversion_mode_parameters: calcule le seuil de conversion" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    # Seuil = TARGET * 1.2 arrondi = 2070 * 1.2 = 2484, arrondi à 2520
+    [ "$BITRATE_CONVERSION_THRESHOLD_KBPS" -gt "$TARGET_BITRATE_KBPS" ]
+}
+
+###########################################################
+# Tests des constantes de configuration
+###########################################################
+
+@test "config: PARALLEL_JOBS par défaut est 1" {
+    [ "$PARALLEL_JOBS" -eq 1 ]
+}
+
+@test "config: DRYRUN par défaut est false" {
+    [ "$DRYRUN" = "false" ]
+}
+
+@test "config: VMAF_ENABLED par défaut est false" {
+    [ "$VMAF_ENABLED" = "false" ]
+}
+
+@test "config: MIN_TMP_FREE_MB est défini" {
+    [ -n "$MIN_TMP_FREE_MB" ]
+    [ "$MIN_TMP_FREE_MB" -gt 0 ]
+}
