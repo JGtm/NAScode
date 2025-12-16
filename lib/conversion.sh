@@ -358,8 +358,7 @@ _execute_conversion() {
 
         /progress=end/ {
             if (NOPROG != \"true\") {
-                bar_complete = \"\";
-                for (i = 0; i < 1; i++) bar_complete = bar_complete \"8==============D ~~~\";
+                bar_complete = \"████████████████████\";
                 if (is_parallel && slot > 0) {
                     lines_up = max_slots - slot + 2;
                     printf \"\\033[%dA\\r\\033[K  🔍 [%d] %-25.25s [%s] 100.0%% | Analyse OK\\033[%dB\\r\",

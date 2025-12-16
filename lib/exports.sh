@@ -38,6 +38,7 @@ export_variables() {
     
     # --- Fonctions utilitaires ---
     export -f is_excluded count_null_separated compute_md5_prefix now_ts compute_sha256
+    export -f normalize_path
     
     # --- Fonctions VMAF (qualité vidéo) ---
     export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
@@ -63,9 +64,10 @@ export_variables() {
     export TRANSFER_PIDS_FILE MAX_CONCURRENT_TRANSFERS
     
     # --- Variables d'options ---
-    export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG
+    export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG LOCKFILE
     export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE
     export EXECUTION_TIMESTAMP EXCLUDES_REGEX VMAF_ENABLED
+    export LOG_DRYRUN_COMPARISON IS_MSYS
     
     # --- Variables de couleurs et affichage ---
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE
@@ -80,7 +82,4 @@ export_variables() {
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
     export HAS_LIBVMAF VMAF_QUEUE_FILE
-    
-    # --- Export du tableau EXCLUDES ---
-    ( IFS=:; export EXCLUDES="${EXCLUDES[*]}" )
 }
