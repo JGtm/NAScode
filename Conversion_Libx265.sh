@@ -51,6 +51,42 @@ HAS_OPENSSL=$(command -v openssl >/dev/null 2>&1 && echo 1 || echo 0)
 # Détection de libvmaf dans FFmpeg (pour évaluation qualité vidéo)
 HAS_LIBVMAF=$(ffmpeg -hide_banner -filters 2>/dev/null | grep -q libvmaf && echo 1 || echo 0)
 
+# Détection de l'environnement MSYS/MinGW/Git Bash sur Windows
+IS_MSYS=0
+if [[ -n "${MSYSTEM:-}" ]] || [[ "$(uname -s)" =~ ^MINGW|^MSYS|^CYGWIN ]]; then
+    IS_MSYS=1
+fi
+
+# Normalisation des chemins pour éviter les problèmes de formats mixtes
+# Convertit les chemins MSYS (/c/, /d/, etc.) en format Windows (C:/, D:/, etc.)
+# et nettoie les doubles slashes, ./ inutiles, etc.
+normalize_path() {
+    local path="$1"
+    [[ -z "$path" ]] && return 0
+    
+    # Sur environnement MSYS/MinGW/Git Bash, convertir /lettre/ en Lettre:/
+    if [[ "$IS_MSYS" -eq 1 ]]; then
+        # Convertir /c/... en C:/... (lettres de lecteur)
+        if [[ "$path" =~ ^/([a-zA-Z])(/|$) ]]; then
+            local drive="${BASH_REMATCH[1]}"
+            drive="${drive^^}"  # Convertir en majuscule
+            path="${drive}:${path:2}"
+        fi
+    fi
+    
+    # Nettoyer les chemins : supprimer les ./ au milieu et les doubles slashes
+    # Remplacer /./ par /
+    while [[ "$path" =~ /\./ ]]; do
+        path="${path//\/.\//\/}"
+    done
+    # Supprimer les doubles slashes (sauf au début pour les chemins UNC)
+    path=$(echo "$path" | sed 's#\([^:]\)//\+#\1/#g')
+    # Supprimer le slash final sauf pour la racine
+    [[ "$path" != "/" && "$path" != *":" ]] && path="${path%/}"
+    
+    echo "$path"
+}
+
 # préfixe md5 portable (8 premiers caractères) pour créer les noms temporaires
 compute_md5_prefix() {
     local input="$1"
@@ -336,6 +372,10 @@ parse_arguments() {
     #if [[ "$OUTPUT_DIR" != /* ]]; then
     #    OUTPUT_DIR="$SCRIPT_DIR/$OUTPUT_DIR"
     #fi
+    
+    # Normaliser les chemins source et destination pour éviter les problèmes de formats mixtes
+    SOURCE=$(normalize_path "$SOURCE")
+    OUTPUT_DIR=$(normalize_path "$OUTPUT_DIR")
     
     # En mode random, appliquer la limite par défaut si aucune limite n a été spécifiée
     if [[ "$RANDOM_MODE" == true ]] && [[ "$LIMIT_FILES" -eq 0 ]]; then
@@ -1308,6 +1348,15 @@ _prepare_file_paths() {
     local file_original="$1"
     local output_dir="$2"
     
+    # Normaliser les chemins d'entrée
+    file_original=$(normalize_path "$file_original")
+    output_dir=$(normalize_path "$output_dir")
+    
+    # Normaliser SOURCE pour la comparaison (assurer format cohérent)
+    local normalized_source=$(normalize_path "$SOURCE")
+    # S'assurer que SOURCE n'a pas de slash final pour un matching correct
+    normalized_source="${normalized_source%/}"
+    
     local filename_raw=$(basename "$file_original")
     local filename=$(echo "$filename_raw" | tr -d '\r\n')
     
@@ -1318,10 +1367,17 @@ _prepare_file_paths() {
         return 1
     fi
 
-    local relative_path="${file_original#$SOURCE}"
+    local relative_path="${file_original#$normalized_source}"
     relative_path="${relative_path#/}"
     local relative_dir=$(dirname "$relative_path")
-    local final_dir="$output_dir/$relative_dir"
+    # Éviter le ./ dans le chemin quand le fichier est à la racine
+    if [[ "$relative_dir" == "." ]]; then
+        relative_dir=""
+    fi
+    local final_dir="$output_dir"
+    [[ -n "$relative_dir" ]] && final_dir="$output_dir/$relative_dir"
+    # Normaliser final_dir aussi
+    final_dir=$(normalize_path "$final_dir")
     local base_name="${filename%.*}"
     
     local effective_suffix="$SUFFIX_STRING"
@@ -1329,7 +1385,7 @@ _prepare_file_paths() {
         effective_suffix="${effective_suffix}${DRYRUN_SUFFIX}"
     fi
 
-    local final_output="$final_dir/${base_name}${effective_suffix}.mkv"
+    local final_output=$(normalize_path "$final_dir/${base_name}${effective_suffix}.mkv")
     
     echo "$filename|$final_dir|$base_name|$effective_suffix|$final_output"
 }
@@ -2147,6 +2203,10 @@ _queue_vmaf_analysis() {
     local file_original="$1"
     local final_actual="$2"
     
+    # Normaliser les chemins pour éviter les formats mixtes
+    file_original=$(normalize_path "$file_original")
+    final_actual=$(normalize_path "$final_actual")
+    
     # Verifier que evaluation VMAF est activee
     if [[ "$VMAF_ENABLED" != true ]]; then
         return 0
@@ -2188,6 +2248,10 @@ process_vmaf_queue() {
     local current=0
     while IFS='|' read -r file_original final_actual; do
         ((current++)) || true
+        
+        # Normaliser les chemins lus depuis le fichier
+        file_original=$(normalize_path "$file_original")
+        final_actual=$(normalize_path "$final_actual")
         
         # Vérifier que les fichiers existent toujours
         if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
@@ -2314,6 +2378,10 @@ _finalize_log_and_verify() {
     local checksum_before="$5"
     local sizeBeforeMB="$6"
     local sizeBeforeBytes="${7:-0}"
+    
+    # Normaliser les chemins pour les logs
+    file_original=$(normalize_path "$file_original")
+    final_actual=$(normalize_path "$final_actual")
 
     # Nettoyer les artefacts temporaires liés à l entrée et au log ffmpeg
     rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
@@ -2470,21 +2538,35 @@ dry_run_compare_names() {
             local anomaly_count=0
             
             while IFS= read -r -d $'\0' file_original; do
+                # Normaliser le chemin d'entrée
+                file_original=$(normalize_path "$file_original")
+                
+                # Normaliser SOURCE pour la comparaison
+                local normalized_source=$(normalize_path "$SOURCE")
+                normalized_source="${normalized_source%/}"
+                
                 local filename_raw=$(basename "$file_original")
                 local filename=$(echo "$filename_raw" | tr -d '\r\n')
                 local base_name="${filename%.*}"
                 
-                local relative_path="${file_original#$SOURCE}"
+                local relative_path="${file_original#$normalized_source}"
                 relative_path="${relative_path#/}"
                 local relative_dir=$(dirname "$relative_path")
-                local final_dir="$OUTPUT_DIR/$relative_dir"
+                # Éviter le ./ dans le chemin quand le fichier est à la racine
+                if [[ "$relative_dir" == "." ]]; then
+                    relative_dir=""
+                fi
+                local final_dir="$OUTPUT_DIR"
+                [[ -n "$relative_dir" ]] && final_dir="$OUTPUT_DIR/$relative_dir"
+                # Normaliser final_dir
+                final_dir=$(normalize_path "$final_dir")
                 
                 local effective_suffix="$SUFFIX_STRING"
                 if [[ "$DRYRUN" == true ]]; then
                     effective_suffix="${effective_suffix}${DRYRUN_SUFFIX}"
                 fi
 
-                local final_output="$final_dir/${base_name}${effective_suffix}.mkv"
+                local final_output=$(normalize_path "$final_dir/${base_name}${effective_suffix}.mkv")
                 local final_output_basename=$(basename "$final_output")
 
                 # --- PRÉPARATION POUR LA VÉRIFICATION D ANOMALIE ---
@@ -2638,7 +2720,7 @@ export_variables() {
     export -f increment_processed_count update_queue
     
     # --- Fonctions utilitaires ---
-    export -f is_excluded count_null_separated compute_md5_prefix now_ts
+    export -f is_excluded count_null_separated compute_md5_prefix now_ts normalize_path
     
     # --- Fonctions VMAF (qualité vidéo) ---
     export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
@@ -2677,6 +2759,7 @@ export_variables() {
     export HAS_MD5SUM HAS_MD5 HAS_PYTHON3
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
+    export IS_MSYS
     export HAS_LIBVMAF VMAF_QUEUE_FILE
     
     # --- Export du tableau EXCLUDES ---
