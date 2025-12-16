@@ -19,6 +19,11 @@ export_variables() {
     export -f _finalize_conversion_success _finalize_try_move
     export -f _finalize_log_and_verify _finalize_conversion_error
     
+    # --- Fonctions de transfert asynchrone ---
+    export -f init_async_transfers start_async_transfer
+    export -f wait_for_transfer_slot wait_all_transfers cleanup_transfers
+    export -f _add_transfer_pid _cleanup_finished_transfers _count_active_transfers
+    
     # --- Fonctions de gestion de queue ---
     export -f _handle_custom_queue _handle_existing_index
     export -f _normalize_source_path _validate_index_source _save_index_metadata
@@ -53,6 +58,9 @@ export_variables() {
     export WORKFIFO QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE
     export FIFO_WRITER_PID FIFO_WRITER_READY
     export PROCESSED_COUNT_FILE TARGET_COUNT_FILE
+    
+    # --- Variables de transfert asynchrone ---
+    export TRANSFER_PIDS_FILE MAX_CONCURRENT_TRANSFERS
     
     # --- Variables d'options ---
     export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG

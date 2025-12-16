@@ -66,6 +66,7 @@ source "$LIB_DIR/vmaf.sh"        # VMAF (dépend de colors, config, utils, loggi
 source "$LIB_DIR/conversion.sh"  # Conversion (dépend de tout sauf finalize)
 source "$LIB_DIR/processing.sh"  # Traitement (dépend de conversion, queue)
 source "$LIB_DIR/finalize.sh"    # Finalisation (dépend de colors, config, utils, vmaf)
+source "$LIB_DIR/transfer.sh"    # Transferts asynchrones (dépend de finalize, config)
 source "$LIB_DIR/exports.sh"     # Exports (dépend de tout)
 
 ###########################################################
@@ -90,6 +91,9 @@ main() {
     check_dependencies
     initialize_directories
     
+    # Initialiser le système de transferts asynchrones
+    init_async_transfers
+    
     # Vérifications interactives
     check_plexignore
     check_output_suffix
@@ -108,6 +112,9 @@ main() {
 
     # Préparer la queue dynamique, lancer le traitement et attendre la fin
     prepare_dynamic_queue
+
+    # Attendre la fin de tous les transferts en cours
+    cleanup_transfers
 
     # Afficher le résumé final
     if [[ "$DRYRUN" == true ]]; then

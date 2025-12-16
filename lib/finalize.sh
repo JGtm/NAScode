@@ -138,6 +138,7 @@ _finalize_log_and_verify() {
 ###########################################################
 
 # Fonction principale de finalisation (regroupe l'affichage, le déplacement, le logging)
+# Le transfert est lancé en arrière-plan pour ne pas bloquer les conversions suivantes
 _finalize_conversion_success() {
     local filename="$1"
     local file_original="$2"
@@ -174,12 +175,26 @@ _finalize_conversion_success() {
     checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
     sizeBeforeBytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
 
-    # Déplacer / copier / fallback et récupérer le chemin réel
-    local final_actual
-    final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
+    # Vérifier si le système de transfert asynchrone est initialisé
+    if [[ -n "${TRANSFER_PIDS_FILE:-}" ]] && declare -f start_async_transfer &>/dev/null; then
+        # Attendre qu'un slot de transfert soit disponible (max 2 simultanés)
+        wait_for_transfer_slot
+        
+        # Préparer les données de callback pour le transfert asynchrone
+        # Format: checksum_before|sizeBeforeMB|sizeBeforeBytes|tmp_input|ffmpeg_log_temp
+        local callback_data="${checksum_before}|${sizeBeforeMB}|${sizeBeforeBytes}|${tmp_input}|${ffmpeg_log_temp}"
+        
+        # Lancer le transfert en arrière-plan
+        start_async_transfer "$tmp_output" "$final_output" "$file_original" "$callback_data"
+    else
+        # Mode synchrone (fallback si transfert asynchrone non initialisé)
+        # Déplacer / copier / fallback et récupérer le chemin réel
+        local final_actual
+        final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
 
-    # Nettoyage, logs et vérifications
-    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB" "$sizeBeforeBytes"
+        # Nettoyage, logs et vérifications
+        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB" "$sizeBeforeBytes"
+    fi
 }
 
 ###########################################################
