@@ -87,8 +87,8 @@ compute_vmaf_score() {
                             counter_prefix="[$current_index/$total_count] "
                         fi
                         # Écrire sur stderr (fd 2) pour éviter capture par $()
-                        # Compteur et nom de fichier en CYAN
-                        printf "\r  \033[0;36m%s%-30s\033[0m VMAF [%s] %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
+                        # Compteur et nom de fichier en CYAN, espace initial pour aligner avec l'icône de statut
+                        printf "\r    \033[0;36m%s%-30s\033[0m VMAF [%s] %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
                     fi
                 fi
             fi
@@ -107,16 +107,29 @@ compute_vmaf_score() {
     rm -f "$progress_file" 2>/dev/null || true
     
     # Extraire le score VMAF depuis le fichier JSON
+    # Le format JSON de libvmaf contient : "pooled_metrics": { "vmaf": { "mean": XX.XX, ... } }
     local vmaf_score=""
     if [[ -f "$vmaf_log_file" ]] && [[ -s "$vmaf_log_file" ]]; then
-        vmaf_score=$(grep -o '"mean"[[:space:]]*:[[:space:]]*[0-9.]*' "$vmaf_log_file" 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
+        # Essayer d'extraire le score VMAF mean depuis pooled_metrics
+        # Format: "mean": 92.456789 (le score est normalement entre 0 et 100)
+        vmaf_score=$(grep -oE '"mean"[[:space:]]*:[[:space:]]*[0-9]+\.?[0-9]*' "$vmaf_log_file" 2>/dev/null | head -1 | grep -oE '[0-9]+\.?[0-9]*$')
     fi
     
     # Nettoyer le fichier temporaire
     rm -f "$vmaf_log_file" 2>/dev/null || true
     
     if [[ -n "$vmaf_score" ]]; then
-        # Arrondir à 2 décimales
+        # Vérifier si le score est normalisé entre 0 et 1 (certaines versions)
+        # Si c'est le cas, multiplier par 100 pour avoir l'échelle 0-100
+        local score_int=${vmaf_score%%.*}
+        if [[ "$score_int" -eq 0 ]] && [[ $(awk "BEGIN {print ($vmaf_score > 0)}") -eq 1 ]]; then
+            # Score entre 0 et 1 (ex: 0.92) -> convertir en 0-100 (ex: 92)
+            vmaf_score=$(awk "BEGIN {printf \"%.2f\", $vmaf_score * 100}")
+        else
+            # Score déjà en 0-100, arrondir à 2 décimales
+            printf "%.2f" "$vmaf_score"
+            return
+        fi
         printf "%.2f" "$vmaf_score"
     else
         echo "NA"
