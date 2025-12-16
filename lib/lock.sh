@@ -96,66 +96,6 @@ check_lock() {
 }
 
 ###########################################################
-# HELPERS PORTABLES POUR VERROU/DÉVERROUILLAGE
-###########################################################
-
-# Utilisation : lock <chemin> [timeout_seconds]
-# Si `flock` est disponible il est privilégié, sinon on utilise un verrou par répertoire (mkdir).
-lock() {
-    local file="$1"
-    local timeout="${2:-10}"
-
-    if [[ -z "$file" ]]; then
-        return 1
-    fi
-
-    if command -v flock >/dev/null 2>&1; then
-        # Utilise un descripteur de fichier dédié pour maintenir le flock
-        exec 200>"$file" || return 1
-        local elapsed=0
-        while ! flock -n 200; do
-            sleep 1
-            elapsed=$((elapsed+1))
-            if (( elapsed >= timeout )); then
-                return 2
-            fi
-        done
-        return 0
-    else
-        # Repli : créer un répertoire de verrou (opération atomique sur les systèmes POSIX)
-        local lockdir="${file}.lock"
-        local elapsed_ms=0
-        while ! mkdir "$lockdir" 2>/dev/null; do
-            sleep 0.1
-            elapsed_ms=$((elapsed_ms+1))
-            if (( elapsed_ms >= timeout * 10 )); then
-                return 2
-            fi
-        done
-        printf "%s\n" "$$" > "$lockdir/pid" 2>/dev/null || true
-        return 0
-    fi
-}
-
-# Utilisation : unlock <chemin>
-unlock() {
-    local file="$1"
-    if [[ -z "$file" ]]; then
-        return 1
-    fi
-
-    if command -v flock >/dev/null 2>&1; then
-        # Ferme le descripteur 200 si ouvert
-        exec 200>&- 2>/dev/null || true
-        return 0
-    else
-        local lockdir="${file}.lock"
-        rm -rf "$lockdir" 2>/dev/null || true
-        return 0
-    fi
-}
-
-###########################################################
 # CONFIGURATION DES TRAPS
 ###########################################################
 
