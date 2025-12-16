@@ -20,4 +20,5 @@ Thumbs.db
 # Fichiers temporaires
 *.tmp
 *.temp
-*~
+*~x265_2pass.log
+x265_2pass.log.cutree
