@@ -21,6 +21,7 @@ export_variables() {
     
     # --- Fonctions de gestion de queue ---
     export -f _handle_custom_queue _handle_existing_index
+    export -f _normalize_source_path _validate_index_source _save_index_metadata
     export -f _count_total_video_files _index_video_files _generate_index
     export -f _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty
     export -f _display_random_mode_selection _create_readable_queue_copy
@@ -46,7 +47,7 @@ export_variables() {
     # --- Variables de chemins ---
     export SOURCE OUTPUT_DIR TMP_DIR SCRIPT_DIR
     export LOG_DIR LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE
-    export QUEUE INDEX INDEX_READABLE
+    export QUEUE INDEX INDEX_META INDEX_READABLE
     
     # --- Variables de queue dynamique (mode FIFO) ---
     export WORKFIFO QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE

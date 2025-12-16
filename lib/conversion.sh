@@ -203,6 +203,10 @@ _analyze_video() {
     IFS='|' read -r bitrate codec duration_secs <<< "$metadata"
     
     if should_skip_conversion "$codec" "$bitrate" "$filename" "$file_original"; then
+        # Alimenter la queue avec le prochain candidat si limite active
+        if [[ "$LIMIT_FILES" -gt 0 ]]; then
+            update_queue || true
+        fi
         return 1
     fi
     

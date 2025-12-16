@@ -5,6 +5,77 @@
 ###########################################################
 
 ###########################################################
+# VALIDATION DE LA SOURCE DE L'INDEX
+###########################################################
+
+# Normalise un chemin source pour comparaison (chemin absolu canonique)
+_normalize_source_path() {
+    local path="$1"
+    # Utiliser normalize_path si disponible (pour MSYS/Windows)
+    if declare -f normalize_path &>/dev/null; then
+        path=$(normalize_path "$path")
+    fi
+    # Convertir en chemin absolu si relatif
+    if [[ ! "$path" = /* ]] && [[ ! "$path" =~ ^[A-Z]: ]]; then
+        path="$(cd "$(dirname "$path")" 2>/dev/null && pwd)/$(basename "$path")"
+    fi
+    # Supprimer le slash final pour uniformité
+    path="${path%/}"
+    echo "$path"
+}
+
+# Vérifie si l'index existant correspond à la source actuelle
+# Retourne 0 si valide, 1 si régénération nécessaire
+_validate_index_source() {
+    # Si pas de fichier de métadonnées, on ne peut pas valider → régénérer
+    if [[ ! -f "$INDEX_META" ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${YELLOW}⚠️  Pas de métadonnées pour l'index existant, régénération...${NOCOLOR}"
+        fi
+        rm -f "$INDEX" "$INDEX_READABLE"
+        return 1
+    fi
+    
+    # Lire la source stockée dans les métadonnées
+    local stored_source=""
+    stored_source=$(grep '^SOURCE=' "$INDEX_META" 2>/dev/null | cut -d'=' -f2-)
+    
+    if [[ -z "$stored_source" ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${YELLOW}⚠️  Source non trouvée dans les métadonnées, régénération...${NOCOLOR}"
+        fi
+        rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
+        return 1
+    fi
+    
+    # Normaliser les deux chemins pour comparaison
+    local current_source_normalized=$(_normalize_source_path "$SOURCE")
+    local stored_source_normalized=$(_normalize_source_path "$stored_source")
+    
+    if [[ "$current_source_normalized" != "$stored_source_normalized" ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${YELLOW}⚠️  La source a changé :${NOCOLOR}"
+            echo -e "${YELLOW}    Index créé pour : $stored_source${NOCOLOR}"
+            echo -e "${YELLOW}    Source actuelle : $SOURCE${NOCOLOR}"
+            echo -e "${YELLOW}    Régénération automatique de l'index...${NOCOLOR}"
+        fi
+        rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Sauvegarde les métadonnées de l'index (source utilisée, date, etc.)
+_save_index_metadata() {
+    {
+        echo "SOURCE=$SOURCE"
+        echo "CREATED=$(date '+%Y-%m-%d %H:%M:%S')"
+        echo "OUTPUT_DIR=$OUTPUT_DIR"
+    } > "$INDEX_META"
+}
+
+###########################################################
 # SOUS-FONCTIONS DE CONSTRUCTION DE LA FILE D'ATTENTE
 ###########################################################
 
@@ -27,8 +98,9 @@ _handle_custom_queue() {
             echo -e "$(stat -c%s "$f")\t$f"
         done > "$INDEX"
         
-        # Créer INDEX_READABLE
+        # Créer INDEX_READABLE et sauvegarder les métadonnées
         cut -f2- "$INDEX" > "$INDEX_READABLE"
+        _save_index_metadata
         
         return 0
     fi
@@ -41,17 +113,25 @@ _handle_existing_index() {
         return 1
     fi
     
+    # Vérifier que l'index n'est pas vide
+    if ! [[ -s "$INDEX" ]]; then 
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${YELLOW}Index vide, régénération nécessaire...${NOCOLOR}"
+        fi
+        rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
+        return 1
+    fi
+    
+    # Vérifier si l'index correspond à la source actuelle
+    if ! _validate_index_source; then
+        return 1
+    fi
+    
     local index_date=$(stat -c '%y' "$INDEX" | cut -d'.' -f1)
     # Si l'utilisateur a demandé de conserver l'index, on l'accepte sans demander
     if [[ "$KEEP_INDEX" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
             echo -e "${YELLOW}Utilisation forcée de l'index existant (--keep-index activé).${NOCOLOR}"
-        fi
-        # Vérifier que l'index n'est pas vide
-        if ! [[ -s "$INDEX" ]]; then 
-            echo "Index vide, régénération nécessaire..."
-            rm -f "$INDEX" "$INDEX_READABLE"
-            return 1
         fi
         return 0
     fi
@@ -70,21 +150,13 @@ _handle_existing_index() {
             if [[ "$NO_PROGRESS" != true ]]; then
                 echo -e "${YELLOW}Régénération d'un nouvel index...${NOCOLOR}"
             fi
-            rm -f "$INDEX" "$INDEX_READABLE"
+            rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
             return 1
             ;;
         *)
             if [[ "$NO_PROGRESS" != true ]]; then
                 echo -e "${YELLOW}Utilisation de l'index existant.${NOCOLOR}"
             fi
-            
-            # Vérifier que l'index n'est pas vide
-            if ! [[ -s "$INDEX" ]]; then 
-                echo "Index vide, régénération nécessaire..."
-                rm -f "$INDEX" "$INDEX_READABLE"
-                return 1
-            fi
-            
             return 0
             ;;
     esac
@@ -162,6 +234,9 @@ _generate_index() {
     # Sauvegarder l'INDEX (fichier permanent, non trié, format taille\tchemin)
     mv "$index_tmp" "$INDEX" 
     cut -f2- "$INDEX" > "$INDEX_READABLE"
+    
+    # Sauvegarder les métadonnées de l'index (source, date, etc.)
+    _save_index_metadata
 }
 
 _build_queue_from_index() {
