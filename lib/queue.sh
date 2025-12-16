@@ -191,9 +191,9 @@ _index_video_files() {
         local count=$(($(cat "$count_file") + 1))
         echo "$count" > "$count_file"
         
-        # Affichage de progression
+        # Affichage de progression (icône + compteur)
         if [[ "$NO_PROGRESS" != true ]]; then
-            printf "\rIndexation en cours... [%d/%d]" "$count" "$total_files" >&2
+            printf "\r${BLUE}📊 Indexation en cours... [%d/%d]${NOCOLOR}" "$count" "$total_files" >&2
         fi
         
         # Stockage de la taille et du chemin (séparé par tab)
@@ -204,17 +204,9 @@ _index_video_files() {
 _generate_index() {
     # Génération de l'INDEX (fichier permanent contenant tous les fichiers indexés avec tailles)
     local exclude_dir_name=$OUTPUT_DIR
-
-    if [[ "$NO_PROGRESS" != true ]]; then 
-        echo "Indexation fichiers..." >&2
-    fi
     
     # Première passe : compter le nombre total de fichiers vidéo candidats
     local total_files=$(_count_total_video_files "$exclude_dir_name")
-
-    if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${BLUE}📊 Total de fichiers vidéo trouvés : ${total_files}${NOCOLOR}"
-    fi
 
     # Initialiser le compteur
     local count_file="$TMP_DIR/.index_count_$$"
@@ -228,7 +220,7 @@ _generate_index() {
     rm -f "$count_file"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "\n${GREEN}✅ Indexation terminée [${final_count} fichiers répertoriés]${NOCOLOR}" >&2
+        echo -e "\n${GREEN}✅ ${final_count} fichiers indexés${NOCOLOR}" >&2
     fi
     
     # Sauvegarder l'INDEX (fichier permanent, non trié, format taille\tchemin)

@@ -102,12 +102,17 @@ _finalize_log_and_verify() {
     local verify_status="OK"
     local checksum_after=""
     
+    # Nettoyer le checksum_before (supprimer espaces/newlines parasites)
+    checksum_before="${checksum_before//[$'\n\r\t ']/}"
+    
     if [[ "$sizeBeforeBytes" -gt 0 && "$sizeAfterBytes" -gt 0 && "$sizeBeforeBytes" -ne "$sizeAfterBytes" ]]; then
         # Taille différente = transfert incomplet ou corrompu
         verify_status="SIZE_MISMATCH"
     elif [[ -n "$checksum_before" ]]; then
         # Taille identique, vérifier le checksum
         checksum_after=$(compute_sha256 "$final_actual" 2>/dev/null || echo "")
+        # Nettoyer le checksum_after également
+        checksum_after="${checksum_after//[$'\n\r\t ']/}"
         if [[ -z "$checksum_after" ]]; then
             verify_status="NO_CHECKSUM"
         elif [[ "$checksum_before" != "$checksum_after" ]]; then
