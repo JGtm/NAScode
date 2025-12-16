@@ -73,6 +73,15 @@ parse_arguments() {
                 VMAF_ENABLED=true
                 shift
                 ;;
+            -j|--jobs)
+                if [[ "${2:-}" =~ ^[0-9]+$ ]] && [[ "$2" -ge 1 ]]; then
+                    PARALLEL_JOBS="$2"
+                    shift 2
+                else
+                    echo -e "${RED}ERREUR : --jobs doit être suivi d'un nombre >= 1.${NOCOLOR}"
+                    exit 1
+                fi
+                ;;
             -*) 
                 # On vérifie si l'argument est une option courte groupée
                 if [[ "$1" =~ ^-[a-zA-Z]{2,}$ ]]; then
@@ -120,6 +129,7 @@ Options :
     -x, --no-suffix              Désactiver le suffixe _x265 (FLAG)
     -r, --random                 Tri aléatoire : sélectionne des fichiers aléatoires (FLAG) [défaut : 10]
     -l, --limit N                Limiter le traitement à N fichiers (ARG)
+    -j, --jobs N                 Nombre de conversions parallèles (ARG) [défaut : 1]
     -q, --queue FILE             Utiliser un fichier queue personnalisé (ARG)
     -n, --no-progress            Désactiver l'affichage des indicateurs de progression (FLAG)
     -h, --help                   Afficher cette aide (FLAG)
@@ -129,7 +139,7 @@ Options :
 Remarque sur les options courtes groupées :
     - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
         par exemple : -xdrk est équivalent à -x -d -r -k.
-    - Les options qui attendent un argument (marquées (ARG) ci-dessus : -s, -o, -e, -m, -l, -q)
+    - Les options qui attendent un argument (marquées (ARG) ci-dessus : -s, -o, -e, -m, -l, -j, -q)
         doivent être fournies séparément avec leur valeur, par exemple : -l 5 ou --limit 5.
         par exemple : ./conversion.sh -xdrk -l 5  (groupement de flags puis -l 5 séparé),
                       ./conversion.sh --source /path --limit 10.
