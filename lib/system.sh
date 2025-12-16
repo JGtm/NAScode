@@ -90,8 +90,8 @@ validate_queue_file() {
 
 check_plexignore() {
     local source_abs output_abs
-    source_abs=$(readlink -f "$SOURCE")
-    output_abs=$(readlink -f "$OUTPUT_DIR")
+    source_abs=$(cd "$SOURCE" && pwd)
+    output_abs=$(cd "$OUTPUT_DIR" && pwd)
     local plexignore_file="$OUTPUT_DIR/.plexignore"
 
     # Vérifier si OUTPUT_DIR est un sous-dossier de SOURCE
@@ -122,8 +122,8 @@ check_plexignore() {
 
 check_output_suffix() {
     local source_abs output_abs is_same_dir=false
-    source_abs=$(readlink -f "$SOURCE")
-    output_abs=$(readlink -f "$OUTPUT_DIR")
+    source_abs=$(cd "$SOURCE" && pwd)
+    output_abs=$(cd "$OUTPUT_DIR" && pwd)
 
     if [[ "$source_abs" == "$output_abs" ]]; then
         is_same_dir=true
