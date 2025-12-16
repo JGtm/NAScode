@@ -9,12 +9,14 @@
 ###########################################################
 
 # Calcul du score VMAF (qualité vidéo perceptuelle)
-# Usage : compute_vmaf_score <fichier_original> <fichier_converti> [filename_display]
+# Usage : compute_vmaf_score <fichier_original> <fichier_converti> [filename_display] [current_index] [total_count]
 # Retourne le score VMAF moyen (0-100) ou "NA" si indisponible
 compute_vmaf_score() {
     local original="$1"
     local converted="$2"
     local filename_display="${3:-}"
+    local current_index="${4:-}"
+    local total_count="${5:-}"
     
     # Vérifier que libvmaf est disponible
     if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
@@ -79,8 +81,14 @@ compute_vmaf_score() {
                         if [[ ${#short_name} -gt 30 ]]; then
                             short_name="${short_name:0:27}..."
                         fi
+                        # Construire le préfixe avec compteur si disponible
+                        local counter_prefix=""
+                        if [[ -n "$current_index" ]] && [[ -n "$total_count" ]]; then
+                            counter_prefix="[$current_index/$total_count] "
+                        fi
                         # Écrire sur stderr (fd 2) pour éviter capture par $()
-                        printf "\r    %-30s \033[0;36mVMAF\033[0m [%s] %3d%%" "$short_name" "$bar" "$percent" >&2
+                        # Compteur et nom de fichier en CYAN
+                        printf "\r  \033[0;36m%s%-30s\033[0m VMAF [%s] %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
                     fi
                 fi
             fi
@@ -181,7 +189,7 @@ process_vmaf_queue() {
         
         # Calculer le score VMAF (avec barre de progression intégrée)
         local vmaf_score
-        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename")
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename" "$current" "$vmaf_count")
         
         # Interpréter le score VMAF
         local vmaf_quality=""
@@ -215,7 +223,8 @@ process_vmaf_queue() {
             if [[ ${#short_fn} -gt 30 ]]; then
                 short_fn="${short_fn:0:27}..."
             fi
-            printf "\r  %s [%d/%d] %-30s : %s (%s)%20s\n" "$status_icon" "$current" "$vmaf_count" "$short_fn" "$vmaf_score" "${vmaf_quality:-NA}" "" >&2
+            # Compteur et nom de fichier en CYAN
+            printf "\r  %s ${CYAN}[%d/%d] %-30s${NOCOLOR} : %s (%s)%20s\n" "$status_icon" "$current" "$vmaf_count" "$short_fn" "$vmaf_score" "${vmaf_quality:-NA}" "" >&2
         fi
         
     done < "$VMAF_QUEUE_FILE"
