@@ -115,7 +115,10 @@ _prepare_file_paths() {
     local relative_path="${file_original#$SOURCE}"
     relative_path="${relative_path#/}"
     local relative_dir=$(dirname "$relative_path")
-    local final_dir="$output_dir/$relative_dir"
+    # Éviter le ./ quand le fichier est à la racine de SOURCE
+    [[ "$relative_dir" == "." ]] && relative_dir=""
+    local final_dir="$output_dir"
+    [[ -n "$relative_dir" ]] && final_dir="$output_dir/$relative_dir"
     local base_name="${filename%.*}"
     
     local effective_suffix="$SUFFIX_STRING"
@@ -124,6 +127,10 @@ _prepare_file_paths() {
     fi
 
     local final_output="$final_dir/${base_name}${effective_suffix}.mkv"
+    # Normaliser le chemin pour éviter les problèmes de comparaison
+    if declare -f normalize_path &>/dev/null; then
+        final_output=$(normalize_path "$final_output")
+    fi
     
     echo "$filename|$final_dir|$base_name|$effective_suffix|$final_output"
 }
