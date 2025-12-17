@@ -318,7 +318,12 @@ _execute_conversion() {
 
     # ==================== PASS 1 : ANALYSE ====================
     # Utiliser -passlogfile de ffmpeg (gère les chemins Windows correctement)
-    local x265_params_pass1="pass=1:${x265_vbv}"
+    local x265_base_params="${x265_vbv}"
+    # Ajouter les paramètres x265 spécifiques au mode (ex: no-amp:no-rect pour séries)
+    if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
+        x265_base_params="${x265_base_params}:${X265_EXTRA_PARAMS}"
+    fi
+    local x265_params_pass1="pass=1:${x265_base_params}"
     
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
@@ -351,7 +356,7 @@ _execute_conversion() {
 
     # ==================== PASS 2 : ENCODAGE ====================
     START_TS="$(date +%s)"
-    local x265_params_pass2="pass=2:${x265_vbv}"
+    local x265_params_pass2="pass=2:${x265_base_params}"
 
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
