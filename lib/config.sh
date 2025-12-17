@@ -208,9 +208,9 @@ set_conversion_mode_parameters() {
 ###########################################################
 
 # Construit un suffixe de fichier reflétant les paramètres de conversion
-# Format: _x265_<mode>_<bitrate>k_<preset>[_tuned]
-# Exemples: _x265_serie_2070k_medium_tuned
-#           _x265_film_2250k_slow
+# Format: _x265_<bitrate>k_<preset>[_tuned][_sample]
+# Exemples: _x265_2070k_medium_tuned_sample
+#           _x265_2250k_slow
 build_dynamic_suffix() {
     # Ne pas écraser si l'utilisateur a forcé --no-suffix
     if [[ "$FORCE_NO_SUFFIX" == true ]]; then
@@ -229,6 +229,11 @@ build_dynamic_suffix() {
     # Indicateur si paramètres x265 spéciaux (tuned)
     if [[ -n "$X265_EXTRA_PARAMS" ]]; then
         suffix="${suffix}_tuned"
+    fi
+    
+    # Indicateur mode sample (segment de test)
+    if [[ "$SAMPLE_MODE" == true ]]; then
+        suffix="${suffix}_sample"
     fi
     
     SUFFIX_STRING="$suffix"
