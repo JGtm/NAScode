@@ -177,9 +177,9 @@ set_conversion_mode_parameters() {
             ENCODER_PRESET="medium"
             MAXRATE_KBPS=2520
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
-            # Séries : optimisations vitesse (no-amp, no-rect accélèrent l'encodage
+            # Séries : optimisations vitesse (amp=0, rect=0 accélèrent l'encodage
             # avec impact minime sur la qualité pour du contenu série)
-            X265_EXTRA_PARAMS="no-amp:no-rect"
+            X265_EXTRA_PARAMS="amp=0:rect=0"
             ;;
         *)
             echo -e "${RED}ERREUR : Mode de conversion inconnu : $CONVERSION_MODE${NOCOLOR}"
@@ -213,9 +213,6 @@ build_dynamic_suffix() {
     fi
     
     local suffix="_x265"
-    
-    # Mode de conversion (serie/film)
-    suffix="${suffix}_${CONVERSION_MODE}"
     
     # Bitrate cible
     suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
