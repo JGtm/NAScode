@@ -271,6 +271,35 @@ _execute_conversion() {
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
 
+    # Mode sample : paramètres -ss (seek) et -t (durée) pour encoder un segment
+    local sample_seek_params=""
+    local sample_duration_params=""
+    local effective_duration="$duration_secs"
+    
+    if [[ "$SAMPLE_MODE" == true ]]; then
+        local margin_start="${SAMPLE_MARGIN_START:-180}"
+        local margin_end="${SAMPLE_MARGIN_END:-120}"
+        local sample_len="${SAMPLE_DURATION:-30}"
+        local available_range=$((duration_secs - margin_start - margin_end - sample_len))
+        
+        if [[ "$available_range" -gt 0 ]]; then
+            # Position aléatoire dans la plage disponible
+            local random_offset=$((RANDOM % available_range))
+            local seek_pos=$((margin_start + random_offset))
+            sample_seek_params="-ss $seek_pos"
+            sample_duration_params="-t $sample_len"
+            effective_duration="$sample_len"
+            echo -e "${CYAN}  🎯 Mode sample : segment de ${sample_len}s à partir de ${seek_pos}s${NOCOLOR}"
+        else
+            # Vidéo trop courte, prendre le milieu
+            local seek_pos=$((duration_secs / 3))
+            sample_seek_params="-ss $seek_pos"
+            sample_duration_params="-t $sample_len"
+            effective_duration="$sample_len"
+            echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_pos}s${NOCOLOR}"
+        fi
+    fi
+
     # Script AWK adapté selon la disponibilité de systime() (gawk vs awk BSD)
     local awk_time_func
     if [[ "$HAS_GAWK" -eq 1 ]]; then
@@ -292,8 +321,9 @@ _execute_conversion() {
     local x265_params_pass1="pass=1:${x265_vbv}"
     
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" -pix_fmt yuv420p10le \
+        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
@@ -301,7 +331,7 @@ _execute_conversion() {
         -an \
         -f null /dev/null \
         -progress pipe:1 -nostats 2> "${ffmpeg_log_temp}.pass1" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+    awk -v DURATION="$effective_duration" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
         -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🔍" -v END_MSG="Analyse OK" \
         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
@@ -324,8 +354,9 @@ _execute_conversion() {
     local x265_params_pass2="pass=2:${x265_vbv}"
 
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" -pix_fmt yuv420p10le \
+        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
@@ -334,7 +365,7 @@ _execute_conversion() {
         -map 0 -f matroska \
         "$tmp_output" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+    awk -v DURATION="$effective_duration" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
         -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🎬" -v END_MSG="Terminé ✅" \
         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"

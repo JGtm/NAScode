@@ -73,6 +73,10 @@ parse_arguments() {
                 VMAF_ENABLED=true
                 shift
                 ;;
+            -t|--sample|--test)
+                SAMPLE_MODE=true
+                shift
+                ;;
             -j|--jobs)
                 if [[ "${2:-}" =~ ^[0-9]+$ ]] && [[ "$2" -ge 1 ]]; then
                     PARALLEL_JOBS="$2"
@@ -135,6 +139,7 @@ Options :
     -h, --help                   Afficher cette aide (FLAG)
     -k, --keep-index             Conserver l'index existant sans demande interactive (FLAG)
     -v, --vmaf                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
+    -t, --sample                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
 
 Remarque sur les options courtes groupées :
     - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),

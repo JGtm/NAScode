@@ -94,6 +94,12 @@ NO_PROGRESS=false
 CONVERSION_MODE="serie"
 VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
 
+# Mode sample : encoder uniquement un segment de test (30s par défaut)
+SAMPLE_MODE=false
+SAMPLE_DURATION=30      # Durée du segment en secondes
+SAMPLE_MARGIN_START=180 # Marge début (éviter générique) en secondes
+SAMPLE_MARGIN_END=120   # Marge fin (éviter générique) en secondes
+
 # Mode de tri pour la construction de la file d'attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
 #   - size_desc  : Trier par taille décroissante (par défaut, privilégie gros fichiers)
