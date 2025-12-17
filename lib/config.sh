@@ -157,6 +157,9 @@ HWACCEL=""
 #          9011 / 3600s = 2503 kbps total
 #          Video = ~2300-2400 kbps (audio ~128 kbps)
 
+# Paramètres x265 additionnels par mode (optimisations vitesse/qualité)
+X265_EXTRA_PARAMS=""
+
 set_conversion_mode_parameters() {
     case "$CONVERSION_MODE" in
         film)
@@ -165,6 +168,8 @@ set_conversion_mode_parameters() {
             ENCODER_PRESET="slow"
             MAXRATE_KBPS=3600
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
+            # Films : garder toutes les optimisations x265 pour qualité max
+            X265_EXTRA_PARAMS=""
             ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h
@@ -172,6 +177,9 @@ set_conversion_mode_parameters() {
             ENCODER_PRESET="medium"
             MAXRATE_KBPS=2520
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
+            # Séries : optimisations vitesse (no-amp, no-rect accélèrent l'encodage
+            # avec impact minime sur la qualité pour du contenu série)
+            X265_EXTRA_PARAMS="no-amp:no-rect"
             ;;
         *)
             echo -e "${RED}ERREUR : Mode de conversion inconnu : $CONVERSION_MODE${NOCOLOR}"
