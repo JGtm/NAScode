@@ -152,14 +152,15 @@ BEGIN {
     bar = "";
     for (i = 0; i < filled; i++) bar = bar "█";
     for (i = filled; i < bar_width; i++) bar = bar "░";
+    bar = "╢" bar "╟";
 
     if (NOPROG != "true" && (now - last_update >= refresh_interval || percent >= 99)) {
         if (is_parallel && slot > 0) {
             lines_up = max_slots - slot + 2;
-            printf "\033[%dA\r\033[K  %s [%d] %-25.25s [%s] %5.1f%% | ETA: %s | x%.2f\033[%dB\r",
+            printf "\033[%dA\r\033[K  %s [%d] %-30.30s %s %5.1f%% | ETA: %s | x%.2f\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-30.30s [%s] %5.1f%% | ETA: %s | x%.2f",
+            printf "\r\033[K  %s %-30.30s %s %5.1f%% | ETA: %s | x%.2f",
                    EMOJI, CURRENT_FILE_NAME, bar, percent, eta_str, speed > "/dev/stderr";
         }
         fflush("/dev/stderr");
@@ -169,13 +170,13 @@ BEGIN {
 
 /progress=end/ {
     if (NOPROG != "true") {
-        bar_complete = "████████████████████";
+        bar_complete = "╢████████████████████╟";
         if (is_parallel && slot > 0) {
             lines_up = max_slots - slot + 2;
-            printf "\033[%dA\r\033[K  %s [%d] %-25.25s [%s] 100.0%% | %s\033[%dB\r",
+            printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, END_MSG, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-30.30s [%s] 100.0%% | %s\n",
+            printf "\r\033[K  %s %-30.30s %s 100.0%% | %s\n",
                    EMOJI, CURRENT_FILE_NAME, bar_complete, END_MSG > "/dev/stderr";
         }
         fflush("/dev/stderr");
@@ -205,9 +206,9 @@ BEGIN{
     if(pct>100) pct=100;
     filled = int(pct * width / 100);
     bar="";
-    for(i=0;i<filled;i++) bar=bar"=";
-    if(filled<width) bar=bar">"; for(i=filled+1;i<width;i++) bar=bar" ";
-    line = sprintf("%s [%5.2fGiB/s] [%s] %3d%% %s/%s", hms(elapsed), (speed/(1024*1024*1024)), bar, pct, sprintf("%6s", hr(copied)), sprintf("%6s", hr(total)));
+    for(i=0;i<filled;i++) bar=bar"▰";
+    for(i=filled;i<width;i++) bar=bar"▱";
+    line = sprintf("%s %s %3d%% %s @ %.2fG/s", hms(elapsed), bar, pct, hr(copied), (speed/(1024*1024*1024)));
     if (newline) {
         printf("\r\033[K%s%s%s\n", color, line, nocolor);
     } else {
@@ -254,7 +255,7 @@ custom_pv() {
 
         # Afficher la progression (sans saut de ligne)
         awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" \
-            -v width=40 -v color="$color" -v nocolor="$NOCOLOR" -v newline=0 \
+            -v width=30 -v color="$color" -v nocolor="$NOCOLOR" -v newline=0 \
             "$AWK_PROGRESS_SCRIPT" >&2
 
         sleep 0.5
@@ -266,7 +267,7 @@ custom_pv() {
     copied=$(stat -c%s -- "$dst" 2>/dev/null || echo 0)
     current_ts=$(now_ts)
     awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" \
-        -v width=40 -v color="$color" -v nocolor="$NOCOLOR" -v newline=1 \
+        -v width=30 -v color="$color" -v nocolor="$NOCOLOR" -v newline=1 \
         "$AWK_PROGRESS_SCRIPT" >&2
 
     return 0

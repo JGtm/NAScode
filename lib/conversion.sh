@@ -227,10 +227,16 @@ _copy_to_temp_storage() {
     local tmp_input="$3"
     local ffmpeg_log_temp="$4"
     
+    # Tronquer le nom de fichier à 30 caractères pour uniformité
+    local short_name="$filename"
+    if [[ ${#short_name} -gt 30 ]]; then
+        short_name="${short_name:0:27}..."
+    fi
+    
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}→ Transfert de [$filename] vers dossier temporaire...${NOCOLOR}"
+        echo -e "${CYAN}→ Téléchargement de $short_name${NOCOLOR}"
     else
-        echo -e "${CYAN}→ $filename${NOCOLOR}"
+        echo -e "${CYAN}→ $short_name${NOCOLOR}"
     fi
 
     if ! custom_pv "$file_original" "$tmp_input" "$CYAN"; then
@@ -278,6 +284,65 @@ _execute_conversion() {
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
 
+    # Mode sample : trouver le keyframe exact pour garantir la synchronisation avec VMAF
+    local sample_seek_params=""
+    local sample_duration_params=""
+    local effective_duration="$duration_secs"
+    
+    if [[ "$SAMPLE_MODE" == true ]]; then
+        # Convertir duration_secs en entier (Bash ne supporte pas l'arithmétique flottante)
+        local duration_int=${duration_secs%.*}
+        local margin_start="${SAMPLE_MARGIN_START:-180}"
+        local margin_end="${SAMPLE_MARGIN_END:-120}"
+        local sample_len="${SAMPLE_DURATION:-30}"
+        local available_range=$((duration_int - margin_start - margin_end - sample_len))
+        
+        local target_pos
+        if [[ "$available_range" -gt 0 ]]; then
+            # Position aléatoire dans la plage disponible
+            local random_offset=$((RANDOM % available_range))
+            target_pos=$((margin_start + random_offset))
+        else
+            # Vidéo trop courte, prendre le milieu
+            target_pos=$((duration_int / 3))
+        fi
+        
+        # Trouver le keyframe le plus proche de target_pos (en utilisant ffprobe)
+        # On cherche le keyframe >= target_pos pour être sûr d'avoir assez de contenu après
+        local keyframe_pos
+        keyframe_pos=$(ffprobe -v error -select_streams v:0 -skip_frame nokey \
+            -show_entries packet=pts_time -of csv=p=0 \
+            -read_intervals "${target_pos}%+30" "$tmp_input" 2>/dev/null | head -1)
+        
+        # Si pas de keyframe trouvé, utiliser la position cible
+        if [[ -z "$keyframe_pos" ]] || [[ ! "$keyframe_pos" =~ ^[0-9.]+$ ]]; then
+            keyframe_pos="$target_pos"
+        fi
+        
+        # Convertir en entier pour l'affichage et le stockage
+        local keyframe_int=${keyframe_pos%.*}
+        
+        # Utiliser la position exacte du keyframe
+        sample_seek_params="-ss $keyframe_pos"
+        sample_duration_params="-t $sample_len"
+        effective_duration="$sample_len"
+        
+        # Stocker la position EXACTE du keyframe pour VMAF (format décimal)
+        SAMPLE_KEYFRAME_POS="$keyframe_pos"
+        
+        # Formater la position en HH:MM:SS pour l'affichage
+        local seek_h=$((keyframe_int / 3600))
+        local seek_m=$(((keyframe_int % 3600) / 60))
+        local seek_s=$((keyframe_int % 60))
+        local seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
+        
+        if [[ "$available_range" -gt 0 ]]; then
+            echo -e "${CYAN}  🎯 Mode échantillon : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+        else
+            echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+        fi
+    fi
+
     # Script AWK adapté selon la disponibilité de systime() (gawk vs awk BSD)
     local awk_time_func
     if [[ "$HAS_GAWK" -eq 1 ]]; then
@@ -296,11 +361,17 @@ _execute_conversion() {
 
     # ==================== PASS 1 : ANALYSE ====================
     # Utiliser -passlogfile de ffmpeg (gère les chemins Windows correctement)
-    local x265_params_pass1="pass=1:${x265_vbv}"
+    local x265_base_params="${x265_vbv}"
+    # Ajouter les paramètres x265 spécifiques au mode (ex: no-amp:no-rect pour séries)
+    if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
+        x265_base_params="${x265_base_params}:${X265_EXTRA_PARAMS}"
+    fi
+    local x265_params_pass1="pass=1:${x265_base_params}"
     
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" -pix_fmt yuv420p10le \
+        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
@@ -308,7 +379,7 @@ _execute_conversion() {
         -an \
         -f null /dev/null \
         -progress pipe:1 -nostats 2> "${ffmpeg_log_temp}.pass1" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+    awk -v DURATION="$effective_duration" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
         -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🔍" -v END_MSG="Analyse OK" \
         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
@@ -328,11 +399,12 @@ _execute_conversion() {
 
     # ==================== PASS 2 : ENCODAGE ====================
     START_TS="$(date +%s)"
-    local x265_params_pass2="pass=2:${x265_vbv}"
+    local x265_params_pass2="pass=2:${x265_base_params}"
 
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" -pix_fmt yuv420p10le \
+        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p10le \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
@@ -341,7 +413,7 @@ _execute_conversion() {
         -map 0 -f matroska \
         "$tmp_output" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$duration_secs" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+    awk -v DURATION="$effective_duration" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
         -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🎬" -v END_MSG="Terminé ✅" \
         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"

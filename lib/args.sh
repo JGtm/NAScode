@@ -73,6 +73,10 @@ parse_arguments() {
                 VMAF_ENABLED=true
                 shift
                 ;;
+            -t|--sample|--test)
+                SAMPLE_MODE=true
+                shift
+                ;;
             -j|--jobs)
                 if [[ "${2:-}" =~ ^[0-9]+$ ]] && [[ "$2" -ge 1 ]]; then
                     PARALLEL_JOBS="$2"
@@ -110,6 +114,18 @@ parse_arguments() {
     if [[ "$RANDOM_MODE" == true ]] && [[ "$LIMIT_FILES" -eq 0 ]]; then
         LIMIT_FILES=$RANDOM_MODE_DEFAULT_LIMIT
     fi
+    
+    # Avertissements d'incompatibilités
+    if [[ "$DRYRUN" == true ]]; then
+        if [[ "$VMAF_ENABLED" == true ]]; then
+            echo -e "${YELLOW}⚠️  VMAF désactivé en mode dry-run (pas de fichier converti à analyser)${NOCOLOR}"
+            VMAF_ENABLED=false
+        fi
+        if [[ "$SAMPLE_MODE" == true ]]; then
+            echo -e "${YELLOW}⚠️  Mode sample ignoré en mode dry-run (simulation uniquement)${NOCOLOR}"
+            SAMPLE_MODE=false
+        fi
+    fi
 }
 
 ###########################################################
@@ -135,6 +151,7 @@ Options :
     -h, --help                   Afficher cette aide (FLAG)
     -k, --keep-index             Conserver l'index existant sans demande interactive (FLAG)
     -v, --vmaf                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
+    -t, --sample                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
 
 Remarque sur les options courtes groupées :
     - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
