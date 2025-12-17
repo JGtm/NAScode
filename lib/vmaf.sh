@@ -9,7 +9,7 @@
 ###########################################################
 
 # Calcul du score VMAF (qualité vidéo perceptuelle)
-# Usage : compute_vmaf_score <fichier_original> <fichier_converti> [filename_display] [current_index] [total_count]
+# Usage : compute_vmaf_score <fichier_original> <fichier_converti> [filename_display] [current_index] [total_count] [keyframe_pos]
 # Retourne le score VMAF moyen (0-100) ou "NA" si indisponible
 compute_vmaf_score() {
     local original="$1"
@@ -17,6 +17,7 @@ compute_vmaf_score() {
     local filename_display="${3:-}"
     local current_index="${4:-}"
     local total_count="${5:-}"
+    local keyframe_pos="${6:-}"  # Position du keyframe (mode sample)
     
     # Vérifier que libvmaf est disponible
     if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
@@ -38,19 +39,30 @@ compute_vmaf_score() {
     local vmaf_log_file="${vmaf_dir}/vmaf_${file_hash}_${$}_${RANDOM}.json"
     local progress_file="${vmaf_dir}/vmaf_progress_$$.txt"
     
-    # En mode sample, extraire le même segment de l'original pour comparaison correcte
-    local original_for_vmaf="$original"
-    local original_sample_file=""
-    if [[ "$SAMPLE_MODE" == true ]] && [[ "${SAMPLE_SEEK_POS:-0}" -gt 0 ]]; then
-        original_sample_file="${vmaf_dir}/original_sample_${file_hash}_$$.mkv"
-        ffmpeg -hide_banner -nostdin -ss "$SAMPLE_SEEK_POS" -i "$original" \
-            -t "${SAMPLE_DURATION:-30}" -c copy "$original_sample_file" >/dev/null 2>&1
-        if [[ -f "$original_sample_file" ]]; then
-            original_for_vmaf="$original_sample_file"
-        fi
+    # Construire les options d'input et le filtre lavfi selon le mode (normal ou sample)
+    # En mode sample : on utilise la position exacte du keyframe passée en paramètre
+    local lavfi_filter
+    local original_input_opts=""
+    local hwaccel_opts=""
+    local sample_duration="${SAMPLE_DURATION:-30}"
+    
+    # Utiliser hwaccel si disponible pour accélérer le décodage
+    if [[ -n "${HWACCEL:-}" ]] && [[ "$HWACCEL" != "none" ]]; then
+        hwaccel_opts="-hwaccel $HWACCEL"
     fi
     
-    # Obtenir la durée totale de la vidéo en microsecondes pour la progression
+    if [[ -n "$keyframe_pos" ]]; then
+        # Mode sample : utiliser la position EXACTE du keyframe
+        # -ss avec la position précise du keyframe = seek direct au bon endroit
+        # -t pour limiter la durée (identique à la conversion)
+        original_input_opts="-ss ${keyframe_pos} -t ${sample_duration}"
+        # setpts remet les timestamps à 0 pour synchroniser les deux flux
+        lavfi_filter="[0:v]setpts=PTS-STARTPTS[dist];[1:v]setpts=PTS-STARTPTS[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
+    else
+        # Mode normal : comparaison directe
+        lavfi_filter="[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
+    fi
+        # Obtenir la durée totale de la vidéo en microsecondes pour la progression
     local duration_us=0
     local duration_str
     duration_str=$(ffprobe -v error -select_streams v:0 -show_entries format=duration \
@@ -65,8 +77,9 @@ compute_vmaf_score() {
     # model=version=vmaf_v0.6.1neg : utilise VMAF NEG qui pénalise les enhancements artificiels
     if [[ "$NO_PROGRESS" != true ]] && [[ "$duration_us" -gt 0 ]] && [[ -n "$filename_display" ]]; then
         # Lancer ffmpeg en arrière-plan avec progression vers fichier
-        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original_for_vmaf" \
-            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg" \
+        # hwaccel pour accélérer le décodage de l'original
+        ffmpeg -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
+            -lavfi "$lavfi_filter" \
             -progress "$progress_file" \
             -f null - >/dev/null 2>&1 &
         local ffmpeg_pid=$!
@@ -83,12 +96,13 @@ compute_vmaf_score() {
                     # Afficher seulement si le pourcentage a changé
                     if [[ "$percent" -ne "$last_percent" ]]; then
                         last_percent=$percent
-                        # Barre de progression
+                        # Barre de progression avec bordures arrondies
                         local filled=$((percent / 5))
                         local empty=$((20 - filled))
-                        local bar=""
+                        local bar="╢"
                         for ((i=0; i<filled; i++)); do bar+="█"; done
                         for ((i=0; i<empty; i++)); do bar+="░"; done
+                        bar+="╟"
                         # Tronquer le titre à 30 caractères max
                         local short_name="$filename_display"
                         if [[ ${#short_name} -gt 30 ]]; then
@@ -101,7 +115,7 @@ compute_vmaf_score() {
                         fi
                         # Écrire sur stderr (fd 2) pour éviter capture par $()
                         # Compteur et nom de fichier en CYAN, espace initial pour aligner avec l'icône de statut
-                        printf "\r    \033[0;36m%s%-30s\033[0m [%s] %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
+                        printf "\r    \033[0;36m%s%-30s\033[0m %s %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
                     fi
                 fi
             fi
@@ -111,14 +125,13 @@ compute_vmaf_score() {
         printf "\r%100s\r" "" >&2  # Effacer la ligne de progression
     else
         # Sans barre de progression
-        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original_for_vmaf" \
-            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg" \
+        ffmpeg -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
+            -lavfi "$lavfi_filter" \
             -f null - >/dev/null 2>&1
     fi
     
     # Nettoyer les fichiers temporaires
     rm -f "$progress_file" 2>/dev/null || true
-    [[ -n "$original_sample_file" ]] && rm -f "$original_sample_file" 2>/dev/null || true
     
     # Extraire le score VMAF depuis le fichier JSON
     # Le format JSON de libvmaf contient : "pooled_metrics": { "vmaf": { "mean": XX.XX, ... } }
@@ -139,12 +152,9 @@ compute_vmaf_score() {
         if [[ "$score_int" -eq 0 ]] && [[ $(awk "BEGIN {print ($vmaf_score > 0)}") -eq 1 ]]; then
             # Score entre 0 et 1 (ex: 0.92) -> convertir en 0-100 (ex: 92)
             vmaf_score=$(awk "BEGIN {printf \"%.2f\", $vmaf_score * 100}")
-        else
-            # Score déjà en 0-100, arrondir à 2 décimales
-            printf "%.2f" "$vmaf_score"
-            return
         fi
-        printf "%.2f" "$vmaf_score"
+        # Utiliser awk pour le formatage (insensible à la locale)
+        awk "BEGIN {printf \"%.2f\", $vmaf_score}"
     else
         echo "NA"
     fi
@@ -176,8 +186,10 @@ _queue_vmaf_analysis() {
         return 0
     fi
     
-    # Enregistrer la paire dans le fichier de queue (format: original|converti)
-    echo "${file_original}|${final_actual}" >> "$VMAF_QUEUE_FILE" 2>/dev/null || true
+    # Enregistrer la paire dans le fichier de queue
+    # Format: original|converti|keyframe_pos (keyframe_pos vide si mode normal)
+    local keyframe_pos="${SAMPLE_KEYFRAME_POS:-}"
+    echo "${file_original}|${final_actual}|${keyframe_pos}" >> "$VMAF_QUEUE_FILE" 2>/dev/null || true
 }
 
 # Traiter toutes les analyses VMAF en attente
@@ -200,7 +212,7 @@ process_vmaf_queue() {
     fi
     
     local current=0
-    while IFS='|' read -r file_original final_actual; do
+    while IFS='|' read -r file_original final_actual keyframe_pos; do
         ((current++)) || true
         
         # Vérifier que les fichiers existent toujours
@@ -215,8 +227,9 @@ process_vmaf_queue() {
         filename=$(basename "$final_actual")
         
         # Calculer le score VMAF (avec barre de progression intégrée)
+        # Passer la position du keyframe si disponible (mode sample)
         local vmaf_score
-        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename" "$current" "$vmaf_count")
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename" "$current" "$vmaf_count" "$keyframe_pos")
         
         # Interpréter le score VMAF
         local vmaf_quality=""

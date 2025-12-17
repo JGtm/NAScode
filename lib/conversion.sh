@@ -220,10 +220,16 @@ _copy_to_temp_storage() {
     local tmp_input="$3"
     local ffmpeg_log_temp="$4"
     
+    # Tronquer le nom de fichier à 30 caractères pour uniformité
+    local short_name="$filename"
+    if [[ ${#short_name} -gt 30 ]]; then
+        short_name="${short_name:0:27}..."
+    fi
+    
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}→ Transfert de [$filename] vers dossier temporaire...${NOCOLOR}"
+        echo -e "${CYAN}→ Téléchargement de $short_name${NOCOLOR}"
     else
-        echo -e "${CYAN}→ $filename${NOCOLOR}"
+        echo -e "${CYAN}→ $short_name${NOCOLOR}"
     fi
 
     if ! custom_pv "$file_original" "$tmp_input" "$CYAN"; then
@@ -271,34 +277,62 @@ _execute_conversion() {
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
 
-    # Mode sample : paramètres -ss (seek) et -t (durée) pour encoder un segment
+    # Mode sample : trouver le keyframe exact pour garantir la synchronisation avec VMAF
     local sample_seek_params=""
     local sample_duration_params=""
     local effective_duration="$duration_secs"
     
     if [[ "$SAMPLE_MODE" == true ]]; then
+        # Convertir duration_secs en entier (Bash ne supporte pas l'arithmétique flottante)
+        local duration_int=${duration_secs%.*}
         local margin_start="${SAMPLE_MARGIN_START:-180}"
         local margin_end="${SAMPLE_MARGIN_END:-120}"
         local sample_len="${SAMPLE_DURATION:-30}"
-        local available_range=$((duration_secs - margin_start - margin_end - sample_len))
+        local available_range=$((duration_int - margin_start - margin_end - sample_len))
         
+        local target_pos
         if [[ "$available_range" -gt 0 ]]; then
             # Position aléatoire dans la plage disponible
             local random_offset=$((RANDOM % available_range))
-            local seek_pos=$((margin_start + random_offset))
-            sample_seek_params="-ss $seek_pos"
-            sample_duration_params="-t $sample_len"
-            effective_duration="$sample_len"
-            SAMPLE_SEEK_POS="$seek_pos"  # Stocker pour VMAF
-            echo -e "${CYAN}  🎯 Mode sample : segment de ${sample_len}s à partir de ${seek_pos}s${NOCOLOR}"
+            target_pos=$((margin_start + random_offset))
         else
             # Vidéo trop courte, prendre le milieu
-            local seek_pos=$((duration_secs / 3))
-            sample_seek_params="-ss $seek_pos"
-            sample_duration_params="-t $sample_len"
-            effective_duration="$sample_len"
-            SAMPLE_SEEK_POS="$seek_pos"  # Stocker pour VMAF
-            echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_pos}s${NOCOLOR}"
+            target_pos=$((duration_int / 3))
+        fi
+        
+        # Trouver le keyframe le plus proche de target_pos (en utilisant ffprobe)
+        # On cherche le keyframe >= target_pos pour être sûr d'avoir assez de contenu après
+        local keyframe_pos
+        keyframe_pos=$(ffprobe -v error -select_streams v:0 -skip_frame nokey \
+            -show_entries packet=pts_time -of csv=p=0 \
+            -read_intervals "${target_pos}%+30" "$tmp_input" 2>/dev/null | head -1)
+        
+        # Si pas de keyframe trouvé, utiliser la position cible
+        if [[ -z "$keyframe_pos" ]] || [[ ! "$keyframe_pos" =~ ^[0-9.]+$ ]]; then
+            keyframe_pos="$target_pos"
+        fi
+        
+        # Convertir en entier pour l'affichage et le stockage
+        local keyframe_int=${keyframe_pos%.*}
+        
+        # Utiliser la position exacte du keyframe
+        sample_seek_params="-ss $keyframe_pos"
+        sample_duration_params="-t $sample_len"
+        effective_duration="$sample_len"
+        
+        # Stocker la position EXACTE du keyframe pour VMAF (format décimal)
+        SAMPLE_KEYFRAME_POS="$keyframe_pos"
+        
+        # Formater la position en HH:MM:SS pour l'affichage
+        local seek_h=$((keyframe_int / 3600))
+        local seek_m=$(((keyframe_int % 3600) / 60))
+        local seek_s=$((keyframe_int % 60))
+        local seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
+        
+        if [[ "$available_range" -gt 0 ]]; then
+            echo -e "${CYAN}  🎯 Mode échantillon : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+        else
+            echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
         fi
     fi
 
