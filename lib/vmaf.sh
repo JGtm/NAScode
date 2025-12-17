@@ -50,10 +50,11 @@ compute_vmaf_score() {
     
     # Calculer le score VMAF avec subsampling (1 frame sur 5 pour accélérer)
     # n_subsample=5 : analyse seulement 20% des frames (5x plus rapide)
+    # model=version=vmaf_v0.6.1neg : utilise VMAF NEG qui pénalise les enhancements artificiels
     if [[ "$NO_PROGRESS" != true ]] && [[ "$duration_us" -gt 0 ]] && [[ -n "$filename_display" ]]; then
         # Lancer ffmpeg en arrière-plan avec progression vers fichier
         ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
-            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5" \
+            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg" \
             -progress "$progress_file" \
             -f null - >/dev/null 2>&1 &
         local ffmpeg_pid=$!
@@ -99,7 +100,7 @@ compute_vmaf_score() {
     else
         # Sans barre de progression
         ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
-            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5" \
+            -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg" \
             -f null - >/dev/null 2>&1
     fi
     
