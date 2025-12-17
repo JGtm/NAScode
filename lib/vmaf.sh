@@ -38,6 +38,18 @@ compute_vmaf_score() {
     local vmaf_log_file="${vmaf_dir}/vmaf_${file_hash}_${$}_${RANDOM}.json"
     local progress_file="${vmaf_dir}/vmaf_progress_$$.txt"
     
+    # En mode sample, extraire le même segment de l'original pour comparaison correcte
+    local original_for_vmaf="$original"
+    local original_sample_file=""
+    if [[ "$SAMPLE_MODE" == true ]] && [[ "${SAMPLE_SEEK_POS:-0}" -gt 0 ]]; then
+        original_sample_file="${vmaf_dir}/original_sample_${file_hash}_$$.mkv"
+        ffmpeg -hide_banner -nostdin -ss "$SAMPLE_SEEK_POS" -i "$original" \
+            -t "${SAMPLE_DURATION:-30}" -c copy "$original_sample_file" >/dev/null 2>&1
+        if [[ -f "$original_sample_file" ]]; then
+            original_for_vmaf="$original_sample_file"
+        fi
+    fi
+    
     # Obtenir la durée totale de la vidéo en microsecondes pour la progression
     local duration_us=0
     local duration_str
@@ -53,7 +65,7 @@ compute_vmaf_score() {
     # model=version=vmaf_v0.6.1neg : utilise VMAF NEG qui pénalise les enhancements artificiels
     if [[ "$NO_PROGRESS" != true ]] && [[ "$duration_us" -gt 0 ]] && [[ -n "$filename_display" ]]; then
         # Lancer ffmpeg en arrière-plan avec progression vers fichier
-        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
+        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original_for_vmaf" \
             -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg" \
             -progress "$progress_file" \
             -f null - >/dev/null 2>&1 &
@@ -99,13 +111,14 @@ compute_vmaf_score() {
         printf "\r%100s\r" "" >&2  # Effacer la ligne de progression
     else
         # Sans barre de progression
-        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original" \
+        ffmpeg -hide_banner -nostdin -i "$converted" -i "$original_for_vmaf" \
             -lavfi "[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg" \
             -f null - >/dev/null 2>&1
     fi
     
-    # Nettoyer le fichier de progression
+    # Nettoyer les fichiers temporaires
     rm -f "$progress_file" 2>/dev/null || true
+    [[ -n "$original_sample_file" ]] && rm -f "$original_sample_file" 2>/dev/null || true
     
     # Extraire le score VMAF depuis le fichier JSON
     # Le format JSON de libvmaf contient : "pooled_metrics": { "vmaf": { "mean": XX.XX, ... } }

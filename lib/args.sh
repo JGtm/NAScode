@@ -114,6 +114,18 @@ parse_arguments() {
     if [[ "$RANDOM_MODE" == true ]] && [[ "$LIMIT_FILES" -eq 0 ]]; then
         LIMIT_FILES=$RANDOM_MODE_DEFAULT_LIMIT
     fi
+    
+    # Avertissements d'incompatibilités
+    if [[ "$DRYRUN" == true ]]; then
+        if [[ "$VMAF_ENABLED" == true ]]; then
+            echo -e "${YELLOW}⚠️  VMAF désactivé en mode dry-run (pas de fichier converti à analyser)${NOCOLOR}"
+            VMAF_ENABLED=false
+        fi
+        if [[ "$SAMPLE_MODE" == true ]]; then
+            echo -e "${YELLOW}⚠️  Mode sample ignoré en mode dry-run (simulation uniquement)${NOCOLOR}"
+            SAMPLE_MODE=false
+        fi
+    fi
 }
 
 ###########################################################

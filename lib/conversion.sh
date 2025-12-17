@@ -289,6 +289,7 @@ _execute_conversion() {
             sample_seek_params="-ss $seek_pos"
             sample_duration_params="-t $sample_len"
             effective_duration="$sample_len"
+            SAMPLE_SEEK_POS="$seek_pos"  # Stocker pour VMAF
             echo -e "${CYAN}  🎯 Mode sample : segment de ${sample_len}s à partir de ${seek_pos}s${NOCOLOR}"
         else
             # Vidéo trop courte, prendre le milieu
@@ -296,6 +297,7 @@ _execute_conversion() {
             sample_seek_params="-ss $seek_pos"
             sample_duration_params="-t $sample_len"
             effective_duration="$sample_len"
+            SAMPLE_SEEK_POS="$seek_pos"  # Stocker pour VMAF
             echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_pos}s${NOCOLOR}"
         fi
     fi

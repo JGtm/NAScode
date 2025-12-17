@@ -99,6 +99,7 @@ SAMPLE_MODE=false
 SAMPLE_DURATION=30      # Durée du segment en secondes
 SAMPLE_MARGIN_START=180 # Marge début (éviter générique) en secondes
 SAMPLE_MARGIN_END=120   # Marge fin (éviter générique) en secondes
+SAMPLE_SEEK_POS=0       # Position de seek du sample actuel (pour VMAF)
 
 # Mode de tri pour la construction de la file d'attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
