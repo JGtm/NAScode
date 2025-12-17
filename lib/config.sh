@@ -114,7 +114,7 @@ readonly FFMPEG_MIN_VERSION=8
 
 # Suffixe pour les fichiers
 readonly DRYRUN_SUFFIX="-dryrun-sample"
-SUFFIX_STRING="_x265"  # Suffixe par défaut pour les fichiers de sortie
+SUFFIX_STRING="_x265"  # Suffixe par défaut (sera mis à jour par build_dynamic_suffix)
 
 # Exclusions par défaut
 EXCLUDES=("./logs" "./*.sh" "./*.txt" "Converted")
@@ -192,11 +192,44 @@ set_conversion_mode_parameters() {
     MAXRATE_FFMPEG="${MAXRATE_KBPS}k"
     BUFSIZE_FFMPEG="${BUFSIZE_KBPS}k"
     X265_VBV_PARAMS="vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}"
+    
+    # Construire le suffixe dynamique basé sur les paramètres
+    build_dynamic_suffix
 }
 
 ###########################################################
-# REGEX PRÉ-COMPILÉE DES EXCLUSIONS
+# GÉNÉRATION DU SUFFIXE DYNAMIQUE
 ###########################################################
+
+# Construit un suffixe de fichier reflétant les paramètres de conversion
+# Format: _x265_<mode>_<bitrate>k_<preset>[_tuned]
+# Exemples: _x265_serie_2070k_medium_tuned
+#           _x265_film_2250k_slow
+build_dynamic_suffix() {
+    # Ne pas écraser si l'utilisateur a forcé --no-suffix
+    if [[ "$FORCE_NO_SUFFIX" == true ]]; then
+        SUFFIX_STRING=""
+        return
+    fi
+    
+    local suffix="_x265"
+    
+    # Mode de conversion (serie/film)
+    suffix="${suffix}_${CONVERSION_MODE}"
+    
+    # Bitrate cible
+    suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+    
+    # Preset d'encodage
+    suffix="${suffix}_${ENCODER_PRESET}"
+    
+    # Indicateur si paramètres x265 spéciaux (tuned)
+    if [[ -n "$X265_EXTRA_PARAMS" ]]; then
+        suffix="${suffix}_tuned"
+    fi
+    
+    SUFFIX_STRING="$suffix"
+}
 
 # Regex pré-compilée des exclusions (construite au démarrage pour optimiser is_excluded)
 _build_excludes_regex() {
