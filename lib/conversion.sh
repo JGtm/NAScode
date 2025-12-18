@@ -11,20 +11,29 @@
 get_video_metadata() {
     local file="$1"
     local metadata_output
+    local format_output
     
-    # Récupération de toutes les métadonnées en une seule commande pour optimisation
+    # Récupération des métadonnées du stream vidéo
     metadata_output=$(ffprobe -v error \
         -select_streams v:0 \
-        -show_entries stream=bit_rate,codec_name:stream_tags=BPS:format=bit_rate,duration \
+        -show_entries stream=bit_rate,codec_name:stream_tags=BPS \
         -of default=noprint_wrappers=1 \
         "$file" 2>/dev/null)
     
-    # Parsing des résultats
-    local bitrate_stream=$(echo "$metadata_output" | grep '^bit_rate=' | head -1 | cut -d'=' -f2)
-    local bitrate_bps=$(echo "$metadata_output" | grep '^TAG:BPS=' | cut -d'=' -f2)
-    local bitrate_container=$(echo "$metadata_output" | grep '^\[FORMAT\]' -A 10 | grep '^bit_rate=' | cut -d'=' -f2)
-    local codec=$(echo "$metadata_output" | grep '^codec_name=' | cut -d'=' -f2)
-    local duration=$(echo "$metadata_output" | grep '^duration=' | cut -d'=' -f2)
+    # Récupération séparée des métadonnées du format (container)
+    # Note: -select_streams empêche l'accès aux infos format, donc requête séparée
+    format_output=$(ffprobe -v error \
+        -show_entries format=bit_rate,duration \
+        "$file" 2>/dev/null)
+    
+    # Parsing des résultats stream (format: key=value)
+    local bitrate_stream=$(echo "$metadata_output" | awk -F= '/^bit_rate=/{print $2; exit}')
+    local bitrate_bps=$(echo "$metadata_output" | awk -F= '/^TAG:BPS=/{print $2}')
+    local codec=$(echo "$metadata_output" | awk -F= '/^codec_name=/{print $2}')
+    
+    # Parsing des résultats format (container)
+    local bitrate_container=$(echo "$format_output" | awk -F= '/^bit_rate=/{print $2}')
+    local duration=$(echo "$format_output" | awk -F= '/^duration=/{print $2}')
     
     # Nettoyage des valeurs
     bitrate_stream=$(clean_number "$bitrate_stream")
@@ -32,6 +41,7 @@ get_video_metadata() {
     bitrate_container=$(clean_number "$bitrate_container")
     
     # Détermination du bitrate prioritaire
+    # Priorité : bitrate stream > tag BPS > bitrate container (fallback)
     local bitrate=0
     if [[ -n "$bitrate_stream" ]]; then 
         bitrate="$bitrate_stream"
@@ -455,7 +465,7 @@ _execute_conversion() {
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p10le \
+        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
@@ -488,7 +498,7 @@ _execute_conversion() {
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p10le \
+        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
