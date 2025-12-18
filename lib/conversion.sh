@@ -43,11 +43,11 @@ get_video_metadata() {
     # Détermination du bitrate prioritaire
     # Priorité : bitrate stream > tag BPS > bitrate container (fallback)
     local bitrate=0
-    if [[ -n "$bitrate_stream" ]]; then 
+    if [[ -n "$bitrate_stream" && "$bitrate_stream" -gt 0 ]]; then 
         bitrate="$bitrate_stream"
-    elif [[ -n "$bitrate_bps" ]]; then 
+    elif [[ -n "$bitrate_bps" && "$bitrate_bps" -gt 0 ]]; then 
         bitrate="$bitrate_bps"
-    elif [[ -n "$bitrate_container" ]]; then 
+    elif [[ -n "$bitrate_container" && "$bitrate_container" -gt 0 ]]; then 
         bitrate="$bitrate_container"
     fi
     
