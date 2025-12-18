@@ -55,56 +55,57 @@ get_video_metadata() {
 
 ###########################################################
 # ANALYSE DES MÉTADONNÉES AUDIO
+# TODO: Réactiver quand VLC supportera mieux Opus surround dans MKV
 ###########################################################
 
-# Bitrate cible pour l'audio Opus (kbps)
-readonly AUDIO_OPUS_TARGET_KBPS=128
-# Seuil minimum pour considérer la conversion audio avantageuse (kbps)
-# On ne convertit que si le bitrate source est > seuil (évite de ré-encoder du déjà compressé)
-readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
-
-# Analyse l'audio d'un fichier et détermine si la conversion Opus est avantageuse
-# Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert to opus)
-get_audio_metadata() {
-    local file="$1"
-    
-    # Récupérer les infos audio du premier flux audio
-    local audio_info
-    audio_info=$(ffprobe -v error \
-        -select_streams a:0 \
-        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-        -of default=noprint_wrappers=1 \
-        "$file" 2>/dev/null)
-    
-    local audio_codec=$(echo "$audio_info" | grep '^codec_name=' | cut -d'=' -f2)
-    local audio_bitrate=$(echo "$audio_info" | grep '^bit_rate=' | cut -d'=' -f2)
-    local audio_bitrate_tag=$(echo "$audio_info" | grep '^TAG:BPS=' | cut -d'=' -f2)
-    
-    # Utiliser le tag BPS si bitrate direct non disponible
-    if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
-        audio_bitrate="$audio_bitrate_tag"
-    fi
-    
-    # Convertir en kbps
-    audio_bitrate=$(clean_number "$audio_bitrate")
-    local audio_bitrate_kbps=0
-    if [[ -n "$audio_bitrate" && "$audio_bitrate" =~ ^[0-9]+$ ]]; then
-        audio_bitrate_kbps=$((audio_bitrate / 1000))
-    fi
-    
-    # Déterminer si la conversion est avantageuse
-    local should_convert=0
-    
-    # Ne pas convertir si déjà en Opus
-    if [[ "$audio_codec" == "opus" ]]; then
-        should_convert=0
-    # Convertir si le bitrate source est supérieur au seuil
-    elif [[ "$audio_bitrate_kbps" -gt "$AUDIO_CONVERSION_THRESHOLD_KBPS" ]]; then
-        should_convert=1
-    fi
-    
-    echo "${audio_codec}|${audio_bitrate_kbps}|${should_convert}"
-}
+# # Bitrate cible pour l'audio Opus (kbps)
+# readonly AUDIO_OPUS_TARGET_KBPS=128
+# # Seuil minimum pour considérer la conversion audio avantageuse (kbps)
+# # On ne convertit que si le bitrate source est > seuil (évite de ré-encoder du déjà compressé)
+# readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
+#
+# # Analyse l'audio d'un fichier et détermine si la conversion Opus est avantageuse
+# # Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert to opus)
+# get_audio_metadata() {
+#     local file="$1"
+#     
+#     # Récupérer les infos audio du premier flux audio
+#     local audio_info
+#     audio_info=$(ffprobe -v error \
+#         -select_streams a:0 \
+#         -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
+#         -of default=noprint_wrappers=1 \
+#         "$file" 2>/dev/null)
+#     
+#     local audio_codec=$(echo "$audio_info" | grep '^codec_name=' | cut -d'=' -f2)
+#     local audio_bitrate=$(echo "$audio_info" | grep '^bit_rate=' | cut -d'=' -f2)
+#     local audio_bitrate_tag=$(echo "$audio_info" | grep '^TAG:BPS=' | cut -d'=' -f2)
+#     
+#     # Utiliser le tag BPS si bitrate direct non disponible
+#     if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
+#         audio_bitrate="$audio_bitrate_tag"
+#     fi
+#     
+#     # Convertir en kbps
+#     audio_bitrate=$(clean_number "$audio_bitrate")
+#     local audio_bitrate_kbps=0
+#     if [[ -n "$audio_bitrate" && "$audio_bitrate" =~ ^[0-9]+$ ]]; then
+#         audio_bitrate_kbps=$((audio_bitrate / 1000))
+#     fi
+#     
+#     # Déterminer si la conversion est avantageuse
+#     local should_convert=0
+#     
+#     # Ne pas convertir si déjà en Opus
+#     if [[ "$audio_codec" == "opus" ]]; then
+#         should_convert=0
+#     # Convertir si le bitrate source est supérieur au seuil
+#     elif [[ "$audio_bitrate_kbps" -gt "$AUDIO_CONVERSION_THRESHOLD_KBPS" ]]; then
+#         should_convert=1
+#     fi
+#     
+#     echo "${audio_codec}|${audio_bitrate_kbps}|${should_convert}"
+# }
 
 ###########################################################
 # LOGIQUE DE SKIP
@@ -337,24 +338,28 @@ _execute_conversion() {
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
 
-    # Analyser l'audio et déterminer les paramètres de conversion
-    local audio_info
-    audio_info=$(get_audio_metadata "$tmp_input")
-    local audio_codec audio_bitrate_kbps audio_should_convert
-    IFS='|' read -r audio_codec audio_bitrate_kbps audio_should_convert <<< "$audio_info"
+    # TODO: Réactiver la conversion audio Opus quand VLC supportera mieux Opus surround dans MKV
+    # # Analyser l'audio et déterminer les paramètres de conversion
+    # local audio_info
+    # audio_info=$(get_audio_metadata "$tmp_input")
+    # local audio_codec audio_bitrate_kbps audio_should_convert
+    # IFS='|' read -r audio_codec audio_bitrate_kbps audio_should_convert <<< "$audio_info"
+    # 
+    # # Construire les paramètres audio pour FFmpeg
+    # local audio_params=""
+    # if [[ "$audio_should_convert" -eq 1 ]]; then
+    #     # Conversion vers Opus 128 kbps (meilleure qualité/taille que AAC)
+    #     # -af "aformat=channel_layouts=..." normalise les layouts audio non-standard
+    #     # (ex: 5.1(side) → 5.1) pour éviter l'erreur "Invalid channel layout"
+    #     # Ordre de préférence : 7.1 > 5.1 > stereo > mono
+    #     audio_params="-c:a libopus -b:a ${AUDIO_OPUS_TARGET_KBPS}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
+    # else
+    #     # Copier l'audio tel quel (déjà optimisé ou Opus)
+    #     audio_params="-c:a copy"
+    # fi
     
-    # Construire les paramètres audio pour FFmpeg
-    local audio_params=""
-    if [[ "$audio_should_convert" -eq 1 ]]; then
-        # Conversion vers Opus 128 kbps (meilleure qualité/taille que AAC)
-        # -af "aformat=channel_layouts=..." normalise les layouts audio non-standard
-        # (ex: 5.1(side) → 5.1) pour éviter l'erreur "Invalid channel layout"
-        # Ordre de préférence : 7.1 > 5.1 > stereo > mono
-        audio_params="-c:a libopus -b:a ${AUDIO_OPUS_TARGET_KBPS}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
-    else
-        # Copier l'audio tel quel (déjà optimisé ou Opus)
-        audio_params="-c:a copy"
-    fi
+    # Copier l'audio tel quel (en attendant meilleur support VLC pour Opus)
+    local audio_params="-c:a copy"
 
     # Mode sample : trouver le keyframe exact pour garantir la synchronisation avec VMAF
     local sample_seek_params=""
