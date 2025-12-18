@@ -1,155 +1,214 @@
-# Conversion_Libx265 — README
+# 🎬 Conversion Video x265
 
-Description
-- **But:** : Script d'automatisation pour convertir des vidéos vers HEVC (`libx265`) en batch, spécialement orienté pour des séries/films.
-- **Script principal:** : `Conversion_Libx265.sh` (ou `Conversion_Libx265_v18.sh` selon votre copie).
+Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** en batch, optimisé pour les séries et films.
 
-Prérequis
-- **Système:** : GNU/Linux, macOS ou Windows via WSL / Git Bash.
-- **Outils:** : `ffmpeg` (build avec `libx265`), `ffprobe` (optionnel), utilitaires shell standards (`awk`, `stat`, `md5sum` ou `md5`).
+## ✨ Fonctionnalités
 
-Installation rapide
-- Copier le script dans le dossier contenant vos fichiers vidéo (ou préciser `--source`).
-- Rendre exécutable : `chmod +x Conversion_Libx265.sh`
+### Encodage
+- **Two-pass encoding** : analyse puis encodage pour une répartition optimale du bitrate
+- **Deux modes de conversion** :
+  - `serie` : optimisé vitesse (~1 Go/h), preset medium, 2070 kbps
+  - `film` : optimisé qualité, preset slow, 2250 kbps
+- **Paramètres x265 optimisés** pour le mode série :
+  - `sao=0` : désactive Sample Adaptive Offset (gain ~5%)
+  - `strong-intra-smoothing=0` : préserve les détails fins
+  - `limit-refs=3` : limite les références motion
+  - `subme=2` : précision sub-pixel réduite
+  - `no-slow-firstpass=1` : pass 1 rapide (gain ~15%)
+- **Format 10-bit** (`yuv420p10le`) pour une meilleure qualité
+- **Accélération matérielle** : CUDA (Windows/Linux) ou VideoToolbox (macOS)
 
-Usage
-- **Commande générale:** :
+### Gestion des fichiers
+- **File d'attente intelligente** avec index persistant
+- **Modes de tri** : par taille (asc/desc) ou par nom (asc/desc)
+- **Skip automatique** : fichiers déjà en x265 avec bitrate optimisé
+- **Suffixe dynamique** reflétant les paramètres : `_x265_2070k_medium_tuned`
+- **Transfert vérifié** avec checksum SHA256
 
+### Évaluation qualité
+- **Score VMAF** (optionnel) : évaluation perceptuelle de la qualité vidéo
+- **Mode sample** (`-t`) : encode un segment de 30s pour test rapide
+- Analyse VMAF en batch à la fin des conversions
+
+### Audio
+- Copie de l'audio source (`-c:a copy`)
+- *[Préparé]* Conversion Opus 128 kbps (désactivé, en attente support VLC)
+
+## 📋 Prérequis
+
+- **Système** : GNU/Linux, macOS, Windows (Git Bash/WSL)
+- **FFmpeg** avec `libx265` et optionnellement `libvmaf`
+- **Outils** : `bash 4+`, `awk`, `stat`, `md5sum`/`md5`
+
+Vérifier FFmpeg :
 ```bash
-bash Conversion_Libx265.sh [options]
-```
-
-- **Paramètres courants:**
-  - **`--source` / `-s` :** dossier source (par défaut, dossier du script).
-  - **`--output-dir` / `-o` :** dossier de sortie (par défaut `Converted`).
-  - **`--mode` / `-m` :** `serie` (défaut) ou `film` (ajuste CRF/preset).
-  - **`--dry-run` / `-d` :** simulation sans lancer d'encodage.
-  - **`--no-suffix` / `-x` :** n'ajoute pas le suffixe de sortie (risque d'écrasement).
-  - **`--random` / `-r`` et `--limit` / `-l` :** sélectionner un sous-ensemble aléatoire.
-
-Options recommandées
-- **CRF:** règle la qualité (ex. `--crf 20`). Plus bas = meilleure qualité et fichier plus gros.
-- **Preset:** `--preset slow|medium|fast` — presets plus lents offrent meilleure compression.
-- **Audio:** `--audio-copy` pour garder l'audio original, ou `--audio-bitrate 192k` pour réencoder.
-
-Exemples
-- Conversion rapide avec CRF 22 :
-
-```bash
-bash Conversion_Libx265.sh -s "/chemin/vers/source" -o "/chemin/vers/Converted" --crf 22 --preset medium
-```
-
-- Simulation en mode film :
-
-```bash
-bash Conversion_Libx265.sh --mode film --dry-run
-```
-
-Bonnes pratiques
-- Tester sur un épisode/clip court avant d'encoder toute une saison.
-- Toujours lancer avec `--dry-run` pour valider la nomenclature et éviter écrasement.
-- Conserver les originaux jusqu'à validation finale.
-
-Logs & sorties
-- Les logs et fichiers temporaires sont créés dans `./logs/` (ex. `Success_*.log`, `Error_*.log`, `Index`, `Queue_readable_*.txt`).
-
-Dépannage
-- Vérifier que `ffmpeg` supporte `libx265` : `ffmpeg -version`.
-- Consulter `./logs/Error_*.log` en cas d'échec d'encodage.
-
-Personnalisation
-- Paramètres modifiables en tête du script : `SUFFIX_STRING`, `CRF` par mode, `ENCODER_PRESET`, `PARALLEL_JOBS`, etc.
-
-Sécurité
-- N'utilisez pas `--no-suffix` sans changer `--output-dir` hors du dossier source.
-
-**Fonctionnalités principales**
-- Traitement batch de dossiers (séries, films).
-- File d'attente et indexation (tri par taille, filtrage, limitation).
-- Mode `--dry-run` pour valider sans encoder.
-- Protection contre l'écrasement (suffixes, confirmations).
-- Gestion des logs détaillés et reprise possible.
-
-**Paramètres & options détaillées**
-**Paramètres & options détaillées**
-- `-s, --source DIR` : dossier source (par défaut : le dossier parent du script). Le chemin est converti en absolu au démarrage.
-- `-o, --output-dir DIR` : dossier de sortie (par défaut : `Converted` dans le répertoire du script).
-- `-e, --exclude PATTERN` : ajouter un pattern d'exclusion (glob) pour ignorer des fichiers/dossiers.
-- `-m, --mode MODE` : `serie` (défaut) ou `film` — ajuste les paramètres internes (`TARGET_BITRATE_KBPS`, `ENCODER_PRESET`, etc.).
-- `-d, --dry-run | --dryrun` : mode simulation — aucun encodage; les fichiers de sortie sont simplement créés (utile pour vérification).
-- `-x, --no-suffix` : désactive le suffixe de sortie (`_x265`). Le script demandera confirmation si la sortie est le même répertoire (protection contre écrasement).
-- `-r, --random` : sélection aléatoire des fichiers (si utilisé, `--limit` s'applique à la sélection). Par défaut, si `--random` est activé et `--limit` absent, la limite par défaut est 10.
-- `-l, --limit N` : limiter le nombre de fichiers traités à N (doit être un entier strictement positif).
-- `-q, --queue FILE` : utiliser un fichier `queue` personnalisé (format attendu : noms de fichiers séparés par NUL). Le fichier doit exister et ne pas être vide.
-- `-n, --no-progress` : désactiver les barres et sorties de progression (utile pour exécution non interactive).
-- `-k, --keep-index` : conserver un `Index` existant sans demander confirmation (réutilise l'index déjà généré).
-- `-v, --vmaf` : activer l'évaluation VMAF (nécessite `libvmaf` présent dans la build `ffmpeg`).
-- `-h, --help` : afficher l'aide intégrée et les options prises en charge.
-
-Remarques importantes :
-- Le script réalise systématiquement un encodage en deux passes pour la vidéo (pass 1 = analyse, pass 2 = encodage final).
-- L'audio est copié par défaut (`-c:a copy` dans la commande `ffmpeg`) ; il n'y a pas d'option CLI pour réencoder l'audio — modifiez le script si vous souhaitez un comportement différent.
-- Les paramètres d'encodage (préset, bitrate cible, seuils, suffixe, parallélisation) sont contrôlés par des variables en tête du script : `ENCODER_PRESET`, `TARGET_BITRATE_KBPS`, `SUFFIX_STRING`, `PARALLEL_JOBS`, `BITRATE_CONVERSION_THRESHOLD_KBPS`, `SORT_MODE`, etc. Ces réglages ne sont pas tous exposés en ligne de commande.
-- Modes de tri disponibles pour la construction de la file d'attente : `size_desc`, `size_asc`, `name_asc`, `name_desc` (variable `SORT_MODE`).
-
-Options avancées (exemples d'utilisation interne)
-- `BITRATE_CONVERSION_THRESHOLD_KBPS` : seuil au-dessus duquel l'audio est réencodé ou conservé.
-- `PARALLEL_JOBS` : variable pour ajuster la parallélisation dans le script.
-
-Exemples avancés
-- Encodage de base (CRF 22, preset medium) :
-
-```bash
-bash Conversion_Libx265.sh -s "/chemin/vers/source" -o "/chemin/vers/Converted" --crf 22 --preset medium
-```
-
-- Conserver l'audio et les sous-titres :
-
-```bash
-bash Conversion_Libx265.sh "Episode.mkv" "Episode_x265.mkv" --crf 20 --audio-copy --copy-subs
-```
-
-- Encodage 2-pass pour bitrate cible (ex. 2000 kbps) :
-
-```bash
-bash Conversion_Libx265.sh input.mkv output_x265.mkv --two-pass --target-bitrate 2000k
-```
-
-- Incruster (hardsub) un fichier de sous-titres :
-
-```bash
-bash Conversion_Libx265.sh input.mkv output_x265.mkv --crf 20 --hardsub subs.srt
-```
-
-- Traitement parallèle (N jobs) :
-
-```bash
-bash Conversion_Libx265.sh -s "/chemin" --parallel 4
-```
-
-Windows / WSL / Git Bash
-- Sur Windows, préférez WSL (Ubuntu) pour compatibilité complète avec Bash et outils POSIX.
-- Avec Git Bash, certaines fonctionnalités (ionice, fifo) peuvent manquer.
-- Vérifiez `ffmpeg -version`; si `libx265` n'apparaît pas, installez une build tierce ou utilisez WSL.
-
-Commandes utiles
-- Vérifier ffmpeg et libx265 :
-
-```bash
-ffmpeg -version
 ffmpeg -hide_banner -encoders | grep libx265
+ffmpeg -hide_banner -filters | grep libvmaf
 ```
 
-- Extraire les pistes audio / subs avec `ffprobe`/`ffmpeg` si nécessaire.
+## 🚀 Installation
 
-Dépannage rapide
-- Erreur `libx265` non trouvée → installer ffmpeg avec `libx265` ou utiliser WSL.
-- Fichiers sautés / erreurs → consulter `./logs/Error_*.log` et `Progress_*.log`.
-- Vérifiez l'espace disque, permissions et les noms de fichiers / caractères spéciaux.
+```bash
+git clone <repo_url> Conversion
+cd Conversion
+chmod +x convert.sh
+```
 
-Personnalisation
-- Variables en tête du script (ex. `SUFFIX_STRING`, `DEFAULT_CRF_SERIE`, `DEFAULT_CRF_FILM`, `PARALLEL_JOBS`) peuvent être ajustées selon vos besoins.
+## 📖 Usage
 
-FAQ rapide
-- Puis-je restaurer les originaux ? Oui — conservez-les jusqu'à validation, ou ajoutez une option `--remove-source` après validation manuelle.
-- Le script gère-t-il les chapitres ? Le support dépend de la façon dont `ffmpeg` est appelé dans le script ; on peut ajouter la copie des chapitres (`-map_chapters`).
+```bash
+bash convert.sh [options]
+```
+
+### Options principales
+
+| Option | Description |
+|--------|-------------|
+| `-s, --source DIR` | Dossier source (défaut: `../`) |
+| `-o, --output-dir DIR` | Dossier de sortie (défaut: `Converted/`) |
+| `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
+| `-d, --dry-run` | Simulation sans encodage |
+| `-t, --test` | Mode sample : encode 30s pour test rapide |
+| `-v, --vmaf` | Activer l'évaluation VMAF |
+| `-l, --limit N` | Limiter à N fichiers |
+| `-r, --random` | Sélection aléatoire des fichiers |
+| `-k, --keep-index` | Réutiliser l'index existant |
+| `-n, --no-progress` | Désactiver les barres de progression |
+| `-x, --no-suffix` | Pas de suffixe sur les fichiers de sortie |
+| `-e, --exclude PATTERN` | Exclure des fichiers (glob) |
+| `-q, --queue FILE` | Utiliser une file d'attente personnalisée |
+| `-h, --help` | Afficher l'aide |
+
+### Exemples
+
+```bash
+# Conversion standard d'un dossier de séries
+bash convert.sh -s "/chemin/vers/series"
+
+# Mode film avec évaluation VMAF
+bash convert.sh -m film -v -s "/chemin/vers/films"
+
+# Test rapide sur 5 fichiers aléatoires (30s chacun)
+bash convert.sh -t -v -r -l 5
+
+# Simulation pour vérifier la configuration
+bash convert.sh -d -s "/chemin/source"
+
+# Conversion avec limite et index conservé
+bash convert.sh -l 10 -k
+```
+
+## ⚙️ Configuration
+
+### Modes de conversion
+
+| Paramètre | Mode `serie` | Mode `film` |
+|-----------|--------------|-------------|
+| Bitrate cible | 2070 kbps | 2250 kbps |
+| Maxrate | 2520 kbps | 3600 kbps |
+| Preset | medium | slow |
+| Optimisations x265 | Oui (tuned) | Non (qualité max) |
+| Pass 1 rapide | Oui | Non |
+
+### Variables modifiables (`lib/config.sh`)
+
+```bash
+CONVERSION_MODE="serie"           # Mode par défaut
+SORT_MODE="name_asc"              # Tri de la file d'attente
+SAMPLE_DURATION=30                # Durée du segment test (secondes)
+BITRATE_CONVERSION_THRESHOLD_KBPS=2520  # Seuil pour skip
+```
+
+### Paramètres x265 (mode série)
+
+```
+amp=0:rect=0:sao=0:strong-intra-smoothing=0:limit-refs=3:subme=2
+```
+
+## 📁 Structure
+
+```
+Conversion/
+├── convert.sh          # Script principal
+├── lib/
+│   ├── args.sh         # Parsing des arguments
+│   ├── colors.sh       # Codes couleur terminal
+│   ├── config.sh       # Configuration globale
+│   ├── conversion.sh   # Logique d'encodage FFmpeg
+│   ├── finalize.sh     # Finalisation et transfert
+│   ├── logging.sh      # Gestion des logs
+│   ├── progress.sh     # Barres de progression
+│   ├── queue.sh        # File d'attente
+│   ├── system.sh       # Vérifications système
+│   ├── transfer.sh     # Transfert avec checksum
+│   ├── utils.sh        # Utilitaires
+│   └── vmaf.sh         # Évaluation VMAF
+├── logs/               # Logs d'exécution
+│   ├── Success_*.log
+│   ├── Error_*.log
+│   ├── Progress_*.log
+│   └── Index
+└── Converted/          # Fichiers convertis
+```
+
+## 📊 Logs
+
+- `Success_*.log` : fichiers convertis avec succès
+- `Error_*.log` : erreurs de conversion
+- `Progress_*.log` : progression détaillée
+- `Skipped_*.log` : fichiers ignorés (déjà optimisés)
+- `Index` : index des fichiers à traiter
+- `Queue_readable_*.txt` : file d'attente lisible
+
+## 🔍 Évaluation VMAF
+
+Le score VMAF (Video Multi-Method Assessment Fusion) évalue la qualité perceptuelle :
+
+| Score | Qualité |
+|-------|---------|
+| ≥ 90 | EXCELLENT |
+| 80-89 | TRÈS BON |
+| 70-79 | BON |
+| < 70 | DÉGRADÉ |
+
+```bash
+# Activer VMAF avec mode test
+bash convert.sh -v -t
+```
+
+## 🛠️ Dépannage
+
+### FFmpeg sans libx265
+```bash
+# Ubuntu/Debian
+sudo apt install ffmpeg
+
+# macOS
+brew install ffmpeg
+
+# Windows : télécharger depuis gyan.dev ou utiliser WSL
+```
+
+### Fichiers sautés
+Consultez `logs/Skipped_*.log` - le fichier est probablement déjà en x265 avec un bitrate optimisé.
+
+### Erreurs d'encodage
+1. Vérifiez `logs/Error_*.log`
+2. Vérifiez l'espace disque dans `/tmp`
+3. Testez avec un seul fichier : `bash convert.sh -l 1`
+
+### Caractères spéciaux dans les noms
+Le script gère les espaces et caractères spéciaux, mais évitez les caractères de contrôle.
+
+## 📝 Changelog récent
+
+### v2.0 (Décembre 2025)
+- ✅ Nouveaux paramètres x265 optimisés pour le mode série
+- ✅ Pass 1 rapide (`no-slow-firstpass`) pour gain de temps
+- ✅ Préparation conversion audio Opus 128k (désactivé temporairement)
+- ✅ Amélioration gestion VMAF (détection fichiers vides)
+- ✅ Suffixe dynamique avec indicateur `_tuned`
+
+## 📄 Licence
+
+MIT License - Libre d'utilisation et de modification.
