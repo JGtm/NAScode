@@ -31,6 +31,14 @@ compute_vmaf_score() {
         return 0
     fi
     
+    # Vérifier que le fichier converti n'est pas vide (dryrun crée des fichiers de 0 octets)
+    local converted_size
+    converted_size=$(stat -c%s "$converted" 2>/dev/null || stat -f%z "$converted" 2>/dev/null || echo "0")
+    if [[ "$converted_size" -eq 0 ]]; then
+        echo "NA"
+        return 0
+    fi
+    
     # Fichiers temporaires dans logs/vmaf/
     local vmaf_dir="${LOG_DIR}/vmaf"
     mkdir -p "$vmaf_dir" 2>/dev/null || true
@@ -215,16 +223,31 @@ process_vmaf_queue() {
     while IFS='|' read -r file_original final_actual keyframe_pos; do
         ((current++)) || true
         
+        local filename
+        filename=$(basename "$final_actual")
+        # Tronquer le nom pour l'affichage
+        local short_fn="$filename"
+        if [[ ${#short_fn} -gt 30 ]]; then
+            short_fn="${short_fn:0:27}..."
+        fi
+        
         # Vérifier que les fichiers existent toujours
         if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
             if [[ "$NO_PROGRESS" != true ]]; then
-                echo -e "  ${YELLOW}⚠${NOCOLOR} [$current/$vmaf_count] Fichier(s) introuvable(s), ignoré"
+                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier introuvable)\n" "$current" "$vmaf_count" "$short_fn" >&2
             fi
             continue
         fi
         
-        local filename
-        filename=$(basename "$final_actual")
+        # Vérifier que le fichier converti n'est pas vide (dryrun crée des fichiers de 0 octets)
+        local converted_size
+        converted_size=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo "0")
+        if [[ "$converted_size" -eq 0 ]]; then
+            if [[ "$NO_PROGRESS" != true ]]; then
+                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier vide/dryrun)\n" "$current" "$vmaf_count" "$short_fn" >&2
+            fi
+            continue
+        fi
         
         # Calculer le score VMAF (avec barre de progression intégrée)
         # Passer la position du keyframe si disponible (mode sample)
