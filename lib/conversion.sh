@@ -351,19 +351,9 @@ _execute_conversion() {
         # (ex: 5.1(side) → 5.1) pour éviter l'erreur "Invalid channel layout"
         # Ordre de préférence : 7.1 > 5.1 > stereo > mono
         audio_params="-c:a libopus -b:a ${AUDIO_OPUS_TARGET_KBPS}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${CYAN}  🎵 Audio: ${audio_codec} ${audio_bitrate_kbps}k → Opus ${AUDIO_OPUS_TARGET_KBPS}k${NOCOLOR}"
-        fi
     else
         # Copier l'audio tel quel (déjà optimisé ou Opus)
         audio_params="-c:a copy"
-        if [[ "$NO_PROGRESS" != true && -n "$audio_codec" ]]; then
-            if [[ "$audio_codec" == "opus" ]]; then
-                echo -e "${CYAN}  🎵 Audio: Opus (déjà optimisé) → copie${NOCOLOR}"
-            else
-                echo -e "${CYAN}  🎵 Audio: ${audio_codec} ${audio_bitrate_kbps}k → copie${NOCOLOR}"
-            fi
-        fi
     fi
 
     # Mode sample : trouver le keyframe exact pour garantir la synchronisation avec VMAF

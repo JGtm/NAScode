@@ -244,7 +244,7 @@ process_vmaf_queue() {
         converted_size=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo "0")
         if [[ "$converted_size" -eq 0 ]]; then
             if [[ "$NO_PROGRESS" != true ]]; then
-                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier vide/dryrun)\n" "$current" "$vmaf_count" "$short_fn" >&2
+                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier vide)\n" "$current" "$vmaf_count" "$short_fn" >&2
             fi
             continue
         fi
