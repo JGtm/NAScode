@@ -77,10 +77,11 @@ teardown() {
 }
 
 @test "_prepare_file_paths: ajoute le suffix dryrun si activé" {
+    # DRYRUN_SUFFIX est readonly dans config.sh, on teste avec la valeur par défaut
+    # La valeur par défaut est "-dryrun-sample", donc on vérifie juste que DRYRUN=true l'ajoute
     SOURCE="/videos"
     SUFFIX_STRING="_x265"
     DRYRUN=true
-    DRYRUN_SUFFIX="_DRYRUN"
     
     local result
     result=$(_prepare_file_paths "/videos/test.mkv" "/output")
@@ -88,7 +89,8 @@ teardown() {
     local final_output
     final_output=$(echo "$result" | cut -d'|' -f5)
     
-    [[ "$final_output" =~ "_x265_DRYRUN.mkv" ]]
+    # Vérifier que le suffix dryrun est présent (valeur par défaut: -dryrun-sample)
+    [[ "$final_output" =~ "-dryrun-sample.mkv" ]]
 }
 
 ###########################################################
@@ -101,28 +103,21 @@ teardown() {
 }
 
 @test "should_skip_conversion: skip si hevc avec bitrate bas" {
-    # Configurer le seuil
-    BITRATE_CONVERSION_THRESHOLD_KBPS=2500
-    SKIP_TOLERANCE_PERCENT=5
-    
-    # Bitrate sous le seuil (2.5 Mbps * 1.05 = 2.625 Mbps = 2625000 bps)
+    # Utiliser les valeurs par défaut (readonly)
+    # Le seuil par défaut est ~2500 kbps, on teste avec un bitrate bien en dessous
+    # Bitrate sous le seuil
     run should_skip_conversion "hevc" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
 }
 
 @test "should_skip_conversion: pas de skip si hevc avec bitrate élevé" {
-    BITRATE_CONVERSION_THRESHOLD_KBPS=2500
-    SKIP_TOLERANCE_PERCENT=5
-    
-    # Bitrate au-dessus du seuil
+    # Bitrate au-dessus du seuil (5 Mbps >> seuil de ~2.5 Mbps)
     run should_skip_conversion "hevc" "5000000" "test.mkv" "/source/test.mkv"
     [ "$status" -ne 0 ]
 }
 
 @test "should_skip_conversion: pas de skip si h264 même avec bitrate bas" {
-    BITRATE_CONVERSION_THRESHOLD_KBPS=2500
-    SKIP_TOLERANCE_PERCENT=5
-    
+    # H264 doit toujours être converti (pas de skip basé sur le bitrate)
     run should_skip_conversion "h264" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -ne 0 ]
 }
@@ -132,8 +127,7 @@ teardown() {
 ###########################################################
 
 @test "_get_temp_filename: génère un chemin dans TMP_DIR" {
-    TMP_DIR="$TEST_TEMP_DIR/tmp"
-    
+    # TMP_DIR est readonly, utiliser sa valeur actuelle
     local result
     result=$(_get_temp_filename "/source/video.mkv" ".in")
     
@@ -141,8 +135,6 @@ teardown() {
 }
 
 @test "_get_temp_filename: inclut le suffix demandé" {
-    TMP_DIR="$TEST_TEMP_DIR/tmp"
-    
     local result
     result=$(_get_temp_filename "/source/video.mkv" ".out.mkv")
     
@@ -150,8 +142,6 @@ teardown() {
 }
 
 @test "_get_temp_filename: génère des noms différents pour fichiers différents" {
-    TMP_DIR="$TEST_TEMP_DIR/tmp"
-    
     local result1
     local result2
     result1=$(_get_temp_filename "/source/video1.mkv" ".in")
@@ -165,9 +155,7 @@ teardown() {
 ###########################################################
 
 @test "_check_disk_space: retourne 0 si assez d'espace" {
-    TMP_DIR="$TEST_TEMP_DIR/tmp"
-    MIN_TMP_FREE_MB=1  # 1 MB minimum
-    
+    # TMP_DIR et MIN_TMP_FREE_MB sont readonly, utiliser les valeurs par défaut
     run _check_disk_space "/source/test.mkv"
     [ "$status" -eq 0 ]
 }
