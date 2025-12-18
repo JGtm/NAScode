@@ -219,8 +219,8 @@ set_conversion_mode_parameters() {
 ###########################################################
 
 # Construit un suffixe de fichier reflétant les paramètres de conversion
-# Format: _x265_<bitrate>k_<preset>[_tuned][_sample]
-# Exemples: _x265_2070k_medium_tuned_sample
+# Format: _x265_<bitrate>k_<preset>[_tuned][_opus128k][_sample]
+# Exemples: _x265_2070k_medium_tuned_opus128k_sample
 #           _x265_2250k_slow
 build_dynamic_suffix() {
     # Ne pas écraser si l'utilisateur a forcé --no-suffix
@@ -241,6 +241,12 @@ build_dynamic_suffix() {
     if [[ -n "$X265_EXTRA_PARAMS" ]]; then
         suffix="${suffix}_tuned"
     fi
+    
+    # TODO: Réactiver quand VLC supportera Opus surround dans MKV
+    # Indicateur conversion audio Opus (128 kbps)
+    # if [[ "${AUDIO_OPUS_ENABLED:-false}" == true ]]; then
+    #     suffix="${suffix}_opus${AUDIO_OPUS_TARGET_KBPS}k"
+    # fi
     
     # Indicateur mode sample (segment de test)
     if [[ "$SAMPLE_MODE" == true ]]; then

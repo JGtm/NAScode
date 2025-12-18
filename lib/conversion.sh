@@ -58,6 +58,8 @@ get_video_metadata() {
 # TODO: Réactiver quand VLC supportera mieux Opus surround dans MKV
 ###########################################################
 
+# # Activer la conversion audio vers Opus
+# AUDIO_OPUS_ENABLED=true
 # # Bitrate cible pour l'audio Opus (kbps)
 # readonly AUDIO_OPUS_TARGET_KBPS=128
 # # Seuil minimum pour considérer la conversion audio avantageuse (kbps)
