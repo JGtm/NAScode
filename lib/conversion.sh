@@ -54,6 +54,59 @@ get_video_metadata() {
 }
 
 ###########################################################
+# ANALYSE DES MÉTADONNÉES AUDIO
+###########################################################
+
+# Bitrate cible pour l'audio Opus (kbps)
+readonly AUDIO_OPUS_TARGET_KBPS=128
+# Seuil minimum pour considérer la conversion audio avantageuse (kbps)
+# On ne convertit que si le bitrate source est > seuil (évite de ré-encoder du déjà compressé)
+readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
+
+# Analyse l'audio d'un fichier et détermine si la conversion Opus est avantageuse
+# Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert to opus)
+get_audio_metadata() {
+    local file="$1"
+    
+    # Récupérer les infos audio du premier flux audio
+    local audio_info
+    audio_info=$(ffprobe -v error \
+        -select_streams a:0 \
+        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
+        -of default=noprint_wrappers=1 \
+        "$file" 2>/dev/null)
+    
+    local audio_codec=$(echo "$audio_info" | grep '^codec_name=' | cut -d'=' -f2)
+    local audio_bitrate=$(echo "$audio_info" | grep '^bit_rate=' | cut -d'=' -f2)
+    local audio_bitrate_tag=$(echo "$audio_info" | grep '^TAG:BPS=' | cut -d'=' -f2)
+    
+    # Utiliser le tag BPS si bitrate direct non disponible
+    if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
+        audio_bitrate="$audio_bitrate_tag"
+    fi
+    
+    # Convertir en kbps
+    audio_bitrate=$(clean_number "$audio_bitrate")
+    local audio_bitrate_kbps=0
+    if [[ -n "$audio_bitrate" && "$audio_bitrate" =~ ^[0-9]+$ ]]; then
+        audio_bitrate_kbps=$((audio_bitrate / 1000))
+    fi
+    
+    # Déterminer si la conversion est avantageuse
+    local should_convert=0
+    
+    # Ne pas convertir si déjà en Opus
+    if [[ "$audio_codec" == "opus" ]]; then
+        should_convert=0
+    # Convertir si le bitrate source est supérieur au seuil
+    elif [[ "$audio_bitrate_kbps" -gt "$AUDIO_CONVERSION_THRESHOLD_KBPS" ]]; then
+        should_convert=1
+    fi
+    
+    echo "${audio_codec}|${audio_bitrate_kbps}|${should_convert}"
+}
+
+###########################################################
 # LOGIQUE DE SKIP
 ###########################################################
 
@@ -278,11 +331,37 @@ _execute_conversion() {
     # Pass 1 : analyse rapide pour générer les statistiques
     # Pass 2 : encodage final avec répartition optimale du bitrate
 
-    # Préparer les paramètres
+    # Préparer les paramètres vidéo
     local ff_bitrate="${TARGET_BITRATE_FFMPEG:-${TARGET_BITRATE_KBPS}k}"
     local ff_maxrate="${MAXRATE_FFMPEG:-${MAXRATE_KBPS}k}"
     local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
     local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
+
+    # Analyser l'audio et déterminer les paramètres de conversion
+    local audio_info
+    audio_info=$(get_audio_metadata "$tmp_input")
+    local audio_codec audio_bitrate_kbps audio_should_convert
+    IFS='|' read -r audio_codec audio_bitrate_kbps audio_should_convert <<< "$audio_info"
+    
+    # Construire les paramètres audio pour FFmpeg
+    local audio_params=""
+    if [[ "$audio_should_convert" -eq 1 ]]; then
+        # Conversion vers Opus 128 kbps (meilleure qualité/taille que AAC)
+        audio_params="-c:a libopus -b:a ${AUDIO_OPUS_TARGET_KBPS}k"
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${CYAN}  🎵 Audio: ${audio_codec} ${audio_bitrate_kbps}k → Opus ${AUDIO_OPUS_TARGET_KBPS}k${NOCOLOR}"
+        fi
+    else
+        # Copier l'audio tel quel (déjà optimisé ou Opus)
+        audio_params="-c:a copy"
+        if [[ "$NO_PROGRESS" != true && -n "$audio_codec" ]]; then
+            if [[ "$audio_codec" == "opus" ]]; then
+                echo -e "${CYAN}  🎵 Audio: Opus (déjà optimisé) → copie${NOCOLOR}"
+            else
+                echo -e "${CYAN}  🎵 Audio: ${audio_codec} ${audio_bitrate_kbps}k → copie${NOCOLOR}"
+            fi
+        fi
+    fi
 
     # Mode sample : trouver le keyframe exact pour garantir la synchronisation avec VMAF
     local sample_seek_params=""
@@ -366,7 +445,12 @@ _execute_conversion() {
     if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
         x265_base_params="${x265_base_params}:${X265_EXTRA_PARAMS}"
     fi
+    # Construire les paramètres pass 1 avec option fast si activée
     local x265_params_pass1="pass=1:${x265_base_params}"
+    if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
+        # no-slow-firstpass : analyse rapide, gain ~15% en temps, impact qualité négligeable
+        x265_params_pass1="${x265_params_pass1}:no-slow-firstpass=1"
+    fi
     
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
@@ -409,7 +493,7 @@ _execute_conversion() {
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
         -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
-        -c:a copy \
+        $audio_params \
         -map 0 -f matroska \
         "$tmp_output" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \

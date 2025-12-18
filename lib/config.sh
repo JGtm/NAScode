@@ -166,6 +166,8 @@ HWACCEL=""
 
 # Paramètres x265 additionnels par mode (optimisations vitesse/qualité)
 X265_EXTRA_PARAMS=""
+# Pass 1 rapide (no-slow-firstpass) - désactivé par défaut pour qualité max
+X265_PASS1_FAST=false
 
 set_conversion_mode_parameters() {
     case "$CONVERSION_MODE" in
@@ -177,6 +179,8 @@ set_conversion_mode_parameters() {
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             # Films : garder toutes les optimisations x265 pour qualité max
             X265_EXTRA_PARAMS=""
+            # Pass 1 complète pour une analyse approfondie (qualité max)
+            X265_PASS1_FAST=false
             ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h
@@ -184,9 +188,15 @@ set_conversion_mode_parameters() {
             ENCODER_PRESET="medium"
             MAXRATE_KBPS=2520
             BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
-            # Séries : optimisations vitesse (amp=0, rect=0 accélèrent l'encodage
-            # avec impact minime sur la qualité pour du contenu série)
-            X265_EXTRA_PARAMS="amp=0:rect=0"
+            # Séries : optimisations vitesse/qualité adaptées au contenu série
+            # - amp=0, rect=0 : désactive AMP/RECT (gain vitesse ~10%, perte qualité négligeable)
+            # - sao=0 : désactive Sample Adaptive Offset (gain ~5%, perte minime sur séries)
+            # - strong-intra-smoothing=0 : préserve les détails fins et edges nettes
+            # - limit-refs=3 : limite les références motion (bon compromis)
+            # - subme=2 : précision sub-pixel réduite (gain vitesse significatif)
+            X265_EXTRA_PARAMS="amp=0:rect=0:sao=0:strong-intra-smoothing=0:limit-refs=3:subme=2"
+            # Pass 1 rapide : analyse moins approfondie mais gain temps ~15%
+            X265_PASS1_FAST=true
             ;;
         *)
             echo -e "${RED}ERREUR : Mode de conversion inconnu : $CONVERSION_MODE${NOCOLOR}"
