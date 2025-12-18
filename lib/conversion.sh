@@ -347,7 +347,10 @@ _execute_conversion() {
     local audio_params=""
     if [[ "$audio_should_convert" -eq 1 ]]; then
         # Conversion vers Opus 128 kbps (meilleure qualité/taille que AAC)
-        audio_params="-c:a libopus -b:a ${AUDIO_OPUS_TARGET_KBPS}k"
+        # -af "aformat=channel_layouts=..." normalise les layouts audio non-standard
+        # (ex: 5.1(side) → 5.1) pour éviter l'erreur "Invalid channel layout"
+        # Ordre de préférence : 7.1 > 5.1 > stereo > mono
+        audio_params="-c:a libopus -b:a ${AUDIO_OPUS_TARGET_KBPS}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
         if [[ "$NO_PROGRESS" != true ]]; then
             echo -e "${CYAN}  🎵 Audio: ${audio_codec} ${audio_bitrate_kbps}k → Opus ${AUDIO_OPUS_TARGET_KBPS}k${NOCOLOR}"
         fi
