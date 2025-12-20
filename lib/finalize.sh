@@ -162,10 +162,11 @@ _finalize_conversion_success() {
     if [[ "$NO_PROGRESS" != true ]]; then
         # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
         local elapsed_str="N/A"
-        if [[ -n "${START_TS:-}" ]]; then
+        local start_for_file="${FILE_START_TS:-${START_TS:-}}"
+        if [[ -n "${start_for_file:-}" ]] && [[ "${start_for_file}" =~ ^[0-9]+$ ]]; then
             local end_ts
             end_ts=$(date +%s)
-            local elapsed=$((end_ts - START_TS_TOTAL))
+            local elapsed=$((end_ts - start_for_file))
             local eh=$((elapsed / 3600))
             local em=$(((elapsed % 3600) / 60))
             local es=$((elapsed % 60))
@@ -238,20 +239,38 @@ _finalize_conversion_error() {
 show_summary() {
     # Traiter toutes les analyses VMAF en attente
     process_vmaf_queue
+
+    # Durée totale du traitement
+    local total_elapsed_str="N/A"
+    if [[ -n "${START_TS_TOTAL:-}" ]] && [[ "${START_TS_TOTAL}" =~ ^[0-9]+$ ]]; then
+        local end_ts
+        end_ts=$(date +%s)
+        local elapsed=$((end_ts - START_TS_TOTAL))
+        local eh=$((elapsed / 3600))
+        local em=$(((elapsed % 3600) / 60))
+        local es=$((elapsed % 60))
+        total_elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
+    fi
     
     local succ=0
     if [[ -f "$LOG_SUCCESS" && -s "$LOG_SUCCESS" ]]; then
-        succ=$(grep -c ' | SUCCESS' "$LOG_SUCCESS" 2>/dev/null || echo 0)
+        succ=$(grep -c ' | SUCCESS' "$LOG_SUCCESS" 2>/dev/null || true)
+        succ=$(echo "${succ:-0}" | tr -d '[:space:]')
+        [[ -z "$succ" ]] && succ=0
     fi
 
     local skip=0
     if [[ -f "$LOG_SKIPPED" && -s "$LOG_SKIPPED" ]]; then
-        skip=$(grep -c ' | SKIPPED' "$LOG_SKIPPED" 2>/dev/null || echo 0)
+        skip=$(grep -c ' | SKIPPED' "$LOG_SKIPPED" 2>/dev/null || true)
+        skip=$(echo "${skip:-0}" | tr -d '[:space:]')
+        [[ -z "$skip" ]] && skip=0
     fi
 
     local err=0
     if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
-        err=$(grep -c ' | ERROR ffmpeg | ' "$LOG_ERROR" 2>/dev/null || echo 0)
+        err=$(grep -c ' | ERROR ffmpeg | ' "$LOG_ERROR" 2>/dev/null || true)
+        err=$(echo "${err:-0}" | tr -d '[:space:]')
+        [[ -z "$err" ]] && err=0
     fi
 
     # Anomalies : fichiers plus lourds après conversion
@@ -277,16 +296,17 @@ show_summary() {
         echo "-------------------------------------------"
         echo "           RÉSUMÉ DE CONVERSION            "
         echo "-------------------------------------------"
-        echo "Date fin  : $(date +"%Y-%m-%d %H:%M:%S")"
-        echo "Succès    : $succ"
-        echo "Ignorés   : $skip"
-        echo "Erreurs   : $err"
+        echo "Date fin     : $(date +"%Y-%m-%d %H:%M:%S")"
+        echo "Durée totale : ${total_elapsed_str}"
+        echo "Succès       : $succ"
+        echo "Ignorés      : $skip"
+        echo "Erreurs      : $err"
         echo "-------------------------------------------"
         echo "           ANOMALIES DÉTECTÉES             "
         echo "-------------------------------------------"
-        echo "Taille    : $size_anomalies"
-        echo "Intégrité : $checksum_anomalies"
-        echo "VMAF      : $vmaf_anomalies"
+        echo "Taille       : $size_anomalies"
+        echo "Intégrité    : $checksum_anomalies"
+        echo "VMAF         : $vmaf_anomalies"
         echo "-------------------------------------------"
     } | tee "$SUMMARY_FILE"
 }

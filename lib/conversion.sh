@@ -166,6 +166,7 @@ _check_output_exists() {
         if [[ -n "$LOG_SKIPPED" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
         fi
+
         # Alimenter la queue avec le prochain candidat si limite active
         if [[ "$LIMIT_FILES" -gt 0 ]]; then
             update_queue || true
