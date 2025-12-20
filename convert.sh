@@ -109,6 +109,9 @@ main() {
     # Exporter les variables et fonctions pour les sous-shells
     export_variables
 
+    # Marquer le début effectif du traitement (conversions)
+    START_TS_TOTAL="$(date +%s)"
+
     # Préparer la queue dynamique, lancer le traitement et attendre la fin
     prepare_dynamic_queue
 

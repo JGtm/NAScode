@@ -72,9 +72,8 @@ _execute_conversion() {
     #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
     #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits (si source 10-bit)
 
-    # timestamp de départ portable
+    # timestamp de départ portable (conversion du fichier courant)
     START_TS="$(date +%s)"
-    START_TS_TOTAL="$(date +%s)"
 
     # Two-pass encoding : analyse puis encodage
     # Pass 1 : analyse rapide pour générer les statistiques
