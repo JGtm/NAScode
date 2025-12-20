@@ -17,6 +17,9 @@ Output/
 # Thumbnails
 Thumbs.db
 
+# Captures d'écran locales
+Capture*.PNG
+
 # Fichiers temporaires
 *.tmp
 *.temp
