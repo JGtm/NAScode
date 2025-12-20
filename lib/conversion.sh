@@ -64,6 +64,75 @@ get_video_metadata() {
 }
 
 ###########################################################
+# ANALYSE DES PROPRIÉTÉS VIDÉO (RÉSOLUTION / PIX_FMT)
+###########################################################
+
+# Récupère des infos de base sur le flux vidéo (résolution + pixel format).
+# Usage: get_video_stream_props <file>
+# Retour: width|height|pix_fmt (valeurs vides si non disponibles)
+get_video_stream_props() {
+    local file="$1"
+    local out
+    out=$(ffprobe -v error \
+        -select_streams v:0 \
+        -show_entries stream=width,height,pix_fmt \
+        -of default=noprint_wrappers=1 \
+        "$file" 2>/dev/null)
+
+    local width height pix_fmt
+    width=$(echo "$out" | awk -F= '/^width=/{print $2; exit}')
+    height=$(echo "$out" | awk -F= '/^height=/{print $2; exit}')
+    pix_fmt=$(echo "$out" | awk -F= '/^pix_fmt=/{print $2; exit}')
+
+    echo "${width}|${height}|${pix_fmt}"
+}
+
+# Détermine le pixel format de sortie.
+# - Si la source est 10-bit (Main10 etc.), on garde du 10-bit (yuv420p10le)
+# - Sinon on reste en 8-bit (yuv420p)
+_select_output_pix_fmt() {
+    local input_pix_fmt="$1"
+    local out_pix_fmt="yuv420p"
+
+    # Heuristique simple et robuste : les pix_fmt 10-bit contiennent généralement "10".
+    # Ex: yuv420p10le, yuv422p10le, yuv444p10le
+    if [[ "$input_pix_fmt" == *"10"* ]]; then
+        out_pix_fmt="yuv420p10le"
+    fi
+
+    echo "$out_pix_fmt"
+}
+
+# Construit le filtre vidéo (optionnel) pour limiter la résolution à 1080p.
+# Retourne une chaîne vide si aucun downscale n'est requis.
+_build_downscale_filter_if_needed() {
+    local width="$1"
+    local height="$2"
+
+    if [[ -z "$width" || -z "$height" ]]; then
+        echo ""
+        return 0
+    fi
+    if ! [[ "$width" =~ ^[0-9]+$ ]] || ! [[ "$height" =~ ^[0-9]+$ ]]; then
+        echo ""
+        return 0
+    fi
+
+    # Règle "safe qualité" : si la vidéo dépasse le cadre 1080p (largeur > 1920 OU hauteur > 1080),
+    # on downscale pour réduire le nombre de pixels à bitrate constant.
+    if [[ "$width" -le "${DOWNSCALE_MAX_WIDTH}" && "$height" -le "${DOWNSCALE_MAX_HEIGHT}" ]]; then
+        echo ""
+        return 0
+    fi
+
+    # Conserver le ratio, ne jamais upscaler, et forcer des dimensions paires (requis par YUV 4:2:0).
+    # min(W/iw, H/ih) donne le facteur de réduction pour tenir dans 1920x1080.
+    # trunc(x/2)*2 garantit un multiple de 2.
+    local s="scale=w='trunc(iw*min(${DOWNSCALE_MAX_WIDTH}/iw\\,${DOWNSCALE_MAX_HEIGHT}/ih)/2)*2':h='trunc(ih*min(${DOWNSCALE_MAX_WIDTH}/iw\\,${DOWNSCALE_MAX_HEIGHT}/ih)/2)*2':flags=lanczos"
+    echo "$s"
+}
+
+###########################################################
 # ANALYSE DES MÉTADONNÉES AUDIO
 # TODO: Réactiver quand VLC supportera mieux Opus surround dans MKV
 ###########################################################
@@ -334,7 +403,7 @@ _execute_conversion() {
     #  -c:v libx265         : encodeur logiciel x265 (HEVC)
     #  -preset slow         : préréglage qualité/temps (lent = meilleure compression)
     #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
-    #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits
+    #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits (si source 10-bit)
 
     # timestamp de départ portable
     START_TS="$(date +%s)"
@@ -372,6 +441,36 @@ _execute_conversion() {
     
     # Copier l'audio tel quel (en attendant meilleur support VLC pour Opus)
     local audio_params="-c:a copy"
+
+    # ==================== ADAPTATION SOURCE (10-bit + downscale) ====================
+    # Objectif :
+    # - éviter le banding : conserver du 10-bit quand l'entrée est 10-bit
+    # - éviter une qualité catastrophique : downscale au-delà de 1080p pour un bitrate cible prévu 1080p
+    local input_props
+    input_props=$(get_video_stream_props "$tmp_input")
+    local input_width input_height input_pix_fmt
+    IFS='|' read -r input_width input_height input_pix_fmt <<< "$input_props"
+
+    local output_pix_fmt
+    output_pix_fmt=$(_select_output_pix_fmt "$input_pix_fmt")
+
+    local downscale_filter
+    downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
+
+    # Note: on passe "-vf ..." sous forme de chaîne pour rester compatible avec la construction
+    # existante des commandes ffmpeg (style du script).
+    local video_filter_opts=""
+    if [[ -n "$downscale_filter" ]]; then
+        video_filter_opts="-vf $downscale_filter"
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+        fi
+    fi
+    if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]]; then
+        if [[ "$output_pix_fmt" == "yuv420p10le" ]]; then
+            echo -e "${CYAN}  🎨 Sortie 10-bit activée (source: $input_pix_fmt)${NOCOLOR}"
+        fi
+    fi
 
     # Mode sample : trouver le keyframe exact pour garantir la synchronisation avec VMAF
     local sample_seek_params=""
@@ -465,7 +564,7 @@ _execute_conversion() {
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p \
+        -i "$tmp_input" $sample_duration_params $video_filter_opts -pix_fmt "$output_pix_fmt" \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
@@ -498,7 +597,7 @@ _execute_conversion() {
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
         -hwaccel $HWACCEL \
-        -i "$tmp_input" $sample_duration_params -pix_fmt yuv420p \
+        -i "$tmp_input" $sample_duration_params $video_filter_opts -pix_fmt "$output_pix_fmt" \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
         -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \

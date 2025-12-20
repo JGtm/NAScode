@@ -53,6 +53,26 @@ compute_vmaf_score() {
     local original_input_opts=""
     local hwaccel_opts=""
     local sample_duration="${SAMPLE_DURATION:-30}"
+
+    # VMAF requiert des résolutions identiques.
+    # Or, la conversion peut downscaler automatiquement (>1080p). Dans ce cas,
+    # on scale l'original à la résolution EXACTE du fichier converti.
+    local conv_dims
+    conv_dims=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height \
+        -of csv=p=0:s=x "$converted" 2>/dev/null | head -1)
+    local conv_w="" conv_h=""
+    if [[ -n "$conv_dims" ]] && [[ "$conv_dims" =~ ^([0-9]+)x([0-9]+)$ ]]; then
+        conv_w="${BASH_REMATCH[1]}"
+        conv_h="${BASH_REMATCH[2]}"
+    fi
+
+    # Chaîne scale appliquée à l'original si on a une résolution cible valide.
+    # Le format=yuv420p force une base commune (utile quand la sortie est 10-bit).
+    local ref_chain="format=yuv420p"
+    local dist_chain="format=yuv420p"
+    if [[ -n "$conv_w" && -n "$conv_h" ]]; then
+        ref_chain="scale=w=${conv_w}:h=${conv_h}:flags=lanczos,format=yuv420p"
+    fi
     
     # Utiliser hwaccel si disponible pour accélérer le décodage
     if [[ -n "${HWACCEL:-}" ]] && [[ "$HWACCEL" != "none" ]]; then
@@ -65,10 +85,12 @@ compute_vmaf_score() {
         # -t pour limiter la durée (identique à la conversion)
         original_input_opts="-ss ${keyframe_pos} -t ${sample_duration}"
         # setpts remet les timestamps à 0 pour synchroniser les deux flux
-        lavfi_filter="[0:v]setpts=PTS-STARTPTS[dist];[1:v]setpts=PTS-STARTPTS[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
+        # On ajoute aussi un format commun et un scale éventuel pour garantir la compatibilité VMAF.
+        lavfi_filter="[0:v]setpts=PTS-STARTPTS,${dist_chain}[dist];[1:v]setpts=PTS-STARTPTS,${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
     else
         # Mode normal : comparaison directe
-        lavfi_filter="[0:v][1:v]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
+        # On force un format commun et on scale l'original si besoin (downscale côté conversion).
+        lavfi_filter="[0:v]${dist_chain}[dist];[1:v]${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
     fi
         # Obtenir la durée totale de la vidéo en microsecondes pour la progression
     local duration_us=0

@@ -135,6 +135,13 @@ readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans /tmp
 # Fichiers avec bitrate inférieur à ce seuil ne seront pas reconvertis
 readonly BITRATE_CONVERSION_THRESHOLD_KBPS=2520
 
+# ----- Limitation de résolution (downscale automatique) -----
+# Objectif : éviter de compresser du 1440p/2160p avec un bitrate prévu pour du 1080p.
+# Règle : si la source dépasse 1080p, on redimensionne pour tenir dans 1920x1080
+# en conservant le ratio d'aspect.
+readonly DOWNSCALE_MAX_WIDTH=1920
+readonly DOWNSCALE_MAX_HEIGHT=1080
+
 # TOLÉRANCE DU BITRATE A SKIP (%)
 readonly SKIP_TOLERANCE_PERCENT=10
 
