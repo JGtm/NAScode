@@ -6,7 +6,9 @@
 
 export_variables() {
     # --- Fonctions de conversion ---
-    export -f convert_file get_video_metadata should_skip_conversion clean_number custom_pv
+    export -f convert_file get_video_metadata get_video_stream_props
+    export -f _select_output_pix_fmt _build_downscale_filter_if_needed
+    export -f should_skip_conversion clean_number custom_pv
     
     # --- Fonctions de préparation fichiers ---
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
@@ -47,7 +49,9 @@ export_variables() {
     export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
     export ENCODER_PRESET TARGET_BITRATE_KBPS TARGET_BITRATE_FFMPEG HWACCEL
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
+    export X265_EXTRA_PARAMS X265_PASS1_FAST
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
+    export DOWNSCALE_MAX_WIDTH DOWNSCALE_MAX_HEIGHT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
     
     # --- Variables de chemins ---
@@ -67,6 +71,8 @@ export_variables() {
     export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG LOCKFILE
     export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE
     export EXECUTION_TIMESTAMP EXCLUDES_REGEX VMAF_ENABLED
+    export FORCE_NO_SUFFIX
+    export SAMPLE_MODE SAMPLE_DURATION SAMPLE_MARGIN_START SAMPLE_MARGIN_END SAMPLE_KEYFRAME_POS
     export LOG_DRYRUN_COMPARISON IS_MSYS
     
     # --- Variables de couleurs et affichage ---
