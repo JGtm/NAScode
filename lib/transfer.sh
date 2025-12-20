@@ -153,7 +153,7 @@ wait_all_transfers() {
 
 # Lancer un transfert en arrière-plan
 # Usage: start_async_transfer <tmp_output> <final_output> <file_original> <callback_data>
-# callback_data: données pour le logging (checksum_before|sizeBeforeMB|sizeBeforeBytes|tmp_input|ffmpeg_log_temp)
+# callback_data: données pour le logging (checksum_before|size_before_mb|size_before_bytes|tmp_input|ffmpeg_log_temp)
 start_async_transfer() {
     local tmp_output="$1"
     local final_output="$2"
@@ -163,14 +163,14 @@ start_async_transfer() {
     # Lancer le transfert dans un sous-shell en arrière-plan
     (
         # Extraire les données du callback
-        IFS='|' read -r checksum_before sizeBeforeMB sizeBeforeBytes tmp_input ffmpeg_log_temp <<< "$callback_data"
+        IFS='|' read -r checksum_before size_before_mb size_before_bytes tmp_input ffmpeg_log_temp <<< "$callback_data"
         
         # Effectuer le déplacement/copie
         local final_actual
         final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
         
         # Effectuer le logging et la vérification d'intégrité
-        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB" "$sizeBeforeBytes"
+        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes"
     ) &
     
     local transfer_pid=$!

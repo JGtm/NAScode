@@ -112,9 +112,9 @@ compute_vmaf_score() {
                         for ((i=0; i<empty; i++)); do bar+="░"; done
                         bar+="╟"
                         # Tronquer le titre à 30 caractères max
-                        local short_name="$filename_display"
-                        if [[ ${#short_name} -gt 30 ]]; then
-                            short_name="${short_name:0:27}..."
+                        local display_name="$filename_display"
+                        if [[ ${#display_name} -gt 30 ]]; then
+                            display_name="${display_name:0:27}..."
                         fi
                         # Construire le préfixe avec compteur si disponible
                         local counter_prefix=""
@@ -123,7 +123,7 @@ compute_vmaf_score() {
                         fi
                         # Écrire sur stderr (fd 2) pour éviter capture par $()
                         # Compteur et nom de fichier en CYAN, espace initial pour aligner avec l'icône de statut
-                        printf "\r    \033[0;36m%s%-30s\033[0m %s %3d%%" "$counter_prefix" "$short_name" "$bar" "$percent" >&2
+                        printf "\r    \033[0;36m%s%-30s\033[0m %s %3d%%" "$counter_prefix" "$display_name" "$bar" "$percent" >&2
                     fi
                 fi
             fi
@@ -226,15 +226,15 @@ process_vmaf_queue() {
         local filename
         filename=$(basename "$final_actual")
         # Tronquer le nom pour l'affichage
-        local short_fn="$filename"
-        if [[ ${#short_fn} -gt 30 ]]; then
-            short_fn="${short_fn:0:27}..."
+        local display_name="$filename"
+        if [[ ${#display_name} -gt 30 ]]; then
+            display_name="${display_name:0:27}..."
         fi
         
         # Vérifier que les fichiers existent toujours
         if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
             if [[ "$NO_PROGRESS" != true ]]; then
-                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier introuvable)\n" "$current" "$vmaf_count" "$short_fn" >&2
+                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier introuvable)\n" "$current" "$vmaf_count" "$display_name" >&2
             fi
             continue
         fi
@@ -244,7 +244,7 @@ process_vmaf_queue() {
         converted_size=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo "0")
         if [[ "$converted_size" -eq 0 ]]; then
             if [[ "$NO_PROGRESS" != true ]]; then
-                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier vide)\n" "$current" "$vmaf_count" "$short_fn" >&2
+                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-30s${NOCOLOR} : NA (fichier vide)\n" "$current" "$vmaf_count" "$display_name" >&2
             fi
             continue
         fi
@@ -282,12 +282,12 @@ process_vmaf_queue() {
                 status_icon="${RED}✗${NOCOLOR}"
             fi
             # Tronquer le nom de fichier à 30 caractères pour aligner
-            local short_fn="$filename"
-            if [[ ${#short_fn} -gt 30 ]]; then
-                short_fn="${short_fn:0:27}..."
+            local display_name_final="$filename"
+            if [[ ${#display_name_final} -gt 30 ]]; then
+                display_name_final="${display_name_final:0:27}..."
             fi
             # Compteur et nom de fichier en CYAN
-            printf "\r  %s ${CYAN}[%d/%d] %-30s${NOCOLOR} : %s (%s)%20s\n" "$status_icon" "$current" "$vmaf_count" "$short_fn" "$vmaf_score" "${vmaf_quality:-NA}" "" >&2
+            printf "\r  %s ${CYAN}[%d/%d] %-30s${NOCOLOR} : %s (%s)%20s\n" "$status_icon" "$current" "$vmaf_count" "$display_name_final" "$vmaf_score" "${vmaf_quality:-NA}" "" >&2
         fi
         
     done < "$VMAF_QUEUE_FILE"

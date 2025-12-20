@@ -154,3 +154,60 @@ teardown() {
     [ -n "$MIN_TMP_FREE_MB" ]
     [ "$MIN_TMP_FREE_MB" -gt 0 ]
 }
+
+###########################################################
+# Tests des paramètres X265 avancés
+###########################################################
+
+@test "set_conversion_mode_parameters: mode série configure X265_EXTRA_PARAMS" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    # Vérifier que les paramètres série sont présents
+    [[ "$X265_EXTRA_PARAMS" =~ "sao=0" ]]
+    [[ "$X265_EXTRA_PARAMS" =~ "strong-intra-smoothing=0" ]]
+    [[ "$X265_EXTRA_PARAMS" =~ "limit-refs=3" ]]
+    [[ "$X265_EXTRA_PARAMS" =~ "subme=2" ]]
+}
+
+@test "set_conversion_mode_parameters: mode série active X265_PASS1_FAST" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    [ "$X265_PASS1_FAST" = "true" ]
+}
+
+@test "set_conversion_mode_parameters: mode série inclut amp=0 et rect=0" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    [[ "$X265_EXTRA_PARAMS" =~ "amp=0" ]]
+    [[ "$X265_EXTRA_PARAMS" =~ "rect=0" ]]
+}
+
+@test "set_conversion_mode_parameters: mode film n'active pas X265_PASS1_FAST" {
+    CONVERSION_MODE="film"
+    set_conversion_mode_parameters
+    
+    [ "$X265_PASS1_FAST" = "false" ]
+}
+
+@test "set_conversion_mode_parameters: mode film configure X265_EXTRA_PARAMS différemment" {
+    CONVERSION_MODE="film"
+    set_conversion_mode_parameters
+    
+    # Mode film utilise amp et rect (pas désactivés)
+    [[ ! "$X265_EXTRA_PARAMS" =~ "amp=0" ]] || [[ -z "$X265_EXTRA_PARAMS" ]]
+}
+
+###########################################################
+# Tests des constantes VBV
+###########################################################
+
+@test "config: X265_VBV_PARAMS est cohérent avec MAXRATE et BUFSIZE" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    [[ "$X265_VBV_PARAMS" =~ "vbv-maxrate=${MAXRATE_KBPS}" ]]
+    [[ "$X265_VBV_PARAMS" =~ "vbv-bufsize=${BUFSIZE_KBPS}" ]]
+}

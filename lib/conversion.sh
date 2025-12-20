@@ -294,15 +294,15 @@ _copy_to_temp_storage() {
     local ffmpeg_log_temp="$4"
     
     # Tronquer le nom de fichier à 30 caractères pour uniformité
-    local short_name="$filename"
-    if [[ ${#short_name} -gt 30 ]]; then
-        short_name="${short_name:0:27}..."
+    local display_name="$filename"
+    if [[ ${#display_name} -gt 30 ]]; then
+        display_name="${display_name:0:27}..."
     fi
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}→ Téléchargement de $short_name${NOCOLOR}"
+        echo -e "${CYAN}→ Téléchargement de $display_name${NOCOLOR}"
     else
-        echo -e "${CYAN}→ $short_name${NOCOLOR}"
+        echo -e "${CYAN}→ $display_name${NOCOLOR}"
     fi
 
     if ! custom_pv "$file_original" "$tmp_input" "$CYAN"; then
@@ -584,12 +584,12 @@ convert_file() {
     fi
     IFS='|' read -r bitrate codec duration_secs <<< "$metadata_info"
     
-    local sizeBeforeMB=$(du -m "$file_original" | awk '{print $1}')
+    local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
     
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
     
     if _execute_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name"; then
-        _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$sizeBeforeMB"
+        _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$size_before_mb"
     else
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
     fi

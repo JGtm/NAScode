@@ -64,30 +64,30 @@ _finalize_try_move() {
 ###########################################################
 
 # Nettoyage local des artefacts temporaires et calculs de taille/checksum.
-# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <sizeBeforeMB> <sizeBeforeBytes>
+# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <size_before_mb> <size_before_bytes>
 _finalize_log_and_verify() {
     local file_original="$1"
     local final_actual="$2"
     local tmp_input="$3"
     local ffmpeg_log_temp="$4"
     local checksum_before="$5"
-    local sizeBeforeMB="$6"
-    local sizeBeforeBytes="${7:-0}"
+    local size_before_mb="$6"
+    local size_before_bytes="${7:-0}"
 
     # Nettoyer les artefacts temporaires liés à l'entrée et au log ffmpeg
     rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
 
     # Taille après (en MB et en octets)
-    local sizeAfterMB=0 sizeAfterBytes=0
+    local size_after_mb=0 size_after_bytes=0
     if [[ -e "$final_actual" ]]; then
-        sizeAfterMB=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || sizeAfterMB=0
+        size_after_mb=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || size_after_mb=0
         # Taille exacte en octets (stat -c%s sur Linux, stat -f%z sur macOS)
-        sizeAfterBytes=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo 0)
+        size_after_bytes=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo 0)
     fi
 
-    local size_comparison="${sizeBeforeMB}MB → ${sizeAfterMB}MB"
+    local size_comparison="${size_before_mb}MB → ${size_after_mb}MB"
 
-    if [[ "$sizeAfterMB" -ge "$sizeBeforeMB" ]]; then
+    if [[ "$size_after_mb" -ge "$size_before_mb" ]]; then
         if [[ -n "$LOG_SKIPPED" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: FICHIER PLUS LOURD ($size_comparison). | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
         fi
@@ -105,7 +105,7 @@ _finalize_log_and_verify() {
     # Nettoyer le checksum_before (supprimer espaces/newlines parasites)
     checksum_before="${checksum_before//[$'\n\r\t ']/}"
     
-    if [[ "$sizeBeforeBytes" -gt 0 && "$sizeAfterBytes" -gt 0 && "$sizeBeforeBytes" -ne "$sizeAfterBytes" ]]; then
+    if [[ "$size_before_bytes" -gt 0 && "$size_after_bytes" -gt 0 && "$size_before_bytes" -ne "$size_after_bytes" ]]; then
         # Taille différente = transfert incomplet ou corrompu
         verify_status="SIZE_MISMATCH"
     elif [[ -n "$checksum_before" ]]; then
@@ -124,7 +124,7 @@ _finalize_log_and_verify() {
 
     # Écrire uniquement dans les logs : VERIFY
     if [[ -n "$LOG_SUCCESS" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
 
     # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)
@@ -133,7 +133,7 @@ _finalize_log_and_verify() {
     # En cas de problème, journaliser dans le log d'erreur
     if [[ "$verify_status" == "MISMATCH" || "$verify_status" == "SIZE_MISMATCH" ]]; then
         if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${sizeBeforeBytes}B->${sizeAfterBytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
         fi
     fi
 }
@@ -151,7 +151,7 @@ _finalize_conversion_success() {
     local tmp_output="$4"
     local final_output="$5"
     local ffmpeg_log_temp="$6"
-    local sizeBeforeMB="$7"
+    local size_before_mb="$7"
 
     # Si un marqueur d'arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
     if [[ -f "$STOP_FLAG" ]]; then
@@ -176,9 +176,9 @@ _finalize_conversion_success() {
     fi
 
     # checksum et taille exacte avant déplacement (pour vérification intégrité)
-    local checksum_before sizeBeforeBytes
+    local checksum_before size_before_bytes
     checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
-    sizeBeforeBytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
+    size_before_bytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
 
     # Vérifier si le système de transfert asynchrone est initialisé
     if [[ -n "${TRANSFER_PIDS_FILE:-}" ]] && declare -f start_async_transfer &>/dev/null; then
@@ -186,8 +186,8 @@ _finalize_conversion_success() {
         wait_for_transfer_slot
         
         # Préparer les données de callback pour le transfert asynchrone
-        # Format: checksum_before|sizeBeforeMB|sizeBeforeBytes|tmp_input|ffmpeg_log_temp
-        local callback_data="${checksum_before}|${sizeBeforeMB}|${sizeBeforeBytes}|${tmp_input}|${ffmpeg_log_temp}"
+        # Format: checksum_before|size_before_mb|size_before_bytes|tmp_input|ffmpeg_log_temp
+        local callback_data="${checksum_before}|${size_before_mb}|${size_before_bytes}|${tmp_input}|${ffmpeg_log_temp}"
         
         # Lancer le transfert en arrière-plan
         start_async_transfer "$tmp_output" "$final_output" "$file_original" "$callback_data"
