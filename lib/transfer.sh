@@ -115,13 +115,35 @@ wait_for_transfer_slot() {
 # Attendre que TOUS les transferts en cours soient terminés
 # Appelé avant le résumé final et l'analyse VMAF
 wait_all_transfers() {
+    # Vérifier s'il y a eu des transferts (fichier de PIDs existe et contenait au moins un PID)
+    local had_transfers=false
+    if [[ -n "$TRANSFER_PIDS_FILE" ]] && [[ -f "$TRANSFER_PIDS_FILE" ]]; then
+        # Vérifier si le fichier a contenu des PIDs (taille > 0 initialement)
+        # On vérifie le nombre total de lignes (même vides après cleanup)
+        local total_lines
+        total_lines=$(wc -l < "$TRANSFER_PIDS_FILE" 2>/dev/null | tr -d '[:space:]') || total_lines=0
+        if [[ "$total_lines" -gt 0 ]]; then
+            had_transfers=true
+        fi
+    fi
+    
     local active_count
     active_count=$(_count_active_transfers)
     
-    if [[ "$active_count" -eq 0 ]]; then
+    # Si aucun transfert actif ET aucun transfert lancé, sortir silencieusement
+    if [[ "$active_count" -eq 0 ]] && [[ "$had_transfers" == false ]]; then
         return 0
     fi
     
+    # Si des transferts ont été lancés mais sont déjà terminés
+    if [[ "$active_count" -eq 0 ]] && [[ "$had_transfers" == true ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${GREEN}✅ Tous les transferts sont terminés${NOCOLOR}"
+        fi
+        return 0
+    fi
+    
+    # Des transferts sont encore en cours
     if [[ "$NO_PROGRESS" != true ]]; then
         echo ""
         echo -e "${MAGENTA}⏳ Attente de la fin des transferts en cours ($active_count restants)...${NOCOLOR}"
