@@ -291,6 +291,16 @@ show_summary() {
         vmaf_anomalies=$(grep -c ' | VMAF | .* | quality:DEGRADE' "$LOG_SUCCESS" 2>/dev/null | tr -d '\r\n') || vmaf_anomalies=0
     fi
     
+    # Afficher message si aucun fichier traité (tous skippés ou queue vide)
+    local total_processed=$((succ + err))
+    if [[ "$total_processed" -eq 0 ]] && [[ "$skip" -gt 0 ]]; then
+        echo ""
+        echo -e "${YELLOW}ℹ️  Tous les fichiers ont été ignorés (déjà convertis ou déjà optimisés).${NOCOLOR}"
+    elif [[ "$total_processed" -eq 0 ]] && [[ "$skip" -eq 0 ]]; then
+        echo ""
+        echo -e "${YELLOW}ℹ️  Aucun fichier à traiter.${NOCOLOR}"
+    fi
+    
     {
         echo ""
         echo "-------------------------------------------"
