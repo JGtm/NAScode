@@ -132,6 +132,16 @@ _reset_cli_state() {
     [ "$SAMPLE_MODE" = "true" ]
 }
 
+@test "parse_arguments: dry-run désactive VMAF et sample" {
+    _reset_cli_state
+
+    parse_arguments -d -v -t
+
+    [ "$DRYRUN" = "true" ]
+    [ "$VMAF_ENABLED" = "false" ]
+    [ "$SAMPLE_MODE" = "false" ]
+}
+
 @test "parse_arguments: -j/--jobs configure PARALLEL_JOBS" {
     _reset_cli_state
 
