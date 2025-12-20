@@ -162,10 +162,11 @@ _finalize_conversion_success() {
     if [[ "$NO_PROGRESS" != true ]]; then
         # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
         local elapsed_str="N/A"
-        if [[ -n "${START_TS:-}" ]] && [[ "${START_TS}" =~ ^[0-9]+$ ]]; then
+        local start_for_file="${FILE_START_TS:-${START_TS:-}}"
+        if [[ -n "${start_for_file:-}" ]] && [[ "${start_for_file}" =~ ^[0-9]+$ ]]; then
             local end_ts
             end_ts=$(date +%s)
-            local elapsed=$((end_ts - START_TS))
+            local elapsed=$((end_ts - start_for_file))
             local eh=$((elapsed / 3600))
             local em=$(((elapsed % 3600) / 60))
             local es=$((elapsed % 60))
@@ -295,17 +296,17 @@ show_summary() {
         echo "-------------------------------------------"
         echo "           RÉSUMÉ DE CONVERSION            "
         echo "-------------------------------------------"
-        echo "Date fin  : $(date +"%Y-%m-%d %H:%M:%S")"
-        echo "Durée tot : ${total_elapsed_str}"
-        echo "Succès    : $succ"
-        echo "Ignorés   : $skip"
-        echo "Erreurs   : $err"
+        echo "Date fin     : $(date +"%Y-%m-%d %H:%M:%S")"
+        echo "Durée totale : ${total_elapsed_str}"
+        echo "Succès       : $succ"
+        echo "Ignorés      : $skip"
+        echo "Erreurs      : $err"
         echo "-------------------------------------------"
         echo "           ANOMALIES DÉTECTÉES             "
         echo "-------------------------------------------"
-        echo "Taille    : $size_anomalies"
-        echo "Intégrité : $checksum_anomalies"
-        echo "VMAF      : $vmaf_anomalies"
+        echo "Taille       : $size_anomalies"
+        echo "Intégrité    : $checksum_anomalies"
+        echo "VMAF         : $vmaf_anomalies"
         echo "-------------------------------------------"
     } | tee "$SUMMARY_FILE"
 }

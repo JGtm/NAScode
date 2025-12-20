@@ -72,8 +72,11 @@ _execute_conversion() {
     #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
     #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits (si source 10-bit)
 
-    # timestamp de départ portable (conversion du fichier courant)
-    START_TS="$(date +%s)"
+    # Chronos :
+    # - FILE_START_TS : début du traitement de CE fichier (pass 1 + pass 2 combinées)
+    # - START_TS      : début de la passe courante (affichage durée pass 1 / pass 2 via awk)
+    FILE_START_TS="$(date +%s)"
+    START_TS="$FILE_START_TS"
 
     # Two-pass encoding : analyse puis encodage
     # Pass 1 : analyse rapide pour générer les statistiques
@@ -227,6 +230,8 @@ _execute_conversion() {
         x265_params_pass1="${x265_params_pass1}:no-slow-firstpass=1"
     fi
 
+    # Pass 1 (chrono dédié)
+    START_TS="$(date +%s)"
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $sample_seek_params \
         -hwaccel $HWACCEL \
@@ -257,6 +262,7 @@ _execute_conversion() {
     fi
 
     # ==================== PASS 2 : ENCODAGE ====================
+    # Pass 2 (chrono dédié)
     START_TS="$(date +%s)"
     local x265_params_pass2="pass=2:${x265_base_params}"
 

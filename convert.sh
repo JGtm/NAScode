@@ -75,6 +75,12 @@ source "$LIB_DIR/exports.sh"     # Exports (dépend de tout)
 main() {
     # Configurer les traps pour le nettoyage
     setup_traps
+
+    # Chrono global (temps total d'exécution du script)
+    # Défini une seule fois, et utilisé dans le résumé final.
+    if [[ -z "${START_TS_TOTAL:-}" ]]; then
+        START_TS_TOTAL="$(date +%s)"
+    fi
     
     # Parser les arguments de la ligne de commande
     parse_arguments "$@"
@@ -108,9 +114,6 @@ main() {
     
     # Exporter les variables et fonctions pour les sous-shells
     export_variables
-
-    # Marquer le début effectif du traitement (conversions)
-    START_TS_TOTAL="$(date +%s)"
 
     # Préparer la queue dynamique, lancer le traitement et attendre la fin
     prepare_dynamic_queue
