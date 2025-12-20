@@ -18,6 +18,8 @@
 #   lib/args.sh       - Parsing des arguments CLI
 #   lib/queue.sh      - Construction et gestion de la file d'attente
 #   lib/progress.sh   - Système de slots pour progression parallèle
+#   lib/media_probe.sh - Propriétés média (ffprobe)
+#   lib/transcode_video.sh - Transcodage vidéo (x265, 10-bit/downscale)
 #   lib/conversion.sh - Logique de conversion FFmpeg
 #   lib/processing.sh - Traitement parallèle et FIFO
 #   lib/vmaf.sh       - Analyse VMAF (qualité vidéo)
@@ -58,6 +60,8 @@ source "$LIB_DIR/system.sh"      # Système (dépend de colors, config, utils)
 source "$LIB_DIR/args.sh"        # Arguments (dépend de colors, config)
 source "$LIB_DIR/queue.sh"       # Queue (dépend de colors, config, utils, logging)
 source "$LIB_DIR/vmaf.sh"        # VMAF (dépend de colors, config, utils, logging)
+source "$LIB_DIR/media_probe.sh" # Propriétés média (dépend de utils)
+source "$LIB_DIR/transcode_video.sh" # Transcodage vidéo (dépend de media_probe, config)
 source "$LIB_DIR/conversion.sh"  # Conversion (dépend de tout sauf finalize)
 source "$LIB_DIR/processing.sh"  # Traitement (dépend de conversion, queue)
 source "$LIB_DIR/finalize.sh"    # Finalisation (dépend de colors, config, utils, vmaf)

@@ -198,7 +198,7 @@ _finalize_conversion_success() {
         final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
 
         # Nettoyage, logs et vérifications
-        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$sizeBeforeMB" "$sizeBeforeBytes"
+        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes"
     fi
 }
 

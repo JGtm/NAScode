@@ -21,6 +21,13 @@ echo -e "${CYAN}═════════════════════�
 
 # Vérifier si bats est installé
 if ! command -v bats &> /dev/null; then
+    # Sur Git Bash / MSYS2, bats peut être installé dans un préfixe utilisateur
+    if [[ -x "${HOME:-}/.local/bin/bats" ]]; then
+        export PATH="${HOME}/.local/bin:${PATH}"
+    fi
+fi
+
+if ! command -v bats &> /dev/null; then
     echo -e "${YELLOW}⚠️  Bats n'est pas installé.${NC}"
     echo ""
     echo "Installation :"

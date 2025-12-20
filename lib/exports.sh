@@ -6,7 +6,9 @@
 
 export_variables() {
     # --- Fonctions de conversion ---
-    export -f convert_file get_video_metadata should_skip_conversion clean_number custom_pv
+    export -f convert_file get_video_metadata get_video_stream_props
+    export -f _select_output_pix_fmt _build_downscale_filter_if_needed
+    export -f should_skip_conversion clean_number custom_pv
     
     # --- Fonctions de préparation fichiers ---
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
