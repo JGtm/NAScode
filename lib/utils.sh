@@ -109,10 +109,20 @@ clean_number() {
 # Fonction get_time() doit être injectée selon HAS_GAWK
 # Usage: awk -v DURATION=... -v ... "$AWK_TIME_FUNC $AWK_FFMPEG_PROGRESS_SCRIPT"
 readonly AWK_FFMPEG_PROGRESS_SCRIPT='
+function format_time(ts,   cmd,result,h,m,s) {
+    # Formater un timestamp Unix en HH:MM:SS
+    h = int((ts % 86400) / 3600);
+    m = int((ts % 3600) / 60);
+    s = int(ts % 60);
+    # Ajuster pour le fuseau horaire local (approximation +1h pour CET)
+    h = (h + 1) % 24;
+    return sprintf("%02d:%02d:%02d", h, m, s);
+}
 BEGIN {
     duration = DURATION + 0;
     if (duration < 1) exit;
     start = START + 0;
+    start_time_str = format_time(start);
     last_update = 0;
     refresh_interval = 2;
     speed = 1;
@@ -166,13 +176,20 @@ BEGIN {
 /progress=end/ {
     if (NOPROG != "true") {
         bar_complete = "╢████████████████████╟";
+        end_now = get_time();
+        end_time_str = format_time(end_now);
+        elapsed_total = end_now - start;
+        elapsed_h = int(elapsed_total / 3600);
+        elapsed_m = int((elapsed_total % 3600) / 60);
+        elapsed_s = int(elapsed_total % 60);
+        elapsed_str = sprintf("%02d:%02d:%02d", elapsed_h, elapsed_m, elapsed_s);
         if (is_parallel && slot > 0) {
             lines_up = max_slots - slot + 2;
-            printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s\033[%dB\r",
-                   lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, END_MSG, lines_up > "/dev/stderr";
+            printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s [%s→%s %s]\033[%dB\r",
+                   lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, END_MSG, start_time_str, end_time_str, elapsed_str, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-30.30s %s 100.0%% | %s\n",
-                   EMOJI, CURRENT_FILE_NAME, bar_complete, END_MSG > "/dev/stderr";
+            printf "\r\033[K  %s %-30.30s %s 100.0%% | %s [%s→%s %s]\n",
+                   EMOJI, CURRENT_FILE_NAME, bar_complete, END_MSG, start_time_str, end_time_str, elapsed_str > "/dev/stderr";
         }
         fflush("/dev/stderr");
     }
