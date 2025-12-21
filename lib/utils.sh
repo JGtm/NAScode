@@ -162,11 +162,11 @@ BEGIN {
     if (NOPROG != "true" && (now - last_update >= refresh_interval || percent >= 99)) {
         if (is_parallel && slot > 0) {
             lines_up = max_slots - slot + 2;
-            printf "\033[%dA\r\033[K  %s [%d] %-30.30s %s %5.1f%% | ETA: %s | x%.2f\033[%dB\r",
-                   lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar, percent, eta_str, speed, lines_up > "/dev/stderr";
+            printf "\033[%dA\r\033[K  %s [%d] %-30.30s %s %5.1f%% | %s | ETA: %s | x%.2f\033[%dB\r",
+                   lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-30.30s %s %5.1f%% | ETA: %s | x%.2f",
-                   EMOJI, CURRENT_FILE_NAME, bar, percent, eta_str, speed > "/dev/stderr";
+            printf "\r\033[K  %s %-30.30s %s %5.1f%% | %s | ETA: %s | x%.2f",
+                   EMOJI, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed > "/dev/stderr";
         }
         fflush("/dev/stderr");
         last_update = now;
