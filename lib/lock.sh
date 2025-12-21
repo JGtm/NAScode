@@ -45,11 +45,21 @@ cleanup() {
         echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
     fi
     touch "$STOP_FLAG"
-    # Attendre brièvement que les processus en arrière-plan détectent le STOP_FLAG
-    sleep 0.3
+    
+    # Supprimer les messages résiduels des sous-processus en redirigeant stderr
+    # vers /dev/null pendant le cleanup
+    exec 2>/dev/null
+    
+    # Envoyer SIGTERM aux jobs en arrière-plan
     kill $(jobs -p) 2>/dev/null || true
-    # Attendre que les jobs se terminent pour éviter les messages après le prompt
+    
+    # Attendre que tous les processus enfants se terminent proprement
+    # Cela évite que leurs messages s'affichent après le retour au prompt
     wait 2>/dev/null || true
+    
+    # Petit délai pour laisser les processus finir d'écrire
+    sleep 0.2
+    
     rm -f "$LOCKFILE"
     # Nettoyage des artefacts de queue dynamique
     if [[ -n "${WORKFIFO:-}" ]]; then
