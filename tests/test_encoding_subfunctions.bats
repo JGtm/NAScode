@@ -11,6 +11,9 @@ setup() {
     load_base_modules
     source "$LIB_DIR/transcode_video.sh"
     
+    # Initialiser le mode conversion (définit TARGET_BITRATE_KBPS, etc.)
+    set_conversion_mode_parameters "series"
+    
     # Les variables readonly sont déjà définies par config.sh
     # On utilise leurs valeurs par défaut
     NO_PROGRESS=true

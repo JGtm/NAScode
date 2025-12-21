@@ -15,6 +15,8 @@ setup() {
         source "$LIB_DIR/config.sh"
         source "$LIB_DIR/utils.sh"
         source "$LIB_DIR/transcode_video.sh"
+        # Initialiser le mode conversion (définit TARGET_BITRATE_KBPS, etc.)
+        set_conversion_mode_parameters "series"
         _OPUS_TEST_LOADED=1
     fi
     
@@ -98,11 +100,8 @@ teardown() {
 
 @test "_build_effective_suffix_for_dims: inclut _opus si activé" {
     OPUS_ENABLED=true
-    TARGET_BITRATE_KBPS=2070
-    ENCODER_PRESET="medium"
-    X265_EXTRA_PARAMS=""
+    # ADAPTIVE_BITRATE_BY_RESOLUTION est readonly=true, utiliser la valeur par défaut
     SAMPLE_MODE=false
-    ADAPTIVE_BITRATE_BY_RESOLUTION=false
     
     local result
     result=$(_build_effective_suffix_for_dims 1920 1080)
@@ -112,11 +111,8 @@ teardown() {
 
 @test "_build_effective_suffix_for_dims: n'inclut pas _opus si désactivé" {
     OPUS_ENABLED=false
-    TARGET_BITRATE_KBPS=2070
-    ENCODER_PRESET="medium"
-    X265_EXTRA_PARAMS=""
+    # ADAPTIVE_BITRATE_BY_RESOLUTION est readonly=true, utiliser la valeur par défaut
     SAMPLE_MODE=false
-    ADAPTIVE_BITRATE_BY_RESOLUTION=false
     
     local result
     result=$(_build_effective_suffix_for_dims 1920 1080)
