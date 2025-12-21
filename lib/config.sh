@@ -1,7 +1,6 @@
 #!/bin/bash
 ###########################################################
 # CONFIGURATION GLOBALE
-# Paramètres par défaut et constantes du script
 ###########################################################
 
 # ----- Horodatage et chemins de base -----
@@ -162,6 +161,21 @@ BUFSIZE_FFMPEG=""
 X265_VBV_PARAMS=""
 HWACCEL=""
 
+# ----- Adaptation du bitrate par résolution (par fichier) -----
+# Objectif : garder une taille prévisible en two-pass en ajustant le budget quand la
+# sortie est nettement plus petite qu'un 1080p (ex: 720p).
+#
+# Remarque : ces valeurs s'appliquent uniquement à l'encodage (FFmpeg/x265) et ne
+# changent pas le mode global (film/serie) affiché dans le résumé.
+readonly ADAPTIVE_BITRATE_BY_RESOLUTION=true
+
+# Profil 720p (déclenché si la hauteur de sortie estimée <= 720)
+readonly ADAPTIVE_720P_MAX_HEIGHT=720
+
+# Facteur appliqué aux bitrates base (TARGET/MAXRATE/BUFSIZE) quand profil 720p.
+# Exemple : 70 => 2070k (1080p) devient ~1449k (720p)
+readonly ADAPTIVE_720P_SCALE_PERCENT=70
+
 ###########################################################
 # GESTION DES MODES DE CONVERSION
 ###########################################################
@@ -225,10 +239,14 @@ set_conversion_mode_parameters() {
 # GÉNÉRATION DU SUFFIXE DYNAMIQUE
 ###########################################################
 
-# Construit un suffixe de fichier reflétant les paramètres de conversion
-# Format: _x265_<bitrate>k_<preset>[_tuned][_opus128k][_sample]
-# Exemples: _x265_2070k_medium_tuned_opus128k_sample
-#           _x265_2250k_slow
+# Construit un suffixe de fichier reflétant les paramètres de conversion.
+# IMPORTANT : le suffixe final est désormais calculé par fichier (bitrate effectif + résolution)
+# dans lib/transcode_video.sh. SUFFIX_STRING sert ici surtout de "preview" et d'interrupteur
+# (vide = suffixe désactivé).
+#
+# Format effectif: _x265_<bitrate>k_<height>p_<preset>[_tuned][_sample]
+# Exemples: _x265_1449k_720p_medium_tuned
+#           _x265_2070k_1080p_medium_tuned
 build_dynamic_suffix() {
     # Ne pas écraser si l'utilisateur a forcé --no-suffix
     if [[ "$FORCE_NO_SUFFIX" == true ]]; then
@@ -240,6 +258,9 @@ build_dynamic_suffix() {
     
     # Bitrate cible
     suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+
+    # Résolution (preview) : la valeur réelle est déterminée par fichier.
+    suffix="${suffix}_1080p"
     
     # Preset d'encodage
     suffix="${suffix}_${ENCODER_PRESET}"

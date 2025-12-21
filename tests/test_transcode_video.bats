@@ -54,3 +54,46 @@ teardown() {
     result=$(_build_downscale_filter_if_needed "abc" "1080")
     [ -z "$result" ]
 }
+
+@test "_compute_output_height_for_bitrate: inchangé sans downscale" {
+    result=$(_compute_output_height_for_bitrate 1280 720)
+    [ "$result" -eq 720 ]
+}
+
+@test "_compute_output_height_for_bitrate: 4K downscale vers 1080" {
+    result=$(_compute_output_height_for_bitrate 3840 2160)
+    [ "$result" -eq 1080 ]
+}
+
+@test "_compute_output_height_for_bitrate: ultra-wide (2560x720) downscale vers 540" {
+    result=$(_compute_output_height_for_bitrate 2560 720)
+    [ "$result" -eq 540 ]
+}
+
+@test "_compute_effective_bitrate_kbps_for_height: applique le facteur 720p" {
+    # Valeur base = mode série (2070), profil 720p => 70%
+    result=$(_compute_effective_bitrate_kbps_for_height 2070 720)
+    [ "$result" -eq 1449 ]
+}
+
+@test "_compute_effective_bitrate_kbps_for_height: ne change pas au-dessus de 720p" {
+    result=$(_compute_effective_bitrate_kbps_for_height 2070 1080)
+    [ "$result" -eq 2070 ]
+}
+
+@test "_build_effective_suffix_for_dims: inclut bitrate+résolution+preset (720p)" {
+    # 1280x720 => out_height=720 => scale 70% => 1449k
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+
+    result=$(_build_effective_suffix_for_dims 1280 720)
+    [ "$result" = "_x265_1449k_720p_medium_tuned" ]
+}
+
+@test "_build_effective_suffix_for_dims: reflète 1080p quand hauteur 1080" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+
+    result=$(_build_effective_suffix_for_dims 1920 1080)
+    [ "$result" = "_x265_2070k_1080p_medium_tuned" ]
+}

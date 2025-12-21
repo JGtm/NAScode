@@ -1,7 +1,6 @@
 #!/bin/bash
 ###########################################################
 # ENCODAGE VIDÉO
-# Logique d'encodage FFmpeg/x265 (incluant adaptation 10-bit/downscale)
 ###########################################################
 
 ###########################################################
@@ -54,6 +53,127 @@ _build_downscale_filter_if_needed() {
 }
 
 ###########################################################
+# ADAPTATION BITRATE PAR RÉSOLUTION (720p)
+###########################################################
+
+# Estime la hauteur de sortie après application éventuelle du downscale 1080p.
+# Retourne vide si les entrées sont invalides.
+_compute_output_height_for_bitrate() {
+    local width="$1"
+    local height="$2"
+
+    if [[ -z "$width" || -z "$height" ]]; then
+        echo ""
+        return 0
+    fi
+    if ! [[ "$width" =~ ^[0-9]+$ ]] || ! [[ "$height" =~ ^[0-9]+$ ]]; then
+        echo ""
+        return 0
+    fi
+
+    # Pas de downscale : hauteur inchangée
+    if [[ "$width" -le "${DOWNSCALE_MAX_WIDTH}" && "$height" -le "${DOWNSCALE_MAX_HEIGHT}" ]]; then
+        echo "$height"
+        return 0
+    fi
+
+    # Reproduire la logique du filtre : facteur = min(Wmax/iw, Hmax/ih), puis arrondi à pair.
+    local out_h
+    out_h=$(awk \
+        -v iw="$width" \
+        -v ih="$height" \
+        -v mw="${DOWNSCALE_MAX_WIDTH}" \
+        -v mh="${DOWNSCALE_MAX_HEIGHT}" \
+        'BEGIN {
+            if (iw <= 0 || ih <= 0) { print ""; exit }
+            fw = mw / iw;
+            fh = mh / ih;
+            f = (fw < fh ? fw : fh);
+            if (f > 1) f = 1;
+            oh = int((ih * f) / 2) * 2;
+            if (oh < 2) oh = 2;
+            print oh;
+        }')
+
+    echo "$out_h"
+}
+
+# Calcule un bitrate effectif (kbps) selon la hauteur de sortie estimée.
+_compute_effective_bitrate_kbps_for_height() {
+    local base_kbps="$1"
+    local out_height="$2"
+
+    if [[ -z "$base_kbps" ]] || ! [[ "$base_kbps" =~ ^[0-9]+$ ]]; then
+        echo "$base_kbps"
+        return 0
+    fi
+    if [[ "${ADAPTIVE_BITRATE_BY_RESOLUTION:-false}" != true ]]; then
+        echo "$base_kbps"
+        return 0
+    fi
+    if [[ -z "$out_height" ]] || ! [[ "$out_height" =~ ^[0-9]+$ ]]; then
+        echo "$base_kbps"
+        return 0
+    fi
+
+    if [[ "$out_height" -le "${ADAPTIVE_720P_MAX_HEIGHT}" ]]; then
+        local pct="${ADAPTIVE_720P_SCALE_PERCENT}"
+        if [[ -z "$pct" ]] || ! [[ "$pct" =~ ^[0-9]+$ ]] || [[ "$pct" -le 0 ]]; then
+            echo "$base_kbps"
+            return 0
+        fi
+        # Arrondi au plus proche
+        echo $(( (base_kbps * pct + 50) / 100 ))
+        return 0
+    fi
+
+    echo "$base_kbps"
+}
+
+# Construit le suffixe effectif par fichier à partir des dimensions source.
+# Inclut : bitrate effectif + hauteur de sortie estimée (ex: 720p) + preset.
+# Format: _x265_<bitrate>k_<height>p_<preset>[_tuned][_sample]
+_build_effective_suffix_for_dims() {
+    local width="$1"
+    local height="$2"
+
+    local suffix="_x265"
+
+    # Résolution de sortie estimée (après downscale éventuel)
+    local out_height
+    out_height=$(_compute_output_height_for_bitrate "$width" "$height")
+
+    # Bitrate effectif (selon hauteur)
+    local eff_target_kbps
+    eff_target_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$out_height")
+    if [[ -n "$eff_target_kbps" ]] && [[ "$eff_target_kbps" =~ ^[0-9]+$ ]]; then
+        suffix="${suffix}_${eff_target_kbps}k"
+    else
+        suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+    fi
+
+    # Ajout de la résolution (si connue)
+    if [[ -n "$out_height" ]] && [[ "$out_height" =~ ^[0-9]+$ ]]; then
+        suffix="${suffix}_${out_height}p"
+    fi
+
+    # Preset d'encodage
+    suffix="${suffix}_${ENCODER_PRESET}"
+
+    # Indicateur si paramètres x265 spéciaux (tuned)
+    if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
+        suffix="${suffix}_tuned"
+    fi
+
+    # Indicateur mode sample (segment de test)
+    if [[ "${SAMPLE_MODE:-false}" == true ]]; then
+        suffix="${suffix}_sample"
+    fi
+
+    echo "$suffix"
+}
+
+###########################################################
 # EXÉCUTION DE LA CONVERSION FFMPEG
 ###########################################################
 
@@ -82,11 +202,11 @@ _execute_conversion() {
     # Pass 1 : analyse rapide pour générer les statistiques
     # Pass 2 : encodage final avec répartition optimale du bitrate
 
-    # Préparer les paramètres vidéo
-    local ff_bitrate="${TARGET_BITRATE_FFMPEG:-${TARGET_BITRATE_KBPS}k}"
-    local ff_maxrate="${MAXRATE_FFMPEG:-${MAXRATE_KBPS}k}"
-    local ff_bufsize="${BUFSIZE_FFMPEG:-${BUFSIZE_KBPS}k}"
-    local x265_vbv="${X265_VBV_PARAMS:-vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}}"
+    # Préparer les paramètres vidéo (ils peuvent être adaptés par fichier selon la résolution)
+    local ff_bitrate=""
+    local ff_maxrate=""
+    local ff_bufsize=""
+    local x265_vbv=""
 
     # TODO: Réactiver la conversion audio Opus quand VLC supportera mieux Opus surround dans MKV
     # # Analyser l'audio et déterminer les paramètres de conversion
@@ -125,6 +245,26 @@ _execute_conversion() {
 
     local downscale_filter
     downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
+
+    # ==================== ADAPTATION BITRATE PAR RÉSOLUTION (ex: 720p) ====================
+    local out_height_for_bitrate
+    out_height_for_bitrate=$(_compute_output_height_for_bitrate "$input_width" "$input_height")
+
+    local base_target_kbps="${TARGET_BITRATE_KBPS}"
+    local base_maxrate_kbps="${MAXRATE_KBPS}"
+    local base_bufsize_kbps="${BUFSIZE_KBPS}"
+
+    local eff_target_kbps eff_maxrate_kbps eff_bufsize_kbps
+    eff_target_kbps=$(_compute_effective_bitrate_kbps_for_height "$base_target_kbps" "$out_height_for_bitrate")
+    eff_maxrate_kbps=$(_compute_effective_bitrate_kbps_for_height "$base_maxrate_kbps" "$out_height_for_bitrate")
+    eff_bufsize_kbps=$(_compute_effective_bitrate_kbps_for_height "$base_bufsize_kbps" "$out_height_for_bitrate")
+
+    ff_bitrate="${eff_target_kbps}k"
+    ff_maxrate="${eff_maxrate_kbps}k"
+    ff_bufsize="${eff_bufsize_kbps}k"
+    x265_vbv="vbv-maxrate=${eff_maxrate_kbps}:vbv-bufsize=${eff_bufsize_kbps}"
+
+    :
 
     # Note: on passe "-vf ..." sous forme de chaîne pour rester compatible avec la construction
     # existante des commandes ffmpeg (style du script).
@@ -283,21 +423,17 @@ _execute_conversion() {
         -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🎬" -v END_MSG="Terminé ✅" \
         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
+    # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline,
+    # avant toute autre commande qui l'écraserait.
+    local ffmpeg_rc=${PIPESTATUS[0]:-0}
+    local awk_rc=${PIPESTATUS[1]:-0}
+
     # Nettoyer les fichiers de stats
     rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
-
 
     # Libérer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
         release_progress_slot "$progress_slot"
-    fi
-
-    # Récupère les codes de sortie du pipeline (0 = succès).
-    local ffmpeg_rc=0
-    local awk_rc=0
-    if [[ ${#PIPESTATUS[@]} -ge 1 ]]; then
-        ffmpeg_rc=${PIPESTATUS[0]:-0}
-        awk_rc=${PIPESTATUS[1]:-0}
     fi
 
     if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then

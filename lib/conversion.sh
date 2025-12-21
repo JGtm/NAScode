@@ -1,28 +1,13 @@
 #!/bin/bash
 ###########################################################
-# CONVERSION VIDÉO
-# Logique de conversion FFmpeg et fonctions associées
+# LOGIQUE DE SKIP
 ###########################################################
 
 ###########################################################
-# ANALYSE DES MÉTADONNÉES VIDÉO
+# PARAMÈTRES AUDIO (préparation pour réactivation)
 ###########################################################
 
-# NOTE: Les fonctions ffprobe ont été déplacées dans lib/media_probe.sh
-# - get_video_metadata
-# - get_video_stream_props
-
-###########################################################
-# ANALYSE DES PROPRIÉTÉS VIDÉO (RÉSOLUTION / PIX_FMT)
-###########################################################
-
-# NOTE: La logique d'encodage (10-bit/downscale + _execute_conversion) a été déplacée dans lib/transcode_video.sh
-
-###########################################################
-# ANALYSE DES MÉTADONNÉES AUDIO
 # TODO: Réactiver quand VLC supportera mieux Opus surround dans MKV
-###########################################################
-
 # # Activer la conversion audio vers Opus
 # AUDIO_OPUS_ENABLED=true
 # # Bitrate cible pour l'audio Opus (kbps)
@@ -30,53 +15,6 @@
 # # Seuil minimum pour considérer la conversion audio avantageuse (kbps)
 # # On ne convertit que si le bitrate source est > seuil (évite de ré-encoder du déjà compressé)
 # readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
-#
-# # Analyse l'audio d'un fichier et détermine si la conversion Opus est avantageuse
-# # Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert to opus)
-# get_audio_metadata() {
-#     local file="$1"
-#     
-#     # Récupérer les infos audio du premier flux audio
-#     local audio_info
-#     audio_info=$(ffprobe -v error \
-#         -select_streams a:0 \
-#         -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-#         -of default=noprint_wrappers=1 \
-#         "$file" 2>/dev/null)
-#     
-#     local audio_codec=$(echo "$audio_info" | grep '^codec_name=' | cut -d'=' -f2)
-#     local audio_bitrate=$(echo "$audio_info" | grep '^bit_rate=' | cut -d'=' -f2)
-#     local audio_bitrate_tag=$(echo "$audio_info" | grep '^TAG:BPS=' | cut -d'=' -f2)
-#     
-#     # Utiliser le tag BPS si bitrate direct non disponible
-#     if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
-#         audio_bitrate="$audio_bitrate_tag"
-#     fi
-#     
-#     # Convertir en kbps
-#     audio_bitrate=$(clean_number "$audio_bitrate")
-#     local audio_bitrate_kbps=0
-#     if [[ -n "$audio_bitrate" && "$audio_bitrate" =~ ^[0-9]+$ ]]; then
-#         audio_bitrate_kbps=$((audio_bitrate / 1000))
-#     fi
-#     
-#     # Déterminer si la conversion est avantageuse
-#     local should_convert=0
-#     
-#     # Ne pas convertir si déjà en Opus
-#     if [[ "$audio_codec" == "opus" ]]; then
-#         should_convert=0
-#     # Convertir si le bitrate source est supérieur au seuil
-#     elif [[ "$audio_bitrate_kbps" -gt "$AUDIO_CONVERSION_THRESHOLD_KBPS" ]]; then
-#         should_convert=1
-#     fi
-#     
-#     echo "${audio_codec}|${audio_bitrate_kbps}|${should_convert}"
-# }
-
-###########################################################
-# LOGIQUE DE SKIP
-###########################################################
 
 should_skip_conversion() {
     local codec="$1"
@@ -141,8 +79,18 @@ _prepare_file_paths() {
     local final_dir="$output_dir"
     [[ -n "$relative_dir" ]] && final_dir="$output_dir/$relative_dir"
     local base_name="${filename%.*}"
-    
+
+    # Suffixe effectif (par fichier) : inclut bitrate adapté + résolution.
+    # Fallback : si les fonctions ne sont pas chargées (tests/unitaires), on garde SUFFIX_STRING.
     local effective_suffix="$SUFFIX_STRING"
+    if [[ -n "$SUFFIX_STRING" ]] && declare -f get_video_stream_props &>/dev/null && declare -f _build_effective_suffix_for_dims &>/dev/null; then
+        local stream_props
+        stream_props=$(get_video_stream_props "$file_original")
+        local input_width input_height _pix_fmt
+        IFS='|' read -r input_width input_height _pix_fmt <<< "$stream_props"
+        effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height")
+    fi
+
     if [[ "$DRYRUN" == true ]]; then
         effective_suffix="${effective_suffix}${DRYRUN_SUFFIX}"
     fi

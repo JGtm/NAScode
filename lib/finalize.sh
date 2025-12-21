@@ -1,7 +1,6 @@
 #!/bin/bash
 ###########################################################
 # FINALISATION ET RÉSULTATS
-# Déplacement des fichiers, vérification d'intégrité, résumé
 ###########################################################
 
 ###########################################################
@@ -16,7 +15,8 @@ _finalize_try_move() {
     local final_output="$2"
     local file_original="$3"
 
-    local max_try=3
+    local max_try="${MOVE_RETRY_MAX_TRY:-3}"
+    local retry_sleep="${MOVE_RETRY_SLEEP_SECONDS:-2}"
     local try=0
 
     # Tentative mv (3 essais)
@@ -26,7 +26,7 @@ _finalize_try_move() {
             return 0
         fi
         try=$((try+1))
-        sleep 2
+        [[ "$retry_sleep" != "0" ]] && sleep "$retry_sleep"
     done
 
     # Essayer cp + rm (3 essais)
@@ -38,20 +38,21 @@ _finalize_try_move() {
             return 0
         fi
         try=$((try+1))
-        sleep 2
+        [[ "$retry_sleep" != "0" ]] && sleep "$retry_sleep"
     done
 
     # Repli local : dossier fallback
     local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
     mkdir -p "$local_fallback_dir" 2>/dev/null || true
-    if mv "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
-        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
-        return 0
+    local fallback_target="$local_fallback_dir/$(basename "$final_output")"
+    if mv "$tmp_output" "$fallback_target" 2>/dev/null; then
+        printf "%s" "$fallback_target"
+        return 1
     fi
-    if cp "$tmp_output" "$local_fallback_dir/" 2>/dev/null; then
+    if cp "$tmp_output" "$fallback_target" 2>/dev/null; then
         rm -f "$tmp_output" 2>/dev/null || true
-        printf "%s" "$local_fallback_dir/$(basename "$final_output")"
-        return 0
+        printf "%s" "$fallback_target"
+        return 1
     fi
 
     # Ultime repli : laisser le temporaire et l'utiliser
@@ -64,7 +65,7 @@ _finalize_try_move() {
 ###########################################################
 
 # Nettoyage local des artefacts temporaires et calculs de taille/checksum.
-# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <size_before_mb> <size_before_bytes>
+# Usage : _finalize_log_and_verify <file_original> <final_actual> <tmp_input> <ffmpeg_log_temp> <checksum_before> <size_before_mb> <size_before_bytes> <final_intended> <move_status>
 _finalize_log_and_verify() {
     local file_original="$1"
     local final_actual="$2"
@@ -73,6 +74,8 @@ _finalize_log_and_verify() {
     local checksum_before="$5"
     local size_before_mb="$6"
     local size_before_bytes="${7:-0}"
+    local final_intended="${8:-}"
+    local move_status="${9:-0}"
 
     # Nettoyer les artefacts temporaires liés à l'entrée et au log ffmpeg
     rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
@@ -93,7 +96,16 @@ _finalize_log_and_verify() {
         fi
     fi
 
-    # Log success
+    # Si le transfert ne s'est pas fait vers la destination prévue, le signaler comme erreur.
+    # move_status: 0=OK vers destination, 1=fallback, 2=échec (temporaire)
+    if [[ "$move_status" != "0" ]]; then
+        if [[ -n "$LOG_ERROR" ]]; then
+            local intended_msg="${final_intended:-$final_actual}"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR TRANSFER_FALLBACK | $file_original -> $intended_msg | actual:$final_actual | move_status:$move_status" >> "$LOG_ERROR" 2>/dev/null || true
+        fi
+    fi
+
+    # Log success (conversion OK) — même si le transfert a dû passer par un fallback, on garde la trace.
     if [[ -n "$LOG_SUCCESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
     fi
@@ -105,7 +117,9 @@ _finalize_log_and_verify() {
     # Nettoyer le checksum_before (supprimer espaces/newlines parasites)
     checksum_before="${checksum_before//[$'\n\r\t ']/}"
     
-    if [[ "$size_before_bytes" -gt 0 && "$size_after_bytes" -gt 0 && "$size_before_bytes" -ne "$size_after_bytes" ]]; then
+    if [[ ! -e "$final_actual" ]]; then
+        verify_status="TRANSFER_FAILED"
+    elif [[ "$size_before_bytes" -gt 0 && "$size_after_bytes" -gt 0 && "$size_before_bytes" -ne "$size_after_bytes" ]]; then
         # Taille différente = transfert incomplet ou corrompu
         verify_status="SIZE_MISMATCH"
     elif [[ -n "$checksum_before" ]]; then
@@ -128,10 +142,12 @@ _finalize_log_and_verify() {
     fi
 
     # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)
-    _queue_vmaf_analysis "$file_original" "$final_actual"
+    if declare -f _queue_vmaf_analysis &>/dev/null; then
+        _queue_vmaf_analysis "$file_original" "$final_actual"
+    fi
 
     # En cas de problème, journaliser dans le log d'erreur
-    if [[ "$verify_status" == "MISMATCH" || "$verify_status" == "SIZE_MISMATCH" ]]; then
+    if [[ "$verify_status" != "OK" && "$verify_status" != "SKIPPED" ]]; then
         if [[ -n "$LOG_ERROR" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
         fi
@@ -195,11 +211,12 @@ _finalize_conversion_success() {
     else
         # Mode synchrone (fallback si transfert asynchrone non initialisé)
         # Déplacer / copier / fallback et récupérer le chemin réel
-        local final_actual
-        final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
+        local final_actual move_status
+        final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original")
+        move_status=$?
 
         # Nettoyage, logs et vérifications
-        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes"
+        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes" "$final_output" "$move_status"
     fi
 }
 
@@ -268,7 +285,7 @@ show_summary() {
 
     local err=0
     if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
-        err=$(grep -c ' | ERROR ffmpeg | ' "$LOG_ERROR" 2>/dev/null || true)
+        err=$(grep -c ' | ERROR ' "$LOG_ERROR" 2>/dev/null || true)
         err=$(echo "${err:-0}" | tr -d '[:space:]')
         [[ -z "$err" ]] && err=0
     fi
@@ -291,12 +308,10 @@ show_summary() {
         vmaf_anomalies=$(grep -c ' | VMAF | .* | quality:DEGRADE' "$LOG_SUCCESS" 2>/dev/null | tr -d '\r\n') || vmaf_anomalies=0
     fi
     
-    # Afficher message si aucun fichier traité (tous skippés ou queue vide)
+    # Afficher message si aucun fichier traité (queue vide ou tout skippé)
+    # Spécification: si tout est skippé, on dit aussi "Aucun fichier à traiter".
     local total_processed=$((succ + err))
-    if [[ "$total_processed" -eq 0 ]] && [[ "$skip" -gt 0 ]]; then
-        echo ""
-        echo -e "${YELLOW}ℹ️  Tous les fichiers ont été ignorés (déjà convertis ou déjà optimisés).${NOCOLOR}"
-    elif [[ "$total_processed" -eq 0 ]] && [[ "$skip" -eq 0 ]]; then
+    if [[ "$total_processed" -eq 0 ]]; then
         echo ""
         echo -e "${YELLOW}ℹ️  Aucun fichier à traiter.${NOCOLOR}"
     fi
@@ -354,8 +369,18 @@ dry_run_compare_names() {
                 relative_path="${relative_path#/}"
                 local relative_dir=$(dirname "$relative_path")
                 local final_dir="$OUTPUT_DIR/$relative_dir"
-                
+
+                # Suffixe effectif (par fichier) : inclut bitrate adapté + résolution.
+                # Fallback : si les fonctions ne sont pas chargées, on garde SUFFIX_STRING.
                 local effective_suffix="$SUFFIX_STRING"
+                if [[ -n "$SUFFIX_STRING" ]] && declare -f get_video_stream_props &>/dev/null && declare -f _build_effective_suffix_for_dims &>/dev/null; then
+                    local stream_props
+                    stream_props=$(get_video_stream_props "$file_original")
+                    local input_width input_height _pix_fmt
+                    IFS='|' read -r input_width input_height _pix_fmt <<< "$stream_props"
+                    effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height")
+                fi
+
                 if [[ "$DRYRUN" == true ]]; then
                     effective_suffix="${effective_suffix}${DRYRUN_SUFFIX}"
                 fi
@@ -371,9 +396,13 @@ dry_run_compare_names() {
                     generated_base_name="${generated_base_name%"$DRYRUN_SUFFIX"}"
                 fi
                 
-                # 2. RETRAIT DU SUFFIXE D'ORIGINE ($SUFFIX_STRING)
-                if [[ -n "$SUFFIX_STRING" ]]; then
-                    generated_base_name="${generated_base_name%"$SUFFIX_STRING"}"
+                # 2. RETRAIT DU SUFFIXE EFFECTIF (par fichier)
+                if [[ -n "$effective_suffix" ]]; then
+                    local effective_suffix_no_dryrun="$effective_suffix"
+                    if [[ "$DRYRUN" == true ]]; then
+                        effective_suffix_no_dryrun="${effective_suffix_no_dryrun%"$DRYRUN_SUFFIX"}"
+                    fi
+                    generated_base_name="${generated_base_name%"$effective_suffix_no_dryrun"}"
                 fi
 
                 count=$((count + 1))

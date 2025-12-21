@@ -1,13 +1,14 @@
 #!/bin/bash
 ###########################################################
 # EXPORT DES FONCTIONS ET VARIABLES
-# Pour le traitement parallèle (sous-shells)
 ###########################################################
 
 export_variables() {
     # --- Fonctions de conversion ---
     export -f convert_file get_video_metadata get_video_stream_props
     export -f _select_output_pix_fmt _build_downscale_filter_if_needed
+    export -f _compute_output_height_for_bitrate _compute_effective_bitrate_kbps_for_height
+    export -f _build_effective_suffix_for_dims
     export -f should_skip_conversion clean_number custom_pv
     
     # --- Fonctions de préparation fichiers ---
@@ -52,6 +53,7 @@ export_variables() {
     export X265_EXTRA_PARAMS X265_PASS1_FAST
     export BITRATE_CONVERSION_THRESHOLD_KBPS SKIP_TOLERANCE_PERCENT
     export DOWNSCALE_MAX_WIDTH DOWNSCALE_MAX_HEIGHT
+    export ADAPTIVE_BITRATE_BY_RESOLUTION ADAPTIVE_720P_MAX_HEIGHT ADAPTIVE_720P_SCALE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
     
     # --- Variables de chemins ---

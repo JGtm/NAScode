@@ -188,11 +188,12 @@ start_async_transfer() {
         IFS='|' read -r checksum_before size_before_mb size_before_bytes tmp_input ffmpeg_log_temp <<< "$callback_data"
         
         # Effectuer le déplacement/copie
-        local final_actual
-        final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original") || true
+        local final_actual move_status
+        final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original")
+        move_status=$?
         
         # Effectuer le logging et la vérification d'intégrité
-        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes"
+        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes" "$final_output" "$move_status"
     ) &
     
     local transfer_pid=$!

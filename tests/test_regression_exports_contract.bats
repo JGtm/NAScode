@@ -43,6 +43,8 @@ teardown() {
       set -euo pipefail
       _select_output_pix_fmt yuv420p10le | grep -qx yuv420p10le
       _build_downscale_filter_if_needed 3840 2160 | grep -q "scale="
+            _compute_output_height_for_bitrate 2560 720 | grep -qx 540
+            _build_effective_suffix_for_dims 1280 720 | grep -q "_720p_"
       normalize_path "/c/Users/test" >/dev/null || true
       echo ok
     '
