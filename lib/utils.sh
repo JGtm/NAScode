@@ -185,11 +185,11 @@ BEGIN {
         elapsed_str = sprintf("%02d:%02d:%02d", elapsed_h, elapsed_m, elapsed_s);
         if (is_parallel && slot > 0) {
             lines_up = max_slots - slot + 2;
-            printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s [%s→%s %s]\033[%dB\r",
-                   lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, END_MSG, start_time_str, end_time_str, elapsed_str, lines_up > "/dev/stderr";
+            printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s | %s | %s | %s\033[%dB\r",
+                   lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str, elapsed_str, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-30.30s %s 100.0%% | %s [%s→%s %s]\n",
-                   EMOJI, CURRENT_FILE_NAME, bar_complete, END_MSG, start_time_str, end_time_str, elapsed_str > "/dev/stderr";
+            printf "\r\033[K  %s %-30.30s %s 100.0%% | %s | %s | %s | %s\n",
+                   EMOJI, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str, elapsed_str > "/dev/stderr";
         }
         fflush("/dev/stderr");
     }
