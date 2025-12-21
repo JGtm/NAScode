@@ -12,7 +12,7 @@ export_variables() {
     export -f should_skip_conversion clean_number custom_pv
     
     # --- Fonctions d'encodage (sous-fonctions refactorisées) ---
-    export -f _get_audio_conversion_info _build_audio_params
+    export -f _get_audio_conversion_info _build_audio_params _build_stream_mapping
     export -f _setup_video_encoding_params _setup_sample_mode_params
     export -f _run_encoding_pass1 _run_encoding_pass2
     

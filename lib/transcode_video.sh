@@ -251,6 +251,52 @@ _build_audio_params() {
 }
 
 ###########################################################
+# MAPPING DES STREAMS (FILTRAGE SOUS-TITRES)
+###########################################################
+
+# Construit les paramètres de mapping des streams pour ffmpeg.
+# - Mappe tous les flux vidéo et audio
+# - Filtre les sous-titres pour ne garder que le français (fre/fra)
+# Retourne une chaîne de paramètres -map pour ffmpeg.
+_build_stream_mapping() {
+    local input_file="$1"
+    
+    # Toujours mapper vidéo et audio
+    local mapping="-map 0:v -map 0:a?"
+    
+    # Récupérer les index des sous-titres français
+    # On cherche les streams de type subtitle avec language=fre ou fra
+    local fr_subs
+    fr_subs=$(ffprobe -v error -select_streams s \
+        -show_entries stream=index:stream_tags=language \
+        -of csv=p=0 "$input_file" 2>/dev/null | \
+        grep -E ',fre$|,fra$|,french$' | cut -d',' -f1)
+    
+    if [[ -n "$fr_subs" ]]; then
+        # Ajouter chaque sous-titre français
+        while IFS= read -r idx; do
+            if [[ -n "$idx" ]] && [[ "$idx" =~ ^[0-9]+$ ]]; then
+                mapping="$mapping -map 0:$idx"
+            fi
+        done <<< "$fr_subs"
+        
+        if [[ "$NO_PROGRESS" != true ]]; then
+            local count
+            count=$(echo "$fr_subs" | wc -l)
+            echo -e "${CYAN}  🇫🇷 Sous-titres FR conservés : $count piste(s)${NOCOLOR}" >&2
+        fi
+    else
+        # Aucun sous-titre FR trouvé, on garde tous les sous-titres
+        mapping="$mapping -map 0:s?"
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${YELLOW}  ⚠️  Aucun sous-titre FR détecté, tous les sous-titres conservés${NOCOLOR}" >&2
+        fi
+    fi
+    
+    echo "$mapping"
+}
+
+###########################################################
 # SOUS-FONCTIONS D'ENCODAGE (PASS 1 / PASS 2)
 ###########################################################
 
@@ -419,9 +465,10 @@ _run_encoding_pass2() {
     local base_name="$4"
     local x265_base_params="$5"
     local audio_params="$6"
-    local progress_slot="$7"
-    local is_parallel="$8"
-    local awk_time_func="$9"
+    local stream_mapping="$7"
+    local progress_slot="$8"
+    local is_parallel="$9"
+    local awk_time_func="${10}"
 
     START_TS="$(date +%s)"
     local x265_params_pass2="pass=2:${x265_base_params}"
@@ -435,7 +482,7 @@ _run_encoding_pass2() {
         -tune fastdecode -b:v "$VIDEO_BITRATE" -x265-params "$x265_params_pass2" \
         -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
         $audio_params \
-        -map 0 -f matroska \
+        $stream_mapping -f matroska \
         "$output_file" \
         -progress pipe:1 -nostats 2> "$ffmpeg_log" | \
     awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
@@ -484,6 +531,10 @@ _execute_conversion() {
     local audio_params
     audio_params=$(_build_audio_params "$tmp_input")
 
+    # Préparer le mapping des streams (filtre sous-titres FR)
+    local stream_mapping
+    stream_mapping=$(_build_stream_mapping "$tmp_input")
+
     # Script AWK adapté selon la disponibilité de systime() (gawk vs awk BSD)
     local awk_time_func
     if [[ "$HAS_GAWK" -eq 1 ]]; then
@@ -517,7 +568,8 @@ _execute_conversion() {
 
     # ==================== PASS 2 : ENCODAGE ====================
     if ! _run_encoding_pass2 "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                             "$x265_base_params" "$audio_params" "$progress_slot" "$is_parallel" "$awk_time_func"; then
+                             "$x265_base_params" "$audio_params" "$stream_mapping" \
+                             "$progress_slot" "$is_parallel" "$awk_time_func"; then
         # Nettoyer les fichiers de stats x265
         rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
         if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
