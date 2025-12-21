@@ -72,6 +72,10 @@ parse_arguments() {
                 SAMPLE_MODE=true
                 shift
                 ;;
+            --opus)
+                OPUS_ENABLED=true
+                shift
+                ;;
             -j|--jobs)
                 if [[ "${2:-}" =~ ^[0-9]+$ ]] && [[ "$2" -ge 1 ]]; then
                     PARALLEL_JOBS="$2"
@@ -147,6 +151,7 @@ Options :
     -k, --keep-index             Conserver l'index existant sans demande interactive (FLAG)
     -v, --vmaf                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
     -t, --sample                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
+    --opus                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
 
 Remarque sur les options courtes groupées :
     - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),

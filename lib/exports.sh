@@ -5,11 +5,16 @@
 
 export_variables() {
     # --- Fonctions de conversion ---
-    export -f convert_file get_video_metadata get_video_stream_props
+    export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel
     export -f _select_output_pix_fmt _build_downscale_filter_if_needed
     export -f _compute_output_height_for_bitrate _compute_effective_bitrate_kbps_for_height
     export -f _build_effective_suffix_for_dims
     export -f should_skip_conversion clean_number custom_pv
+    
+    # --- Fonctions d'encodage (sous-fonctions refactorisées) ---
+    export -f _get_audio_conversion_info _build_audio_params
+    export -f _setup_video_encoding_params _setup_sample_mode_params
+    export -f _run_encoding_pass1 _run_encoding_pass2
     
     # --- Fonctions de préparation fichiers ---
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
@@ -55,6 +60,9 @@ export_variables() {
     export DOWNSCALE_MAX_WIDTH DOWNSCALE_MAX_HEIGHT
     export ADAPTIVE_BITRATE_BY_RESOLUTION ADAPTIVE_720P_MAX_HEIGHT ADAPTIVE_720P_SCALE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
+    
+    # --- Variables audio Opus ---
+    export OPUS_ENABLED OPUS_TARGET_BITRATE_KBPS OPUS_CONVERSION_THRESHOLD_KBPS
     
     # --- Variables de chemins ---
     export SOURCE OUTPUT_DIR TMP_DIR SCRIPT_DIR

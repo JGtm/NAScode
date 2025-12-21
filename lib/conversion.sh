@@ -1,20 +1,7 @@
 #!/bin/bash
 ###########################################################
-# LOGIQUE DE SKIP
+# LOGIQUE DE SKIP ET CONVERSION
 ###########################################################
-
-###########################################################
-# PARAMÈTRES AUDIO (préparation pour réactivation)
-###########################################################
-
-# TODO: Réactiver quand VLC supportera mieux Opus surround dans MKV
-# # Activer la conversion audio vers Opus
-# AUDIO_OPUS_ENABLED=true
-# # Bitrate cible pour l'audio Opus (kbps)
-# readonly AUDIO_OPUS_TARGET_KBPS=128
-# # Seuil minimum pour considérer la conversion audio avantageuse (kbps)
-# # On ne convertit que si le bitrate source est > seuil (évite de ré-encoder du déjà compressé)
-# readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
 
 should_skip_conversion() {
     local codec="$1"

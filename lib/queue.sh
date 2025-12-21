@@ -5,6 +5,41 @@
 ###########################################################
 
 ###########################################################
+# VALIDATION DU FICHIER QUEUE
+###########################################################
+
+# Valide qu'un fichier queue est bien formé (non vide, format null-separated).
+# Utilisé pour les queues personnalisées (-q) et la validation interne.
+validate_queue_file() {
+    local queue_file="$1"
+    
+    if [[ ! -f "$queue_file" ]]; then
+        echo -e "${RED}ERREUR : Le fichier queue '$queue_file' n'existe pas.${NOCOLOR}"
+        return 1
+    fi
+    
+    if [[ ! -s "$queue_file" ]]; then
+        echo -e "${RED}ERREUR : Le fichier queue '$queue_file' est vide.${NOCOLOR}"
+        return 1
+    fi
+    
+    local file_count=$(count_null_separated "$queue_file")
+    if [[ $file_count -eq 0 ]]; then
+        echo -e "${RED}ERREUR : Le fichier queue n'a pas le format attendu (fichiers séparés par null).${NOCOLOR}"
+        return 1
+    fi
+    
+    local test_read=$(head -c 100 "$queue_file" | tr '\0' '\n' | head -1)
+    if [[ -z "$test_read" ]] && [[ $file_count -gt 0 ]]; then
+        echo -e "${YELLOW}⚠️  Le fichier queue semble valide ($file_count fichiers détectés).${NOCOLOR}"
+    else
+        echo -e "${GREEN}✅ Fichier queue validé ($file_count fichiers détectés).${NOCOLOR}"
+    fi
+    
+    return 0
+}
+
+###########################################################
 # VALIDATION DE LA SOURCE DE L'INDEX
 ###########################################################
 

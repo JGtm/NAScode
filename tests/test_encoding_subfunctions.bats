@@ -1,0 +1,215 @@
+#!/usr/bin/env bats
+###########################################################
+# TESTS UNITAIRES - Sous-fonctions d'encodage refactorisées
+# Tests pour _setup_video_encoding_params, _setup_sample_mode_params, etc.
+###########################################################
+
+load 'test_helper'
+
+setup() {
+    setup_test_env
+    load_base_modules
+    source "$LIB_DIR/transcode_video.sh"
+    
+    # Les variables readonly sont déjà définies par config.sh
+    # On utilise leurs valeurs par défaut
+    NO_PROGRESS=true
+    SAMPLE_MODE=false
+}
+
+teardown() {
+    teardown_test_env
+}
+
+###########################################################
+# Tests de _setup_video_encoding_params() - variables globales
+###########################################################
+
+@test "_setup_video_encoding_params: définit VIDEO_BITRATE pour 1080p" {
+    # Simuler get_video_stream_props
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    # VIDEO_BITRATE doit être défini
+    [ -n "$VIDEO_BITRATE" ]
+    [[ "$VIDEO_BITRATE" =~ ^[0-9]+k$ ]]
+}
+
+@test "_setup_video_encoding_params: réduit le bitrate pour 720p" {
+    get_video_stream_props() { echo "1280|720|yuv420p"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    # Le bitrate doit être ~70% de 2070k = ~1449k
+    local bitrate_num=${VIDEO_BITRATE%k}
+    [ "$bitrate_num" -lt 2070 ]
+    [ "$bitrate_num" -gt 1400 ]
+}
+
+@test "_setup_video_encoding_params: définit OUTPUT_PIX_FMT" {
+    get_video_stream_props() { echo "1920|1080|yuv420p10le"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    [ "$OUTPUT_PIX_FMT" = "yuv420p10le" ]
+}
+
+@test "_setup_video_encoding_params: définit X265_VBV_STRING" {
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    [[ "$X265_VBV_STRING" =~ "vbv-maxrate=" ]]
+    [[ "$X265_VBV_STRING" =~ "vbv-bufsize=" ]]
+}
+
+###########################################################
+# Tests de _setup_sample_mode_params()
+###########################################################
+
+@test "_setup_sample_mode_params: ne fait rien si SAMPLE_MODE=false" {
+    SAMPLE_MODE=false
+    
+    _setup_sample_mode_params "/fake/file.mkv" "3600"
+    
+    [ -z "$SAMPLE_SEEK_PARAMS" ]
+    [ -z "$SAMPLE_DURATION_PARAMS" ]
+    [ "$EFFECTIVE_DURATION" = "3600" ]
+}
+
+@test "_setup_sample_mode_params: définit les paramètres si SAMPLE_MODE=true" {
+    SAMPLE_MODE=true
+    SAMPLE_DURATION=30
+    SAMPLE_MARGIN_START=180
+    SAMPLE_MARGIN_END=120
+    
+    # Mock ffprobe pour éviter l'appel réel
+    ffprobe() { echo "200.0"; }
+    export -f ffprobe
+    
+    _setup_sample_mode_params "/fake/file.mkv" "3600"
+    
+    # Vérifier que les paramètres sont définis
+    [[ "$SAMPLE_SEEK_PARAMS" =~ "-ss" ]]
+    [[ "$SAMPLE_DURATION_PARAMS" == "-t 30" ]]
+    [ "$EFFECTIVE_DURATION" = "30" ]
+}
+
+###########################################################
+# Tests de _build_audio_params()
+###########################################################
+
+@test "_build_audio_params: retourne copy par défaut" {
+    OPUS_ENABLED=false
+    
+    local result
+    result=$(_build_audio_params "/fake/file.mkv")
+    
+    [ "$result" = "-c:a copy" ]
+}
+
+###########################################################
+# Tests de cohérence des noms de variables
+###########################################################
+
+@test "nomenclature: VIDEO_BITRATE est bien nommé (pas ff_bitrate)" {
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    # VIDEO_BITRATE doit exister
+    [ -n "$VIDEO_BITRATE" ]
+    # L'ancienne variable ne doit pas être définie par cette fonction
+    [ -z "${ff_bitrate:-}" ]
+}
+
+@test "nomenclature: OUTPUT_PIX_FMT est bien nommé (pas output_pix_fmt local)" {
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    # La variable globale doit être définie
+    [ -n "$OUTPUT_PIX_FMT" ]
+}
+
+###########################################################
+# Tests de _compute_output_height_for_bitrate avec variables explicites
+###########################################################
+
+@test "_compute_output_height_for_bitrate: utilise src_width/src_height (pas width/height)" {
+    # Vérifier que la fonction fonctionne avec les nouveaux noms de paramètres
+    local result
+    result=$(_compute_output_height_for_bitrate "1280" "720")
+    
+    [ "$result" = "720" ]
+}
+
+@test "_compute_output_height_for_bitrate: calcule computed_height correctement" {
+    # Test avec downscale nécessaire (4K → 1080p)
+    local result
+    result=$(_compute_output_height_for_bitrate "3840" "2160")
+    
+    # La hauteur doit être <= 1080 et paire
+    [ "$result" -le 1080 ]
+    [ $((result % 2)) -eq 0 ]
+}
+
+###########################################################
+# Tests de _compute_effective_bitrate_kbps_for_height avec variables explicites
+###########################################################
+
+@test "_compute_effective_bitrate_kbps_for_height: utilise output_height (pas out_height)" {
+    local result
+    result=$(_compute_effective_bitrate_kbps_for_height "2070" "720")
+    
+    # Doit retourner ~70% de 2070 = ~1449
+    [ "$result" -gt 1400 ]
+    [ "$result" -lt 1500 ]
+}
+
+@test "_compute_effective_bitrate_kbps_for_height: utilise scale_percent (pas pct)" {
+    # Note: ADAPTIVE_720P_SCALE_PERCENT est readonly (70 par défaut)
+    # On teste avec la valeur par défaut
+    
+    local result
+    result=$(_compute_effective_bitrate_kbps_for_height "2000" "720")
+    
+    # Avec 70%, on attend 1400
+    [ "$result" -eq 1400 ]
+}
+
+###########################################################
+# Tests de _build_effective_suffix_for_dims avec variables explicites
+###########################################################
+
+@test "_build_effective_suffix_for_dims: utilise src_width/src_height" {
+    # Les variables readonly sont définies par config.sh
+    OPUS_ENABLED=false
+    SAMPLE_MODE=false
+    
+    local result
+    result=$(_build_effective_suffix_for_dims "1920" "1080")
+    
+    [[ "$result" =~ "_x265_" ]]
+    [[ "$result" =~ "_1080p" ]]
+}
+
+@test "_build_effective_suffix_for_dims: utilise effective_bitrate_kbps" {
+    # Les variables readonly sont définies par config.sh
+    # TARGET_BITRATE_KBPS=2070, ADAPTIVE_720P_SCALE_PERCENT=70
+    OPUS_ENABLED=false
+    SAMPLE_MODE=false
+    
+    local result
+    result=$(_build_effective_suffix_for_dims "1280" "720")
+    
+    # Le bitrate dans le suffixe doit être réduit (~1449k pour 2070*70%)
+    [[ "$result" =~ "_1449k_" ]] || [[ "$result" =~ "_14[0-9][0-9]k_" ]]
+}

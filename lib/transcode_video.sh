@@ -59,29 +59,29 @@ _build_downscale_filter_if_needed() {
 # Estime la hauteur de sortie après application éventuelle du downscale 1080p.
 # Retourne vide si les entrées sont invalides.
 _compute_output_height_for_bitrate() {
-    local width="$1"
-    local height="$2"
+    local src_width="$1"
+    local src_height="$2"
 
-    if [[ -z "$width" || -z "$height" ]]; then
+    if [[ -z "$src_width" || -z "$src_height" ]]; then
         echo ""
         return 0
     fi
-    if ! [[ "$width" =~ ^[0-9]+$ ]] || ! [[ "$height" =~ ^[0-9]+$ ]]; then
+    if ! [[ "$src_width" =~ ^[0-9]+$ ]] || ! [[ "$src_height" =~ ^[0-9]+$ ]]; then
         echo ""
         return 0
     fi
 
     # Pas de downscale : hauteur inchangée
-    if [[ "$width" -le "${DOWNSCALE_MAX_WIDTH}" && "$height" -le "${DOWNSCALE_MAX_HEIGHT}" ]]; then
-        echo "$height"
+    if [[ "$src_width" -le "${DOWNSCALE_MAX_WIDTH}" && "$src_height" -le "${DOWNSCALE_MAX_HEIGHT}" ]]; then
+        echo "$src_height"
         return 0
     fi
 
     # Reproduire la logique du filtre : facteur = min(Wmax/iw, Hmax/ih), puis arrondi à pair.
-    local out_h
-    out_h=$(awk \
-        -v iw="$width" \
-        -v ih="$height" \
+    local computed_height
+    computed_height=$(awk \
+        -v iw="$src_width" \
+        -v ih="$src_height" \
         -v mw="${DOWNSCALE_MAX_WIDTH}" \
         -v mh="${DOWNSCALE_MAX_HEIGHT}" \
         'BEGIN {
@@ -95,13 +95,13 @@ _compute_output_height_for_bitrate() {
             print oh;
         }')
 
-    echo "$out_h"
+    echo "$computed_height"
 }
 
 # Calcule un bitrate effectif (kbps) selon la hauteur de sortie estimée.
 _compute_effective_bitrate_kbps_for_height() {
     local base_kbps="$1"
-    local out_height="$2"
+    local output_height="$2"
 
     if [[ -z "$base_kbps" ]] || ! [[ "$base_kbps" =~ ^[0-9]+$ ]]; then
         echo "$base_kbps"
@@ -111,19 +111,19 @@ _compute_effective_bitrate_kbps_for_height() {
         echo "$base_kbps"
         return 0
     fi
-    if [[ -z "$out_height" ]] || ! [[ "$out_height" =~ ^[0-9]+$ ]]; then
+    if [[ -z "$output_height" ]] || ! [[ "$output_height" =~ ^[0-9]+$ ]]; then
         echo "$base_kbps"
         return 0
     fi
 
-    if [[ "$out_height" -le "${ADAPTIVE_720P_MAX_HEIGHT}" ]]; then
-        local pct="${ADAPTIVE_720P_SCALE_PERCENT}"
-        if [[ -z "$pct" ]] || ! [[ "$pct" =~ ^[0-9]+$ ]] || [[ "$pct" -le 0 ]]; then
+    if [[ "$output_height" -le "${ADAPTIVE_720P_MAX_HEIGHT}" ]]; then
+        local scale_percent="${ADAPTIVE_720P_SCALE_PERCENT}"
+        if [[ -z "$scale_percent" ]] || ! [[ "$scale_percent" =~ ^[0-9]+$ ]] || [[ "$scale_percent" -le 0 ]]; then
             echo "$base_kbps"
             return 0
         fi
         # Arrondi au plus proche
-        echo $(( (base_kbps * pct + 50) / 100 ))
+        echo $(( (base_kbps * scale_percent + 50) / 100 ))
         return 0
     fi
 
@@ -132,29 +132,29 @@ _compute_effective_bitrate_kbps_for_height() {
 
 # Construit le suffixe effectif par fichier à partir des dimensions source.
 # Inclut : bitrate effectif + hauteur de sortie estimée (ex: 720p) + preset.
-# Format: _x265_<bitrate>k_<height>p_<preset>[_tuned][_sample]
+# Format: _x265_<bitrate>k_<height>p_<preset>[_tuned][_opus][_sample]
 _build_effective_suffix_for_dims() {
-    local width="$1"
-    local height="$2"
+    local src_width="$1"
+    local src_height="$2"
 
     local suffix="_x265"
 
     # Résolution de sortie estimée (après downscale éventuel)
-    local out_height
-    out_height=$(_compute_output_height_for_bitrate "$width" "$height")
+    local output_height
+    output_height=$(_compute_output_height_for_bitrate "$src_width" "$src_height")
 
     # Bitrate effectif (selon hauteur)
-    local eff_target_kbps
-    eff_target_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$out_height")
-    if [[ -n "$eff_target_kbps" ]] && [[ "$eff_target_kbps" =~ ^[0-9]+$ ]]; then
-        suffix="${suffix}_${eff_target_kbps}k"
+    local effective_bitrate_kbps
+    effective_bitrate_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
+    if [[ -n "$effective_bitrate_kbps" ]] && [[ "$effective_bitrate_kbps" =~ ^[0-9]+$ ]]; then
+        suffix="${suffix}_${effective_bitrate_kbps}k"
     else
         suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
     fi
 
     # Ajout de la résolution (si connue)
-    if [[ -n "$out_height" ]] && [[ "$out_height" =~ ^[0-9]+$ ]]; then
-        suffix="${suffix}_${out_height}p"
+    if [[ -n "$output_height" ]] && [[ "$output_height" =~ ^[0-9]+$ ]]; then
+        suffix="${suffix}_${output_height}p"
     fi
 
     # Preset d'encodage
@@ -165,12 +165,298 @@ _build_effective_suffix_for_dims() {
         suffix="${suffix}_tuned"
     fi
 
+    # Indicateur conversion audio Opus
+    if [[ "${OPUS_ENABLED:-false}" == true ]]; then
+        suffix="${suffix}_opus"
+    fi
+
     # Indicateur mode sample (segment de test)
     if [[ "${SAMPLE_MODE:-false}" == true ]]; then
         suffix="${suffix}_sample"
     fi
 
     echo "$suffix"
+}
+
+###########################################################
+# ANALYSE AUDIO ET PARAMÈTRES OPUS (expérimental)
+###########################################################
+
+# Analyse l'audio d'un fichier et détermine si la conversion Opus est avantageuse.
+# Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert to opus)
+_get_audio_conversion_info() {
+    local input_file="$1"
+    
+    # Si Opus désactivé, toujours copier
+    if [[ "${OPUS_ENABLED:-false}" != true ]]; then
+        echo "copy|0|0"
+        return 0
+    fi
+    
+    # Récupérer les infos audio du premier flux audio
+    local audio_info
+    audio_info=$(ffprobe -v error \
+        -select_streams a:0 \
+        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
+        -of default=noprint_wrappers=1 \
+        "$input_file" 2>/dev/null)
+    
+    local audio_codec audio_bitrate audio_bitrate_tag
+    audio_codec=$(echo "$audio_info" | grep '^codec_name=' | cut -d'=' -f2)
+    audio_bitrate=$(echo "$audio_info" | grep '^bit_rate=' | cut -d'=' -f2)
+    audio_bitrate_tag=$(echo "$audio_info" | grep '^TAG:BPS=' | cut -d'=' -f2)
+    
+    # Utiliser le tag BPS si bitrate direct non disponible
+    if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
+        audio_bitrate="$audio_bitrate_tag"
+    fi
+    
+    # Convertir en kbps
+    audio_bitrate=$(clean_number "$audio_bitrate")
+    local audio_bitrate_kbps=0
+    if [[ -n "$audio_bitrate" && "$audio_bitrate" =~ ^[0-9]+$ ]]; then
+        audio_bitrate_kbps=$((audio_bitrate / 1000))
+    fi
+    
+    # Déterminer si la conversion est avantageuse
+    local should_convert=0
+    
+    # Ne pas convertir si déjà en Opus
+    if [[ "$audio_codec" == "opus" ]]; then
+        should_convert=0
+    # Convertir si le bitrate source est supérieur au seuil
+    elif [[ "$audio_bitrate_kbps" -gt "${OPUS_CONVERSION_THRESHOLD_KBPS:-160}" ]]; then
+        should_convert=1
+    fi
+    
+    echo "${audio_codec}|${audio_bitrate_kbps}|${should_convert}"
+}
+
+# Construit les paramètres audio FFmpeg selon l'analyse
+_build_audio_params() {
+    local input_file="$1"
+    
+    local audio_info should_convert
+    audio_info=$(_get_audio_conversion_info "$input_file")
+    should_convert=$(echo "$audio_info" | cut -d'|' -f3)
+    
+    if [[ "$should_convert" -eq 1 ]]; then
+        # Conversion vers Opus avec normalisation des layouts audio
+        # -af "aformat=channel_layouts=..." normalise les layouts non-standard
+        echo "-c:a libopus -b:a ${OPUS_TARGET_BITRATE_KBPS:-128}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
+    else
+        # Copier l'audio tel quel
+        echo "-c:a copy"
+    fi
+}
+
+###########################################################
+# SOUS-FONCTIONS D'ENCODAGE (PASS 1 / PASS 2)
+###########################################################
+
+# Prépare les paramètres vidéo adaptés au fichier source (bitrate, filtres, etc.)
+# Retourne via variables globales : VIDEO_BITRATE, VIDEO_MAXRATE, VIDEO_BUFSIZE,
+#                                   X265_VBV_STRING, VIDEO_FILTER_OPTS, OUTPUT_PIX_FMT
+_setup_video_encoding_params() {
+    local input_file="$1"
+    
+    # Récupérer les propriétés du flux vidéo source
+    local input_props
+    input_props=$(get_video_stream_props "$input_file")
+    local input_width input_height input_pix_fmt
+    IFS='|' read -r input_width input_height input_pix_fmt <<< "$input_props"
+
+    # Pixel format de sortie (10-bit si source 10-bit)
+    OUTPUT_PIX_FMT=$(_select_output_pix_fmt "$input_pix_fmt")
+
+    # Filtre de downscale si nécessaire
+    local downscale_filter
+    downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
+    
+    VIDEO_FILTER_OPTS=""
+    if [[ -n "$downscale_filter" ]]; then
+        VIDEO_FILTER_OPTS="-vf $downscale_filter"
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+        fi
+    fi
+    
+    # Affichage 10-bit si applicable
+    if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]]; then
+        if [[ "$OUTPUT_PIX_FMT" == "yuv420p10le" ]]; then
+            echo -e "${CYAN}  🎨 Sortie 10-bit activée (source: $input_pix_fmt)${NOCOLOR}"
+        fi
+    fi
+
+    # Calcul du bitrate adapté à la résolution de sortie
+    local output_height
+    output_height=$(_compute_output_height_for_bitrate "$input_width" "$input_height")
+
+    local effective_target effective_maxrate effective_bufsize
+    effective_target=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
+    effective_maxrate=$(_compute_effective_bitrate_kbps_for_height "${MAXRATE_KBPS}" "$output_height")
+    effective_bufsize=$(_compute_effective_bitrate_kbps_for_height "${BUFSIZE_KBPS}" "$output_height")
+
+    VIDEO_BITRATE="${effective_target}k"
+    VIDEO_MAXRATE="${effective_maxrate}k"
+    VIDEO_BUFSIZE="${effective_bufsize}k"
+    X265_VBV_STRING="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
+}
+
+# Prépare les paramètres du mode sample (seek + durée)
+# Retourne via variables globales : SAMPLE_SEEK_PARAMS, SAMPLE_DURATION_PARAMS, EFFECTIVE_DURATION
+_setup_sample_mode_params() {
+    local input_file="$1"
+    local duration_secs="$2"
+    
+    SAMPLE_SEEK_PARAMS=""
+    SAMPLE_DURATION_PARAMS=""
+    EFFECTIVE_DURATION="$duration_secs"
+
+    if [[ "$SAMPLE_MODE" != true ]]; then
+        return 0
+    fi
+
+    # Convertir duration_secs en entier
+    local duration_int=${duration_secs%.*}
+    local margin_start="${SAMPLE_MARGIN_START:-180}"
+    local margin_end="${SAMPLE_MARGIN_END:-120}"
+    local sample_len="${SAMPLE_DURATION:-30}"
+    local available_range=$((duration_int - margin_start - margin_end - sample_len))
+
+    local target_pos
+    if [[ "$available_range" -gt 0 ]]; then
+        local random_offset=$((RANDOM % available_range))
+        target_pos=$((margin_start + random_offset))
+    else
+        target_pos=$((duration_int / 3))
+    fi
+
+    # Trouver le keyframe le plus proche
+    local keyframe_pos
+    keyframe_pos=$(ffprobe -v error -select_streams v:0 -skip_frame nokey \
+        -show_entries packet=pts_time -of csv=p=0 \
+        -read_intervals "${target_pos}%+30" "$input_file" 2>/dev/null | head -1)
+
+    if [[ -z "$keyframe_pos" ]] || [[ ! "$keyframe_pos" =~ ^[0-9.]+$ ]]; then
+        keyframe_pos="$target_pos"
+    fi
+
+    local keyframe_int=${keyframe_pos%.*}
+    
+    SAMPLE_SEEK_PARAMS="-ss $keyframe_pos"
+    SAMPLE_DURATION_PARAMS="-t $sample_len"
+    EFFECTIVE_DURATION="$sample_len"
+    SAMPLE_KEYFRAME_POS="$keyframe_pos"
+
+    # Formater pour affichage
+    local seek_h=$((keyframe_int / 3600))
+    local seek_m=$(((keyframe_int % 3600) / 60))
+    local seek_s=$((keyframe_int % 60))
+    local seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
+
+    if [[ "$available_range" -gt 0 ]]; then
+        echo -e "${CYAN}  🎯 Mode échantillon : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+    else
+        echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+    fi
+}
+
+# Exécute le pass 1 (analyse) de l'encodage two-pass
+# Retourne 0 si succès, 1 si erreur
+_run_encoding_pass1() {
+    local input_file="$1"
+    local ffmpeg_log="$2"
+    local base_name="$3"
+    local x265_base_params="$4"
+    local progress_slot="$5"
+    local is_parallel="$6"
+    local awk_time_func="$7"
+
+    START_TS="$(date +%s)"
+    
+    # Construire les paramètres pass 1
+    local x265_params_pass1="pass=1:${x265_base_params}"
+    if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
+        x265_params_pass1="${x265_params_pass1}:no-slow-firstpass=1"
+    fi
+
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $SAMPLE_SEEK_PARAMS \
+        -hwaccel $HWACCEL \
+        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
+        -g 600 -keyint_min 600 \
+        -c:v libx265 -preset "$ENCODER_PRESET" \
+        -tune fastdecode -b:v "$VIDEO_BITRATE" -x265-params "$x265_params_pass1" \
+        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
+        -an \
+        -f null /dev/null \
+        -progress pipe:1 -nostats 2> "${ffmpeg_log}.pass1" | \
+    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🔍" -v END_MSG="Analyse OK" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+
+    local pass1_rc=${PIPESTATUS[0]:-0}
+    
+    if [[ "$pass1_rc" -ne 0 ]]; then
+        echo -e "${RED}❌ Erreur lors de l'analyse (pass 1)${NOCOLOR}" >&2
+        if [[ -f "${ffmpeg_log}.pass1" ]]; then
+            tail -n 40 "${ffmpeg_log}.pass1" >&2 || true
+        fi
+        return 1
+    fi
+    
+    return 0
+}
+
+# Exécute le pass 2 (encodage final) de l'encodage two-pass
+# Retourne 0 si succès, 1 si erreur
+_run_encoding_pass2() {
+    local input_file="$1"
+    local output_file="$2"
+    local ffmpeg_log="$3"
+    local base_name="$4"
+    local x265_base_params="$5"
+    local audio_params="$6"
+    local progress_slot="$7"
+    local is_parallel="$8"
+    local awk_time_func="$9"
+
+    START_TS="$(date +%s)"
+    local x265_params_pass2="pass=2:${x265_base_params}"
+
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $SAMPLE_SEEK_PARAMS \
+        -hwaccel $HWACCEL \
+        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
+        -g 600 -keyint_min 600 \
+        -c:v libx265 -preset "$ENCODER_PRESET" \
+        -tune fastdecode -b:v "$VIDEO_BITRATE" -x265-params "$x265_params_pass2" \
+        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
+        $audio_params \
+        -map 0 -f matroska \
+        "$output_file" \
+        -progress pipe:1 -nostats 2> "$ffmpeg_log" | \
+    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🎬" -v END_MSG="Terminé ✅" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+
+    # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
+    local ffmpeg_rc=${PIPESTATUS[0]:-0}
+    local awk_rc=${PIPESTATUS[1]:-0}
+
+    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
+        return 0
+    else
+        if [[ -f "$ffmpeg_log" ]]; then
+            echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log) ---" >&2
+            tail -n 80 "$ffmpeg_log" >&2 || true
+            echo "--- Fin du log ffmpeg ---" >&2
+        fi
+        return 1
+    fi
 }
 
 ###########################################################
@@ -184,161 +470,19 @@ _execute_conversion() {
     local duration_secs="$4"
     local base_name="$5"
 
-    # Options de l'encodage (principales) :
-    #  -g 600               : taille GOP (nombre d'images entre I-frames)
-    #  -keyint_min 600      : intervalle minimum entre keyframes (force des I-frames régulières)
-    #  -c:v libx265         : encodeur logiciel x265 (HEVC)
-    #  -preset slow         : préréglage qualité/temps (lent = meilleure compression)
-    #  -tune fastdecode     : optimiser l'encodeur pour un décodage plus rapide
-    #  -pix_fmt yuv420p10le : format de pixels YUV 4:2:0 en 10 bits (si source 10-bit)
-
-    # Chronos :
-    # - FILE_START_TS : début du traitement de CE fichier (pass 1 + pass 2 combinées)
-    # - START_TS      : début de la passe courante (affichage durée pass 1 / pass 2 via awk)
+    # Chronos : début du traitement de ce fichier
     FILE_START_TS="$(date +%s)"
     START_TS="$FILE_START_TS"
 
-    # Two-pass encoding : analyse puis encodage
-    # Pass 1 : analyse rapide pour générer les statistiques
-    # Pass 2 : encodage final avec répartition optimale du bitrate
+    # Préparer les paramètres vidéo (adaptés à la résolution source)
+    _setup_video_encoding_params "$tmp_input"
+    
+    # Préparer les paramètres du mode sample si activé
+    _setup_sample_mode_params "$tmp_input" "$duration_secs"
 
-    # Préparer les paramètres vidéo (ils peuvent être adaptés par fichier selon la résolution)
-    local ff_bitrate=""
-    local ff_maxrate=""
-    local ff_bufsize=""
-    local x265_vbv=""
-
-    # TODO: Réactiver la conversion audio Opus quand VLC supportera mieux Opus surround dans MKV
-    # # Analyser l'audio et déterminer les paramètres de conversion
-    # local audio_info
-    # audio_info=$(get_audio_metadata "$tmp_input")
-    # local audio_codec audio_bitrate_kbps audio_should_convert
-    # IFS='|' read -r audio_codec audio_bitrate_kbps audio_should_convert <<< "$audio_info"
-    # 
-    # # Construire les paramètres audio pour FFmpeg
-    # local audio_params=""
-    # if [[ "$audio_should_convert" -eq 1 ]]; then
-    #     # Conversion vers Opus 128 kbps (meilleure qualité/taille que AAC)
-    #     # -af "aformat=channel_layouts=..." normalise les layouts audio non-standard
-    #     # (ex: 5.1(side) → 5.1) pour éviter l'erreur "Invalid channel layout"
-    #     # Ordre de préférence : 7.1 > 5.1 > stereo > mono
-    #     audio_params="-c:a libopus -b:a ${AUDIO_OPUS_TARGET_KBPS}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
-    # else
-    #     # Copier l'audio tel quel (déjà optimisé ou Opus)
-    #     audio_params="-c:a copy"
-    # fi
-
-    # Copier l'audio tel quel (en attendant meilleur support VLC pour Opus)
-    local audio_params="-c:a copy"
-
-    # ==================== ADAPTATION SOURCE (10-bit + downscale) ====================
-    # Objectif :
-    # - éviter le banding : conserver du 10-bit quand l'entrée est 10-bit
-    # - éviter une qualité catastrophique : downscale au-delà de 1080p pour un bitrate cible prévu 1080p
-    local input_props
-    input_props=$(get_video_stream_props "$tmp_input")
-    local input_width input_height input_pix_fmt
-    IFS='|' read -r input_width input_height input_pix_fmt <<< "$input_props"
-
-    local output_pix_fmt
-    output_pix_fmt=$(_select_output_pix_fmt "$input_pix_fmt")
-
-    local downscale_filter
-    downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
-
-    # ==================== ADAPTATION BITRATE PAR RÉSOLUTION (ex: 720p) ====================
-    local out_height_for_bitrate
-    out_height_for_bitrate=$(_compute_output_height_for_bitrate "$input_width" "$input_height")
-
-    local base_target_kbps="${TARGET_BITRATE_KBPS}"
-    local base_maxrate_kbps="${MAXRATE_KBPS}"
-    local base_bufsize_kbps="${BUFSIZE_KBPS}"
-
-    local eff_target_kbps eff_maxrate_kbps eff_bufsize_kbps
-    eff_target_kbps=$(_compute_effective_bitrate_kbps_for_height "$base_target_kbps" "$out_height_for_bitrate")
-    eff_maxrate_kbps=$(_compute_effective_bitrate_kbps_for_height "$base_maxrate_kbps" "$out_height_for_bitrate")
-    eff_bufsize_kbps=$(_compute_effective_bitrate_kbps_for_height "$base_bufsize_kbps" "$out_height_for_bitrate")
-
-    ff_bitrate="${eff_target_kbps}k"
-    ff_maxrate="${eff_maxrate_kbps}k"
-    ff_bufsize="${eff_bufsize_kbps}k"
-    x265_vbv="vbv-maxrate=${eff_maxrate_kbps}:vbv-bufsize=${eff_bufsize_kbps}"
-
-    :
-
-    # Note: on passe "-vf ..." sous forme de chaîne pour rester compatible avec la construction
-    # existante des commandes ffmpeg (style du script).
-    local video_filter_opts=""
-    if [[ -n "$downscale_filter" ]]; then
-        video_filter_opts="-vf $downscale_filter"
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
-        fi
-    fi
-    if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]]; then
-        if [[ "$output_pix_fmt" == "yuv420p10le" ]]; then
-            echo -e "${CYAN}  🎨 Sortie 10-bit activée (source: $input_pix_fmt)${NOCOLOR}"
-        fi
-    fi
-
-    # Mode sample : trouver le keyframe exact pour garantir la synchronisation avec VMAF
-    local sample_seek_params=""
-    local sample_duration_params=""
-    local effective_duration="$duration_secs"
-
-    if [[ "$SAMPLE_MODE" == true ]]; then
-        # Convertir duration_secs en entier (Bash ne supporte pas l'arithmétique flottante)
-        local duration_int=${duration_secs%.*}
-        local margin_start="${SAMPLE_MARGIN_START:-180}"
-        local margin_end="${SAMPLE_MARGIN_END:-120}"
-        local sample_len="${SAMPLE_DURATION:-30}"
-        local available_range=$((duration_int - margin_start - margin_end - sample_len))
-
-        local target_pos
-        if [[ "$available_range" -gt 0 ]]; then
-            # Position aléatoire dans la plage disponible
-            local random_offset=$((RANDOM % available_range))
-            target_pos=$((margin_start + random_offset))
-        else
-            # Vidéo trop courte, prendre le milieu
-            target_pos=$((duration_int / 3))
-        fi
-
-        # Trouver le keyframe le plus proche de target_pos (en utilisant ffprobe)
-        # On cherche le keyframe >= target_pos pour être sûr d'avoir assez de contenu après
-        local keyframe_pos
-        keyframe_pos=$(ffprobe -v error -select_streams v:0 -skip_frame nokey \
-            -show_entries packet=pts_time -of csv=p=0 \
-            -read_intervals "${target_pos}%+30" "$tmp_input" 2>/dev/null | head -1)
-
-        # Si pas de keyframe trouvé, utiliser la position cible
-        if [[ -z "$keyframe_pos" ]] || [[ ! "$keyframe_pos" =~ ^[0-9.]+$ ]]; then
-            keyframe_pos="$target_pos"
-        fi
-
-        # Convertir en entier pour l'affichage et le stockage
-        local keyframe_int=${keyframe_pos%.*}
-
-        # Utiliser la position exacte du keyframe
-        sample_seek_params="-ss $keyframe_pos"
-        sample_duration_params="-t $sample_len"
-        effective_duration="$sample_len"
-
-        # Stocker la position EXACTE du keyframe pour VMAF (format décimal)
-        SAMPLE_KEYFRAME_POS="$keyframe_pos"
-
-        # Formater la position en HH:MM:SS pour l'affichage
-        local seek_h=$((keyframe_int / 3600))
-        local seek_m=$(((keyframe_int % 3600) / 60))
-        local seek_s=$((keyframe_int % 60))
-        local seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
-
-        if [[ "$available_range" -gt 0 ]]; then
-            echo -e "${CYAN}  🎯 Mode échantillon : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
-        else
-            echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
-        fi
-    fi
+    # Préparer les paramètres audio (copy ou conversion Opus)
+    local audio_params
+    audio_params=$(_build_audio_params "$tmp_input")
 
     # Script AWK adapté selon la disponibilité de systime() (gawk vs awk BSD)
     local awk_time_func
@@ -356,45 +500,15 @@ _execute_conversion() {
         progress_slot=$(acquire_progress_slot)
     fi
 
-    # ==================== PASS 1 : ANALYSE ====================
-    # Utiliser -passlogfile de ffmpeg (gère les chemins Windows correctement)
-    local x265_base_params="${x265_vbv}"
-    # Ajouter les paramètres x265 spécifiques au mode (ex: no-amp:no-rect pour séries)
+    # Paramètres x265 de base (VBV + extra params du mode)
+    local x265_base_params="${X265_VBV_STRING}"
     if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
         x265_base_params="${x265_base_params}:${X265_EXTRA_PARAMS}"
     fi
-    # Construire les paramètres pass 1 avec option fast si activée
-    local x265_params_pass1="pass=1:${x265_base_params}"
-    if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
-        # no-slow-firstpass : analyse rapide, gain ~15% en temps, impact qualité négligeable
-        x265_params_pass1="${x265_params_pass1}:no-slow-firstpass=1"
-    fi
 
-    # Pass 1 (chrono dédié)
-    START_TS="$(date +%s)"
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $sample_seek_params \
-        -hwaccel $HWACCEL \
-        -i "$tmp_input" $sample_duration_params $video_filter_opts -pix_fmt "$output_pix_fmt" \
-        -g 600 -keyint_min 600 \
-        -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass1" \
-        -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
-        -an \
-        -f null /dev/null \
-        -progress pipe:1 -nostats 2> "${ffmpeg_log_temp}.pass1" | \
-    awk -v DURATION="$effective_duration" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🔍" -v END_MSG="Analyse OK" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
-
-    # Vérifier le succès du pass 1
-    local pass1_rc=${PIPESTATUS[0]:-0}
-    if [[ "$pass1_rc" -ne 0 ]]; then
-        echo -e "${RED}❌ Erreur lors de l'analyse (pass 1)${NOCOLOR}" >&2
-        if [[ -f "${ffmpeg_log_temp}.pass1" ]]; then
-            tail -n 40 "${ffmpeg_log_temp}.pass1" >&2 || true
-        fi
+    # ==================== PASS 1 : ANALYSE ====================
+    if ! _run_encoding_pass1 "$tmp_input" "$ffmpeg_log_temp" "$base_name" \
+                             "$x265_base_params" "$progress_slot" "$is_parallel" "$awk_time_func"; then
         if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
             release_progress_slot "$progress_slot"
         fi
@@ -402,50 +516,21 @@ _execute_conversion() {
     fi
 
     # ==================== PASS 2 : ENCODAGE ====================
-    # Pass 2 (chrono dédié)
-    START_TS="$(date +%s)"
-    local x265_params_pass2="pass=2:${x265_base_params}"
+    if ! _run_encoding_pass2 "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
+                             "$x265_base_params" "$audio_params" "$progress_slot" "$is_parallel" "$awk_time_func"; then
+        # Nettoyer les fichiers de stats x265
+        rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+        if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+            release_progress_slot "$progress_slot"
+        fi
+        return 1
+    fi
 
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $sample_seek_params \
-        -hwaccel $HWACCEL \
-        -i "$tmp_input" $sample_duration_params $video_filter_opts -pix_fmt "$output_pix_fmt" \
-        -g 600 -keyint_min 600 \
-        -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode -b:v "$ff_bitrate" -x265-params "$x265_params_pass2" \
-        -maxrate "$ff_maxrate" -bufsize "$ff_bufsize" \
-        $audio_params \
-        -map 0 -f matroska \
-        "$tmp_output" \
-        -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$effective_duration" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🎬" -v END_MSG="Terminé ✅" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
-
-    # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline,
-    # avant toute autre commande qui l'écraserait.
-    local ffmpeg_rc=${PIPESTATUS[0]:-0}
-    local awk_rc=${PIPESTATUS[1]:-0}
-
-    # Nettoyer les fichiers de stats
+    # Nettoyage final
     rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
-
-    # Libérer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
         release_progress_slot "$progress_slot"
     fi
 
-    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
-        return 0
-    else
-        if [[ -f "$ffmpeg_log_temp" ]]; then
-            echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log_temp) ---" >&2
-            tail -n 80 "$ffmpeg_log_temp" >&2 || true
-            echo "--- Fin du log ffmpeg ---" >&2
-        else
-            echo "(Aucun fichier de log ffmpeg trouvé: $ffmpeg_log_temp)" >&2
-        fi
-        return 1
-    fi
+    return 0
 }

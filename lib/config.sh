@@ -92,6 +92,7 @@ PARALLEL_JOBS=1
 NO_PROGRESS=false
 CONVERSION_MODE="serie"
 VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
+OPUS_ENABLED=false  # Conversion audio Opus (expérimental, problèmes VLC)
 
 # Mode sample : encoder uniquement un segment de test (30s par défaut)
 SAMPLE_MODE=false
@@ -175,6 +176,12 @@ readonly ADAPTIVE_720P_MAX_HEIGHT=720
 # Facteur appliqué aux bitrates base (TARGET/MAXRATE/BUFSIZE) quand profil 720p.
 # Exemple : 70 => 2070k (1080p) devient ~1449k (720p)
 readonly ADAPTIVE_720P_SCALE_PERCENT=70
+
+# ----- Paramètres audio Opus (expérimental) -----
+# Note : la conversion Opus peut causer des problèmes avec VLC pour le surround.
+# Utiliser --opus pour activer cette fonctionnalité.
+readonly OPUS_TARGET_BITRATE_KBPS=128
+readonly OPUS_CONVERSION_THRESHOLD_KBPS=160
 
 ###########################################################
 # GESTION DES MODES DE CONVERSION
@@ -270,11 +277,10 @@ build_dynamic_suffix() {
         suffix="${suffix}_tuned"
     fi
     
-    # TODO: Réactiver quand VLC supportera Opus surround dans MKV
-    # Indicateur conversion audio Opus (128 kbps)
-    # if [[ "${AUDIO_OPUS_ENABLED:-false}" == true ]]; then
-    #     suffix="${suffix}_opus${AUDIO_OPUS_TARGET_KBPS}k"
-    # fi
+    # Indicateur conversion audio Opus
+    if [[ "${OPUS_ENABLED:-false}" == true ]]; then
+        suffix="${suffix}_opus"
+    fi
     
     # Indicateur mode sample (segment de test)
     if [[ "$SAMPLE_MODE" == true ]]; then
@@ -300,19 +306,3 @@ _build_excludes_regex() {
     echo "$regex"
 }
 EXCLUDES_REGEX="$(_build_excludes_regex)"
-
-###########################################################
-# DÉTECTION HARDWARE ACCELERATION
-###########################################################
-
-# Détecte et définit la variable HWACCEL utilisée pour le décodage matériel
-detect_hwaccel() {
-    HWACCEL=""
-
-    # macOS -> videotoolbox
-    if [[ "$(uname -s)" == "Darwin" ]]; then
-        HWACCEL="videotoolbox"
-    else
-        HWACCEL="cuda"
-    fi
-}

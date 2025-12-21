@@ -1,61 +1,5 @@
 #!/bin/bash
 ###########################################################
-# ANALYSE DES MÉTADONNÉES AUDIO
-# TODO: Réactiver quand VLC supportera mieux Opus surround dans MKV
-###########################################################
-
-# # Activer la conversion audio vers Opus
-# AUDIO_OPUS_ENABLED=true
-# # Bitrate cible pour l'audio Opus (kbps)
-# readonly AUDIO_OPUS_TARGET_KBPS=128
-# # Seuil minimum pour considérer la conversion audio avantageuse (kbps)
-# # On ne convertit que si le bitrate source est > seuil (évite de ré-encoder du déjà compressé)
-# readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
-#
-# # Analyse l'audio d'un fichier et détermine si la conversion Opus est avantageuse
-# # Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert to opus)
-# get_audio_metadata() {
-#     local file="$1"
-#     
-#     # Récupérer les infos audio du premier flux audio
-#     local audio_info
-#     audio_info=$(ffprobe -v error \
-#         -select_streams a:0 \
-#         -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-#         -of default=noprint_wrappers=1 \
-#         "$file" 2>/dev/null)
-#     
-#     local audio_codec=$(echo "$audio_info" | grep '^codec_name=' | cut -d'=' -f2)
-#     local audio_bitrate=$(echo "$audio_info" | grep '^bit_rate=' | cut -d'=' -f2)
-#     local audio_bitrate_tag=$(echo "$audio_info" | grep '^TAG:BPS=' | cut -d'=' -f2)
-#     
-#     # Utiliser le tag BPS si bitrate direct non disponible
-#     if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
-#         audio_bitrate="$audio_bitrate_tag"
-#     fi
-#     
-#     # Convertir en kbps
-#     audio_bitrate=$(clean_number "$audio_bitrate")
-#     local audio_bitrate_kbps=0
-#     if [[ -n "$audio_bitrate" && "$audio_bitrate" =~ ^[0-9]+$ ]]; then
-#         audio_bitrate_kbps=$((audio_bitrate / 1000))
-#     fi
-#     
-#     # Déterminer si la conversion est avantageuse
-#     local should_convert=0
-#     
-#     # Ne pas convertir si déjà en Opus
-#     if [[ "$audio_codec" == "opus" ]]; then
-#         should_convert=0
-#     # Convertir si le bitrate source est supérieur au seuil
-#     elif [[ "$audio_bitrate_kbps" -gt "$AUDIO_CONVERSION_THRESHOLD_KBPS" ]]; then
-#         should_convert=1
-#     fi
-#     
-#     echo "${audio_codec}|${audio_bitrate_kbps}|${should_convert}"
-# }
-
-###########################################################
 # ANALYSE DES MÉTADONNÉES VIDÉO
 ###########################################################
 
@@ -136,4 +80,21 @@ get_video_stream_props() {
     pix_fmt=$(echo "$out" | awk -F= '/^pix_fmt=/{print $2; exit}')
 
     echo "${width}|${height}|${pix_fmt}"
+}
+
+###########################################################
+# DÉTECTION HARDWARE ACCELERATION
+###########################################################
+
+# Détecte et définit la variable HWACCEL utilisée pour le décodage matériel.
+# Appelée une fois au démarrage pour configurer le décodeur.
+detect_hwaccel() {
+    HWACCEL=""
+
+    # macOS -> videotoolbox
+    if [[ "$(uname -s)" == "Darwin" ]]; then
+        HWACCEL="videotoolbox"
+    else
+        HWACCEL="cuda"
+    fi
 }

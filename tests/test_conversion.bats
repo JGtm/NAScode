@@ -164,16 +164,39 @@ teardown() {
 # Tests des paramètres audio (préparation pour réactivation)
 ###########################################################
 
-@test "config: AUDIO_OPUS_TARGET_KBPS défini à 128" {
-    # Vérifier que la constante commentée est bien préparée à 128
-    local opus_target
-    opus_target=$(grep -oP 'AUDIO_OPUS_TARGET_KBPS=\K[0-9]+' "$LIB_DIR/conversion.sh" 2>/dev/null | head -1) || opus_target=""
+@test "config: OPUS_TARGET_BITRATE_KBPS défini à 128" {
+    # OPUS_TARGET_BITRATE_KBPS est readonly et déjà chargé par load_base_modules
+    [ "$OPUS_TARGET_BITRATE_KBPS" -eq 128 ]
+}
+
+###########################################################
+# Tests de chemins avec espaces
+###########################################################
+
+@test "_prepare_file_paths: gère les espaces dans le nom de fichier" {
+    SOURCE="/videos"
+    SUFFIX_STRING="_x265"
+    DRYRUN=false
     
-    # Soit la variable existe (non commentée), soit on vérifie dans le code commenté
-    if [[ -n "$opus_target" ]]; then
-        [ "$opus_target" -eq 128 ]
-    else
-        # Vérifier que c'est présent dans le code commenté
-        grep -q "AUDIO_OPUS_TARGET_KBPS=128" "$LIB_DIR/conversion.sh"
-    fi
+    local result
+    result=$(_prepare_file_paths "/videos/my movie file.mkv" "/output")
+    
+    local filename
+    filename=$(echo "$result" | cut -d'|' -f1)
+    
+    [ "$filename" = "my movie file.mkv" ]
+}
+
+@test "_prepare_file_paths: gère les espaces dans le chemin" {
+    SOURCE="/videos"
+    SUFFIX_STRING="_x265"
+    DRYRUN=false
+    
+    local result
+    result=$(_prepare_file_paths "/videos/season one/episode 01.mkv" "/output")
+    
+    local final_dir
+    final_dir=$(echo "$result" | cut -d'|' -f2)
+    
+    [[ "$final_dir" =~ "season one" ]]
 }
