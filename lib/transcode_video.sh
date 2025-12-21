@@ -279,18 +279,9 @@ _build_stream_mapping() {
                 mapping="$mapping -map 0:$idx"
             fi
         done <<< "$fr_subs"
-        
-        if [[ "$NO_PROGRESS" != true ]]; then
-            local count
-            count=$(echo "$fr_subs" | wc -l)
-            echo -e "${CYAN}  🇫🇷 Sous-titres FR conservés : $count piste(s)${NOCOLOR}" >&2
-        fi
     else
         # Aucun sous-titre FR trouvé, on garde tous les sous-titres
         mapping="$mapping -map 0:s?"
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}  ⚠️  Aucun sous-titre FR détecté, tous les sous-titres conservés${NOCOLOR}" >&2
-        fi
     fi
     
     echo "$mapping"
