@@ -232,7 +232,7 @@ set_conversion_mode_parameters() {
             # En mode single-pass, on utilise CRF au lieu du bitrate cible
             # CRF 23 : bon compromis qualité/taille pour séries
             if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-                CRF_VALUE=23
+                CRF_VALUE=21
             fi
             ;;
         *)

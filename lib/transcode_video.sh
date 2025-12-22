@@ -443,9 +443,13 @@ _run_encoding_pass1() {
     local pass1_rc=${PIPESTATUS[0]:-0}
     
     if [[ "$pass1_rc" -ne 0 ]]; then
-        echo -e "${RED}❌ Erreur lors de l'analyse (pass 1)${NOCOLOR}" >&2
-        if [[ -f "${ffmpeg_log}.pass1" ]]; then
-            tail -n 40 "${ffmpeg_log}.pass1" >&2 || true
+        # Ne pas afficher les logs si interruption volontaire (Ctrl+C)
+        # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
+        if [[ "${_INTERRUPTED:-0}" -ne 1 && "$pass1_rc" -ne 255 && "$pass1_rc" -lt 128 ]]; then
+            echo -e "${RED}❌ Erreur lors de l'analyse (pass 1)${NOCOLOR}" >&2
+            if [[ -f "${ffmpeg_log}.pass1" ]]; then
+                tail -n 40 "${ffmpeg_log}.pass1" >&2 || true
+            fi
         fi
         return 1
     fi
@@ -494,7 +498,9 @@ _run_encoding_pass2() {
     if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
         return 0
     else
-        if [[ -f "$ffmpeg_log" ]]; then
+        # Ne pas afficher les logs si interruption volontaire (Ctrl+C)
+        # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
+        if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]] && [[ -f "$ffmpeg_log" ]]; then
             echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log) ---" >&2
             tail -n 80 "$ffmpeg_log" >&2 || true
             echo "--- Fin du log ffmpeg ---" >&2
@@ -546,7 +552,9 @@ _run_encoding_single_pass() {
     if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
         return 0
     else
-        if [[ -f "$ffmpeg_log" ]]; then
+        # Ne pas afficher les logs si interruption volontaire (Ctrl+C)
+        # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
+        if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]] && [[ -f "$ffmpeg_log" ]]; then
             echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log) ---" >&2
             tail -n 80 "$ffmpeg_log" >&2 || true
             echo "--- Fin du log ffmpeg ---" >&2
