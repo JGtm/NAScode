@@ -609,10 +609,6 @@ _execute_conversion() {
     # ==================== CHOIX DU MODE D'ENCODAGE ====================
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
         # Mode single-pass CRF (séries uniquement)
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${CYAN}  ⚡ Encodage single-pass CRF ${CRF_VALUE}${NOCOLOR}"
-        fi
-        
         if ! _run_encoding_single_pass "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
                                        "$x265_base_params" "$audio_params" "$stream_mapping" \
                                        "$progress_slot" "$is_parallel" "$awk_time_func"; then

@@ -78,11 +78,11 @@ cd "$TESTS_DIR"
 
 if [[ -n "$FILTER" ]]; then
     echo -e "${CYAN}Exécution des tests filtrant: $FILTER${NC}"
-    bats $VERBOSE --filter "$FILTER" *.bats
+    bats --pretty $VERBOSE --filter "$FILTER" *.bats
 else
     echo -e "${CYAN}Exécution de tous les tests...${NC}"
     echo ""
-    bats $VERBOSE *.bats
+    bats --pretty $VERBOSE *.bats
 fi
 
 echo ""

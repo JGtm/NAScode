@@ -102,11 +102,8 @@ SAMPLE_MARGIN_END=120   # Marge fin (éviter générique) en secondes
 SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour VMAF)
 
 # Mode single-pass CRF pour séries (plus rapide, taille variable)
-# Disponible uniquement pour le mode "serie", désactivé automatiquement pour "film"
-SINGLE_PASS_MODE=false
-readonly CRF_SERIES_VALUE=23  # CRF 23 : bon compromis qualité/taille pour séries
-SAMPLE_MARGIN_END=120   # Marge fin (éviter générique) en secondes
-SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour VMAF)
+# Activé par défaut pour le mode "serie", désactivé automatiquement pour "film"
+SINGLE_PASS_MODE=true
 
 # Mode de tri pour la construction de la file d'attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
@@ -233,8 +230,9 @@ set_conversion_mode_parameters() {
             # Pass 1 rapide : analyse moins approfondie mais gain temps ~15%
             X265_PASS1_FAST=true
             # En mode single-pass, on utilise CRF au lieu du bitrate cible
+            # CRF 23 : bon compromis qualité/taille pour séries
             if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-                CRF_VALUE="$CRF_SERIES_VALUE"
+                CRF_VALUE=23
             fi
             ;;
         *)

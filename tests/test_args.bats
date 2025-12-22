@@ -24,7 +24,7 @@ _reset_cli_state() {
     KEEP_INDEX=false
     VMAF_ENABLED=false
     SAMPLE_MODE=false
-    SINGLE_PASS_MODE=false
+    SINGLE_PASS_MODE=true
     NO_PROGRESS=false
     PARALLEL_JOBS=1
     CONVERSION_MODE="serie"
@@ -133,34 +133,34 @@ _reset_cli_state() {
     [ "$SAMPLE_MODE" = "true" ]
 }
 
-@test "parse_arguments: -1/--single-pass active SINGLE_PASS_MODE" {
+@test "parse_arguments: -2/--two-pass désactive SINGLE_PASS_MODE" {
     _reset_cli_state
 
-    parse_arguments --single-pass
-
-    [ "$SINGLE_PASS_MODE" = "true" ]
-}
-
-@test "parse_arguments: -1 active SINGLE_PASS_MODE (forme courte)" {
-    _reset_cli_state
-
-    parse_arguments -1
-
-    [ "$SINGLE_PASS_MODE" = "true" ]
-}
-
-@test "parse_arguments: single-pass désactivé pour mode film" {
-    _reset_cli_state
-
-    parse_arguments -1 --mode film
+    parse_arguments --two-pass
 
     [ "$SINGLE_PASS_MODE" = "false" ]
 }
 
-@test "parse_arguments: single-pass reste actif pour mode serie" {
+@test "parse_arguments: -2 désactive SINGLE_PASS_MODE (forme courte)" {
     _reset_cli_state
 
-    parse_arguments -1 --mode serie
+    parse_arguments -2
+
+    [ "$SINGLE_PASS_MODE" = "false" ]
+}
+
+@test "parse_arguments: single-pass désactivé automatiquement pour mode film" {
+    _reset_cli_state
+
+    parse_arguments --mode film
+
+    [ "$SINGLE_PASS_MODE" = "false" ]
+}
+
+@test "parse_arguments: single-pass reste actif par défaut pour mode serie" {
+    _reset_cli_state
+
+    parse_arguments --mode serie
 
     [ "$SINGLE_PASS_MODE" = "true" ]
 }

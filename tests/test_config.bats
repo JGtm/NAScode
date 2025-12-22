@@ -216,15 +216,11 @@ teardown() {
 # Tests du mode single-pass CRF
 ###########################################################
 
-@test "config: SINGLE_PASS_MODE par défaut est false" {
-    [ "$SINGLE_PASS_MODE" = "false" ]
+@test "config: SINGLE_PASS_MODE par défaut est true" {
+    [ "$SINGLE_PASS_MODE" = "true" ]
 }
 
-@test "config: CRF_SERIES_VALUE est défini à 23" {
-    [ "$CRF_SERIES_VALUE" -eq 23 ]
-}
-
-@test "set_conversion_mode_parameters: single-pass configure CRF_VALUE pour séries" {
+@test "set_conversion_mode_parameters: single-pass configure CRF_VALUE à 23" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     set_conversion_mode_parameters

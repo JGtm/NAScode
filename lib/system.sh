@@ -42,7 +42,12 @@ check_dependencies() {
         exit 1
     fi
 
-    echo -e "   - Mode conversion : ${CYAN}$CONVERSION_MODE${NOCOLOR} (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)"
+    # Affichage adapté selon le mode d'encodage
+    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+        echo -e "   - Mode conversion : ${CYAN}$CONVERSION_MODE${NOCOLOR} (CRF=${CRF_VALUE}, single-pass)"
+    else
+        echo -e "   - Mode conversion : ${CYAN}$CONVERSION_MODE${NOCOLOR} (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)"
+    fi
     echo -e "${GREEN}Environnement validé.${NOCOLOR}"
 }
 
