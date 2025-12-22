@@ -110,6 +110,13 @@ main() {
     # Vérifier si VMAF est activé et disponible
     check_vmaf
 
+    # Construire la file d'attente (peut poser des questions sur l'index)
+    build_queue
+    
+    # Exporter les variables et fonctions pour les sous-shells
+    export_variables
+
+    # --- Après toutes les questions interactives ---
     # Afficher les informations heures creuses si activé
     show_off_peak_startup_info
     
@@ -118,12 +125,6 @@ main() {
         echo -e "${RED}Arrêt demandé avant le début du traitement.${NOCOLOR}"
         exit 0
     fi
-
-    # Construire la file d'attente
-    build_queue
-    
-    # Exporter les variables et fonctions pour les sous-shells
-    export_variables
 
     # Préparer la queue dynamique, lancer le traitement et attendre la fin
     prepare_dynamic_queue
