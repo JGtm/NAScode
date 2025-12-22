@@ -110,7 +110,7 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
-    [ "$result" = "_x265_crf23_1080p_medium_tuned" ]
+    [ "$result" = "_x265_crf21_1080p_medium_tuned" ]
 }
 
 @test "_build_effective_suffix_for_dims: affiche CRF en mode single-pass (720p)" {
@@ -119,7 +119,7 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
-    [ "$result" = "_x265_crf23_720p_medium_tuned" ]
+    [ "$result" = "_x265_crf21_720p_medium_tuned" ]
 }
 
 @test "_build_effective_suffix_for_dims: CRF identique quelle que soit la résolution" {
@@ -131,6 +131,6 @@ teardown() {
     result_720=$(_build_effective_suffix_for_dims 1280 720)
     result_1080=$(_build_effective_suffix_for_dims 1920 1080)
     
-    [[ "$result_720" =~ "_crf23_" ]]
-    [[ "$result_1080" =~ "_crf23_" ]]
+    [[ "$result_720" =~ "_crf21_" ]]
+    [[ "$result_1080" =~ "_crf21_" ]]
 }

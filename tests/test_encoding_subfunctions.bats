@@ -207,6 +207,8 @@ teardown() {
 @test "_build_effective_suffix_for_dims: utilise effective_bitrate_kbps" {
     # Les variables readonly sont définies par config.sh
     # TARGET_BITRATE_KBPS=2070, ADAPTIVE_720P_SCALE_PERCENT=70
+    # Forcer two-pass pour tester le bitrate adapté
+    SINGLE_PASS_MODE=false
     OPUS_ENABLED=false
     SAMPLE_MODE=false
     

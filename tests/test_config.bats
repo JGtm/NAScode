@@ -220,12 +220,12 @@ teardown() {
     [ "$SINGLE_PASS_MODE" = "true" ]
 }
 
-@test "set_conversion_mode_parameters: single-pass configure CRF_VALUE à 23" {
+@test "set_conversion_mode_parameters: single-pass configure CRF_VALUE à 21" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     set_conversion_mode_parameters
     
-    [ "$CRF_VALUE" -eq 23 ]
+    [ "$CRF_VALUE" -eq 21 ]
 }
 
 @test "set_conversion_mode_parameters: single-pass ne change pas le preset" {
@@ -241,7 +241,7 @@ teardown() {
     SINGLE_PASS_MODE=true
     set_conversion_mode_parameters
     
-    [[ "$SUFFIX_STRING" =~ "_crf23_" ]]
+    [[ "$SUFFIX_STRING" =~ "_crf21_" ]]
 }
 
 @test "build_dynamic_suffix: affiche bitrate en mode two-pass" {

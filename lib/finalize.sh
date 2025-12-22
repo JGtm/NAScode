@@ -169,9 +169,19 @@ _finalize_conversion_success() {
     local ffmpeg_log_temp="$6"
     local size_before_mb="$7"
 
-    # Si un marqueur d'arrêt global existe, ne pas finaliser (message déjà affiché par cleanup)
+    # Si un marqueur d'arrêt global existe, ne pas finaliser normalement.
+    # IMPORTANT: On garde tmp_output si le fichier existe pour ne pas perdre le travail.
+    # Le fichier sera nettoyé au prochain lancement ou manuellement récupéré.
     if [[ -f "$STOP_FLAG" ]]; then
-        rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
+        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+        # Avertir si un fichier converti risque d'être perdu
+        if [[ -f "$tmp_output" ]]; then
+            echo -e "  ${YELLOW}⚠️  Conversion interrompue, fichier temporaire conservé: $tmp_output${NOCOLOR}" >&2
+            # Log pour récupération manuelle si besoin
+            if [[ -n "$LOG_ERROR" ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | INTERRUPTED | $file_original -> $tmp_output (fichier temp conservé)" >> "$LOG_ERROR" 2>/dev/null || true
+            fi
+        fi
         return 1
     fi
 
@@ -190,6 +200,16 @@ _finalize_conversion_success() {
         fi
 
         echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
+    fi
+
+    # Vérifier que le fichier de sortie temporaire existe
+    if [[ ! -f "$tmp_output" ]]; then
+        echo -e "  ${RED}❌ ERREUR: Fichier temporaire introuvable après encodage: $tmp_output${NOCOLOR}" >&2
+        if [[ -n "$LOG_ERROR" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output (fichier temp absent)" >> "$LOG_ERROR" 2>/dev/null || true
+        fi
+        rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
+        return 1
     fi
 
     # checksum et taille exacte avant déplacement (pour vérification intégrité)

@@ -64,7 +64,9 @@ teardown() {
 
 @test "_prepare_file_paths: inclut le suffix dans final_output" {
     SOURCE="/videos"
-    SUFFIX_STRING="_x265"
+    # Le suffixe dépend du mode (CRF en single-pass, bitrate en two-pass)
+    # On initialise les paramètres pour avoir un suffixe cohérent
+    set_conversion_mode_parameters
     DRYRUN=false
     
     local result
@@ -73,7 +75,8 @@ teardown() {
     local final_output
     final_output=$(echo "$result" | cut -d'|' -f5)
     
-    [[ "$final_output" =~ "_x265.mkv" ]]
+    # Vérifier que le suffixe contient _x265 (commun aux deux modes)
+    [[ "$final_output" =~ "_x265_" ]]
 }
 
 @test "_prepare_file_paths: ajoute le suffix dryrun si activé" {
