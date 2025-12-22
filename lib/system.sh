@@ -142,7 +142,9 @@ check_output_suffix() {
                 echo -e "${YELLOW}⚠️  Le suffixe de sortie est désactivé.${NOCOLOR}"
                 ;;
             *)
-                echo -e "${GREEN}✅ Le suffixe de sortie ('${SUFFIX_STRING}') sera utilisé.${NOCOLOR}"
+                # Ne pas afficher le suffixe complet car la résolution (1080p/720p) 
+                # dépend de chaque fichier source et peut prêter à confusion
+                echo -e "${GREEN}✅ Le suffixe de sortie sera utilisé.${NOCOLOR}"
                 ;;
         esac
     fi
