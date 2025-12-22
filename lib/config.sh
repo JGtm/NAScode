@@ -213,6 +213,11 @@ set_conversion_mode_parameters() {
             X265_EXTRA_PARAMS=""
             # Pass 1 complète pour une analyse approfondie (qualité max)
             X265_PASS1_FAST=false
+            # En mode single-pass, on utilise CRF au lieu du bitrate cible
+            # CRF : 0=lossless, 18=quasi-transparent, 23=défaut x265, 28+=basse qualité
+            if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+                CRF_VALUE=20
+            fi
             ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 23 (single-pass)
@@ -230,7 +235,7 @@ set_conversion_mode_parameters() {
             # Pass 1 rapide : analyse moins approfondie mais gain temps ~15%
             X265_PASS1_FAST=true
             # En mode single-pass, on utilise CRF au lieu du bitrate cible
-            # CRF 23 : bon compromis qualité/taille pour séries
+            # CRF : 0=lossless, 18=quasi-transparent, 23=défaut x265, 28+=basse qualité
             if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
                 CRF_VALUE=21
             fi
