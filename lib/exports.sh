@@ -99,4 +99,11 @@ export_variables() {
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
     export HAS_LIBVMAF VMAF_QUEUE_FILE
+    
+    # --- Variables et fonctions heures creuses ---
+    export OFF_PEAK_ENABLED OFF_PEAK_START OFF_PEAK_END OFF_PEAK_CHECK_INTERVAL
+    export OFF_PEAK_WAIT_COUNT OFF_PEAK_TOTAL_WAIT_SECONDS
+    export -f is_off_peak_time wait_for_off_peak check_off_peak_before_processing
+    export -f parse_off_peak_range time_to_minutes seconds_until_off_peak format_wait_time
+    export -f show_off_peak_status show_off_peak_startup_info
 }

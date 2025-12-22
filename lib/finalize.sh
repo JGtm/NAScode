@@ -354,6 +354,12 @@ show_summary() {
         echo "VMAF         : $vmaf_anomalies"
         echo "-------------------------------------------"
     } | tee "$SUMMARY_FILE"
+    
+    # Afficher le résumé des heures creuses si activé
+    if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
+        echo ""
+        show_off_peak_status
+    fi
 }
 
 ###########################################################

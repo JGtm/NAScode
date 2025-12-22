@@ -25,6 +25,12 @@ _process_queue_simple() {
     local file
     local -a _pids=()
     while IFS= read -r -d '' file; do
+        # Vérifier les heures creuses avant de lancer une nouvelle conversion
+        if ! check_off_peak_before_processing; then
+            echo -e "${YELLOW}⚠️  Traitement interrompu (arrêt demandé pendant l'attente)${NOCOLOR}"
+            break
+        fi
+        
         convert_file "$file" "$OUTPUT_DIR" &
         _pids+=("$!")
         if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
@@ -137,6 +143,12 @@ _process_queue_with_fifo() {
         local file
         local -a _pids=()
         while IFS= read -r -d '' file; do
+            # Vérifier les heures creuses avant de lancer une nouvelle conversion
+            if ! check_off_peak_before_processing; then
+                echo -e "${YELLOW}⚠️  Traitement interrompu (arrêt demandé pendant l'attente)${NOCOLOR}"
+                break
+            fi
+            
             convert_file "$file" "$OUTPUT_DIR" &
             _pids+=("$!")
             if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then

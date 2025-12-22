@@ -89,6 +89,28 @@ parse_arguments() {
                     exit 1
                 fi
                 ;;
+            -p|--off-peak|--off-peak=*)
+                OFF_PEAK_ENABLED=true
+                # Vérifier si une plage horaire est fournie (format --off-peak=HH:MM-HH:MM)
+                if [[ "$1" == *"="* ]]; then
+                    local range="${1#*=}"
+                    if ! parse_off_peak_range "$range"; then
+                        echo -e "${RED}ERREUR : Format invalide pour --off-peak. Attendu : HH:MM-HH:MM (ex: 22:00-06:00)${NOCOLOR}"
+                        exit 1
+                    fi
+                    shift
+                elif [[ "${2:-}" =~ ^[0-9]{1,2}:[0-9]{2}-[0-9]{1,2}:[0-9]{2}$ ]]; then
+                    # Format : --off-peak 22:00-06:00 (avec espace)
+                    if ! parse_off_peak_range "$2"; then
+                        echo -e "${RED}ERREUR : Format invalide pour --off-peak. Attendu : HH:MM-HH:MM (ex: 22:00-06:00)${NOCOLOR}"
+                        exit 1
+                    fi
+                    shift 2
+                else
+                    # Pas de plage fournie, utiliser les valeurs par défaut
+                    shift
+                fi
+                ;;
             -*) 
                 # On vérifie si l'argument est une option courte groupée
                 if [[ "$1" =~ ^-[a-zA-Z]{2,}$ ]]; then
@@ -162,6 +184,8 @@ Options :
     -t, --sample                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
     --opus                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
     -2, --two-pass               Forcer le mode two-pass (défaut : single-pass CRF 23 pour séries)
+    -p, --off-peak [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
+                                 PLAGE au format HH:MM-HH:MM (ARG optionnel) [défaut : 22:00-06:00]
 
 Remarque sur les options courtes groupées :
     - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
@@ -175,6 +199,11 @@ Modes de conversion :
   film          : Qualité maximale
   serie         : Bon compromis taille/qualité [défaut]
 
+Mode heures creuses :
+  Limite le traitement aux périodes définies (par défaut 22h-6h).
+  Si un fichier est en cours quand les heures pleines arrivent, il termine.
+  Le script attend ensuite le retour des heures creuses avant de continuer.
+
 Exemples :
   ./conversion.sh
   ./conversion.sh -s /media/videos -o /media/converted
@@ -183,5 +212,7 @@ Exemples :
   ./conversion.sh -xdrk -l 5      -x (no-suffix) -d (dry-run) -r (random) -k (keep-index) puis -l 5
   ./conversion.sh -dnr            -d (dry-run) -n (no-progress) -r (random)
   ./conversion.sh --vmaf          Activer l'évaluation VMAF après conversion
+  ./conversion.sh --off-peak      Mode heures creuses (22:00-06:00 par défaut)
+  ./conversion.sh -p 23:00-07:00  Mode heures creuses personnalisé (23h-7h)
 EOF
 }

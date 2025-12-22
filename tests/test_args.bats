@@ -9,6 +9,7 @@ load 'test_helper'
 setup() {
     setup_test_env
     load_minimal
+    source "$LIB_DIR/off_peak.sh"  # Nécessaire pour parse_off_peak_range
     source "$LIB_DIR/args.sh"
 }
 
@@ -32,6 +33,10 @@ _reset_cli_state() {
     OUTPUT_DIR="/output"
     CUSTOM_QUEUE=""
     EXCLUDES=()
+    # Heures creuses
+    OFF_PEAK_ENABLED=false
+    OFF_PEAK_START="22:00"
+    OFF_PEAK_END="06:00"
 }
 
 @test "parse_arguments: dry-run reste false si option absente" {
@@ -254,4 +259,79 @@ _reset_cli_state() {
     run bash -lc 'export DRYRUN=true; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; echo "$DRYRUN"'
     [ "$status" -eq 0 ]
     [ "$output" = "false" ]
+}
+
+###########################################################
+# Tests pour --off-peak / -p (heures creuses)
+###########################################################
+
+@test "parse_arguments: -p active OFF_PEAK_ENABLED avec valeurs par défaut" {
+    _reset_cli_state
+
+    parse_arguments -p
+
+    [ "$OFF_PEAK_ENABLED" = "true" ]
+    [ "$OFF_PEAK_START" = "22:00" ]
+    [ "$OFF_PEAK_END" = "06:00" ]
+}
+
+@test "parse_arguments: --off-peak active OFF_PEAK_ENABLED avec valeurs par défaut" {
+    _reset_cli_state
+
+    parse_arguments --off-peak
+
+    [ "$OFF_PEAK_ENABLED" = "true" ]
+    [ "$OFF_PEAK_START" = "22:00" ]
+    [ "$OFF_PEAK_END" = "06:00" ]
+}
+
+@test "parse_arguments: --off-peak=23:00-07:00 configure la plage personnalisée" {
+    _reset_cli_state
+
+    parse_arguments --off-peak=23:00-07:00
+
+    [ "$OFF_PEAK_ENABLED" = "true" ]
+    [ "$OFF_PEAK_START" = "23:00" ]
+    [ "$OFF_PEAK_END" = "07:00" ]
+}
+
+@test "parse_arguments: -p 21:30-05:30 configure la plage personnalisée" {
+    _reset_cli_state
+
+    parse_arguments -p 21:30-05:30
+
+    [ "$OFF_PEAK_ENABLED" = "true" ]
+    [ "$OFF_PEAK_START" = "21:30" ]
+    [ "$OFF_PEAK_END" = "05:30" ]
+}
+
+@test "parse_arguments: --off-peak avec plage diurne 08:00-18:00" {
+    _reset_cli_state
+
+    parse_arguments --off-peak=08:00-18:00
+
+    [ "$OFF_PEAK_ENABLED" = "true" ]
+    [ "$OFF_PEAK_START" = "08:00" ]
+    [ "$OFF_PEAK_END" = "18:00" ]
+}
+
+@test "parse_arguments: -p combinable avec autres flags (-dp)" {
+    _reset_cli_state
+
+    parse_arguments -dp
+
+    [ "$DRYRUN" = "true" ]
+    [ "$OFF_PEAK_ENABLED" = "true" ]
+}
+
+@test "parse_arguments: --off-peak invalide échoue (sous-shell)" {
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments --off-peak=25:00-06:00'
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Format invalide" ]]
+}
+
+@test "parse_arguments: --off-peak format incomplet échoue (sous-shell)" {
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments --off-peak=22:00'
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Format invalide" ]]
 }

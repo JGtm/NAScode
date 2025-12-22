@@ -57,13 +57,14 @@ source "$LIB_DIR/logging.sh"     # Logs (dépend de config pour EXECUTION_TIMEST
 source "$LIB_DIR/progress.sh"    # Slots progression (dépend de config pour EXECUTION_TIMESTAMP)
 source "$LIB_DIR/lock.sh"        # Verrous (dépend de colors, config)
 source "$LIB_DIR/system.sh"      # Système (dépend de colors, config, utils)
-source "$LIB_DIR/args.sh"        # Arguments (dépend de colors, config)
+source "$LIB_DIR/off_peak.sh"    # Heures creuses (dépend de colors, config)
+source "$LIB_DIR/args.sh"        # Arguments (dépend de colors, config, off_peak pour parse_off_peak_range)
 source "$LIB_DIR/queue.sh"       # Queue (dépend de colors, config, utils, logging)
 source "$LIB_DIR/vmaf.sh"        # VMAF (dépend de colors, config, utils, logging)
 source "$LIB_DIR/media_probe.sh" # Propriétés média (dépend de utils)
 source "$LIB_DIR/transcode_video.sh" # Transcodage vidéo (dépend de media_probe, config)
 source "$LIB_DIR/conversion.sh"  # Conversion (dépend de tout sauf finalize)
-source "$LIB_DIR/processing.sh"  # Traitement (dépend de conversion, queue)
+source "$LIB_DIR/processing.sh"  # Traitement (dépend de conversion, queue, off_peak)
 source "$LIB_DIR/finalize.sh"    # Finalisation (dépend de colors, config, utils, vmaf)
 source "$LIB_DIR/transfer.sh"    # Transferts asynchrones (dépend de finalize, config)
 source "$LIB_DIR/exports.sh"     # Exports (dépend de tout)
@@ -108,6 +109,15 @@ main() {
 
     # Vérifier si VMAF est activé et disponible
     check_vmaf
+
+    # Afficher les informations heures creuses si activé
+    show_off_peak_startup_info
+    
+    # Si mode heures creuses, attendre le début des heures creuses avant de continuer
+    if ! check_off_peak_before_processing; then
+        echo -e "${RED}Arrêt demandé avant le début du traitement.${NOCOLOR}"
+        exit 0
+    fi
 
     # Construire la file d'attente
     build_queue
