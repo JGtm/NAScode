@@ -24,6 +24,7 @@ _reset_cli_state() {
     KEEP_INDEX=false
     VMAF_ENABLED=false
     SAMPLE_MODE=false
+    SINGLE_PASS_MODE=false
     NO_PROGRESS=false
     PARALLEL_JOBS=1
     CONVERSION_MODE="serie"
@@ -130,6 +131,38 @@ _reset_cli_state() {
     parse_arguments --sample
 
     [ "$SAMPLE_MODE" = "true" ]
+}
+
+@test "parse_arguments: -1/--single-pass active SINGLE_PASS_MODE" {
+    _reset_cli_state
+
+    parse_arguments --single-pass
+
+    [ "$SINGLE_PASS_MODE" = "true" ]
+}
+
+@test "parse_arguments: -1 active SINGLE_PASS_MODE (forme courte)" {
+    _reset_cli_state
+
+    parse_arguments -1
+
+    [ "$SINGLE_PASS_MODE" = "true" ]
+}
+
+@test "parse_arguments: single-pass désactivé pour mode film" {
+    _reset_cli_state
+
+    parse_arguments -1 --mode film
+
+    [ "$SINGLE_PASS_MODE" = "false" ]
+}
+
+@test "parse_arguments: single-pass reste actif pour mode serie" {
+    _reset_cli_state
+
+    parse_arguments -1 --mode serie
+
+    [ "$SINGLE_PASS_MODE" = "true" ]
 }
 
 @test "parse_arguments: dry-run désactive VMAF et sample" {

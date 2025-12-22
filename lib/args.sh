@@ -76,6 +76,10 @@ parse_arguments() {
                 OPUS_ENABLED=true
                 shift
                 ;;
+            -1|--single-pass)
+                SINGLE_PASS_MODE=true
+                shift
+                ;;
             -j|--jobs)
                 if [[ "${2:-}" =~ ^[0-9]+$ ]] && [[ "$2" -ge 1 ]]; then
                     PARALLEL_JOBS="$2"
@@ -125,6 +129,12 @@ parse_arguments() {
             SAMPLE_MODE=false
         fi
     fi
+    
+    # Single-pass uniquement disponible pour les séries
+    if [[ "${SINGLE_PASS_MODE:-false}" == true ]] && [[ "$CONVERSION_MODE" == "film" ]]; then
+        echo -e "${YELLOW}⚠️  Mode single-pass désactivé : non disponible pour les films (qualité prioritaire)${NOCOLOR}"
+        SINGLE_PASS_MODE=false
+    fi
 }
 
 ###########################################################
@@ -152,6 +162,7 @@ Options :
     -v, --vmaf                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
     -t, --sample                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
     --opus                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
+    -1, --single-pass            Mode single-pass CRF 23 pour séries (plus rapide, taille variable)
 
 Remarque sur les options courtes groupées :
     - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),

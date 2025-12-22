@@ -131,8 +131,9 @@ _compute_effective_bitrate_kbps_for_height() {
 }
 
 # Construit le suffixe effectif par fichier à partir des dimensions source.
-# Inclut : bitrate effectif + hauteur de sortie estimée (ex: 720p) + preset.
-# Format: _x265_<bitrate>k_<height>p_<preset>[_tuned][_opus][_sample]
+# Inclut : bitrate effectif ou CRF + hauteur de sortie estimée (ex: 720p) + preset.
+# Format two-pass: _x265_<bitrate>k_<height>p_<preset>[_tuned][_opus][_sample]
+# Format single-pass: _x265_crf<value>_<height>p_<preset>[_tuned][_opus][_sample]
 _build_effective_suffix_for_dims() {
     local src_width="$1"
     local src_height="$2"
@@ -143,13 +144,18 @@ _build_effective_suffix_for_dims() {
     local output_height
     output_height=$(_compute_output_height_for_bitrate "$src_width" "$src_height")
 
-    # Bitrate effectif (selon hauteur)
-    local effective_bitrate_kbps
-    effective_bitrate_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
-    if [[ -n "$effective_bitrate_kbps" ]] && [[ "$effective_bitrate_kbps" =~ ^[0-9]+$ ]]; then
-        suffix="${suffix}_${effective_bitrate_kbps}k"
+    # Mode single-pass CRF ou two-pass bitrate
+    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+        suffix="${suffix}_crf${CRF_VALUE}"
     else
-        suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+        # Bitrate effectif (selon hauteur) pour two-pass
+        local effective_bitrate_kbps
+        effective_bitrate_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
+        if [[ -n "$effective_bitrate_kbps" ]] && [[ "$effective_bitrate_kbps" =~ ^[0-9]+$ ]]; then
+            suffix="${suffix}_${effective_bitrate_kbps}k"
+        else
+            suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+        fi
     fi
 
     # Ajout de la résolution (si connue)
@@ -497,6 +503,58 @@ _run_encoding_pass2() {
     fi
 }
 
+# Exécute l'encodage single-pass avec CRF (pour séries)
+# Plus rapide que two-pass, taille variable mais qualité constante
+# Retourne 0 si succès, 1 si erreur
+_run_encoding_single_pass() {
+    local input_file="$1"
+    local output_file="$2"
+    local ffmpeg_log="$3"
+    local base_name="$4"
+    local x265_base_params="$5"
+    local audio_params="$6"
+    local stream_mapping="$7"
+    local progress_slot="$8"
+    local is_parallel="$9"
+    local awk_time_func="${10}"
+
+    START_TS="$(date +%s)"
+    
+    # Paramètres x265 pour CRF (pas de pass=, pas de bitrate cible)
+    local x265_params_crf="${x265_base_params}"
+
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $SAMPLE_SEEK_PARAMS \
+        -hwaccel $HWACCEL \
+        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
+        -g 600 -keyint_min 600 \
+        -c:v libx265 -preset "$ENCODER_PRESET" \
+        -tune fastdecode -crf "$CRF_VALUE" -x265-params "$x265_params_crf" \
+        $audio_params \
+        $stream_mapping -f matroska \
+        "$output_file" \
+        -progress pipe:1 -nostats 2> "$ffmpeg_log" | \
+    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="⚡" -v END_MSG="Terminé ✅" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+
+    # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
+    local ffmpeg_rc=${PIPESTATUS[0]:-0}
+    local awk_rc=${PIPESTATUS[1]:-0}
+
+    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
+        return 0
+    else
+        if [[ -f "$ffmpeg_log" ]]; then
+            echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log) ---" >&2
+            tail -n 80 "$ffmpeg_log" >&2 || true
+            echo "--- Fin du log ffmpeg ---" >&2
+        fi
+        return 1
+    fi
+}
+
 ###########################################################
 # EXÉCUTION DE LA CONVERSION FFMPEG
 ###########################################################
@@ -548,29 +606,49 @@ _execute_conversion() {
         x265_base_params="${x265_base_params}:${X265_EXTRA_PARAMS}"
     fi
 
-    # ==================== PASS 1 : ANALYSE ====================
-    if ! _run_encoding_pass1 "$tmp_input" "$ffmpeg_log_temp" "$base_name" \
-                             "$x265_base_params" "$progress_slot" "$is_parallel" "$awk_time_func"; then
-        if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-            release_progress_slot "$progress_slot"
+    # ==================== CHOIX DU MODE D'ENCODAGE ====================
+    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+        # Mode single-pass CRF (séries uniquement)
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${CYAN}  ⚡ Encodage single-pass CRF ${CRF_VALUE}${NOCOLOR}"
         fi
-        return 1
-    fi
+        
+        if ! _run_encoding_single_pass "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
+                                       "$x265_base_params" "$audio_params" "$stream_mapping" \
+                                       "$progress_slot" "$is_parallel" "$awk_time_func"; then
+            if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+                release_progress_slot "$progress_slot"
+            fi
+            return 1
+        fi
+    else
+        # Mode two-pass classique
+        # ==================== PASS 1 : ANALYSE ====================
+        if ! _run_encoding_pass1 "$tmp_input" "$ffmpeg_log_temp" "$base_name" \
+                                 "$x265_base_params" "$progress_slot" "$is_parallel" "$awk_time_func"; then
+            if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+                release_progress_slot "$progress_slot"
+            fi
+            return 1
+        fi
 
-    # ==================== PASS 2 : ENCODAGE ====================
-    if ! _run_encoding_pass2 "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                             "$x265_base_params" "$audio_params" "$stream_mapping" \
-                             "$progress_slot" "$is_parallel" "$awk_time_func"; then
-        # Nettoyer les fichiers de stats x265
+        # ==================== PASS 2 : ENCODAGE ====================
+        if ! _run_encoding_pass2 "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
+                                 "$x265_base_params" "$audio_params" "$stream_mapping" \
+                                 "$progress_slot" "$is_parallel" "$awk_time_func"; then
+            # Nettoyer les fichiers de stats x265
+            rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+            if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+                release_progress_slot "$progress_slot"
+            fi
+            return 1
+        fi
+
+        # Nettoyage fichiers two-pass
         rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
-        if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-            release_progress_slot "$progress_slot"
-        fi
-        return 1
     fi
 
-    # Nettoyage final
-    rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+    # Libérer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
         release_progress_slot "$progress_slot"
     fi

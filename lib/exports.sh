@@ -14,7 +14,7 @@ export_variables() {
     # --- Fonctions d'encodage (sous-fonctions refactorisées) ---
     export -f _get_audio_conversion_info _build_audio_params _build_stream_mapping
     export -f _setup_video_encoding_params _setup_sample_mode_params
-    export -f _run_encoding_pass1 _run_encoding_pass2
+    export -f _run_encoding_pass1 _run_encoding_pass2 _run_encoding_single_pass
     
     # --- Fonctions de préparation fichiers ---
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
@@ -83,6 +83,7 @@ export_variables() {
     export EXECUTION_TIMESTAMP EXCLUDES_REGEX VMAF_ENABLED
     export FORCE_NO_SUFFIX
     export SAMPLE_MODE SAMPLE_DURATION SAMPLE_MARGIN_START SAMPLE_MARGIN_END SAMPLE_KEYFRAME_POS
+    export SINGLE_PASS_MODE CRF_VALUE CRF_SERIES_VALUE
     export LOG_DRYRUN_COMPARISON IS_MSYS
     
     # --- Variables de couleurs et affichage ---

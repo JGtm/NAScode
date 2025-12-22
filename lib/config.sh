@@ -101,6 +101,13 @@ SAMPLE_MARGIN_START=180 # Marge début (éviter générique) en secondes
 SAMPLE_MARGIN_END=120   # Marge fin (éviter générique) en secondes
 SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour VMAF)
 
+# Mode single-pass CRF pour séries (plus rapide, taille variable)
+# Disponible uniquement pour le mode "serie", désactivé automatiquement pour "film"
+SINGLE_PASS_MODE=false
+readonly CRF_SERIES_VALUE=23  # CRF 23 : bon compromis qualité/taille pour séries
+SAMPLE_MARGIN_END=120   # Marge fin (éviter générique) en secondes
+SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour VMAF)
+
 # Mode de tri pour la construction de la file d'attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
 #   - size_desc  : Trier par taille décroissante (par défaut, privilégie gros fichiers)
@@ -211,7 +218,7 @@ set_conversion_mode_parameters() {
             X265_PASS1_FAST=false
             ;;
         serie)
-            # Séries : bitrate optimisé pour ~1 Go/h
+            # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 23 (single-pass)
             TARGET_BITRATE_KBPS=2070
             ENCODER_PRESET="medium"
             MAXRATE_KBPS=2520
@@ -225,6 +232,10 @@ set_conversion_mode_parameters() {
             X265_EXTRA_PARAMS="amp=0:rect=0:sao=0:strong-intra-smoothing=0:limit-refs=3:subme=2"
             # Pass 1 rapide : analyse moins approfondie mais gain temps ~15%
             X265_PASS1_FAST=true
+            # En mode single-pass, on utilise CRF au lieu du bitrate cible
+            if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+                CRF_VALUE="$CRF_SERIES_VALUE"
+            fi
             ;;
         *)
             echo -e "${RED}ERREUR : Mode de conversion inconnu : $CONVERSION_MODE${NOCOLOR}"
@@ -263,8 +274,13 @@ build_dynamic_suffix() {
     
     local suffix="_x265"
     
-    # Bitrate cible
-    suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+    # Mode single-pass CRF ou two-pass bitrate
+    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+        suffix="${suffix}_crf${CRF_VALUE}"
+    else
+        # Bitrate cible (two-pass)
+        suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+    fi
 
     # Résolution (preview) : la valeur réelle est déterminée par fichier.
     suffix="${suffix}_1080p"

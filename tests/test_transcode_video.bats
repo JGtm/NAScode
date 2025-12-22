@@ -84,6 +84,7 @@ teardown() {
 @test "_build_effective_suffix_for_dims: inclut bitrate+résolution+preset (720p)" {
     # 1280x720 => out_height=720 => scale 70% => 1449k
     CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=false
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
@@ -92,8 +93,44 @@ teardown() {
 
 @test "_build_effective_suffix_for_dims: reflète 1080p quand hauteur 1080" {
     CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=false
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
     [ "$result" = "_x265_2070k_1080p_medium_tuned" ]
+}
+
+###########################################################
+# Tests du mode single-pass CRF
+###########################################################
+
+@test "_build_effective_suffix_for_dims: affiche CRF en mode single-pass (1080p)" {
+    CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=true
+    set_conversion_mode_parameters
+
+    result=$(_build_effective_suffix_for_dims 1920 1080)
+    [ "$result" = "_x265_crf23_1080p_medium_tuned" ]
+}
+
+@test "_build_effective_suffix_for_dims: affiche CRF en mode single-pass (720p)" {
+    CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=true
+    set_conversion_mode_parameters
+
+    result=$(_build_effective_suffix_for_dims 1280 720)
+    [ "$result" = "_x265_crf23_720p_medium_tuned" ]
+}
+
+@test "_build_effective_suffix_for_dims: CRF identique quelle que soit la résolution" {
+    # En mode CRF, la valeur CRF est constante (pas d'adaptation par résolution)
+    CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=true
+    set_conversion_mode_parameters
+
+    result_720=$(_build_effective_suffix_for_dims 1280 720)
+    result_1080=$(_build_effective_suffix_for_dims 1920 1080)
+    
+    [[ "$result_720" =~ "_crf23_" ]]
+    [[ "$result_1080" =~ "_crf23_" ]]
 }

@@ -211,3 +211,48 @@ teardown() {
     [[ "$X265_VBV_PARAMS" =~ "vbv-maxrate=${MAXRATE_KBPS}" ]]
     [[ "$X265_VBV_PARAMS" =~ "vbv-bufsize=${BUFSIZE_KBPS}" ]]
 }
+
+###########################################################
+# Tests du mode single-pass CRF
+###########################################################
+
+@test "config: SINGLE_PASS_MODE par défaut est false" {
+    [ "$SINGLE_PASS_MODE" = "false" ]
+}
+
+@test "config: CRF_SERIES_VALUE est défini à 23" {
+    [ "$CRF_SERIES_VALUE" -eq 23 ]
+}
+
+@test "set_conversion_mode_parameters: single-pass configure CRF_VALUE pour séries" {
+    CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=true
+    set_conversion_mode_parameters
+    
+    [ "$CRF_VALUE" -eq 23 ]
+}
+
+@test "set_conversion_mode_parameters: single-pass ne change pas le preset" {
+    CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=true
+    set_conversion_mode_parameters
+    
+    [ "$ENCODER_PRESET" = "medium" ]
+}
+
+@test "build_dynamic_suffix: affiche CRF en mode single-pass" {
+    CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=true
+    set_conversion_mode_parameters
+    
+    [[ "$SUFFIX_STRING" =~ "_crf23_" ]]
+}
+
+@test "build_dynamic_suffix: affiche bitrate en mode two-pass" {
+    CONVERSION_MODE="serie"
+    SINGLE_PASS_MODE=false
+    set_conversion_mode_parameters
+    
+    [[ "$SUFFIX_STRING" =~ "_2070k_" ]]
+    [[ ! "$SUFFIX_STRING" =~ "_crf" ]]
+}
