@@ -205,6 +205,17 @@ print_status() {
     echo -e "  ${color}◐${NOCOLOR} ${message}"
 }
 
+# Affiche un état vide (rien à traiter)
+# Usage: print_empty_state "Message"
+print_empty_state() {
+    local message="$1"
+    echo ""
+    echo -e "${DIM}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${DIM}  ┃  ${CYAN}${BOX_INFO}${NOCOLOR}  ${BRIGHT_WHITE}${message}${NOCOLOR}"
+    echo -e "${DIM}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+    echo ""
+}
+
 ###########################################################
 # ENCADRÉS DE PHASE (Conversion / Transfert)
 ###########################################################

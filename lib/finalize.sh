@@ -332,12 +332,12 @@ show_summary() {
     # Spécification: si tout est skippé, on dit aussi "Aucun fichier à traiter".
     local total_processed=$((succ + err))
     if [[ "$total_processed" -eq 0 ]]; then
-        print_info "Aucun fichier à traiter"
+        print_empty_state "Aucun fichier à traiter"
     fi
     
     {
         echo ""
-        print_header "RÉSUMÉ DE CONVERSION" "$GREEN"
+        print_header "--- RÉSUMÉ DE CONVERSION" "$GREEN"
         echo ""
         print_item "Date fin" "$(date +"%Y-%m-%d %H:%M:%S")"
         print_item "Durée totale" "${total_elapsed_str}" "$BRIGHT_CYAN"
