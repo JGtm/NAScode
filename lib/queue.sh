@@ -166,31 +166,29 @@ _handle_existing_index() {
     # Si l'utilisateur a demandé de conserver l'index, on l'accepte sans demander
     if [[ "$KEEP_INDEX" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}Utilisation forcée de l'index existant (--keep-index activé).${NOCOLOR}"
+            print_info "Utilisation forcée de l'index existant (--keep-index)"
         fi
         return 0
     fi
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo ""
-        echo -e "${CYAN}  Un fichier index existant a été trouvé.${NOCOLOR}"
-        echo -e "${CYAN}  Date de création : $index_date${NOCOLOR}"
-        echo ""
+        print_info_box "Index existant trouvé" "Date de création : $index_date"
     fi
     
     # Lire la réponse depuis le terminal pour éviter de consommer l'entrée de xargs/cat
-    read -r -p "Souhaitez-vous conserver ce fichier index ? (O/n) " response < /dev/tty
+    ask_question "Conserver ce fichier index ?"
+    read -r response < /dev/tty
     
     case "$response" in
         [nN])
             if [[ "$NO_PROGRESS" != true ]]; then
-                echo -e "${YELLOW}Régénération d'un nouvel index...${NOCOLOR}"
+                print_status "Régénération d'un nouvel index..."
             fi
             rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
             return 1
             ;;
         *)
             if [[ "$NO_PROGRESS" != true ]]; then
-                echo -e "${YELLOW}Utilisation de l'index existant.${NOCOLOR}"
+                print_success "Index existant conservé"
             fi
             return 0
             ;;

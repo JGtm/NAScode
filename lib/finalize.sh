@@ -332,27 +332,30 @@ show_summary() {
     # Spécification: si tout est skippé, on dit aussi "Aucun fichier à traiter".
     local total_processed=$((succ + err))
     if [[ "$total_processed" -eq 0 ]]; then
-        echo ""
-        echo -e "${YELLOW}ℹ️  Aucun fichier à traiter.${NOCOLOR}"
+        print_info "Aucun fichier à traiter"
     fi
     
     {
         echo ""
-        echo "-------------------------------------------"
-        echo "           RÉSUMÉ DE CONVERSION            "
-        echo "-------------------------------------------"
-        echo "Date fin     : $(date +"%Y-%m-%d %H:%M:%S")"
-        echo "Durée totale : ${total_elapsed_str}"
-        echo "Succès       : $succ"
-        echo "Ignorés      : $skip"
-        echo "Erreurs      : $err"
-        echo "-------------------------------------------"
-        echo "           ANOMALIES DÉTECTÉES             "
-        echo "-------------------------------------------"
-        echo "Taille       : $size_anomalies"
-        echo "Intégrité    : $checksum_anomalies"
-        echo "VMAF         : $vmaf_anomalies"
-        echo "-------------------------------------------"
+        print_header "RÉSUMÉ DE CONVERSION" "$GREEN"
+        echo ""
+        print_item "Date fin" "$(date +"%Y-%m-%d %H:%M:%S")"
+        print_item "Durée totale" "${total_elapsed_str}" "$BRIGHT_CYAN"
+        echo ""
+        print_separator 35
+        echo ""
+        print_item "Succès" "$succ" "$GREEN"
+        print_item "Ignorés" "$skip" "$YELLOW"
+        print_item "Erreurs" "$err" "$RED"
+        
+        if [[ "$size_anomalies" -gt 0 ]] || [[ "$checksum_anomalies" -gt 0 ]] || [[ "$vmaf_anomalies" -gt 0 ]]; then
+            echo ""
+            print_section "Anomalies détectées"
+            print_item "Taille" "$size_anomalies" "$YELLOW"
+            print_item "Intégrité" "$checksum_anomalies" "$YELLOW"
+            print_item "VMAF" "$vmaf_anomalies" "$YELLOW"
+        fi
+        echo ""
     } | tee "$SUMMARY_FILE"
     
     # Afficher le résumé des heures creuses si activé
@@ -370,16 +373,13 @@ dry_run_compare_names() {
     local TTY_DEV="/dev/tty"
     local LOG_FILE="$LOG_DRYRUN_COMPARISON"
 
-    echo ""
-    read -r -p "Souhaitez-vous afficher la comparaison entre les noms de fichiers originaux et générés ? (O/n) " response
+    ask_question "Afficher la comparaison des noms de fichiers originaux et générés ?"
+    read -r response
     
     case "$response" in
         [oO]|[yY]|'')
             {
-                echo ""
-                echo "-------------------------------------------"
-                echo "      SIMULATION DES NOMS DE FICHIERS"
-                echo "-------------------------------------------"
+                print_header "SIMULATION DES NOMS DE FICHIERS"
             } | tee -a "$LOG_FILE"
             
             local total_files=$(count_null_separated "$QUEUE")

@@ -39,7 +39,7 @@ parse_arguments() {
                     LIMIT_FILES="$2"
                     shift 2
                 else
-                    echo -e "${RED}ERREUR : --limit doit être suivi d'un nombre positif.${NOCOLOR}"
+                    print_error "--limit doit être suivi d'un nombre positif"
                     exit 1
                 fi
                 ;;
@@ -48,7 +48,7 @@ parse_arguments() {
                     CUSTOM_QUEUE="$2"
                     shift 2
                 else
-                    echo -e "${RED}ERREUR : Fichier queue '$2' introuvable.${NOCOLOR}"
+                    print_error "Fichier queue '$2' introuvable"
                     exit 1
                 fi
                 ;;
@@ -85,7 +85,7 @@ parse_arguments() {
                     PARALLEL_JOBS="$2"
                     shift 2
                 else
-                    echo -e "${RED}ERREUR : --jobs doit être suivi d'un nombre >= 1.${NOCOLOR}"
+                    print_error "--jobs doit être suivi d'un nombre >= 1"
                     exit 1
                 fi
                 ;;
@@ -95,14 +95,14 @@ parse_arguments() {
                 if [[ "$1" == *"="* ]]; then
                     local range="${1#*=}"
                     if ! parse_off_peak_range "$range"; then
-                        echo -e "${RED}ERREUR : Format invalide pour --off-peak. Attendu : HH:MM-HH:MM (ex: 22:00-06:00)${NOCOLOR}"
+                        print_error "Format invalide pour --off-peak (attendu: HH:MM-HH:MM)"
                         exit 1
                     fi
                     shift
                 elif [[ "${2:-}" =~ ^[0-9]{1,2}:[0-9]{2}-[0-9]{1,2}:[0-9]{2}$ ]]; then
                     # Format : --off-peak 22:00-06:00 (avec espace)
                     if ! parse_off_peak_range "$2"; then
-                        echo -e "${RED}ERREUR : Format invalide pour --off-peak. Attendu : HH:MM-HH:MM (ex: 22:00-06:00)${NOCOLOR}"
+                        print_error "Format invalide pour --off-peak (attendu: HH:MM-HH:MM)"
                         exit 1
                     fi
                     shift 2
@@ -124,7 +124,7 @@ parse_arguments() {
                     continue # On relance la boucle pour traiter le flag_to_process.
                 fi
                 # Si ce n'est pas une option groupée ou si ce n'est pas géré, c'est une erreur.
-                echo -e "${RED}Option inconnue : $1${NOCOLOR}"
+                print_error "Option inconnue : $1"
                 show_help
                 exit 1
                 ;;
@@ -143,11 +143,11 @@ parse_arguments() {
     # Avertissements d'incompatibilités
     if [[ "$DRYRUN" == true ]]; then
         if [[ "$VMAF_ENABLED" == true ]]; then
-            echo -e "${YELLOW}⚠️  VMAF désactivé en mode dry-run (pas de fichier converti à analyser)${NOCOLOR}"
+            print_warning "VMAF désactivé en mode dry-run"
             VMAF_ENABLED=false
         fi
         if [[ "$SAMPLE_MODE" == true ]]; then
-            echo -e "${YELLOW}⚠️  Mode sample ignoré en mode dry-run (simulation uniquement)${NOCOLOR}"
+            print_warning "Mode sample ignoré en mode dry-run"
             SAMPLE_MODE=false
         fi
     fi

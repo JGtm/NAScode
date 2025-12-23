@@ -171,8 +171,8 @@ set_conversion_mode_parameters() {
             fi
             ;;
         *)
-            echo -e "${RED}ERREUR : Mode de conversion inconnu : $CONVERSION_MODE${NOCOLOR}"
-            echo "Modes disponibles : film, serie"
+            print_error "Mode de conversion inconnu : $CONVERSION_MODE"
+            echo "  Modes disponibles : film, serie"
             exit 1
             ;;
     esac

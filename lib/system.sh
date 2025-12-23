@@ -4,7 +4,7 @@
 ###########################################################
 
 check_dependencies() {
-    echo -e "${BLUE}Vérification de l'environnement...${NOCOLOR}"
+    print_section "Vérification de l'environnement"
 
     local missing_deps=()
 
@@ -15,7 +15,7 @@ check_dependencies() {
     done
 
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
-        echo -e "${RED}ERREUR : Dépendances manquantes : ${missing_deps[*]}${NOCOLOR}"
+        print_error "Dépendances manquantes : ${missing_deps[*]}"
         exit 1
     fi
 
@@ -24,31 +24,31 @@ check_dependencies() {
     ffmpeg_version=$(ffmpeg -version 2>/dev/null | head -n1 | grep -oE 'version [0-9]+' | cut -d ' ' -f2 || true)
 
     if [[ -z "$ffmpeg_version" ]]; then
-        echo -e "${YELLOW}⚠️  Impossible de déterminer la version de ffmpeg.${NOCOLOR}"
+        print_warning "Impossible de déterminer la version de ffmpeg."
     else
         if [[ "$ffmpeg_version" =~ ^[0-9]+$ ]]; then
             if (( ffmpeg_version < FFMPEG_MIN_VERSION )); then
-                 echo -e "${YELLOW}⚠️ ALERTE : Version FFMPEG ($ffmpeg_version) < Recommandee ($FFMPEG_MIN_VERSION).${NOCOLOR}"
+                print_warning "Version FFMPEG ($ffmpeg_version) < Recommandée ($FFMPEG_MIN_VERSION)"
             else
-                 echo -e "   - FFMPEG Version : ${GREEN}$ffmpeg_version${NOCOLOR} (OK)"
+                print_item "FFmpeg" "v$ffmpeg_version" "$GREEN"
             fi
         else
-            echo -e "${YELLOW}⚠️  Version ffmpeg détectée : $ffmpeg_version${NOCOLOR}"
+            print_warning "Version ffmpeg détectée : $ffmpeg_version"
         fi
     fi
 
     if [[ ! -d "$SOURCE" ]]; then
-        echo -e "${RED}ERREUR : Source '$SOURCE' introuvable.${NOCOLOR}"
+        print_error "Source '$SOURCE' introuvable."
         exit 1
     fi
 
     # Affichage adapté selon le mode d'encodage
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-        echo -e "   - Mode conversion : ${CYAN}$CONVERSION_MODE${NOCOLOR} (CRF=${CRF_VALUE}, single-pass)"
+        print_item "Mode conversion" "$CONVERSION_MODE (CRF=$CRF_VALUE, single-pass)" "$CYAN"
     else
-        echo -e "   - Mode conversion : ${CYAN}$CONVERSION_MODE${NOCOLOR} (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)"
+        print_item "Mode conversion" "$CONVERSION_MODE (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)" "$CYAN"
     fi
-    echo -e "${GREEN}Environnement validé.${NOCOLOR}"
+    print_success "Environnement validé"
 }
 
 ###########################################################
@@ -64,20 +64,20 @@ check_plexignore() {
     # Vérifier si OUTPUT_DIR est un sous-dossier de SOURCE
     if [[ "$output_abs"/ != "$source_abs"/ ]] && [[ "$output_abs" = "$source_abs"/* ]]; then
         if [[ -f "$plexignore_file" ]]; then
-            echo -e "${GREEN}\nℹ️  Fichier .plexignore déjà présent dans '$OUTPUT_DIR'. Aucune action requise.${NOCOLOR}"
+            print_info "Fichier .plexignore déjà présent dans '$OUTPUT_DIR'"
             return 0
         fi
 
-        echo ""
-        read -r -p "Souhaitez-vous créer un fichier .plexignore dans '$OUTPUT_DIR' pour éviter les doublons sur Plex ? (O/n) " response
+        ask_question "Créer un fichier .plexignore dans '$OUTPUT_DIR' pour éviter les doublons Plex ?"
+        read -r response
 
         case "$response" in
             [oO]|[yY]|'')
                 echo "*" > "$plexignore_file"
-                echo -e "${GREEN}✅ Fichier .plexignore créé dans '$OUTPUT_DIR' pour masquer les doublons.${NOCOLOR}"
+                print_success "Fichier .plexignore créé dans '$OUTPUT_DIR'"
                 ;;
             [nN]|*)
-                echo -e "${CYAN}⏭️  Création de .plexignore ignorée.${NOCOLOR}"
+                print_info "Création de .plexignore ignorée"
                 ;;
         esac
     fi
@@ -98,7 +98,7 @@ check_output_suffix() {
 
     if [[ "$FORCE_NO_SUFFIX" == true ]]; then
         SUFFIX_STRING=""
-        echo -e "${YELLOW}ℹ️  Option --no-suffix activée. Le suffixe est désactivé par commande.${NOCOLOR}"
+        print_info "Option --no-suffix activée. Le suffixe est désactivé par commande."
     else
         # 1. Demande interactive (uniquement si l'option force n'est PAS utilisée)
         local suffix_example_1080 suffix_example_720
@@ -131,20 +131,21 @@ check_output_suffix() {
         fi
 
         if [[ -n "$suffix_example_720" ]] && [[ "$suffix_example_720" != "$suffix_example_1080" ]]; then
-            read -r -p "Utiliser le suffixe de sortie ? Ex: $hint_1080 / $hint_720 (O/n) " response
+            ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080 / $hint_720"
         else
-            read -r -p "Utiliser le suffixe de sortie ? Ex: $hint_1080 (O/n) " response
+            ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080"
         fi
+        read -r response
         
         case "$response" in
             [nN])
                 SUFFIX_STRING=""
-                echo -e "${YELLOW}⚠️  Le suffixe de sortie est désactivé.${NOCOLOR}"
+                print_warning "Suffixe de sortie désactivé"
                 ;;
             *)
                 # Ne pas afficher le suffixe complet car la résolution (1080p/720p) 
                 # dépend de chaque fichier source et peut prêter à confusion
-                echo -e "${GREEN}✅ Le suffixe de sortie sera utilisé.${NOCOLOR}"
+                print_success "Suffixe de sortie activé"
                 ;;
         esac
     fi
@@ -152,22 +153,23 @@ check_output_suffix() {
     # 2. Vérification de sécurité critique
     if [[ -z "$SUFFIX_STRING" ]] && [[ "$is_same_dir" == true ]]; then
         # ALERTE : Pas de suffixe ET même répertoire = RISQUE D'ÉCRASMENT
-        echo -e "${MAGENTA}\n🚨 🚨 🚨 ALERTE CRITIQUE : RISQUE D'ÉCRASMENT 🚨 🚨 🚨${NOCOLOR}"
-        echo -e "${MAGENTA}Votre dossier source et votre dossier de sortie sont IDENTIQUES ($source_abs).${NOCOLOR}"
-        echo -e "${MAGENTA}L'absence de suffixe ENTRAÎNERA L'ÉCRASEMENT des fichiers originaux !${NOCOLOR}"
+        print_critical_alert "RISQUE D'ÉCRASEMENT" \
+            "Source et sortie IDENTIQUES: $source_abs" \
+            "L'absence de suffixe ÉCRASERA les originaux !"
         
         if [[ "$DRYRUN" == true ]]; then
-            echo -e "\n⚠️  (MODE DRY RUN) : Cette configuration vous permet de voir les noms de fichiers qui SERONT écrasés."
+            print_info "(MODE DRY RUN) : Visualisez les fichiers qui seront écrasés"
         fi
         
-        read -r -p "Êtes-vous ABSOLUMENT sûr de vouloir continuer SANS suffixe dans le même répertoire ? (O/n) " final_confirm
+        ask_question "Continuer SANS suffixe dans le même répertoire ?"
+        read -r final_confirm
         
         case "$final_confirm" in
             [oO]|[yY]|'')
-                echo "Continuation SANS suffixe. Veuillez vérifier attentivement le Dry Run ou les logs."
+                print_warning "Continuation SANS suffixe. Vérifiez le Dry Run ou les logs."
                 ;;
             *)
-                echo "Opération annulée par l'utilisateur. Veuillez relancer en modifiant le suffixe ou le dossier de sortie."
+                print_error "Opération annulée. Modifiez le suffixe ou le dossier de sortie."
                 exit 1
                 ;;
         esac
@@ -175,8 +177,8 @@ check_output_suffix() {
     # 3. Vérification de sécurité douce
     elif [[ -n "$SUFFIX_STRING" ]] && [[ "$is_same_dir" == true ]]; then
         # ATTENTION : Suffixe utilisé, mais toujours dans le même répertoire
-        echo -e "${YELLOW}⚠️  ATTENTION : Les fichiers originaux et convertis vont COEXISTER dans le même répertoire.${NOCOLOR}"
-        echo -e "${YELLOW}Si vous ne supprimez pas les originaux, assurez-vous que Plex gère correctement les doublons.${NOCOLOR}"
+        print_warning_box "Coexistence de fichiers" \
+            "Les fichiers originaux et convertis coexisteront dans le même répertoire."
     fi
 }
 
@@ -190,9 +192,9 @@ check_vmaf() {
     fi
     
     if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
-        echo -e "${YELLOW}📊 Évaluation VMAF activée${NOCOLOR}"
+        print_info "Évaluation VMAF activée"
     else
-        echo -e "${RED}⚠️ Évaluation VMAF demandée mais libvmaf non disponible dans FFmpeg${NOCOLOR}"
+        print_error "VMAF demandé mais libvmaf non disponible dans FFmpeg"
         VMAF_ENABLED=false
     fi
 }
