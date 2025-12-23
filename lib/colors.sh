@@ -251,6 +251,31 @@ print_transfer_start() {
     print_phase_start "📤 TRANSFERT" "$subtitle" "$BRIGHT_BLUE"
 }
 
+# Affiche la fin de la section transfert
+# Usage: print_transfer_complete
+print_transfer_complete() {
+    echo ""
+    echo -e "${BRIGHT_BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${BRIGHT_BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BOLD}Tous les transferts terminés${NOCOLOR}${BRIGHT_BLUE}      ┃${NOCOLOR}"
+    echo -e "${BRIGHT_BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+}
+
+# Affiche le début de la section VMAF
+# Usage: print_vmaf_start nb_fichiers
+print_vmaf_start() {
+    local nb_files="$1"
+    print_phase_start "📊 ANALYSE VMAF" "$nb_files fichier(s) à analyser" "$BRIGHT_YELLOW"
+}
+
+# Affiche la fin de la section VMAF
+# Usage: print_vmaf_complete
+print_vmaf_complete() {
+    echo ""
+    echo -e "${BRIGHT_YELLOW}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${BRIGHT_YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BOLD}Analyses VMAF terminées${NOCOLOR}${BRIGHT_YELLOW}            ┃${NOCOLOR}"
+    echo -e "${BRIGHT_YELLOW}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+}
+
 # Affiche le début de la section conversion
 # Usage: print_conversion_start nb_fichiers [limitation]
 print_conversion_start() {

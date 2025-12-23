@@ -232,8 +232,7 @@ process_vmaf_queue() {
     fi
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo ""
-        echo -e "${BLUE}📊 Analyse VMAF de $vmaf_count fichier(s)...${NOCOLOR}"
+        print_vmaf_start "$vmaf_count"
     fi
     
     local current=0
@@ -310,7 +309,7 @@ process_vmaf_queue() {
     done < "$VMAF_QUEUE_FILE"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${GREEN}✅ Analyses VMAF terminées${NOCOLOR}"
+        print_vmaf_complete
     fi
     
     # Nettoyer le fichier de queue

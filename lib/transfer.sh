@@ -138,7 +138,7 @@ wait_all_transfers() {
     # Si des transferts ont été lancés mais sont déjà terminés
     if [[ "$active_count" -eq 0 ]] && [[ "$had_transfers" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            print_success "Tous les transferts sont terminés"
+            print_transfer_complete
         fi
         return 0
     fi
@@ -164,7 +164,7 @@ wait_all_transfers() {
     done
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_success "Tous les transferts sont terminés"
+        print_transfer_complete
     fi
 }
 
