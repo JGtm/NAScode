@@ -303,9 +303,9 @@ _apply_queue_limitations() {
     # Affichage du message de limitation
     if [[ "$NO_PROGRESS" != true ]]; then
         if [[ "$RANDOM_MODE" == true ]]; then
-            print_limitation "Sélection aléatoire de $limit_count fichiers maximum" "random"
+            print_limitation "Sélection aléatoire de $limit_count fichier(s) maximum" "random"
         else
-            print_limitation "Traitement de $limit_count fichiers maximum"
+            print_limitation "Traitement de $limit_count fichier(s) maximum"
         fi
     fi
     

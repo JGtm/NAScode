@@ -230,11 +230,10 @@ print_summary_item() {
     local label="$1"
     local value="$2"
     local color="${3:-$WHITE}"
-    # Largeur totale intérieure = 43, moins 2 espaces de marge = 41
-    # Label: 20 chars, espace, valeur alignée à droite sur le reste
-    local line
-    line=$(printf "%-20s %19s" "$label" "$value")
-    echo -e "${GREEN}  ║${NOCOLOR} ${color}${line}${NOCOLOR} ${GREEN}║${NOCOLOR}"
+    # Largeur intérieure totale = 43 caractères
+    local content
+    content=$(printf "  %-20s%19s  " "$label" "$value")
+    echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
 
 # Affiche un séparateur dans le résumé
