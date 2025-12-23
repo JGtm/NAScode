@@ -221,10 +221,12 @@ BEGIN{
     for(i=0;i<filled;i++) bar=bar"▰";
     for(i=filled;i<width;i++) bar=bar"▱";
     line = sprintf("%s %s %3d%% %s @ %.2fG/s", hms(elapsed), bar, pct, hr(copied), (speed/(1024*1024*1024)));
+    # Préfixe avec la bordure de style
+    prefix = "  \033[0;36m│\033[0m  ";
     if (newline) {
-        printf("\r\033[K%s%s%s\n", color, line, nocolor);
+        printf("\r\033[K%s%s%s%s\n", prefix, color, line, nocolor);
     } else {
-        printf("\r\033[K%s%s%s", color, line, nocolor);
+        printf("\r\033[K%s%s%s%s", prefix, color, line, nocolor);
     }
     fflush();
 }

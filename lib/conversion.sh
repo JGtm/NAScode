@@ -184,14 +184,14 @@ _copy_to_temp_storage() {
     local tmp_input="$3"
     local ffmpeg_log_temp="$4"
     
-    # Tronquer le nom de fichier à 30 caractères pour uniformité
+    # Tronquer le nom de fichier à 40 caractères pour uniformité
     local display_name="$filename"
-    if [[ ${#display_name} -gt 30 ]]; then
-        display_name="${display_name:0:27}..."
+    if [[ ${#display_name} -gt 40 ]]; then
+        display_name="${display_name:0:37}..."
     fi
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}→ Téléchargement de $display_name${NOCOLOR}"
+        print_transfer_item "$display_name"
     else
         echo -e "${CYAN}→ $display_name${NOCOLOR}"
     fi
@@ -203,6 +203,10 @@ _copy_to_temp_storage() {
         fi
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null
         return 1
+    fi
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        print_transfer_item_end
     fi
 
     return 0

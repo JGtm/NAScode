@@ -191,6 +191,21 @@ print_success_box() {
     echo -e "${GREEN}  ╰${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}╯${NOCOLOR}"
 }
 
+# Affiche un en-tête de transfert/téléchargement
+# Usage: print_transfer_item "Nom du fichier"
+print_transfer_item() {
+    local filename="$1"
+    echo ""
+    echo -e "${CYAN}  ┌─ 📥 ${WHITE}${filename}${NOCOLOR}"
+    echo -e "${CYAN}  │${NOCOLOR}"
+}
+
+# Ferme l'encadré de transfert (après la barre de progression)
+# Usage: print_transfer_item_end
+print_transfer_item_end() {
+    echo -e "${CYAN}  └───────────────────────────────────────${NOCOLOR}"
+}
+
 # Affiche un spinner de chargement (pour les attentes)
 # Usage: print_status "En cours..." [couleur]
 print_status() {
