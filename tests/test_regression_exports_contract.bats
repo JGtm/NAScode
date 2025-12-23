@@ -21,6 +21,7 @@ setup() {
     source "$LIB_DIR/progress.sh"
     source "$LIB_DIR/lock.sh"
     source "$LIB_DIR/system.sh"
+    source "$LIB_DIR/off_peak.sh"
     source "$LIB_DIR/args.sh"
     source "$LIB_DIR/queue.sh"
     source "$LIB_DIR/vmaf.sh"

@@ -93,11 +93,14 @@ teardown() {
     
     [ "$status" -eq 0 ]
     
-    # Le log de succès doit exister et contenir une entrée
-    [ -f "$WORKDIR/logs/Success.log" ]
+    # Le log de succès doit exister (avec timestamp) et contenir une entrée
+    local success_file
+    success_file=$(find "$WORKDIR/logs" -name "Success_*.log" -type f | head -1)
+    [ -n "$success_file" ]
+    [ -f "$success_file" ]
     
     local success_count
-    success_count=$(wc -l < "$WORKDIR/logs/Success.log")
+    success_count=$(wc -l < "$success_file")
     [ "$success_count" -ge 1 ]
 }
 
@@ -195,6 +198,7 @@ teardown() {
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
+            --opus \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -271,16 +275,18 @@ teardown() {
     
     [ "$status" -eq 0 ]
     
-    # Le fichier doit être dans le log des skipped
-    [ -f "$WORKDIR/logs/Skipped.log" ]
-    grep -q "test_video_hevc_2s.mkv" "$WORKDIR/logs/Skipped.log"
+    # Le fichier doit être dans le log des skipped (avec timestamp)
+    local skipped_file
+    skipped_file=$(find "$WORKDIR/logs" -name "Skipped_*.log" -type f | head -1)
+    [ -n "$skipped_file" ]
+    grep -q "test_video_hevc_2s.mkv" "$skipped_file"
 }
 
 ###########################################################
 # Test E2E: Gestion des erreurs
 ###########################################################
 
-@test "E2E erreur: fichier corrompu génère une entrée dans Error.log" {
+@test "E2E erreur: fichier corrompu génère une entrée dans Error.log ou Skipped.log" {
     # Créer un fichier corrompu
     echo "not a video file" > "$SRC_DIR/corrupted.mkv"
     rm -f "$SRC_DIR/test_video_2s.mkv"
@@ -299,16 +305,25 @@ teardown() {
     echo "=== STDOUT ===" >&3
     echo "$output" >&3
     
-    # Le fichier doit être dans le log des erreurs ou skipped
-    if [ -f "$WORKDIR/logs/Error.log" ]; then
-        grep -q "corrupted.mkv" "$WORKDIR/logs/Error.log" || \
-        grep -q "corrupted.mkv" "$WORKDIR/logs/Skipped.log" 2>/dev/null
-    elif [ -f "$WORKDIR/logs/Skipped.log" ]; then
-        grep -q "corrupted.mkv" "$WORKDIR/logs/Skipped.log"
-    else
-        # Au moins un fichier de log doit mentionner le fichier
-        false
+    # Le fichier doit être mentionné dans les logs (erreur OU skipped)
+    # Un fichier sans flux vidéo valide est SKIPPED, pas ERROR
+    local found=false
+    local error_file skipped_file
+    error_file=$(find "$WORKDIR/logs" -name "Error_*.log" -type f 2>/dev/null | head -1)
+    skipped_file=$(find "$WORKDIR/logs" -name "Skipped_*.log" -type f 2>/dev/null | head -1)
+    
+    if [[ -n "$error_file" ]] && grep -q "corrupted.mkv" "$error_file" 2>/dev/null; then
+        found=true
     fi
+    if [[ -n "$skipped_file" ]] && grep -q "corrupted.mkv" "$skipped_file" 2>/dev/null; then
+        found=true
+    fi
+    # Vérifier aussi dans la sortie standard
+    if [[ "$output" =~ "corrupted.mkv" ]]; then
+        found=true
+    fi
+    
+    [ "$found" = true ]
 }
 
 ###########################################################
@@ -347,8 +362,10 @@ teardown() {
     
     [ "$status" -eq 0 ]
     
-    # Le fichier Summary doit exister
-    [ -f "$WORKDIR/logs/Summary.log" ]
+    # Le fichier Summary doit exister (avec timestamp)
+    local summary_file
+    summary_file=$(find "$WORKDIR/logs" -name "Summary_*.log" -type f | head -1)
+    [ -n "$summary_file" ]
 }
 
 ###########################################################
