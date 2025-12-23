@@ -51,8 +51,9 @@ fi
 
 # Charger les modules dans l'ordre des dépendances
 source "$LIB_DIR/colors.sh"      # Codes couleurs (pas de dépendances)
+source "$LIB_DIR/detect.sh"      # Détection outils/système (dépend de rien, modifie PATH)
 source "$LIB_DIR/config.sh"      # Configuration (dépend de colors pour erreurs)
-source "$LIB_DIR/utils.sh"       # Utilitaires (dépend de config pour HAS_*)
+source "$LIB_DIR/utils.sh"       # Utilitaires (dépend de detect pour HAS_*)
 source "$LIB_DIR/logging.sh"     # Logs (dépend de config pour EXECUTION_TIMESTAMP)
 source "$LIB_DIR/progress.sh"    # Slots progression (dépend de config pour EXECUTION_TIMESTAMP)
 source "$LIB_DIR/lock.sh"        # Verrous (dépend de colors, config)
