@@ -46,11 +46,12 @@ teardown() {
 ###########################################################
 
 @test "E2E single-pass: fichier H.264 converti en HEVC avec succès" {
+    # Note: single-pass (CRF) est le mode par défaut pour les séries, pas besoin d'option
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -83,7 +84,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -105,7 +106,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -193,7 +194,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -221,7 +222,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -259,7 +260,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress
@@ -288,7 +289,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -319,7 +320,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -337,7 +338,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -359,7 +360,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -390,7 +391,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -426,7 +427,7 @@ teardown() {
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
-            --single-pass \
+            --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
