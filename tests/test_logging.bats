@@ -162,7 +162,7 @@ teardown() {
     # Vérifier qu'on peut le lire avec read -d ''
     local count=0
     while IFS= read -r -d '' file; do
-        ((count++))
+        count=$((count + 1))
     done < "$test_index"
     
     [ "$count" -eq 2 ]

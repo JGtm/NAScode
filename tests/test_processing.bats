@@ -269,7 +269,7 @@ teardown() {
     # Simuler la lecture comme le ferait _process_queue_simple
     local processed=0
     while IFS= read -r -d '' file; do
-        ((processed++))
+        processed=$((processed + 1))
     done < "$QUEUE"
     
     [ "$processed" -eq 2 ]
@@ -324,7 +324,7 @@ teardown() {
     local count=0
     while IFS= read -r -d '' file && [[ $count -lt $LIMIT_FILES ]]; do
         printf '%s\0' "$file"
-        ((count++))
+        count=$((count + 1))
     done < "$queue_full" > "$limited_queue"
     
     local limited_count
