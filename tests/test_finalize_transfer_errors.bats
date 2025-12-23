@@ -80,6 +80,7 @@ teardown() {
     run show_summary
     [[ "$output" != *"Aucun fichier à traiter"* ]]
 
-    run grep -F "Erreurs      : 1" "$SUMMARY_FILE"
+    # Le format du résumé utilise maintenant print_summary_item avec alignement
+    run grep -E "Erreurs.*1" "$SUMMARY_FILE"
     [ "$status" -eq 0 ]
 }
