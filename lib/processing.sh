@@ -114,8 +114,12 @@ _process_queue_with_fifo() {
         # Signaler prêt
         touch "$FIFO_WRITER_READY" 2>/dev/null || true
         
+        # Fichier de fin normale (différent de STOP_FLAG qui indique une interruption)
+        local fifo_done="${FIFO_WRITER_PID}.done"
+        
         # Attendre que le nombre de fichiers traités atteigne la cible
-        while [[ ! -f "$STOP_FLAG" ]]; do
+        # ou qu'un signal de fin (normale ou interruption) soit reçu
+        while [[ ! -f "$STOP_FLAG" ]] && [[ ! -f "$fifo_done" ]]; do
             local processed=0
             if [[ -f "$PROCESSED_COUNT_FILE" ]]; then
                 processed=$(cat "$PROCESSED_COUNT_FILE" 2>/dev/null || echo 0)
@@ -178,8 +182,10 @@ _process_queue_with_fifo() {
     # Attendre que le consumer termine
     wait "$consumer_pid" 2>/dev/null || true
     
-    # Signaler au writer FIFO qu'il doit se terminer
-    touch "$STOP_FLAG" 2>/dev/null || true
+    # Signaler au writer FIFO qu'il doit se terminer (fin normale, pas interruption)
+    # On utilise FIFO_DONE pour différencier de STOP_FLAG qui indique une vraie interruption
+    local fifo_done="${FIFO_WRITER_PID}.done"
+    touch "$fifo_done" 2>/dev/null || true
     
     # Si un writer a enregistré son PID, demander son arrêt proprement
     if [[ -n "${FIFO_WRITER_PID:-}" ]] && [[ -f "${FIFO_WRITER_PID}" ]]; then
@@ -192,7 +198,7 @@ _process_queue_with_fifo() {
     fi
 
     # Nettoyer les artefacts FIFO
-    rm -f "$WORKFIFO" "$FIFO_WRITER_PID" "$FIFO_WRITER_READY" 2>/dev/null || true
+    rm -f "$WORKFIFO" "$FIFO_WRITER_PID" "$FIFO_WRITER_READY" "$fifo_done" 2>/dev/null || true
     rm -f "$PROCESSED_COUNT_FILE" "$TARGET_COUNT_FILE" 2>/dev/null || true
     rm -f "$NEXT_QUEUE_POS_FILE" "$TOTAL_QUEUE_FILE" 2>/dev/null || true
     

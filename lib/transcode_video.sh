@@ -424,9 +424,15 @@ _run_encoding_pass1() {
         x265_params_pass1="${x265_params_pass1}:no-slow-firstpass=1"
     fi
 
+    # Construire les options hwaccel (vide si non disponible = fallback software)
+    local hwaccel_opts=""
+    if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
+        hwaccel_opts="-hwaccel $HWACCEL"
+    fi
+
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $SAMPLE_SEEK_PARAMS \
-        -hwaccel $HWACCEL \
+        $hwaccel_opts \
         -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
@@ -474,9 +480,15 @@ _run_encoding_pass2() {
     START_TS="$(date +%s)"
     local x265_params_pass2="pass=2:${x265_base_params}"
 
+    # Construire les options hwaccel (vide si non disponible = fallback software)
+    local hwaccel_opts=""
+    if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
+        hwaccel_opts="-hwaccel $HWACCEL"
+    fi
+
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $SAMPLE_SEEK_PARAMS \
-        -hwaccel $HWACCEL \
+        $hwaccel_opts \
         -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
@@ -529,9 +541,15 @@ _run_encoding_single_pass() {
     # Paramètres x265 pour CRF (pas de pass=, pas de bitrate cible)
     local x265_params_crf="${x265_base_params}"
 
+    # Construire les options hwaccel (vide si non disponible = fallback software)
+    local hwaccel_opts=""
+    if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
+        hwaccel_opts="-hwaccel $HWACCEL"
+    fi
+
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $SAMPLE_SEEK_PARAMS \
-        -hwaccel $HWACCEL \
+        $hwaccel_opts \
         -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
         -g 600 -keyint_min 600 \
         -c:v libx265 -preset "$ENCODER_PRESET" \
