@@ -340,7 +340,7 @@ show_summary() {
         print_header "--- RÉSUMÉ DE CONVERSION ---" "$GREEN"
         echo ""
         print_item "Date fin" "$(date +"%Y-%m-%d %H:%M:%S")"
-        print_item "Durée totale" "${total_elapsed_str}" "$BRIGHT_CYAN"
+        print_item "Durée totale" "${total_elapsed_str}" "$CYAN"
         echo ""
         print_separator 35
         echo ""
