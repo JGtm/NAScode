@@ -97,7 +97,7 @@ _check_output_exists() {
     local final_output="$3"
     
     if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
-        echo -e "${BLUE}⏭️  SKIPPED (Fichier de sortie existe déjà) : $filename${NOCOLOR}" >&2
+        echo -e "${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SKIPPED" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
         fi
