@@ -399,7 +399,7 @@ _setup_sample_mode_params() {
     local seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
 
     if [[ "$available_range" -gt 0 ]]; then
-        echo -e "${YELLOW}  🎯 Mode échantillon : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+        echo -e "${YELLOW}  🎯 Segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
     else
         echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
     fi
