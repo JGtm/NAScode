@@ -95,6 +95,7 @@ print_section() {
 print_info() {
     local message="$1"
     echo -e "  ${CYAN}${BOX_INFO}${NOCOLOR}  ${message}"
+    echo ""
 }
 
 # Affiche un message de succès stylé
@@ -287,6 +288,7 @@ print_limitation() {
     fi
     
     echo -e "${MAGENTA}  ${icon} ${MAGENTA}LIMITATION${NOCOLOR}${MAGENTA} : ${message}${NOCOLOR}"
+    echo ""
 }
 
 # Affiche le début de la section transfert
@@ -305,7 +307,7 @@ print_transfer_start() {
 print_transfer_complete() {
     echo ""
     echo -e "${BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Tous les transferts terminés${NOCOLOR}${BLUE}      ┃${NOCOLOR}"
+    echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Tous les transferts terminés${NOCOLOR}${BLUE}       ┃${NOCOLOR}"
     echo -e "${BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
@@ -321,7 +323,7 @@ print_vmaf_start() {
 print_vmaf_complete() {
     echo ""
     echo -e "${YELLOW}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Analyses VMAF terminées${NOCOLOR}${YELLOW}            ┃${NOCOLOR}"
+    echo -e "${YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Analyses VMAF terminées${NOCOLOR}${YELLOW}             ┃${NOCOLOR}"
     echo -e "${YELLOW}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
@@ -343,6 +345,6 @@ print_conversion_start() {
 print_conversion_complete() {
     echo ""
     echo -e "${CYAN}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Toutes les conversions terminées${NOCOLOR}${CYAN}  ┃${NOCOLOR}"
+    echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Toutes les conversions terminées${NOCOLOR}${CYAN}   ┃${NOCOLOR}"
     echo -e "${CYAN}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
