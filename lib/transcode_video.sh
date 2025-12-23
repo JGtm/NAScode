@@ -346,6 +346,126 @@ _setup_video_encoding_params() {
     X265_VBV_STRING="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
 }
 
+###########################################################
+# ENCODAGE UNIFIÉ
+###########################################################
+
+# Exécute un encodage ffmpeg avec le mode spécifié.
+# Usage: _run_ffmpeg_encode <mode> <input_file> <output_file> <ffmpeg_log> <base_name> 
+#                           <x265_base_params> <audio_params> <stream_mapping>
+#                           <progress_slot> <is_parallel> <awk_time_func>
+# Modes: "pass1" (analyse), "pass2" (encodage two-pass), "crf" (single-pass)
+# Retourne: 0 si succès, 1 si erreur
+_run_ffmpeg_encode() {
+    local mode="$1"
+    local input_file="$2"
+    local output_file="$3"
+    local ffmpeg_log="$4"
+    local base_name="$5"
+    local x265_base_params="$6"
+    local audio_params="$7"
+    local stream_mapping="$8"
+    local progress_slot="$9"
+    local is_parallel="${10}"
+    local awk_time_func="${11}"
+
+    START_TS="$(date +%s)"
+    
+    # Construire les options hwaccel (vide si non disponible = fallback software)
+    local hwaccel_opts=""
+    if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
+        hwaccel_opts="-hwaccel $HWACCEL"
+    fi
+
+    # Configuration selon le mode
+    local x265_params output_dest bitrate_opt
+    local audio_opt stream_opt log_suffix emoji end_msg
+    
+    case "$mode" in
+        "pass1")
+            # Pass 1 : analyse uniquement, pas d'output réel
+            x265_params="pass=1:${x265_base_params}"
+            if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
+                x265_params="${x265_params}:no-slow-firstpass=1"
+            fi
+            bitrate_opt="-b:v $VIDEO_BITRATE"
+            audio_opt="-an"
+            stream_opt=""
+            output_dest="-f null /dev/null"
+            log_suffix=".pass1"
+            emoji="🔍"
+            end_msg="Analyse OK"
+            ;;
+        "pass2")
+            # Pass 2 : encodage final avec audio
+            x265_params="pass=2:${x265_base_params}"
+            bitrate_opt="-b:v $VIDEO_BITRATE"
+            audio_opt="$audio_params"
+            stream_opt="$stream_mapping -f matroska"
+            output_dest="$output_file"
+            log_suffix=""
+            emoji="🎬"
+            end_msg="Terminé ✅"
+            ;;
+        "crf")
+            # Mode CRF single-pass
+            x265_params="${x265_base_params}"
+            bitrate_opt="-crf $CRF_VALUE"
+            audio_opt="$audio_params"
+            stream_opt="$stream_mapping -f matroska"
+            output_dest="$output_file"
+            log_suffix=""
+            emoji="⚡"
+            end_msg="Terminé ✅"
+            ;;
+        *)
+            log_error "Mode d'encodage inconnu: $mode"
+            return 1
+            ;;
+    esac
+
+    # Exécution FFmpeg
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $SAMPLE_SEEK_PARAMS \
+        $hwaccel_opts \
+        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
+        -g 600 -keyint_min 600 \
+        -c:v libx265 -preset "$ENCODER_PRESET" \
+        -tune fastdecode $bitrate_opt -x265-params "$x265_params" \
+        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
+        $audio_opt \
+        $stream_opt \
+        $output_dest \
+        -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
+    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+
+    # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
+    local ffmpeg_rc=${PIPESTATUS[0]:-0}
+    local awk_rc=${PIPESTATUS[1]:-0}
+
+    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
+        return 0
+    fi
+    
+    # Gestion d'erreur - ne pas afficher les logs si interruption volontaire
+    # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
+    if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]]; then
+        local log_file="${ffmpeg_log}${log_suffix}"
+        if [[ "$mode" == "pass1" ]]; then
+            log_error "Erreur lors de l'analyse (pass 1)"
+        fi
+        if [[ -f "$log_file" ]]; then
+            echo "--- Dernières lignes du log ffmpeg ($log_file) ---" >&2
+            tail -n 40 "$log_file" >&2 || true
+            echo "--- Fin du log ffmpeg ---" >&2
+        fi
+    fi
+    return 1
+}
+
 # Prépare les paramètres du mode sample (seek + durée)
 # Retourne via variables globales : SAMPLE_SEEK_PARAMS, SAMPLE_DURATION_PARAMS, EFFECTIVE_DURATION
 _setup_sample_mode_params() {
@@ -405,182 +525,6 @@ _setup_sample_mode_params() {
     fi
 }
 
-# Exécute le pass 1 (analyse) de l'encodage two-pass
-# Retourne 0 si succès, 1 si erreur
-_run_encoding_pass1() {
-    local input_file="$1"
-    local ffmpeg_log="$2"
-    local base_name="$3"
-    local x265_base_params="$4"
-    local progress_slot="$5"
-    local is_parallel="$6"
-    local awk_time_func="$7"
-
-    START_TS="$(date +%s)"
-    
-    # Construire les paramètres pass 1
-    local x265_params_pass1="pass=1:${x265_base_params}"
-    if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
-        x265_params_pass1="${x265_params_pass1}:no-slow-firstpass=1"
-    fi
-
-    # Construire les options hwaccel (vide si non disponible = fallback software)
-    local hwaccel_opts=""
-    if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
-        hwaccel_opts="-hwaccel $HWACCEL"
-    fi
-
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $SAMPLE_SEEK_PARAMS \
-        $hwaccel_opts \
-        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-        -g 600 -keyint_min 600 \
-        -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode -b:v "$VIDEO_BITRATE" -x265-params "$x265_params_pass1" \
-        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
-        -an \
-        -f null /dev/null \
-        -progress pipe:1 -nostats 2> "${ffmpeg_log}.pass1" | \
-    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🔍" -v END_MSG="Analyse OK" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
-
-    local pass1_rc=${PIPESTATUS[0]:-0}
-    
-    if [[ "$pass1_rc" -ne 0 ]]; then
-        # Ne pas afficher les logs si interruption volontaire (Ctrl+C)
-        # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
-        if [[ "${_INTERRUPTED:-0}" -ne 1 && "$pass1_rc" -ne 255 && "$pass1_rc" -lt 128 ]]; then
-            echo -e "${RED}❌ Erreur lors de l'analyse (pass 1)${NOCOLOR}" >&2
-            if [[ -f "${ffmpeg_log}.pass1" ]]; then
-                tail -n 40 "${ffmpeg_log}.pass1" >&2 || true
-            fi
-        fi
-        return 1
-    fi
-    
-    return 0
-}
-
-# Exécute le pass 2 (encodage final) de l'encodage two-pass
-# Retourne 0 si succès, 1 si erreur
-_run_encoding_pass2() {
-    local input_file="$1"
-    local output_file="$2"
-    local ffmpeg_log="$3"
-    local base_name="$4"
-    local x265_base_params="$5"
-    local audio_params="$6"
-    local stream_mapping="$7"
-    local progress_slot="$8"
-    local is_parallel="$9"
-    local awk_time_func="${10}"
-
-    START_TS="$(date +%s)"
-    local x265_params_pass2="pass=2:${x265_base_params}"
-
-    # Construire les options hwaccel (vide si non disponible = fallback software)
-    local hwaccel_opts=""
-    if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
-        hwaccel_opts="-hwaccel $HWACCEL"
-    fi
-
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $SAMPLE_SEEK_PARAMS \
-        $hwaccel_opts \
-        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-        -g 600 -keyint_min 600 \
-        -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode -b:v "$VIDEO_BITRATE" -x265-params "$x265_params_pass2" \
-        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
-        $audio_params \
-        $stream_mapping -f matroska \
-        "$output_file" \
-        -progress pipe:1 -nostats 2> "$ffmpeg_log" | \
-    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="🎬" -v END_MSG="Terminé ✅" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
-
-    # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
-    local ffmpeg_rc=${PIPESTATUS[0]:-0}
-    local awk_rc=${PIPESTATUS[1]:-0}
-
-    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
-        return 0
-    else
-        # Ne pas afficher les logs si interruption volontaire (Ctrl+C)
-        # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
-        if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]] && [[ -f "$ffmpeg_log" ]]; then
-            echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log) ---" >&2
-            tail -n 80 "$ffmpeg_log" >&2 || true
-            echo "--- Fin du log ffmpeg ---" >&2
-        fi
-        return 1
-    fi
-}
-
-# Exécute l'encodage single-pass avec CRF (pour séries)
-# Plus rapide que two-pass, taille variable mais qualité constante
-# Retourne 0 si succès, 1 si erreur
-_run_encoding_single_pass() {
-    local input_file="$1"
-    local output_file="$2"
-    local ffmpeg_log="$3"
-    local base_name="$4"
-    local x265_base_params="$5"
-    local audio_params="$6"
-    local stream_mapping="$7"
-    local progress_slot="$8"
-    local is_parallel="$9"
-    local awk_time_func="${10}"
-
-    START_TS="$(date +%s)"
-    
-    # Paramètres x265 pour CRF (pas de pass=, pas de bitrate cible)
-    local x265_params_crf="${x265_base_params}"
-
-    # Construire les options hwaccel (vide si non disponible = fallback software)
-    local hwaccel_opts=""
-    if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
-        hwaccel_opts="-hwaccel $HWACCEL"
-    fi
-
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $SAMPLE_SEEK_PARAMS \
-        $hwaccel_opts \
-        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-        -g 600 -keyint_min 600 \
-        -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode -crf "$CRF_VALUE" -x265-params "$x265_params_crf" \
-        $audio_params \
-        $stream_mapping -f matroska \
-        "$output_file" \
-        -progress pipe:1 -nostats 2> "$ffmpeg_log" | \
-    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="⚡" -v END_MSG="Terminé ✅" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
-
-    # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
-    local ffmpeg_rc=${PIPESTATUS[0]:-0}
-    local awk_rc=${PIPESTATUS[1]:-0}
-
-    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
-        return 0
-    else
-        # Ne pas afficher les logs si interruption volontaire (Ctrl+C)
-        # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
-        if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]] && [[ -f "$ffmpeg_log" ]]; then
-            echo "--- Dernières lignes du log ffmpeg ($ffmpeg_log) ---" >&2
-            tail -n 80 "$ffmpeg_log" >&2 || true
-            echo "--- Fin du log ffmpeg ---" >&2
-        fi
-        return 1
-    fi
-}
-
 ###########################################################
 # EXÉCUTION DE LA CONVERSION FFMPEG
 ###########################################################
@@ -632,37 +576,39 @@ _execute_conversion() {
         x265_base_params="${x265_base_params}:${X265_EXTRA_PARAMS}"
     fi
 
+    # Fonction helper pour libérer le slot et retourner en erreur
+    _cleanup_and_fail() {
+        if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+            release_progress_slot "$progress_slot"
+        fi
+        return 1
+    }
+
     # ==================== CHOIX DU MODE D'ENCODAGE ====================
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
         # Mode single-pass CRF (séries uniquement)
-        if ! _run_encoding_single_pass "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                                       "$x265_base_params" "$audio_params" "$stream_mapping" \
-                                       "$progress_slot" "$is_parallel" "$awk_time_func"; then
-            if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-                release_progress_slot "$progress_slot"
-            fi
+        if ! _run_ffmpeg_encode "crf" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
+                                "$x265_base_params" "$audio_params" "$stream_mapping" \
+                                "$progress_slot" "$is_parallel" "$awk_time_func"; then
+            _cleanup_and_fail
             return 1
         fi
     else
         # Mode two-pass classique
         # ==================== PASS 1 : ANALYSE ====================
-        if ! _run_encoding_pass1 "$tmp_input" "$ffmpeg_log_temp" "$base_name" \
-                                 "$x265_base_params" "$progress_slot" "$is_parallel" "$awk_time_func"; then
-            if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-                release_progress_slot "$progress_slot"
-            fi
+        if ! _run_ffmpeg_encode "pass1" "$tmp_input" "" "$ffmpeg_log_temp" "$base_name" \
+                                "$x265_base_params" "" "" \
+                                "$progress_slot" "$is_parallel" "$awk_time_func"; then
+            _cleanup_and_fail
             return 1
         fi
 
         # ==================== PASS 2 : ENCODAGE ====================
-        if ! _run_encoding_pass2 "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                                 "$x265_base_params" "$audio_params" "$stream_mapping" \
-                                 "$progress_slot" "$is_parallel" "$awk_time_func"; then
-            # Nettoyer les fichiers de stats x265
+        if ! _run_ffmpeg_encode "pass2" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
+                                "$x265_base_params" "$audio_params" "$stream_mapping" \
+                                "$progress_slot" "$is_parallel" "$awk_time_func"; then
             rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
-            if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-                release_progress_slot "$progress_slot"
-            fi
+            _cleanup_and_fail
             return 1
         fi
 
@@ -677,3 +623,4 @@ _execute_conversion() {
 
     return 0
 }
+

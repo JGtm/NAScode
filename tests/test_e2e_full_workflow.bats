@@ -25,8 +25,9 @@ setup() {
     setup_test_env
     check_ffmpeg_available
     
-    # Nettoyer le lock global pour éviter les conflits entre tests
+    # Nettoyer le lock global et STOP_FLAG pour éviter les conflits entre tests
     rm -f /tmp/conversion_video.lock
+    rm -f /tmp/conversion_stop_flag
     
     # Créer les répertoires de travail
     export WORKDIR="$TEST_TEMP_DIR/work"
@@ -41,8 +42,9 @@ setup() {
 }
 
 teardown() {
-    # Nettoyer le lock global
+    # Nettoyer le lock global et STOP_FLAG
     rm -f /tmp/conversion_video.lock
+    rm -f /tmp/conversion_stop_flag
     teardown_test_env
 }
 

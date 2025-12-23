@@ -1,38 +1,49 @@
 #!/bin/bash
 ###########################################################
 # EXPORT DES FONCTIONS ET VARIABLES
+#
+# Note: Les exports sont nécessaires pour que les fonctions
+# soient accessibles dans les sous-processus (parallel, etc.)
 ###########################################################
 
 export_variables() {
-    # --- Fonctions de conversion ---
+    # ========================================================
+    # FONCTIONS DE CONVERSION PRINCIPALES
+    # ========================================================
     export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel
+    export -f should_skip_conversion clean_number custom_pv
+    
+    # --- Fonctions de paramètres vidéo (video_params.sh) ---
     export -f _select_output_pix_fmt _build_downscale_filter_if_needed
     export -f _compute_output_height_for_bitrate _compute_effective_bitrate_kbps_for_height
     export -f _build_effective_suffix_for_dims
-    export -f should_skip_conversion clean_number custom_pv
     
-    # --- Fonctions d'encodage (sous-fonctions refactorisées) ---
-    export -f _get_audio_conversion_info _build_audio_params _build_stream_mapping
+    # --- Fonctions d'encodage (transcode_video.sh) ---
     export -f _setup_video_encoding_params _setup_sample_mode_params
-    export -f _run_encoding_pass1 _run_encoding_pass2 _run_encoding_single_pass
+    export -f _run_ffmpeg_encode _execute_conversion
     
-    # --- Fonctions de préparation fichiers ---
+    # --- Fonctions audio et sous-titres ---
+    export -f _get_audio_conversion_info _build_audio_params _build_stream_mapping
+    
+    # ========================================================
+    # FONCTIONS DE PRÉPARATION ET FINALISATION
+    # ========================================================
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
     export -f _setup_temp_files_and_logs _check_disk_space _get_temp_filename
-    
-    # --- Fonctions d'analyse et copie ---
-    export -f _analyze_video _copy_to_temp_storage _execute_conversion
-    
-    # --- Fonctions de finalisation ---
+    export -f _analyze_video _copy_to_temp_storage
     export -f _finalize_conversion_success _finalize_try_move
     export -f _finalize_log_and_verify _finalize_conversion_error
     
-    # --- Fonctions de transfert asynchrone ---
+    # ========================================================
+    # FONCTIONS DE TRANSFERT ASYNCHRONE
+    # ========================================================
     export -f init_async_transfers start_async_transfer
     export -f wait_for_transfer_slot wait_all_transfers cleanup_transfers
     export -f _add_transfer_pid _cleanup_finished_transfers _count_active_transfers
     
-    # --- Fonctions de gestion de queue ---
+    # ========================================================
+    # FONCTIONS DE GESTION DE QUEUE
+    # ========================================================
     export -f _handle_custom_queue _handle_existing_index
     export -f _normalize_source_path _validate_index_source _save_index_metadata
     export -f _count_total_video_files _index_video_files _generate_index
@@ -40,18 +51,27 @@ export_variables() {
     export -f _display_random_mode_selection _create_readable_queue_copy _show_active_options
     export -f build_queue validate_queue_file
     
-    # --- Fonctions de traitement parallèle ---
+    # ========================================================
+    # FONCTIONS DE TRAITEMENT PARALLÈLE
+    # ========================================================
     export -f prepare_dynamic_queue _process_queue_simple _process_queue_with_fifo
     export -f increment_processed_count update_queue
     
-    # --- Fonctions utilitaires ---
+    # ========================================================
+    # FONCTIONS UTILITAIRES
+    # ========================================================
     export -f is_excluded count_null_separated compute_md5_prefix now_ts compute_sha256
     export -f normalize_path
+    
+    # --- Fonctions de logging (logging.sh) ---
+    export -f log_error log_warning log_info log_success
     
     # --- Fonctions VMAF (qualité vidéo) ---
     export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
     
-    # --- Variables de configuration ---
+    # ========================================================
+    # VARIABLES DE CONFIGURATION ENCODAGE
+    # ========================================================
     export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
     export ENCODER_PRESET TARGET_BITRATE_KBPS TARGET_BITRATE_FFMPEG HWACCEL
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
@@ -64,20 +84,24 @@ export_variables() {
     # --- Variables audio Opus ---
     export OPUS_ENABLED OPUS_TARGET_BITRATE_KBPS OPUS_CONVERSION_THRESHOLD_KBPS
     
-    # --- Variables de chemins ---
+    # ========================================================
+    # VARIABLES DE CHEMINS
+    # ========================================================
     export SOURCE OUTPUT_DIR TMP_DIR SCRIPT_DIR
     export LOG_DIR LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE
     export QUEUE INDEX INDEX_META INDEX_READABLE
     
-    # --- Variables de queue dynamique (mode FIFO) ---
+    # ========================================================
+    # VARIABLES DE QUEUE ET PROCESSING
+    # ========================================================
     export WORKFIFO QUEUE_FULL NEXT_QUEUE_POS_FILE TOTAL_QUEUE_FILE
     export FIFO_WRITER_PID FIFO_WRITER_READY
     export PROCESSED_COUNT_FILE TARGET_COUNT_FILE
-    
-    # --- Variables de transfert asynchrone ---
     export TRANSFER_PIDS_FILE MAX_CONCURRENT_TRANSFERS
     
-    # --- Variables d'options ---
+    # ========================================================
+    # VARIABLES D'OPTIONS
+    # ========================================================
     export DRYRUN_SUFFIX SUFFIX_STRING NO_PROGRESS STOP_FLAG LOCKFILE
     export RANDOM_MODE RANDOM_MODE_DEFAULT_LIMIT LIMIT_FILES CUSTOM_QUEUE
     export EXECUTION_TIMESTAMP EXCLUDES_REGEX VMAF_ENABLED
@@ -86,21 +110,27 @@ export_variables() {
     export SINGLE_PASS_MODE CRF_VALUE
     export LOG_DRYRUN_COMPARISON IS_MSYS
     
-    # --- Variables de couleurs et affichage ---
+    # ========================================================
+    # VARIABLES D'AFFICHAGE
+    # ========================================================
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE
     export AWK_PROGRESS_SCRIPT AWK_FFMPEG_PROGRESS_SCRIPT IO_PRIORITY_CMD
     
-    # --- Fonctions et variables de progression parallèle ---
+    # --- Progression parallèle ---
     export -f acquire_progress_slot release_progress_slot cleanup_progress_slots setup_progress_display
     export SLOTS_DIR
     
-    # --- Variables de détection d'outils ---
+    # ========================================================
+    # VARIABLES DE DÉTECTION D'OUTILS
+    # ========================================================
     export HAS_MD5SUM HAS_MD5 HAS_PYTHON3
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
     export HAS_LIBVMAF VMAF_QUEUE_FILE
     
-    # --- Variables et fonctions heures creuses ---
+    # ========================================================
+    # VARIABLES ET FONCTIONS HEURES CREUSES
+    # ========================================================
     export OFF_PEAK_ENABLED OFF_PEAK_START OFF_PEAK_END OFF_PEAK_CHECK_INTERVAL
     export OFF_PEAK_WAIT_COUNT OFF_PEAK_TOTAL_WAIT_SECONDS
     export -f is_off_peak_time wait_for_off_peak check_off_peak_before_processing

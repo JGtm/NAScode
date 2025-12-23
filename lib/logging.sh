@@ -4,6 +4,45 @@
 ###########################################################
 
 ###########################################################
+# FONCTIONS DE LOG
+###########################################################
+
+# Log une erreur sur stderr avec formatage cohérent.
+# Usage: log_error <message> [show_in_tty]
+# Ex: log_error "Fichier introuvable"
+log_error() {
+    local message="$1"
+    local show_in_tty="${2:-false}"
+    
+    echo -e "${RED:-}❌ ${message}${NOCOLOR:-}" >&2
+    
+    if [[ "$show_in_tty" == true && -n "${TTY_DEV:-}" ]]; then
+        echo -e "${RED:-}❌ ${message}${NOCOLOR:-}" > "$TTY_DEV" 2>/dev/null || true
+    fi
+}
+
+# Log un avertissement sur stderr avec formatage cohérent.
+# Usage: log_warning <message>
+log_warning() {
+    local message="$1"
+    echo -e "${YELLOW:-}⚠️  ${message}${NOCOLOR:-}" >&2
+}
+
+# Log une info sur stdout avec formatage cohérent.
+# Usage: log_info <message>
+log_info() {
+    local message="$1"
+    echo -e "${GREEN:-}ℹ️  ${message}${NOCOLOR:-}"
+}
+
+# Log un succès sur stdout avec formatage cohérent.
+# Usage: log_success <message>
+log_success() {
+    local message="$1"
+    echo -e "${GREEN:-}✅ ${message}${NOCOLOR:-}"
+}
+
+###########################################################
 # CHEMINS DES LOGS
 ###########################################################
 

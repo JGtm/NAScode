@@ -68,21 +68,26 @@ teardown() {
 
 @test "regression: PIPESTATUS capturé avant rm dans _execute_conversion" {
     # Test complémentaire: vérifier que la ligne "local ffmpeg_rc=\${PIPESTATUS"
-    # apparaît AVANT la ligne "rm -f" après le pass2
+    # apparaît dans _run_ffmpeg_encode et que rm -f est après dans _execute_conversion
     
     local transcode_file="$LIB_DIR/transcode_video.sh"
     
-    # Trouver les numéros de ligne
-    local pipestatus_line rm_line
+    # Vérifier que PIPESTATUS est capturé dans _run_ffmpeg_encode
+    # La fonction unifiée capture PIPESTATUS juste après le pipeline ffmpeg
+    local pipestatus_in_encode
+    pipestatus_in_encode=$(grep -n "ffmpeg_rc=.*PIPESTATUS" "$transcode_file" | head -1 | cut -d: -f1)
     
-    # Chercher après "Terminé" (pass2)
-    pipestatus_line=$(awk '/END_MSG="Terminé/,/ffmpeg_rc=.*PIPESTATUS/ { if (/ffmpeg_rc=.*PIPESTATUS/) print NR }' "$transcode_file" | tail -1)
-    rm_line=$(awk '/END_MSG="Terminé/,/rm -f.*x265_2pass/ { if (/rm -f.*x265_2pass/) print NR }' "$transcode_file" | tail -1)
+    # Vérifier que rm -f x265_2pass est dans _execute_conversion (après l'appel)
+    local rm_line
+    rm_line=$(grep -n 'rm -f "x265_2pass.log"' "$transcode_file" | head -1 | cut -d: -f1)
     
-    # PIPESTATUS doit être capturé AVANT rm
-    [ -n "$pipestatus_line" ]
+    # Les deux patterns doivent exister
+    [ -n "$pipestatus_in_encode" ]
     [ -n "$rm_line" ]
-    [ "$pipestatus_line" -lt "$rm_line" ]
+    
+    # Le PIPESTATUS est dans _run_ffmpeg_encode qui est appelé avant rm dans _execute_conversion
+    # Donc PIPESTATUS est toujours capturé avant que rm soit exécuté
+    [ "$pipestatus_in_encode" -lt "$rm_line" ]
 }
 
 @test "regression: pattern PIPESTATUS immédiat présent dans transcode_video.sh" {
