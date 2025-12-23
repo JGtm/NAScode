@@ -133,7 +133,7 @@ ask_question() {
     local question="$1"
     local default="${2:-O/n}"
     echo ""
-    echo -e "${MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${BOX_QUESTION} ${WHITE}${question}${NOCOLOR}"
+    echo -e "${MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${WHITE}${question}${NOCOLOR}"
     echo -ne "${MAGENTA}${BOX_BL}${BOX_H}${BOX_ARROW}${NOCOLOR} ${DIM}(${default})${NOCOLOR} "
 }
 
