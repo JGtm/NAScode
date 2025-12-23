@@ -25,6 +25,9 @@ setup() {
     setup_test_env
     check_ffmpeg_available
     
+    # Nettoyer le lock global pour éviter les conflits entre tests
+    rm -f /tmp/conversion_video.lock
+    
     # Créer les répertoires de travail
     export WORKDIR="$TEST_TEMP_DIR/work"
     export SRC_DIR="$TEST_TEMP_DIR/src"
@@ -38,6 +41,8 @@ setup() {
 }
 
 teardown() {
+    # Nettoyer le lock global
+    rm -f /tmp/conversion_video.lock
     teardown_test_env
 }
 
@@ -192,6 +197,10 @@ teardown() {
     if ! ffmpeg -encoders 2>/dev/null | grep -q libopus; then
         skip "libopus non disponible dans ffmpeg"
     fi
+    
+    # Utiliser un fichier avec audio à bitrate élevé (>160 kbps) pour déclencher la conversion
+    rm -f "$SRC_DIR/test_video_2s.mkv"
+    cp "$FIXTURES_DIR/test_video_high_audio.mkv" "$SRC_DIR/"
     
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
