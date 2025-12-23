@@ -4,6 +4,10 @@
 # Construction, tri et traitement de la queue de fichiers
 ###########################################################
 
+# Variables pour stocker les options actives (affichage groupé)
+_LIMIT_MESSAGE=""
+_LIMIT_MODE=""
+
 ###########################################################
 # VALIDATION DU FICHIER QUEUE
 ###########################################################
@@ -300,13 +304,13 @@ _apply_queue_limitations() {
         return 0
     fi
     
-    # Affichage du message de limitation
-    if [[ "$NO_PROGRESS" != true ]]; then
-        if [[ "$RANDOM_MODE" == true ]]; then
-            print_limitation "Sélection aléatoire de $limit_count fichier(s) maximum" "random"
-        else
-            print_limitation "Traitement de $limit_count fichier(s) maximum"
-        fi
+    # Stocker les informations de limitation pour affichage groupé
+    if [[ "$RANDOM_MODE" == true ]]; then
+        _LIMIT_MESSAGE="Sélection aléatoire de $limit_count fichier(s) maximum"
+        _LIMIT_MODE="random"
+    else
+        _LIMIT_MESSAGE="Traitement de $limit_count fichier(s) maximum"
+        _LIMIT_MODE="normal"
     fi
     
     local tmp_limit="$QUEUE.limit"
@@ -425,6 +429,47 @@ update_queue() {
 }
 
 ###########################################################
+# AFFICHAGE DES OPTIONS ACTIVES (GROUPÉ)
+###########################################################
+
+# Affiche toutes les options actives dans un encadré après les questions interactives
+_show_active_options() {
+    [[ "$NO_PROGRESS" == true ]] && return 0
+    
+    local options=()
+    
+    # Option Dry-run (en premier car très important)
+    if [[ "$DRYRUN" == true ]]; then
+        options+=("$(format_option_dryrun)")
+    fi
+    
+    # Option VMAF
+    if [[ "$VMAF_ENABLED" == true && "$HAS_LIBVMAF" -eq 1 ]]; then
+        options+=("$(format_option_vmaf)")
+    fi
+    
+    # Option Mode échantillon
+    if [[ "$SAMPLE_MODE" == true ]]; then
+        options+=("$(format_option_sample)")
+    fi
+    
+    # Option Opus
+    if [[ "$OPUS_ENABLED" == true ]]; then
+        options+=("$(format_option_opus)")
+    fi
+    
+    # Option Limitation
+    if [[ -n "$_LIMIT_MESSAGE" ]]; then
+        options+=("$(format_option_limit "$_LIMIT_MESSAGE" "$_LIMIT_MODE")")
+    fi
+    
+    # Afficher seulement si au moins une option est active
+    if [[ ${#options[@]} -gt 0 ]]; then
+        print_active_options "${options[@]}"
+    fi
+}
+
+###########################################################
 # FONCTION PRINCIPALE DE CONSTRUCTION DE LA QUEUE
 ###########################################################
 
@@ -451,7 +496,10 @@ build_queue() {
     # Étape 3 : Appliquer les limitations (limit, random)
     _apply_queue_limitations
     
-    # Étape 4 : Finalisation et validation
+    # Étape 4 : Afficher les options actives (après les questions interactives)
+    _show_active_options
+    
+    # Étape 5 : Finalisation et validation
     _validate_queue_not_empty
     _display_random_mode_selection
     _create_readable_queue_copy

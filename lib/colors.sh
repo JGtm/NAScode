@@ -291,7 +291,61 @@ print_phase_start() {
     echo ""
 }
 
-# Affiche une limitation active
+# Affiche un groupe d'options actives dans un encadré
+# Usage: print_active_options "option1" "option2" ...
+print_active_options() {
+    local options=("$@")
+    local count=${#options[@]}
+    
+    [[ $count -eq 0 ]] && return 0
+    
+    echo ""
+    echo -e "${DIM}  ┌─ Options actives ─────────────────────────┐${NOCOLOR}"
+    for opt in "${options[@]}"; do
+        echo -e "${DIM}  │${NOCOLOR}  $opt"
+    done
+    echo -e "${DIM}  └────────────────────────────────────────────┘${NOCOLOR}"
+}
+
+# Formate une option VMAF pour print_active_options
+# Usage: format_option_vmaf
+format_option_vmaf() {
+    echo -e "${CYAN}ℹ${NOCOLOR}  Évaluation VMAF activée"
+}
+
+# Formate une option limitation pour print_active_options
+# Usage: format_option_limit "5 fichiers" [mode]
+format_option_limit() {
+    local message="$1"
+    local mode="${2:-normal}"
+    local icon="🔒"
+    
+    if [[ "$mode" == "random" ]]; then
+        icon="🎲"
+    fi
+    
+    echo -e "${icon}  ${MAGENTA}LIMITATION${NOCOLOR} : ${message}"
+}
+
+# Formate une option mode échantillon pour print_active_options
+# Usage: format_option_sample
+format_option_sample() {
+    echo -e "🧪  Mode ${YELLOW}échantillon${NOCOLOR} : 30s à position aléatoire"
+}
+
+# Formate une option dry-run pour print_active_options
+# Usage: format_option_dryrun
+format_option_dryrun() {
+    echo -e "🔍  Mode ${YELLOW}dry-run${NOCOLOR} : simulation sans conversion"
+}
+
+# Formate une option Opus pour print_active_options
+# Usage: format_option_opus
+format_option_opus() {
+    echo -e "🎵  Audio ${MAGENTA}Opus${NOCOLOR} activé (expérimental)"
+}
+
+# Affiche une limitation active (fonction legacy, utilisée si pas de regroupement)
 # Usage: print_limitation "Traitement de 5 fichiers maximum" [mode]
 print_limitation() {
     local message="$1"

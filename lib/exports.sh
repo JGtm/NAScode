@@ -37,7 +37,7 @@ export_variables() {
     export -f _normalize_source_path _validate_index_source _save_index_metadata
     export -f _count_total_video_files _index_video_files _generate_index
     export -f _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty
-    export -f _display_random_mode_selection _create_readable_queue_copy
+    export -f _display_random_mode_selection _create_readable_queue_copy _show_active_options
     export -f build_queue validate_queue_file
     
     # --- Fonctions de traitement parallèle ---

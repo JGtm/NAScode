@@ -192,7 +192,8 @@ check_vmaf() {
     fi
     
     if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
-        print_info "Évaluation VMAF activée"
+        # L'affichage sera groupé avec les autres options dans show_active_options
+        return 0
     else
         print_error "VMAF demandé mais libvmaf non disponible dans FFmpeg"
         VMAF_ENABLED=false

@@ -184,16 +184,10 @@ _copy_to_temp_storage() {
     local tmp_input="$3"
     local ffmpeg_log_temp="$4"
     
-    # Tronquer le nom de fichier à 40 caractères pour uniformité
-    local display_name="$filename"
-    if [[ ${#display_name} -gt 40 ]]; then
-        display_name="${display_name:0:37}..."
-    fi
-    
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_transfer_item "$display_name"
+        print_transfer_item "$filename"
     else
-        echo -e "${CYAN}→ $display_name${NOCOLOR}"
+        echo -e "${CYAN}→ $filename${NOCOLOR}"
     fi
 
     if ! custom_pv "$file_original" "$tmp_input" "$CYAN"; then
