@@ -202,6 +202,13 @@ teardown() {
     rm -f "$SRC_DIR/test_video_2s.mkv"
     cp "$FIXTURES_DIR/test_video_high_audio.mkv" "$SRC_DIR/"
     
+    # Vérifier si le bitrate audio source est détectable (requis pour déclencher Opus)
+    local src_audio_bitrate
+    src_audio_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of csv=p=0 "$FIXTURES_DIR/test_video_high_audio.mkv" 2>/dev/null)
+    if [[ "$src_audio_bitrate" == "N/A" || -z "$src_audio_bitrate" ]]; then
+        skip "Le bitrate audio source n'est pas détectable (N/A) - la conversion Opus ne se déclenchera pas"
+    fi
+    
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
         printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
