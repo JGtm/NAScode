@@ -336,24 +336,18 @@ show_summary() {
     fi
     
     {
-        echo ""
-        print_header "--- RÉSUMÉ DE CONVERSION ---" "$GREEN"
-        echo ""
-        print_item "Date fin" "$(date +"%Y-%m-%d %H:%M:%S")"
-        print_item "Durée totale" "${total_elapsed_str}" "$CYAN"
-        echo ""
-        print_separator 35
-        echo ""
-        print_item "Succès" "$succ" "$GREEN"
-        print_item "Ignorés" "$skip" "$YELLOW"
-        print_item "Erreurs" "$err" "$RED"
-        
-        echo ""
-        print_section "Anomalies détectées"
-        print_item "Taille" "$size_anomalies" "$YELLOW"
-        print_item "Intégrité" "$checksum_anomalies" "$YELLOW"
-        print_item "VMAF" "$vmaf_anomalies" "$YELLOW"
-        echo ""
+        print_summary_header
+        print_summary_item "Date fin" "$(date +"%Y-%m-%d %H:%M:%S")"
+        print_summary_item "Durée totale" "${total_elapsed_str}" "$CYAN"
+        print_summary_separator
+        print_summary_item "Succès" "$succ" "$GREEN"
+        print_summary_item "Ignorés" "$skip" "$YELLOW"
+        print_summary_item "Erreurs" "$err" "$RED"
+        print_summary_separator
+        print_summary_item "Anomalies taille" "$size_anomalies" "$YELLOW"
+        print_summary_item "Anomalies intégrité" "$checksum_anomalies" "$YELLOW"
+        print_summary_item "Anomalies VMAF" "$vmaf_anomalies" "$YELLOW"
+        print_summary_footer
     } | tee "$SUMMARY_FILE"
     
     # Afficher le résumé des heures creuses si activé

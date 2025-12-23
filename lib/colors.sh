@@ -210,6 +210,43 @@ print_empty_state() {
 }
 
 ###########################################################
+# RÉSUMÉ FINAL
+###########################################################
+
+# Affiche l'en-tête du résumé de conversion
+# Usage: print_summary_header
+print_summary_header() {
+    echo ""
+    echo -e "${GREEN}  ╔═══════════════════════════════════════════╗${NOCOLOR}"
+    echo -e "${GREEN}  ║                                           ║${NOCOLOR}"
+    echo -e "${GREEN}  ║       📋  RÉSUMÉ DE CONVERSION  📋        ║${NOCOLOR}"
+    echo -e "${GREEN}  ║                                           ║${NOCOLOR}"
+    echo -e "${GREEN}  ╠═══════════════════════════════════════════╣${NOCOLOR}"
+}
+
+# Affiche une ligne du résumé
+# Usage: print_summary_item "Label" "Valeur" [couleur_valeur]
+print_summary_item() {
+    local label="$1"
+    local value="$2"
+    local color="${3:-$WHITE}"
+    printf "${GREEN}  ║${NOCOLOR}   %-20s ${color}%-18s${NOCOLOR}${GREEN}║${NOCOLOR}\n" "$label" "$value"
+}
+
+# Affiche un séparateur dans le résumé
+# Usage: print_summary_separator
+print_summary_separator() {
+    echo -e "${GREEN}  ╟───────────────────────────────────────────╢${NOCOLOR}"
+}
+
+# Ferme l'encadré du résumé
+# Usage: print_summary_footer
+print_summary_footer() {
+    echo -e "${GREEN}  ╚═══════════════════════════════════════════╝${NOCOLOR}"
+    echo ""
+}
+
+###########################################################
 # ENCADRÉS DE PHASE (Conversion / Transfert)
 ###########################################################
 
