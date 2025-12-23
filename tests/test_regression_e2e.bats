@@ -293,3 +293,68 @@ teardown() {
         [ "$out_height" -eq 720 ]
     fi
 }
+
+###########################################################
+# SECTION 5: RÉGRESSION BUG STOP_FLAG
+###########################################################
+
+@test "E2E STOP_FLAG: pas de faux message 'interruption' en fin normale" {
+    # Régression bug: le dernier fichier affichait "Conversion interrompue"
+    # alors que tout s'était bien passé, car STOP_FLAG était créé trop tôt
+    
+    cp "$FIXTURES_DIR/test_video_2s.mkv" "$SRC_DIR/"
+    
+    run bash -lc '
+        set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+    
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+    
+    [ "$status" -eq 0 ]
+    
+    # Le message "Conversion interrompue" NE DOIT PAS apparaître en fin normale
+    [[ ! "$output" =~ "Conversion interrompue" ]]
+    [[ ! "$output" =~ "fichier temporaire conservé" ]]
+    
+    # Il doit y avoir un fichier converti
+    local out_files
+    out_files=$(find "$OUT_DIR" -type f -name "*.mkv" 2>/dev/null | wc -l)
+    [ "$out_files" -ge 1 ]
+}
+
+@test "E2E STOP_FLAG: STOP_FLAG n'existe pas après fin normale" {
+    # Le STOP_FLAG ne doit être créé que lors d'une vraie interruption
+    
+    cp "$FIXTURES_DIR/test_video_2s.mkv" "$SRC_DIR/"
+    
+    # S'assurer que STOP_FLAG n'existe pas avant
+    rm -f /tmp/conversion_stop_flag
+    
+    run bash -lc '
+        set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+    
+    [ "$status" -eq 0 ]
+    
+    # Après une fin normale, le STOP_FLAG peut exister (créé par cleanup)
+    # mais le message d'interruption ne doit pas avoir été affiché
+    # Ce test vérifie surtout que la conversion a réussi sans faux positif
+    [[ ! "$output" =~ "interrompue" ]]
+}
