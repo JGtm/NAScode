@@ -348,13 +348,11 @@ show_summary() {
         print_item "Ignorés" "$skip" "$YELLOW"
         print_item "Erreurs" "$err" "$RED"
         
-        if [[ "$size_anomalies" -gt 0 ]] || [[ "$checksum_anomalies" -gt 0 ]] || [[ "$vmaf_anomalies" -gt 0 ]]; then
-            echo ""
-            print_section "Anomalies détectées"
-            print_item "Taille" "$size_anomalies" "$YELLOW"
-            print_item "Intégrité" "$checksum_anomalies" "$YELLOW"
-            print_item "VMAF" "$vmaf_anomalies" "$YELLOW"
-        fi
+        echo ""
+        print_section "Anomalies détectées"
+        print_item "Taille" "$size_anomalies" "$YELLOW"
+        print_item "Intégrité" "$checksum_anomalies" "$YELLOW"
+        print_item "VMAF" "$vmaf_anomalies" "$YELLOW"
         echo ""
     } | tee "$SUMMARY_FILE"
     
