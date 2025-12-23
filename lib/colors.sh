@@ -231,8 +231,13 @@ print_summary_item() {
     local value="$2"
     local color="${3:-$WHITE}"
     # Largeur intérieure totale = 43 caractères
-    local content
-    content=$(printf "  %-20s%19s  " "$label" "$value")
+    # Compenser les caractères multi-bytes (é, è, etc. = 2 bytes mais 1 colonne)
+    local byte_len char_len extra label_width content
+    byte_len=$(echo -n "$label" | wc -c)
+    char_len=$(echo -n "$label" | wc -m)
+    extra=$((byte_len - char_len))
+    label_width=$((20 + extra))
+    content=$(printf "  %-${label_width}s%19s  " "$label" "$value")
     echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
 
