@@ -344,9 +344,9 @@ show_summary() {
         print_summary_item "Ignorés" "$skip" "$YELLOW"
         print_summary_item "Erreurs" "$err" "$RED"
         print_summary_separator
-        print_summary_item "Anomalies taille" "$size_anomalies" "$YELLOW"
-        print_summary_item "Anomalies intégrité" "$checksum_anomalies" "$YELLOW"
-        print_summary_item "Anomalies VMAF" "$vmaf_anomalies" "$YELLOW"
+        print_summary_item "Anomalies taille" "$size_anomalies"
+        print_summary_item "Anomalies intégrité" "$checksum_anomalies"
+        print_summary_item "Anomalies VMAF" "$vmaf_anomalies"
         print_summary_footer
     } | tee "$SUMMARY_FILE"
     
