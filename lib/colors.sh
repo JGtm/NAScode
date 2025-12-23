@@ -84,7 +84,7 @@ print_header() {
     
     echo ""
     echo -e "${color}${top_line}${NOCOLOR}"
-    echo -e "${color}${BOX_V}${NOCOLOR}${spaces}${BOLD}${title}${NOCOLOR}${spaces}${color}${BOX_V}${NOCOLOR}"
+    echo -e "${color}${BOX_V}${NOCOLOR}${spaces}${BRIGHT_WHITE}${title}${NOCOLOR}${spaces}${color}${BOX_V}${NOCOLOR}"
     echo -e "${color}${bottom_line}${NOCOLOR}"
 }
 
@@ -93,7 +93,7 @@ print_header() {
 print_section() {
     local title="$1"
     echo ""
-    echo -e "${BRIGHT_BLUE}${BOX_ARROW} ${BOLD}${title}${NOCOLOR}"
+    echo -e "${BRIGHT_BLUE}${BOX_ARROW} ${BRIGHT_WHITE}${title}${NOCOLOR}"
     print_separator 45 "$DIM"
 }
 
@@ -140,7 +140,7 @@ ask_question() {
     local question="$1"
     local default="${2:-O/n}"
     echo ""
-    echo -e "${BRIGHT_MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${BOX_QUESTION} ${question}${NOCOLOR}"
+    echo -e "${BRIGHT_MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${BOX_QUESTION} ${BRIGHT_WHITE}${question}${NOCOLOR}"
     echo -ne "${BRIGHT_MAGENTA}${BOX_BL}${BOX_H}${BOX_ARROW}${NOCOLOR} ${DIM}(${default})${NOCOLOR} "
 }
 
@@ -152,13 +152,13 @@ print_critical_alert() {
     local messages=("$@")
     
     echo ""
-    echo -e "${RED}${BOLD}  ╔════════════════════════════════════════════════════╗${NOCOLOR}"
-    echo -e "${RED}${BOLD}  ║  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}  ${title}  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}${NOCOLOR}"
-    echo -e "${RED}${BOLD}  ╠════════════════════════════════════════════════════╣${NOCOLOR}"
+    echo -e "${RED}  ╔════════════════════════════════════════════════════╗${NOCOLOR}"
+    echo -e "${RED}  ║  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}  ${BRIGHT_WHITE}${title}${NOCOLOR}${RED}  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}${NOCOLOR}"
+    echo -e "${RED}  ╠════════════════════════════════════════════════════╣${NOCOLOR}"
     for msg in "${messages[@]}"; do
         printf "${RED}  ║${NOCOLOR}  %-50s ${RED}║${NOCOLOR}\n" "$msg"
     done
-    echo -e "${RED}${BOLD}  ╚════════════════════════════════════════════════════╝${NOCOLOR}"
+    echo -e "${RED}  ╚════════════════════════════════════════════════════╝${NOCOLOR}"
     echo ""
 }
 
@@ -169,7 +169,7 @@ print_warning_box() {
     local message="$2"
     
     echo ""
-    echo -e "${YELLOW}  ┌─ ${BOX_WARN} ${BOLD}${title}${NOCOLOR}"
+    echo -e "${YELLOW}  ┌─ ${BOX_WARN} ${BRIGHT_YELLOW}${title}${NOCOLOR}"
     echo -e "${YELLOW}  │${NOCOLOR}"
     echo -e "${YELLOW}  │${NOCOLOR}  ${message}"
     echo -e "${YELLOW}  └${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${NOCOLOR}"
@@ -182,7 +182,7 @@ print_info_box() {
     local message="$2"
     
     echo ""
-    echo -e "${CYAN}  ┌─ ${BOX_INFO} ${BOLD}${title}${NOCOLOR}"
+    echo -e "${CYAN}  ┌─ ${BOX_INFO} ${BRIGHT_CYAN}${title}${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}  ${message}"
     echo -e "${CYAN}  └${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${NOCOLOR}"
@@ -193,7 +193,7 @@ print_info_box() {
 print_success_box() {
     local message="$1"
     echo -e "${GREEN}  ╭${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}╮${NOCOLOR}"
-    echo -e "${GREEN}  │ ${BOX_CHECK} ${message}${NOCOLOR}"
+    echo -e "${GREEN}  │ ${BOX_CHECK} ${BRIGHT_GREEN}${message}${NOCOLOR}"
     echo -e "${GREEN}  ╰${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}╯${NOCOLOR}"
 }
 
@@ -218,9 +218,9 @@ print_phase_start() {
     
     echo ""
     echo -e "${color}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${color}  ┃  ${BOLD}${title}${NOCOLOR}${color}${NOCOLOR}"
+    echo -e "${color}  ┃  ${BRIGHT_WHITE}${title}${NOCOLOR}"
     if [[ -n "$subtitle" ]]; then
-        echo -e "${color}  ┃  ${DIM}${subtitle}${NOCOLOR}${color}${NOCOLOR}"
+        echo -e "${color}  ┃  ${DIM}${subtitle}${NOCOLOR}"
     fi
     echo -e "${color}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
     echo ""
@@ -237,7 +237,7 @@ print_limitation() {
         icon="🎲"
     fi
     
-    echo -e "${MAGENTA}  ${icon} ${BOLD}LIMITATION${NOCOLOR}${MAGENTA} : ${message}${NOCOLOR}"
+    echo -e "${MAGENTA}  ${icon} ${BRIGHT_MAGENTA}LIMITATION${NOCOLOR}${MAGENTA} : ${message}${NOCOLOR}"
 }
 
 # Affiche le début de la section transfert
@@ -256,7 +256,7 @@ print_transfer_start() {
 print_transfer_complete() {
     echo ""
     echo -e "${BRIGHT_BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${BRIGHT_BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BOLD}Tous les transferts terminés${NOCOLOR}${BRIGHT_BLUE}      ┃${NOCOLOR}"
+    echo -e "${BRIGHT_BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BRIGHT_GREEN}Tous les transferts terminés${NOCOLOR}${BRIGHT_BLUE}      ┃${NOCOLOR}"
     echo -e "${BRIGHT_BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
@@ -272,7 +272,7 @@ print_vmaf_start() {
 print_vmaf_complete() {
     echo ""
     echo -e "${BRIGHT_YELLOW}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${BRIGHT_YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BOLD}Analyses VMAF terminées${NOCOLOR}${BRIGHT_YELLOW}            ┃${NOCOLOR}"
+    echo -e "${BRIGHT_YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BRIGHT_GREEN}Analyses VMAF terminées${NOCOLOR}${BRIGHT_YELLOW}            ┃${NOCOLOR}"
     echo -e "${BRIGHT_YELLOW}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
