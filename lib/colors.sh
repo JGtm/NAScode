@@ -230,7 +230,7 @@ print_summary_item() {
     local label="$1"
     local value="$2"
     local color="${3:-$WHITE}"
-    printf "${GREEN}  ║${NOCOLOR}   %-20s ${color}%-18s${NOCOLOR}${GREEN}║${NOCOLOR}\n" "$label" "$value"
+    printf "${GREEN}  ║${NOCOLOR}   %-19s  ${color}%16s${NOCOLOR} ${GREEN}║${NOCOLOR}\n" "$label" "$value"
 }
 
 # Affiche un séparateur dans le résumé
