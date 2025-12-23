@@ -135,15 +135,12 @@ print_item() {
 }
 
 # Affiche une question interactive avec style
-# Usage: ask_question "Question ?" variable_name [default: O/n]
+# Usage: ask_question "Question ?" [default: O/n]
 ask_question() {
     local question="$1"
     local default="${2:-O/n}"
     echo ""
-    echo -e "${BRIGHT_MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${BOX_QUESTION} ${BOLD}Question${NOCOLOR}"
-    echo -e "${BRIGHT_MAGENTA}${BOX_V}${NOCOLOR}"
-    echo -e "${BRIGHT_MAGENTA}${BOX_V}${NOCOLOR}  ${question}"
-    echo -e "${BRIGHT_MAGENTA}${BOX_V}${NOCOLOR}"
+    echo -e "${BRIGHT_MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${BOX_QUESTION} ${question}${NOCOLOR}"
     echo -ne "${BRIGHT_MAGENTA}${BOX_BL}${BOX_H}${BOX_ARROW}${NOCOLOR} ${DIM}(${default})${NOCOLOR} "
 }
 
@@ -206,4 +203,63 @@ print_status() {
     local message="$1"
     local color="${2:-$CYAN}"
     echo -e "  ${color}◐${NOCOLOR} ${message}"
+}
+
+###########################################################
+# ENCADRÉS DE PHASE (Conversion / Transfert)
+###########################################################
+
+# Affiche le démarrage d'une phase de traitement
+# Usage: print_phase_start "🎬 CONVERSION" "5 fichiers" [couleur]
+print_phase_start() {
+    local title="$1"
+    local subtitle="$2"
+    local color="${3:-$BRIGHT_CYAN}"
+    
+    echo ""
+    echo -e "${color}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${color}  ┃  ${BOLD}${title}${NOCOLOR}${color}${NOCOLOR}"
+    if [[ -n "$subtitle" ]]; then
+        echo -e "${color}  ┃  ${DIM}${subtitle}${NOCOLOR}${color}${NOCOLOR}"
+    fi
+    echo -e "${color}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+    echo ""
+}
+
+# Affiche une limitation active
+# Usage: print_limitation "Traitement de 5 fichiers maximum" [mode]
+print_limitation() {
+    local message="$1"
+    local mode="${2:-normal}"  # normal ou random
+    local icon="🔒"
+    
+    if [[ "$mode" == "random" ]]; then
+        icon="🎲"
+    fi
+    
+    echo -e "${MAGENTA}  ${icon} ${BOLD}LIMITATION${NOCOLOR}${MAGENTA} : ${message}${NOCOLOR}"
+}
+
+# Affiche le début de la section transfert
+# Usage: print_transfer_start [nb_fichiers]
+print_transfer_start() {
+    local nb_files="${1:-}"
+    local subtitle=""
+    if [[ -n "$nb_files" ]]; then
+        subtitle="$nb_files fichier(s) en attente"
+    fi
+    print_phase_start "📤 TRANSFERT" "$subtitle" "$BRIGHT_BLUE"
+}
+
+# Affiche le début de la section conversion
+# Usage: print_conversion_start nb_fichiers [limitation]
+print_conversion_start() {
+    local nb_files="$1"
+    local limitation="${2:-}"
+    
+    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$BRIGHT_CYAN"
+    
+    if [[ -n "$limitation" ]]; then
+        print_limitation "$limitation"
+    fi
 }

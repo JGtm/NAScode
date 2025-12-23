@@ -16,7 +16,7 @@ _process_queue_simple() {
     fi
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
+        print_conversion_start "$nb_files"
         # Réserver espace affichage pour les workers parallèles
         setup_progress_display
     fi
@@ -133,7 +133,7 @@ _process_queue_with_fifo() {
     # Traitement des fichiers
     local nb_files=$target_count
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${CYAN}Démarrage du traitement ($nb_files fichiers)...${NOCOLOR}"
+        print_conversion_start "$nb_files"
         # Réserver espace affichage pour les workers parallèles
         setup_progress_display
     fi

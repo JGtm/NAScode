@@ -98,7 +98,7 @@ wait_for_transfer_slot() {
     
     # Afficher le message d'attente
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "  ${YELLOW}⏳ Attente fin de transfert... ($active_count transferts en cours)${NOCOLOR}"
+        print_status "Attente fin de transfert... ($active_count en cours)" "$YELLOW"
     fi
     
     # Attendre qu'au moins un transfert se termine
@@ -108,7 +108,7 @@ wait_for_transfer_slot() {
     done
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "  ${GREEN}✓ Slot de transfert disponible${NOCOLOR}"
+        print_success "Slot de transfert disponible"
     fi
 }
 
@@ -138,15 +138,14 @@ wait_all_transfers() {
     # Si des transferts ont été lancés mais sont déjà terminés
     if [[ "$active_count" -eq 0 ]] && [[ "$had_transfers" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${GREEN}✅ Tous les transferts sont terminés${NOCOLOR}"
+            print_success "Tous les transferts sont terminés"
         fi
         return 0
     fi
     
     # Des transferts sont encore en cours
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo ""
-        echo -e "${MAGENTA}⏳ Attente de la fin des transferts en cours ($active_count restants)...${NOCOLOR}"
+        print_transfer_start "$active_count"
     fi
     
     # Attendre tous les transferts
@@ -158,14 +157,14 @@ wait_all_transfers() {
         # Afficher la progression si le nombre a changé
         if [[ "$new_count" -ne "$active_count" ]] && [[ "$NO_PROGRESS" != true ]]; then
             if [[ "$new_count" -gt 0 ]]; then
-                echo -e "  ${MAGENTA}⏳ $new_count transfert(s) restant(s)...${NOCOLOR}"
+                print_status "$new_count transfert(s) restant(s)..." "$MAGENTA"
             fi
         fi
         active_count="$new_count"
     done
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "${GREEN}✅ Tous les transferts sont terminés${NOCOLOR}"
+        print_success "Tous les transferts sont terminés"
     fi
 }
 
@@ -200,7 +199,7 @@ start_async_transfer() {
     _add_transfer_pid "$transfer_pid"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        echo -e "  ${BLUE}📤 Transfert lancé en arrière-plan${NOCOLOR}"
+        print_info "Transfert lancé en arrière-plan"
     fi
 }
 

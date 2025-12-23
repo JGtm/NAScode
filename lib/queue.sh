@@ -303,9 +303,9 @@ _apply_queue_limitations() {
     # Affichage du message de limitation
     if [[ "$NO_PROGRESS" != true ]]; then
         if [[ "$RANDOM_MODE" == true ]]; then
-            echo -e "${MAGENTA}LIMITATION (RANDOM) : Sélection aléatoire de $limit_count fichiers maximum.${NOCOLOR}"
+            print_limitation "Sélection aléatoire de $limit_count fichiers maximum" "random"
         else
-            echo -e "${MAGENTA}LIMITATION : Traitement de $limit_count fichiers maximum.${NOCOLOR}"
+            print_limitation "Traitement de $limit_count fichiers maximum"
         fi
     fi
     
