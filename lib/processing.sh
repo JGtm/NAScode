@@ -54,6 +54,10 @@ _process_queue_simple() {
     
     wait 2>/dev/null || true
     sleep 1
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        print_conversion_complete
+    fi
 }
 
 ###########################################################
@@ -211,6 +215,10 @@ _process_queue_with_fifo() {
 
     wait 2>/dev/null || true
     sleep 1
+    
+    if [[ "$NO_PROGRESS" != true ]]; then
+        print_conversion_complete
+    fi
 }
 
 ###########################################################

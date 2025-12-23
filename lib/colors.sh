@@ -337,3 +337,12 @@ print_conversion_start() {
         print_limitation "$limitation"
     fi
 }
+
+# Affiche la fin de la section conversion
+# Usage: print_conversion_complete
+print_conversion_complete() {
+    echo ""
+    echo -e "${CYAN}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Toutes les conversions terminées${NOCOLOR}${CYAN}  ┃${NOCOLOR}"
+    echo -e "${CYAN}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+}
