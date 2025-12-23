@@ -64,7 +64,7 @@ check_plexignore() {
     # Vérifier si OUTPUT_DIR est un sous-dossier de SOURCE
     if [[ "$output_abs"/ != "$source_abs"/ ]] && [[ "$output_abs" = "$source_abs"/* ]]; then
         if [[ -f "$plexignore_file" ]]; then
-            print_info "Fichier .plexignore déjà présent dans '$OUTPUT_DIR'"
+            print_info "Fichier .plexignore déjà présent dans le répertoire de destination"
             return 0
         fi
 

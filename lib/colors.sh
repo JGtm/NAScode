@@ -12,6 +12,7 @@ readonly RED=$'\033[0;31m'
 readonly CYAN=$'\033[0;36m'
 readonly BLUE=$'\033[0;34m'
 readonly MAGENTA=$'\033[0;35m'
+readonly WHITE=$'\033[0;37m'
 readonly ORANGE=$'\033[1;33m'
 
 # === STYLES SUPPLÉMENTAIRES ===
@@ -19,14 +20,6 @@ readonly BOLD=$'\033[1m'
 readonly DIM=$'\033[2m'
 readonly ITALIC=$'\033[3m'
 readonly UNDERLINE=$'\033[4m'
-
-# === COULEURS CLAIRES (BRIGHT) ===
-readonly BRIGHT_GREEN=$'\033[1;32m'
-readonly BRIGHT_YELLOW=$'\033[1;33m'
-readonly BRIGHT_CYAN=$'\033[1;36m'
-readonly BRIGHT_BLUE=$'\033[1;34m'
-readonly BRIGHT_MAGENTA=$'\033[1;35m'
-readonly BRIGHT_WHITE=$'\033[1;37m'
 
 # === CARACTÈRES DE DESSIN DE BOÎTE (Unicode) ===
 readonly BOX_TL="╭"    # Top-left
@@ -63,7 +56,7 @@ print_separator() {
 # Usage: print_header "Titre" [couleur]
 print_header() {
     local title="$1"
-    local color="${2:-$BRIGHT_CYAN}"
+    local color="${2:-$CYAN}"
     local padding=2
     local title_len=${#title}
     local total_width=$((title_len + padding * 2 + 2))
@@ -84,7 +77,7 @@ print_header() {
     
     echo ""
     echo -e "${color}${top_line}${NOCOLOR}"
-    echo -e "${color}${BOX_V}${NOCOLOR}${spaces}${BRIGHT_WHITE}${title}${NOCOLOR}${spaces}${color}${BOX_V}${NOCOLOR}"
+    echo -e "${color}${BOX_V}${NOCOLOR}${spaces}${WHITE}${title}${NOCOLOR}${spaces}${color}${BOX_V}${NOCOLOR}"
     echo -e "${color}${bottom_line}${NOCOLOR}"
 }
 
@@ -93,7 +86,7 @@ print_header() {
 print_section() {
     local title="$1"
     echo ""
-    echo -e "${BRIGHT_BLUE}${BOX_ARROW} ${BRIGHT_WHITE}${title}${NOCOLOR}"
+    echo -e "${BLUE}${BOX_ARROW} ${WHITE}${title}${NOCOLOR}"
     print_separator 45 "$DIM"
 }
 
@@ -130,7 +123,7 @@ print_error() {
 print_item() {
     local label="$1"
     local value="$2"
-    local value_color="${3:-$BRIGHT_WHITE}"
+    local value_color="${3:-$WHITE}"
     echo -e "  ${DIM}${BOX_DOT}${NOCOLOR} ${label} : ${value_color}${value}${NOCOLOR}"
 }
 
@@ -140,8 +133,8 @@ ask_question() {
     local question="$1"
     local default="${2:-O/n}"
     echo ""
-    echo -e "${BRIGHT_MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${BOX_QUESTION} ${BRIGHT_WHITE}${question}${NOCOLOR}"
-    echo -ne "${BRIGHT_MAGENTA}${BOX_BL}${BOX_H}${BOX_ARROW}${NOCOLOR} ${DIM}(${default})${NOCOLOR} "
+    echo -e "${MAGENTA}${BOX_TL}${BOX_H}${BOX_H} ${BOX_QUESTION} ${WHITE}${question}${NOCOLOR}"
+    echo -ne "${MAGENTA}${BOX_BL}${BOX_H}${BOX_ARROW}${NOCOLOR} ${DIM}(${default})${NOCOLOR} "
 }
 
 # Affiche un encadré d'alerte critique
@@ -153,7 +146,7 @@ print_critical_alert() {
     
     echo ""
     echo -e "${RED}  ╔════════════════════════════════════════════════════╗${NOCOLOR}"
-    echo -e "${RED}  ║  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}  ${BRIGHT_WHITE}${title}${NOCOLOR}${RED}  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}${NOCOLOR}"
+    echo -e "${RED}  ║  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}  ${WHITE}${title}${NOCOLOR}${RED}  ${BOX_WARN} ${BOX_WARN} ${BOX_WARN}${NOCOLOR}"
     echo -e "${RED}  ╠════════════════════════════════════════════════════╣${NOCOLOR}"
     for msg in "${messages[@]}"; do
         printf "${RED}  ║${NOCOLOR}  %-50s ${RED}║${NOCOLOR}\n" "$msg"
@@ -169,7 +162,7 @@ print_warning_box() {
     local message="$2"
     
     echo ""
-    echo -e "${YELLOW}  ┌─ ${BOX_WARN} ${BRIGHT_YELLOW}${title}${NOCOLOR}"
+    echo -e "${YELLOW}  ┌─ ${BOX_WARN} ${YELLOW}${title}${NOCOLOR}"
     echo -e "${YELLOW}  │${NOCOLOR}"
     echo -e "${YELLOW}  │${NOCOLOR}  ${message}"
     echo -e "${YELLOW}  └${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${NOCOLOR}"
@@ -182,7 +175,7 @@ print_info_box() {
     local message="$2"
     
     echo ""
-    echo -e "${CYAN}  ┌─ ${BOX_INFO} ${BRIGHT_CYAN}${title}${NOCOLOR}"
+    echo -e "${CYAN}  ┌─ ${BOX_INFO} ${CYAN}${title}${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}  ${message}"
     echo -e "${CYAN}  └${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${NOCOLOR}"
@@ -193,7 +186,7 @@ print_info_box() {
 print_success_box() {
     local message="$1"
     echo -e "${GREEN}  ╭${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}╮${NOCOLOR}"
-    echo -e "${GREEN}  │ ${BOX_CHECK} ${BRIGHT_GREEN}${message}${NOCOLOR}"
+    echo -e "${GREEN}  │ ${BOX_CHECK} ${GREEN}${message}${NOCOLOR}"
     echo -e "${GREEN}  ╰${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}╯${NOCOLOR}"
 }
 
@@ -211,7 +204,7 @@ print_empty_state() {
     local message="$1"
     echo ""
     echo -e "${DIM}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${DIM}  ┃  ${CYAN}${BOX_INFO}${NOCOLOR}  ${BRIGHT_WHITE}${message}${NOCOLOR}"
+    echo -e "${DIM}  ┃  ${CYAN}${BOX_INFO}${NOCOLOR}  ${WHITE}${message}${NOCOLOR}"
     echo -e "${DIM}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
     echo ""
 }
@@ -225,11 +218,11 @@ print_empty_state() {
 print_phase_start() {
     local title="$1"
     local subtitle="$2"
-    local color="${3:-$BRIGHT_CYAN}"
+    local color="${3:-$CYAN}"
     
     echo ""
     echo -e "${color}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${color}  ┃  ${BRIGHT_WHITE}${title}${NOCOLOR}"
+    echo -e "${color}  ┃  ${WHITE}${title}${NOCOLOR}"
     if [[ -n "$subtitle" ]]; then
         echo -e "${color}  ┃  ${DIM}${subtitle}${NOCOLOR}"
     fi
@@ -248,7 +241,7 @@ print_limitation() {
         icon="🎲"
     fi
     
-    echo -e "${MAGENTA}  ${icon} ${BRIGHT_MAGENTA}LIMITATION${NOCOLOR}${MAGENTA} : ${message}${NOCOLOR}"
+    echo -e "${MAGENTA}  ${icon} ${MAGENTA}LIMITATION${NOCOLOR}${MAGENTA} : ${message}${NOCOLOR}"
 }
 
 # Affiche le début de la section transfert
@@ -259,32 +252,32 @@ print_transfer_start() {
     if [[ -n "$nb_files" ]]; then
         subtitle="$nb_files fichier(s) en attente"
     fi
-    print_phase_start "📤 TRANSFERT" "$subtitle" "$BRIGHT_BLUE"
+    print_phase_start "📤 TRANSFERT" "$subtitle" "$BLUE"
 }
 
 # Affiche la fin de la section transfert
 # Usage: print_transfer_complete
 print_transfer_complete() {
     echo ""
-    echo -e "${BRIGHT_BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${BRIGHT_BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BRIGHT_GREEN}Tous les transferts terminés${NOCOLOR}${BRIGHT_BLUE}      ┃${NOCOLOR}"
-    echo -e "${BRIGHT_BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+    echo -e "${BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Tous les transferts terminés${NOCOLOR}${BLUE}      ┃${NOCOLOR}"
+    echo -e "${BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
 # Affiche le début de la section VMAF
 # Usage: print_vmaf_start nb_fichiers
 print_vmaf_start() {
     local nb_files="$1"
-    print_phase_start "📊 ANALYSE VMAF" "$nb_files fichier(s) à analyser" "$BRIGHT_YELLOW"
+    print_phase_start "📊 ANALYSE VMAF" "$nb_files fichier(s) à analyser" "$YELLOW"
 }
 
 # Affiche la fin de la section VMAF
 # Usage: print_vmaf_complete
 print_vmaf_complete() {
     echo ""
-    echo -e "${BRIGHT_YELLOW}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${BRIGHT_YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${BRIGHT_GREEN}Analyses VMAF terminées${NOCOLOR}${BRIGHT_YELLOW}            ┃${NOCOLOR}"
-    echo -e "${BRIGHT_YELLOW}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+    echo -e "${YELLOW}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Analyses VMAF terminées${NOCOLOR}${YELLOW}            ┃${NOCOLOR}"
+    echo -e "${YELLOW}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
 # Affiche le début de la section conversion
@@ -293,7 +286,7 @@ print_conversion_start() {
     local nb_files="$1"
     local limitation="${2:-}"
     
-    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$BRIGHT_CYAN"
+    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$CYAN"
     
     if [[ -n "$limitation" ]]; then
         print_limitation "$limitation"
