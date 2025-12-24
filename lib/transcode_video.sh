@@ -205,12 +205,12 @@ _get_audio_conversion_info() {
         -select_streams a:0 \
         -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
         -of default=noprint_wrappers=1 \
-        "$input_file" 2>/dev/null)
+        "$input_file" 2>/dev/null || true)
     
     local audio_codec audio_bitrate audio_bitrate_tag
-    audio_codec=$(echo "$audio_info" | grep '^codec_name=' | cut -d'=' -f2)
-    audio_bitrate=$(echo "$audio_info" | grep '^bit_rate=' | cut -d'=' -f2)
-    audio_bitrate_tag=$(echo "$audio_info" | grep '^TAG:BPS=' | cut -d'=' -f2)
+    audio_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
+    audio_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
+    audio_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
     
     # Utiliser le tag BPS si bitrate direct non disponible
     if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
@@ -276,7 +276,7 @@ _build_stream_mapping() {
     fr_subs=$(ffprobe -v error -select_streams s \
         -show_entries stream=index:stream_tags=language \
         -of csv=p=0 "$input_file" 2>/dev/null | \
-        grep -E ',fre$|,fra$|,french$' | cut -d',' -f1)
+        awk -F',' '$2 ~ /^(fre|fra|french)$/{print $1}' || true)
     
     if [[ -n "$fr_subs" ]]; then
         # Ajouter chaque sous-titre français
@@ -508,7 +508,7 @@ _setup_sample_mode_params() {
     local keyframe_pos
     keyframe_pos=$(ffprobe -v error -select_streams v:0 -skip_frame nokey \
         -show_entries packet=pts_time -of csv=p=0 \
-        -read_intervals "${target_pos}%+30" "$input_file" 2>/dev/null | head -1)
+        -read_intervals "${target_pos}%+30" "$input_file" 2>/dev/null | head -1 || true)
 
     if [[ -z "$keyframe_pos" ]] || [[ ! "$keyframe_pos" =~ ^[0-9.]+$ ]]; then
         keyframe_pos="$target_pos"

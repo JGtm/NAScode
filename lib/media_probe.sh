@@ -13,13 +13,13 @@ get_video_metadata() {
         -select_streams v:0 \
         -show_entries stream=bit_rate,codec_name:stream_tags=BPS \
         -of default=noprint_wrappers=1 \
-        "$file" 2>/dev/null)
+        "$file" 2>/dev/null || true)
     
     # Récupération séparée des métadonnées du format (container)
     # Note: -select_streams empêche l'accès aux infos format, donc requête séparée
     format_output=$(ffprobe -v error \
         -show_entries format=bit_rate,duration \
-        "$file" 2>/dev/null)
+        "$file" 2>/dev/null || true)
     
     # Parsing des résultats stream (format: key=value)
     local bitrate_stream=$(echo "$metadata_output" | awk -F= '/^bit_rate=/{print $2; exit}')
@@ -72,7 +72,7 @@ get_video_stream_props() {
         -select_streams v:0 \
         -show_entries stream=width,height,pix_fmt \
         -of default=noprint_wrappers=1 \
-        "$file" 2>/dev/null)
+        "$file" 2>/dev/null || true)
 
     local width height pix_fmt
     width=$(echo "$out" | awk -F= '/^width=/{print $2; exit}')
