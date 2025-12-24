@@ -1,0 +1,17 @@
+# Format commit (inspiré du repo)
+#
+# 1ère ligne (obligatoire) : <type>(<scope>): <résumé à l’impératif>
+#   - Ex: refactor(queue): stabilise la génération d’index
+#   - Ex: fix(vmaf): gère les fichiers vides
+#
+# Types conseillés: feat | fix | refactor | docs | test | chore
+# Scopes conseillés: args | queue | conversion | transcode | vmaf | logging | system | transfer | tests | docs
+#
+# Corps : une action par ligne, format "- ..."
+# Évite les paragraphes longs.
+
+refactor: réduire la dette technique
+
+- 
+- 
+- 
