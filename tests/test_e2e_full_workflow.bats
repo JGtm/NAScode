@@ -200,13 +200,18 @@ teardown() {
         skip "libopus non disponible dans ffmpeg"
     fi
     
-    # Utiliser un fichier avec audio à bitrate élevé (>160 kbps) pour déclencher la conversion
+    # Utiliser un fichier MP4 avec audio à bitrate élevé (>160 kbps) pour déclencher la conversion
+    # Note: MKV ne stocke pas le bitrate audio dans les métadonnées, MP4 oui
     rm -f "$SRC_DIR/test_video_2s.mkv"
-    cp "$FIXTURES_DIR/test_video_high_audio.mkv" "$SRC_DIR/"
+    local src_file="$FIXTURES_DIR/test_video_high_audio.mp4"
+    if [[ ! -f "$src_file" ]]; then
+        skip "Fichier test_video_high_audio.mp4 non disponible"
+    fi
+    cp "$src_file" "$SRC_DIR/"
     
     # Vérifier si le bitrate audio source est détectable (requis pour déclencher Opus)
     local src_audio_bitrate
-    src_audio_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of csv=p=0 "$FIXTURES_DIR/test_video_high_audio.mkv" 2>/dev/null)
+    src_audio_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of csv=p=0 "$src_file" 2>/dev/null)
     if [[ "$src_audio_bitrate" == "N/A" || -z "$src_audio_bitrate" ]]; then
         skip "Le bitrate audio source n'est pas détectable (N/A) - la conversion Opus ne se déclenchera pas"
     fi
