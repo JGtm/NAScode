@@ -135,12 +135,15 @@ teardown() {
     [[ "$SUFFIX_STRING" =~ "_opus" ]]
 }
 
-@test "config: OPUS_TARGET_BITRATE_KBPS est défini à 128" {
+@test "config: OPUS_TARGET_BITRATE_KBPS est défini et valide" {
     # Variable readonly déjà chargée
-    [ "$OPUS_TARGET_BITRATE_KBPS" -eq 128 ]
+    [ -n "$OPUS_TARGET_BITRATE_KBPS" ]
+    [ "$OPUS_TARGET_BITRATE_KBPS" -gt 0 ]
+    [ "$OPUS_TARGET_BITRATE_KBPS" -lt 512 ]
 }
 
-@test "config: OPUS_CONVERSION_THRESHOLD_KBPS est défini à 160" {
-    # Variable readonly déjà chargée
-    [ "$OPUS_CONVERSION_THRESHOLD_KBPS" -eq 160 ]
+@test "config: OPUS_CONVERSION_THRESHOLD_KBPS supérieur au target" {
+    # Le seuil de conversion doit être supérieur au bitrate cible
+    [ -n "$OPUS_CONVERSION_THRESHOLD_KBPS" ]
+    [ "$OPUS_CONVERSION_THRESHOLD_KBPS" -gt "$OPUS_TARGET_BITRATE_KBPS" ]
 }

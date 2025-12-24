@@ -424,14 +424,23 @@ _run_ffmpeg_encode() {
             ;;
     esac
 
+    # Paramètres GOP selon le mode (film: 240, série: 600)
+    local keyint_value="${FILM_KEYINT:-600}"
+    
+    # Option tune selon le mode (film: pas de tune, série: fastdecode)
+    local tune_opt=""
+    if [[ "${FILM_TUNE_FASTDECODE:-true}" == true ]]; then
+        tune_opt="-tune fastdecode"
+    fi
+
     # Exécution FFmpeg
     $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
         $SAMPLE_SEEK_PARAMS \
         $hwaccel_opts \
         -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-        -g 600 -keyint_min 600 \
+        -g "$keyint_value" -keyint_min "$keyint_value" \
         -c:v libx265 -preset "$ENCODER_PRESET" \
-        -tune fastdecode $bitrate_opt -x265-params "$x265_params" \
+        $tune_opt $bitrate_opt -x265-params "$x265_params" \
         -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
         $audio_opt \
         $stream_opt \

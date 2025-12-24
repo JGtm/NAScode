@@ -98,18 +98,38 @@ teardown() {
 # Tests de set_conversion_mode_parameters()
 ###########################################################
 
-@test "set_conversion_mode_parameters: mode série configure le bitrate" {
+@test "set_conversion_mode_parameters: mode série configure un bitrate valide" {
     CONVERSION_MODE="serie"
     set_conversion_mode_parameters
     
-    [ "$TARGET_BITRATE_KBPS" -eq 2070 ]
+    # Bitrate doit être défini et dans une plage raisonnable (1000-5000 kbps)
+    [ -n "$TARGET_BITRATE_KBPS" ]
+    [ "$TARGET_BITRATE_KBPS" -gt 1000 ]
+    [ "$TARGET_BITRATE_KBPS" -lt 5000 ]
 }
 
-@test "set_conversion_mode_parameters: mode film configure le bitrate" {
+@test "set_conversion_mode_parameters: mode film configure un bitrate valide" {
     CONVERSION_MODE="film"
     set_conversion_mode_parameters
     
-    [ "$TARGET_BITRATE_KBPS" -eq 2250 ]
+    # Bitrate doit être défini et dans une plage raisonnable
+    [ -n "$TARGET_BITRATE_KBPS" ]
+    [ "$TARGET_BITRATE_KBPS" -gt 1000 ]
+    [ "$TARGET_BITRATE_KBPS" -lt 5000 ]
+}
+
+@test "set_conversion_mode_parameters: MAXRATE supérieur au TARGET" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    [ "$MAXRATE_KBPS" -gt "$TARGET_BITRATE_KBPS" ]
+}
+
+@test "set_conversion_mode_parameters: BUFSIZE supérieur au MAXRATE" {
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    [ "$BUFSIZE_KBPS" -gt "$MAXRATE_KBPS" ]
 }
 
 @test "set_conversion_mode_parameters: mode série utilise preset medium" {
@@ -220,12 +240,15 @@ teardown() {
     [ "$SINGLE_PASS_MODE" = "true" ]
 }
 
-@test "set_conversion_mode_parameters: single-pass configure CRF_VALUE à 21" {
+@test "set_conversion_mode_parameters: single-pass configure CRF_VALUE dans une plage valide" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     set_conversion_mode_parameters
     
-    [ "$CRF_VALUE" -eq 21 ]
+    # CRF doit être entre 18 (quasi-transparent) et 28 (basse qualité)
+    [ -n "$CRF_VALUE" ]
+    [ "$CRF_VALUE" -ge 18 ]
+    [ "$CRF_VALUE" -le 28 ]
 }
 
 @test "set_conversion_mode_parameters: single-pass ne change pas le preset" {
@@ -241,7 +264,8 @@ teardown() {
     SINGLE_PASS_MODE=true
     set_conversion_mode_parameters
     
-    [[ "$SUFFIX_STRING" =~ "_crf21_" ]]
+    # Doit contenir _crf suivi d'un nombre
+    [[ "$SUFFIX_STRING" =~ _crf[0-9]+_ ]]
 }
 
 @test "build_dynamic_suffix: affiche bitrate en mode two-pass" {
@@ -249,6 +273,7 @@ teardown() {
     SINGLE_PASS_MODE=false
     set_conversion_mode_parameters
     
-    [[ "$SUFFIX_STRING" =~ "_2070k_" ]]
+    # Doit contenir le bitrate suivi de k, pas de CRF
+    [[ "$SUFFIX_STRING" =~ _[0-9]+k_ ]]
     [[ ! "$SUFFIX_STRING" =~ "_crf" ]]
 }

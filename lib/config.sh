@@ -134,23 +134,26 @@ X265_PASS1_FAST=false
 set_conversion_mode_parameters() {
     case "$CONVERSION_MODE" in
         film)
-            # Films : bitrate plus élevé pour meilleure qualité
-            TARGET_BITRATE_KBPS=2250
+            # Films : paramètres alignés sur TyHD (two-pass ABR, qualité max)
+            # Référence: Nuremberg.2025 - bitrate=2035, keyint=240, pas de tune
+            TARGET_BITRATE_KBPS=2035
             ENCODER_PRESET="slow"
-            MAXRATE_KBPS=3600
-            BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
-            # Films : garder toutes les optimisations x265 pour qualité max
+            # ABR pur comme TyHD (maxrate/bufsize plus souples)
+            MAXRATE_KBPS=3200
+            BUFSIZE_KBPS=4800
+            # Films : pas de paramètres x265 spéciaux (défauts optimaux)
             X265_EXTRA_PARAMS=""
             # Pass 1 complète pour une analyse approfondie (qualité max)
             X265_PASS1_FAST=false
-            # En mode single-pass, on utilise CRF au lieu du bitrate cible
-            # CRF : 0=lossless, 18=quasi-transparent, 23=défaut x265, 28+=basse qualité
-            if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-                CRF_VALUE=20
-            fi
+            # Films : forcer two-pass pour qualité max (comme TyHD)
+            SINGLE_PASS_MODE=false
+            # GOP court pour meilleur seeking (240 frames ~10s @ 24fps)
+            FILM_KEYINT=240
+            # Pas de tune fastdecode pour qualité max
+            FILM_TUNE_FASTDECODE=false
             ;;
         serie)
-            # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 23 (single-pass)
+            # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 21 (single-pass)
             TARGET_BITRATE_KBPS=2070
             ENCODER_PRESET="medium"
             MAXRATE_KBPS=2520
@@ -169,6 +172,10 @@ set_conversion_mode_parameters() {
             if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
                 CRF_VALUE=21
             fi
+            # GOP long pour meilleure compression (600 frames ~25s @ 24fps)
+            FILM_KEYINT=600
+            # Tune fastdecode pour décodage fluide sur appareils variés
+            FILM_TUNE_FASTDECODE=true
             ;;
         *)
             print_error "Mode de conversion inconnu : $CONVERSION_MODE"

@@ -7,14 +7,19 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** en 
 ### Encodage
 - **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
 - **Deux modes de conversion** :
-  - `serie` : optimisé vitesse (~1 Go/h), preset medium, 2070 kbps
-  - `film` : optimisé qualité, preset slow, 2250 kbps
+  - `serie` : optimisé vitesse (~1 Go/h), preset medium, CRF ou 2070 kbps
+  - `film` : optimisé qualité (aligné TyHD), preset slow, two-pass 2035 kbps
 - **Paramètres x265 optimisés** pour le mode série :
   - `sao=0` : désactive Sample Adaptive Offset (gain ~5%)
   - `strong-intra-smoothing=0` : préserve les détails fins
   - `limit-refs=3` : limite les références motion
   - `subme=2` : précision sub-pixel réduite
   - `no-slow-firstpass=1` : pass 1 rapide (gain ~15%)
+  - `-tune fastdecode` : décodage fluide sur appareils variés
+- **Mode film** (aligné sur TyHD) :
+  - Two-pass forcé pour qualité maximale
+  - GOP court (keyint=240, ~10s) pour meilleur seeking
+  - Pas de tune fastdecode (qualité prioritaire)
 - **Format 10-bit** (`yuv420p10le`) pour une meilleure qualité
 - **Accélération matérielle** : CUDA (Windows/Linux) ou VideoToolbox (macOS)
 
@@ -140,11 +145,14 @@ bash convert.sh -l 10 -k
 
 | Paramètre | Mode `serie` | Mode `film` |
 |-----------|--------------|-------------|
-| Bitrate cible | 2070 kbps | 2250 kbps |
-| Maxrate | 2520 kbps | 3600 kbps |
+| Bitrate cible | 2070 kbps | 2035 kbps |
+| Maxrate | 2520 kbps | 3200 kbps |
 | Preset | medium | slow |
+| Keyint (GOP) | 600 (~25s) | 240 (~10s) |
+| Tune fastdecode | Oui | Non |
 | Optimisations x265 | Oui (tuned) | Non (qualité max) |
 | Pass 1 rapide | Oui | Non |
+| Mode par défaut | Single-pass CRF | Two-pass forcé |
 
 ### Variables modifiables (`lib/config.sh`)
 
@@ -256,6 +264,13 @@ Consultez `logs/Skipped_*.log` - le fichier est probablement déjà en x265 avec
 Le script gère les espaces et caractères spéciaux, mais évitez les caractères de contrôle.
 
 ## 📝 Changelog récent
+
+### v2.1 (Décembre 2025)
+- ✅ Mode film aligné sur TyHD (two-pass 2035 kbps, keyint=240)
+- ✅ GOP différencié : 240 frames (film) vs 600 frames (série)
+- ✅ Tune fastdecode optionnel (activé série, désactivé film)
+- ✅ Tests refactorisés : comportement vs valeurs en dur
+- ✅ Affichage tests condensé avec progression temps réel
 
 ### v2.0 (Décembre 2025)
 - ✅ Nouveaux paramètres x265 optimisés pour le mode série

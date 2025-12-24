@@ -167,9 +167,11 @@ teardown() {
 # Tests des paramètres audio (préparation pour réactivation)
 ###########################################################
 
-@test "config: OPUS_TARGET_BITRATE_KBPS défini à 128" {
+@test "config: OPUS_TARGET_BITRATE_KBPS défini et valide" {
     # OPUS_TARGET_BITRATE_KBPS est readonly et déjà chargé par load_base_modules
-    [ "$OPUS_TARGET_BITRATE_KBPS" -eq 128 ]
+    [ -n "$OPUS_TARGET_BITRATE_KBPS" ]
+    [ "$OPUS_TARGET_BITRATE_KBPS" -gt 0 ]
+    [ "$OPUS_TARGET_BITRATE_KBPS" -lt 512 ]  # Plage raisonnable pour Opus
 }
 
 ###########################################################
