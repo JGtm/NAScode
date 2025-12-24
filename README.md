@@ -8,7 +8,7 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** en 
 - **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
 - **Deux modes de conversion** :
   - `serie` : optimisé vitesse (~1 Go/h), preset medium, CRF ou 2070 kbps
-  - `film` : optimisé qualité (aligné TyHD), preset slow, two-pass 2035 kbps
+  - `film` : optimisé qualité, preset slow, two-pass 2035 kbps
 - **Paramètres x265 optimisés** pour le mode série :
   - `sao=0` : désactive Sample Adaptive Offset (gain ~5%)
   - `strong-intra-smoothing=0` : préserve les détails fins
@@ -16,8 +16,8 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** en 
   - `subme=2` : précision sub-pixel réduite
   - `no-slow-firstpass=1` : pass 1 rapide (gain ~15%)
   - `-tune fastdecode` : décodage fluide sur appareils variés
-- **Mode film** (aligné sur TyHD) :
-  - Two-pass forcé pour qualité maximale
+- **Mode film** (qualité maximale) :
+  - Two-pass forcé pour qualité optimale
   - GOP court (keyint=240, ~10s) pour meilleur seeking
   - Pas de tune fastdecode (qualité prioritaire)
 - **Format 10-bit** (`yuv420p10le`) pour une meilleure qualité
@@ -266,7 +266,7 @@ Le script gère les espaces et caractères spéciaux, mais évitez les caractèr
 ## 📝 Changelog récent
 
 ### v2.1 (Décembre 2025)
-- ✅ Mode film aligné sur TyHD (two-pass 2035 kbps, keyint=240)
+- ✅ Mode film optimisé qualité (two-pass 2035 kbps, keyint=240)
 - ✅ GOP différencié : 240 frames (film) vs 600 frames (série)
 - ✅ Tune fastdecode optionnel (activé série, désactivé film)
 - ✅ Tests refactorisés : comportement vs valeurs en dur

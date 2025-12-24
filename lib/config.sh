@@ -134,18 +134,17 @@ X265_PASS1_FAST=false
 set_conversion_mode_parameters() {
     case "$CONVERSION_MODE" in
         film)
-            # Films : paramètres alignés sur TyHD (two-pass ABR, qualité max)
-            # Référence: Nuremberg.2025 - bitrate=2035, keyint=240, pas de tune
+            # Films : two-pass ABR, qualité maximale
             TARGET_BITRATE_KBPS=2035
             ENCODER_PRESET="slow"
-            # ABR pur comme TyHD (maxrate/bufsize plus souples)
+            # ABR avec maxrate/bufsize souples pour qualité constante
             MAXRATE_KBPS=3200
             BUFSIZE_KBPS=4800
             # Films : pas de paramètres x265 spéciaux (défauts optimaux)
             X265_EXTRA_PARAMS=""
             # Pass 1 complète pour une analyse approfondie (qualité max)
             X265_PASS1_FAST=false
-            # Films : forcer two-pass pour qualité max (comme TyHD)
+            # Films : forcer two-pass pour qualité maximale
             SINGLE_PASS_MODE=false
             # GOP court pour meilleur seeking (240 frames ~10s @ 24fps)
             FILM_KEYINT=240
