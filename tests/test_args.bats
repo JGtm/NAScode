@@ -37,6 +37,8 @@ _reset_cli_state() {
     OFF_PEAK_ENABLED=false
     OFF_PEAK_START="22:00"
     OFF_PEAK_END="06:00"
+    # Fichier unique
+    SINGLE_FILE=""
 }
 
 @test "parse_arguments: dry-run reste false si option absente" {
@@ -334,4 +336,53 @@ _reset_cli_state() {
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments --off-peak=22:00'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "Format invalide" ]]
+}
+
+###########################################################
+# Tests option -f/--file (fichier unique)
+###########################################################
+
+@test "parse_arguments: -f avec fichier existant définit SINGLE_FILE" {
+    _reset_cli_state
+    
+    # Créer un fichier temporaire
+    local test_file="$TEST_TEMP_DIR/video.mkv"
+    touch "$test_file"
+    
+    parse_arguments -f "$test_file"
+    
+    [ "$SINGLE_FILE" = "$test_file" ]
+}
+
+@test "parse_arguments: --file avec fichier existant définit SINGLE_FILE" {
+    _reset_cli_state
+    
+    local test_file="$TEST_TEMP_DIR/movie.mp4"
+    touch "$test_file"
+    
+    parse_arguments --file "$test_file"
+    
+    [ "$SINGLE_FILE" = "$test_file" ]
+}
+
+@test "parse_arguments: -f avec fichier inexistant échoue" {
+    _reset_cli_state
+    
+    run parse_arguments -f "/chemin/inexistant/video.mkv"
+    
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "introuvable" ]]
+}
+
+@test "parse_arguments: -f combinable avec -m et -t" {
+    _reset_cli_state
+    
+    local test_file="$TEST_TEMP_DIR/test.mkv"
+    touch "$test_file"
+    
+    parse_arguments -f "$test_file" -m film -t
+    
+    [ "$SINGLE_FILE" = "$test_file" ]
+    [ "$CONVERSION_MODE" = "film" ]
+    [ "$SAMPLE_MODE" = "true" ]
 }

@@ -106,8 +106,8 @@ Avant toute modification non-triviale (multi-fichiers, changement de comportemen
 Pour les petits changements (typo, ajustement local, test manquant évident) : plan léger ou exécution directe si c’est clairement sans risque.
 
 ## Politique de tests et documentation
-
-- Si une fonction change (signature/comportement/side effects), mettre à jour ou ajouter les tests Bats correspondants dans `tests/`.
+- **Toute nouvelle fonction doit être couverte par des tests unitaires** dans `tests/`.
+- Si la fonction impacte le workflow complet (CLI, conversion, résumé), ajouter aussi un **test e2e** si applicable.- Si une fonction change (signature/comportement/side effects), mettre à jour ou ajouter les tests Bats correspondants dans `tests/`.
 - Si une option CLI, un mode, un suffixe, ou une convention de log change : mettre à jour `README.md`.
 - Ne pas “corriger” les tests en les affaiblissant : préférer rendre le code plus déterministe/robuste.
 
