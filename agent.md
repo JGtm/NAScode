@@ -153,11 +153,26 @@ git config commit.template .gitmessage.txt
 - Pas de modification “silencieuse” des chemins, suffixes, ou conventions de logs sans doc.
 - Si le comportement change : mise à jour de `README.md`.
 
+## Paramètres de conversion (référence rapide)
+
+| Paramètre | Mode `serie` | Mode `film` |
+|-----------|--------------|-------------|
+| Bitrate cible | 2070 kbps | 2035 kbps |
+| Maxrate | 2520 kbps | 3200 kbps |
+| Preset | medium | slow |
+| Keyint (GOP) | 600 (~25s) | 240 (~10s) |
+| Tune fastdecode | Oui | Non |
+| X265 tuned | Oui | Non |
+| Pass 1 rapide | Oui | Non |
+| Mode par défaut | Single-pass CRF | Two-pass |
+
+## Politique de tests (bonnes pratiques)
+
+- **Tests par comportement** : vérifier des plages et relations (`MAXRATE > TARGET`), pas des valeurs en dur.
+- **Tests robustes** : un changement de config ne doit pas casser les tests si le comportement reste correct.
+- **Logs de tests** : les résultats sont enregistrés dans `logs/tests/tests_YYYYMMDD_HHMMSS.log`.
+
 ## Notes de debugging
 
 - Pour inspecter une commande FFmpeg générée : activer/consulter les logs dans `logs/`.
 - En cas de comportement inattendu sur un fichier précis : lancer une exécution limitée (`-l 1`) et/ou un sample (`-t`).
-
----
-
-Si tu me dis à quoi tu destines exactement `agent.md` (instructions pour Copilot/LLM ? checklist perso ? doc pour contributeurs ?), je peux l’ajuster au format attendu (plus “règles de contribution” ou plus “runbook”).
