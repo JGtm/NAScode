@@ -226,6 +226,41 @@ print_empty_state() {
 }
 
 ###########################################################
+# INDEXATION
+###########################################################
+
+# Affiche l'en-tête du bloc d'indexation
+# Usage: print_indexing_start
+print_indexing_start() {
+    echo ""
+    echo -e "${MAGENTA}  ┌──────────────────────────────────────────────────┐${NOCOLOR}"
+}
+
+# Affiche la progression de l'indexation (sur une seule ligne, mise à jour in-place)
+# Usage: print_indexing_progress <current> <total>
+# Largeur interne : 50 caractères (supporte jusqu'à 9999/9999 fichiers)
+print_indexing_progress() {
+    local current="$1"
+    local total="$2"
+    local percent=0
+    [[ "$total" -gt 0 ]] && percent=$((current * 100 / total))
+    # Format : "  │  📊 Indexation : 9999/9999 fichiers (100%)      │"
+    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers ${DIM}(%3d%%)${NOCOLOR}       ${MAGENTA}│${NOCOLOR}" "$current" "$total" "$percent" >&2
+}
+
+# Affiche la fin du bloc d'indexation avec le résultat
+# Usage: print_indexing_end <count>
+print_indexing_end() {
+    local count="$1"
+    echo "" >&2
+    echo -e "${MAGENTA}  ├──────────────────────────────────────────────────┤${NOCOLOR}" >&2
+    # Format : "  │  ✅ 9999 fichiers indexés                       │"
+    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%4d${GREEN} fichiers indexés${NOCOLOR}                        ${MAGENTA}│${NOCOLOR}\n" "$count" >&2
+    echo -e "${MAGENTA}  └──────────────────────────────────────────────────┘${NOCOLOR}" >&2
+    echo "" >&2
+}
+
+###########################################################
 # RÉSUMÉ FINAL
 ###########################################################
 
@@ -300,11 +335,11 @@ print_active_options() {
     [[ $count -eq 0 ]] && return 0
     
     echo ""
-    echo -e "${DIM}  ┌─ Options actives ─────────────────────────┐${NOCOLOR}"
+    echo -e "${DIM}  ┌─ Options actives ──────────────────────────────┐${NOCOLOR}"
     for opt in "${options[@]}"; do
         echo -e "${DIM}  │${NOCOLOR}  $opt"
     done
-    echo -e "${DIM}  └────────────────────────────────────────────┘${NOCOLOR}"
+    echo -e "${DIM}  └────────────────────────────────────────────────┘${NOCOLOR}"
 }
 
 # Formate une option VMAF pour print_active_options
