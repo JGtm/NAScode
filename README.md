@@ -5,7 +5,7 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** en 
 ## ✨ Fonctionnalités
 
 ### Encodage
-- **Two-pass encoding** : analyse puis encodage pour une répartition optimale du bitrate
+- **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
 - **Deux modes de conversion** :
   - `serie` : optimisé vitesse (~1 Go/h), preset medium, 2070 kbps
   - `film` : optimisé qualité, preset slow, 2250 kbps
@@ -53,6 +53,33 @@ git clone <repo_url> Conversion
 cd Conversion
 chmod +x convert.sh
 ```
+
+## 🧪 Tests
+
+Le repo utilise **Bats**.
+
+```bash
+bash run_tests.sh
+
+# Verbose
+bash run_tests.sh -v
+
+# Filtrer
+bash run_tests.sh -f "queue"  # exemple
+```
+
+Sur Git Bash / Windows, [run_tests.sh](run_tests.sh) tente aussi `${HOME}/.local/bin/bats` si `bats` n’est pas sur le PATH.
+
+## 🤝 Contribution
+
+- Règles de travail : lire [agent.md](agent.md) (modularité, plan avant gros changements, tests/doc, post-merge `main`).
+- Template de commit :
+
+```bash
+git config commit.template .gitmessage.txt
+```
+
+- Copilot (repo-level) : voir [.github/copilot-instructions.md](.github/copilot-instructions.md).
 
 ## 📖 Usage
 
@@ -131,18 +158,28 @@ amp=0:rect=0:sao=0:strong-intra-smoothing=0:limit-refs=3:subme=2
 Conversion/
 ├── convert.sh          # Script principal
 ├── lib/
-│   ├── args.sh         # Parsing des arguments
-│   ├── colors.sh       # Codes couleur terminal
-│   ├── config.sh       # Configuration globale
-│   ├── conversion.sh   # Logique d'encodage FFmpeg
-│   ├── finalize.sh     # Finalisation et transfert
-│   ├── logging.sh      # Gestion des logs
-│   ├── progress.sh     # Barres de progression
-│   ├── queue.sh        # File d'attente
-│   ├── system.sh       # Vérifications système
-│   ├── transfer.sh     # Transfert avec checksum
-│   ├── utils.sh        # Utilitaires
-│   └── vmaf.sh         # Évaluation VMAF
+│   ├── args.sh              # Parsing des arguments
+│   ├── audio_params.sh      # Paramètres audio
+│   ├── colors.sh            # Codes couleur terminal
+│   ├── config.sh            # Configuration globale
+│   ├── conversion.sh        # Orchestration FFmpeg
+│   ├── detect.sh            # Détection outils/système
+│   ├── exports.sh           # Exports pour sous-shells
+│   ├── finalize.sh          # Finalisation et résumé
+│   ├── lock.sh              # Verrou + traps
+│   ├── logging.sh           # Gestion des logs
+│   ├── media_probe.sh       # Propriétés média (ffprobe)
+│   ├── off_peak.sh          # Heures creuses
+│   ├── processing.sh        # Traitement (queue, FIFO)
+│   ├── progress.sh          # Progression
+│   ├── queue.sh             # Index + file d'attente
+│   ├── stream_mapping.sh    # Mapping des flux
+│   ├── system.sh            # Vérifications système
+│   ├── transcode_video.sh   # Logique vidéo (x265, downscale)
+│   ├── transfer.sh          # Transferts asynchrones
+│   ├── utils.sh             # Utilitaires
+│   ├── video_params.sh      # Paramètres vidéo
+│   └── vmaf.sh              # Évaluation VMAF
 ├── logs/               # Logs d'exécution
 │   ├── Success_*.log
 │   ├── Error_*.log
@@ -158,7 +195,8 @@ Conversion/
 - `Progress_*.log` : progression détaillée
 - `Skipped_*.log` : fichiers ignorés (déjà optimisés)
 - `Index` : index des fichiers à traiter
-- `Queue_readable_*.txt` : file d'attente lisible
+- `Index_readable_*.txt` : index lisible (liste des fichiers)
+- `Queue` : file d'attente (format null-separated)
 
 ## 🔍 Évaluation VMAF
 
