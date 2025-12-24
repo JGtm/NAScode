@@ -94,9 +94,11 @@ bash convert.sh [options]
 | `-s, --source DIR` | Dossier source (défaut: `../`) |
 | `-o, --output-dir DIR` | Dossier de sortie (défaut: `Converted/`) |
 | `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
-| `-d, --dry-run` | Simulation sans encodage |
-| `-t, --test` | Mode sample : encode 30s pour test rapide |
+| `-d, --dry-run` | Simulation sans encodage (alias : `--dryrun`) |
+| `-t, --sample` | Mode sample : encode ~30s pour test rapide (alias : `--test`) |
 | `-v, --vmaf` | Activer l'évaluation VMAF |
+| `--opus` | Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround) |
+| `-2, --two-pass` | Forcer le mode two-pass (défaut : single-pass CRF pour séries) |
 | `-l, --limit N` | Limiter à N fichiers |
 | `-r, --random` | Sélection aléatoire des fichiers |
 | `-k, --keep-index` | Réutiliser l'index existant |
@@ -104,6 +106,7 @@ bash convert.sh [options]
 | `-x, --no-suffix` | Pas de suffixe sur les fichiers de sortie |
 | `-e, --exclude PATTERN` | Exclure des fichiers (glob) |
 | `-q, --queue FILE` | Utiliser une file d'attente personnalisée |
+| `-p, --off-peak [HH:MM-HH:MM]` | Mode heures creuses (défaut : `22:00-06:00`) |
 | `-h, --help` | Afficher l'aide |
 
 ### Exemples
@@ -117,6 +120,12 @@ bash convert.sh -m film -v -s "/chemin/vers/films"
 
 # Test rapide sur 5 fichiers aléatoires (30s chacun)
 bash convert.sh -t -v -r -l 5
+
+# Heures creuses (plage par défaut 22:00-06:00)
+bash convert.sh -p -s "/chemin/vers/series"
+
+# Heures creuses avec plage personnalisée
+bash convert.sh --off-peak=23:00-07:00 -s "/chemin/vers/series"
 
 # Simulation pour vérifier la configuration
 bash convert.sh -d -s "/chemin/source"
@@ -151,6 +160,14 @@ BITRATE_CONVERSION_THRESHOLD_KBPS=2520  # Seuil pour skip
 ```
 amp=0:rect=0:sao=0:strong-intra-smoothing=0:limit-refs=3:subme=2
 ```
+
+### Mode heures creuses (off-peak)
+
+Quand `-p/--off-peak` est activé :
+
+- Le script ne démarre de nouvelles conversions **que** pendant la plage définie.
+- Si un fichier est en cours quand les heures pleines reviennent, il **termine**, puis le script attend le retour des heures creuses.
+- La plage par défaut est `22:00-06:00` (modifiable via `--off-peak=HH:MM-HH:MM`).
 
 ## 📁 Structure
 
