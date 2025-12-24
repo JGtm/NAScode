@@ -90,6 +90,37 @@ main() {
     # Configurer les paramètres selon le mode de conversion
     set_conversion_mode_parameters
     
+    # Mode fichier unique : traiter directement sans index/queue
+    if [[ -n "${SINGLE_FILE:-}" ]]; then
+        # Convertir en chemin absolu
+        SINGLE_FILE=$(cd "$(dirname "$SINGLE_FILE")" && pwd)/$(basename "$SINGLE_FILE")
+        # SOURCE = dossier contenant le fichier (pour les chemins relatifs)
+        SOURCE=$(dirname "$SINGLE_FILE")
+        
+        # Vérifications minimales
+        check_lock
+        check_dependencies
+        initialize_directories
+        init_async_transfers
+        detect_hwaccel
+        check_vmaf
+        export_variables
+        
+        # Conversion directe du fichier unique
+        if [[ "$NO_PROGRESS" != true ]]; then
+            print_conversion_start 1
+        fi
+        
+        convert_file "$SINGLE_FILE" "$OUTPUT_DIR"
+        
+        cleanup_transfers
+        
+        if [[ "$DRYRUN" != true ]]; then
+            show_summary
+        fi
+        return
+    fi
+    
     # Convertir SOURCE en chemin absolu pour éviter les problèmes de répertoire courant
     SOURCE=$(cd "$SOURCE" && pwd)
     

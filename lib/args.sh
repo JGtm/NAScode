@@ -72,6 +72,15 @@ parse_arguments() {
                 SAMPLE_MODE=true
                 shift
                 ;;
+            -f|--file)
+                if [[ -f "$2" ]]; then
+                    SINGLE_FILE="$2"
+                    shift 2
+                else
+                    print_error "Fichier '$2' introuvable"
+                    exit 1
+                fi
+                ;;
             --opus)
                 OPUS_ENABLED=true
                 shift
@@ -182,6 +191,7 @@ Options :
     -k, --keep-index             Conserver l'index existant sans demande interactive (FLAG)
     -v, --vmaf                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
     -t, --sample                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
+    -f, --file FILE              Convertir un fichier unique (bypass index/queue) (ARG)
     --opus                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
     -2, --two-pass               Forcer le mode two-pass (défaut : single-pass CRF 23 pour séries)
     -p, --off-peak [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
@@ -214,5 +224,6 @@ Exemples :
   ./conversion.sh --vmaf          Activer l'évaluation VMAF après conversion
   ./conversion.sh --off-peak      Mode heures creuses (22:00-06:00 par défaut)
   ./conversion.sh -p 23:00-07:00  Mode heures creuses personnalisé (23h-7h)
+  ./conversion.sh -f /path/video.mkv  Convertir un fichier spécifique
 EOF
 }

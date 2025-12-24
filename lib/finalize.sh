@@ -152,6 +152,38 @@ _finalize_log_and_verify() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
         fi
     fi
+
+    # --- Comptabiliser les gains de place (uniquement si conversion réussie) ---
+    # Note: size_before_mb vient du fichier original, size_after_bytes du fichier converti
+    if [[ "$verify_status" == "OK" || "$verify_status" == "SKIPPED" ]] && [[ -e "$final_actual" ]]; then
+        # Taille originale en octets (convertir depuis MB ou recalculer si le fichier existe encore)
+        local original_size_bytes=0
+        if [[ -e "$file_original" ]]; then
+            original_size_bytes=$(stat -c%s "$file_original" 2>/dev/null || stat -f%z "$file_original" 2>/dev/null || echo 0)
+        else
+            # Fichier original supprimé, estimer depuis size_before_mb
+            original_size_bytes=$((size_before_mb * 1024 * 1024))
+        fi
+        
+        # Incrémenter les compteurs atomiquement (flock pour éviter race conditions en parallèle)
+        if [[ -n "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && [[ -f "$TOTAL_SIZE_BEFORE_FILE" ]]; then
+            (
+                flock -x 200
+                local current
+                current=$(cat "$TOTAL_SIZE_BEFORE_FILE" 2>/dev/null || echo 0)
+                echo $((current + original_size_bytes)) > "$TOTAL_SIZE_BEFORE_FILE"
+            ) 200>"${TOTAL_SIZE_BEFORE_FILE}.lock" 2>/dev/null || true
+        fi
+        
+        if [[ -n "${TOTAL_SIZE_AFTER_FILE:-}" ]] && [[ -f "$TOTAL_SIZE_AFTER_FILE" ]]; then
+            (
+                flock -x 200
+                local current
+                current=$(cat "$TOTAL_SIZE_AFTER_FILE" 2>/dev/null || echo 0)
+                echo $((current + size_after_bytes)) > "$TOTAL_SIZE_AFTER_FILE"
+            ) 200>"${TOTAL_SIZE_AFTER_FILE}.lock" 2>/dev/null || true
+        fi
+    fi
 }
 
 ###########################################################
@@ -273,6 +305,25 @@ _finalize_conversion_error() {
 # AFFICHAGE DU RÉSUMÉ FINAL
 ###########################################################
 
+# Formate une taille en octets en format lisible (Ko, Mo, Go)
+# Usage: _format_size_bytes <bytes>
+_format_size_bytes() {
+    local bytes="${1:-0}"
+    
+    if [[ "$bytes" -ge 1073741824 ]]; then
+        # Go
+        awk "BEGIN {printf \"%.2f Go\", $bytes / 1073741824}"
+    elif [[ "$bytes" -ge 1048576 ]]; then
+        # Mo
+        awk "BEGIN {printf \"%.2f Mo\", $bytes / 1048576}"
+    elif [[ "$bytes" -ge 1024 ]]; then
+        # Ko
+        awk "BEGIN {printf \"%.2f Ko\", $bytes / 1024}"
+    else
+        echo "${bytes} octets"
+    fi
+}
+
 show_summary() {
     # Traiter toutes les analyses VMAF en attente
     process_vmaf_queue
@@ -328,6 +379,35 @@ show_summary() {
         vmaf_anomalies=$(grep -c ' | VMAF | .* | quality:DEGRADE' "$LOG_SUCCESS" 2>/dev/null | tr -d '\r\n') || vmaf_anomalies=0
     fi
     
+    # Calcul du gain de place total
+    local total_before=0 total_after=0 space_saved=0 space_saved_str="N/A" savings_percent=""
+    if [[ -f "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && [[ -f "${TOTAL_SIZE_AFTER_FILE:-}" ]]; then
+        total_before=$(cat "$TOTAL_SIZE_BEFORE_FILE" 2>/dev/null || echo 0)
+        total_after=$(cat "$TOTAL_SIZE_AFTER_FILE" 2>/dev/null || echo 0)
+        total_before=$(echo "$total_before" | tr -d '[:space:]')
+        total_after=$(echo "$total_after" | tr -d '[:space:]')
+        [[ -z "$total_before" ]] && total_before=0
+        [[ -z "$total_after" ]] && total_after=0
+        
+        if [[ "$total_before" -gt 0 ]] && [[ "$total_after" -gt 0 ]]; then
+            space_saved=$((total_before - total_after))
+            local before_fmt=$(_format_size_bytes "$total_before")
+            local after_fmt=$(_format_size_bytes "$total_after")
+            local saved_fmt=$(_format_size_bytes "$space_saved")
+            # Calculer le pourcentage d'économie
+            if [[ "$total_before" -gt 0 ]]; then
+                savings_percent=$(awk "BEGIN {printf \"%.1f\", ($space_saved / $total_before) * 100}")
+            fi
+            if [[ "$space_saved" -ge 0 ]]; then
+                space_saved_str="${before_fmt} → ${after_fmt} (−${saved_fmt}, ${savings_percent}%)"
+            else
+                # Cas rare : fichiers plus gros après conversion
+                local increase_fmt=$(_format_size_bytes "$((-space_saved))")
+                space_saved_str="${before_fmt} → ${after_fmt} (+${increase_fmt})"
+            fi
+        fi
+    fi
+    
     # Afficher message si aucun fichier traité (queue vide ou tout skippé)
     # Spécification: si tout est skippé, on dit aussi "Aucun fichier à traiter".
     local total_processed=$((succ + err))
@@ -347,6 +427,11 @@ show_summary() {
         print_summary_item "Anomalies taille" "$size_anomalies"
         print_summary_item "Anomalies intégrité" "$checksum_anomalies"
         print_summary_item "Anomalies VMAF" "$vmaf_anomalies"
+        # Afficher le gain de place si disponible
+        if [[ "$space_saved_str" != "N/A" ]]; then
+            print_summary_separator
+            print_summary_item "Espace économisé" "$space_saved_str" "$GREEN"
+        fi
         print_summary_footer
     } | tee "$SUMMARY_FILE"
     

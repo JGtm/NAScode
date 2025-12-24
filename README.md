@@ -98,6 +98,7 @@ bash convert.sh [options]
 |--------|-------------|
 | `-s, --source DIR` | Dossier source (défaut: `../`) |
 | `-o, --output-dir DIR` | Dossier de sortie (défaut: `Converted/`) |
+| `-f, --file FILE` | Convertir un fichier unique (bypass index/queue) |
 | `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
 | `-d, --dry-run` | Simulation sans encodage (alias : `--dryrun`) |
 | `-t, --sample` | Mode sample : encode ~30s pour test rapide (alias : `--test`) |
@@ -119,6 +120,9 @@ bash convert.sh [options]
 ```bash
 # Conversion standard d'un dossier de séries
 bash convert.sh -s "/chemin/vers/series"
+
+# Convertir un fichier spécifique
+bash convert.sh -f "/chemin/vers/video.mkv"
 
 # Mode film avec évaluation VMAF
 bash convert.sh -m film -v -s "/chemin/vers/films"
@@ -264,6 +268,11 @@ Consultez `logs/Skipped_*.log` - le fichier est probablement déjà en x265 avec
 Le script gère les espaces et caractères spéciaux, mais évitez les caractères de contrôle.
 
 ## 📝 Changelog récent
+
+### v2.2 (Décembre 2025)
+- ✅ Option `-f/--file` pour convertir un fichier unique (bypass index/queue)
+- ✅ Affichage du gain de place total dans le résumé final (avant → après, économie en %)
+- ✅ Amélioration fiabilité pipefail et nettoyage fichiers temporaires
 
 ### v2.1 (Décembre 2025)
 - ✅ Mode film optimisé qualité (two-pass 2035 kbps, keyint=240)

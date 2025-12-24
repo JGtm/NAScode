@@ -23,6 +23,7 @@ NO_PROGRESS=false
 CONVERSION_MODE="serie"
 VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
 OPUS_ENABLED=false  # Conversion audio Opus (expérimental, problèmes VLC)
+SINGLE_FILE=""       # Chemin vers un fichier unique à convertir (bypass index/queue)
 
 # Mode sample : encoder uniquement un segment de test (30s par défaut)
 SAMPLE_MODE=false

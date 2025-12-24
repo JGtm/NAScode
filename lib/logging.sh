@@ -59,6 +59,10 @@ readonly QUEUE="$LOG_DIR/Queue"
 readonly LOG_DRYRUN_COMPARISON="$LOG_DIR/DryRun_Comparison_${EXECUTION_TIMESTAMP}.log"
 readonly VMAF_QUEUE_FILE="$LOG_DIR/.vmaf_queue_${EXECUTION_TIMESTAMP}"
 
+# Fichiers compteurs pour le suivi des gains de place (en octets)
+readonly TOTAL_SIZE_BEFORE_FILE="$LOG_DIR/.total_size_before_${EXECUTION_TIMESTAMP}"
+readonly TOTAL_SIZE_AFTER_FILE="$LOG_DIR/.total_size_after_${EXECUTION_TIMESTAMP}"
+
 ###########################################################
 # INITIALISATION DES RÉPERTOIRES
 ###########################################################
@@ -76,4 +80,8 @@ initialize_directories() {
     if [[ "$DRYRUN" == true ]]; then
         touch "$LOG_DRYRUN_COMPARISON"
     fi
+    
+    # Initialiser les compteurs de taille (pour le gain de place)
+    echo "0" > "$TOTAL_SIZE_BEFORE_FILE"
+    echo "0" > "$TOTAL_SIZE_AFTER_FILE"
 }
