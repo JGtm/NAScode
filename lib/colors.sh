@@ -292,6 +292,17 @@ print_summary_item() {
     echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
 
+# Affiche une valeur seule (sans label) alignée à droite dans le résumé
+# Usage: print_summary_value_only "Valeur" [couleur_valeur]
+print_summary_value_only() {
+    local value="$1"
+    local color="${2:-$WHITE}"
+    # Largeur intérieure totale = 43 caractères, valeur alignée à droite
+    local content
+    content=$(printf "%41s  " "$value")
+    echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
+}
+
 # Affiche un séparateur dans le résumé
 # Usage: print_summary_separator
 print_summary_separator() {

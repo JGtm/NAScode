@@ -380,30 +380,42 @@ show_summary() {
     fi
     
     # Calcul du gain de place total
-    local total_before=0 total_after=0 space_saved=0 space_saved_str="N/A" savings_percent=""
-    if [[ -f "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && [[ -f "${TOTAL_SIZE_AFTER_FILE:-}" ]]; then
-        total_before=$(cat "$TOTAL_SIZE_BEFORE_FILE" 2>/dev/null || echo 0)
-        total_after=$(cat "$TOTAL_SIZE_AFTER_FILE" 2>/dev/null || echo 0)
-        total_before=$(echo "$total_before" | tr -d '[:space:]')
-        total_after=$(echo "$total_after" | tr -d '[:space:]')
-        [[ -z "$total_before" ]] && total_before=0
-        [[ -z "$total_after" ]] && total_after=0
-        
-        if [[ "$total_before" -gt 0 ]] && [[ "$total_after" -gt 0 ]]; then
-            space_saved=$((total_before - total_after))
-            local before_fmt=$(_format_size_bytes "$total_before")
-            local after_fmt=$(_format_size_bytes "$total_after")
-            local saved_fmt=$(_format_size_bytes "$space_saved")
-            # Calculer le pourcentage d'économie
-            if [[ "$total_before" -gt 0 ]]; then
-                savings_percent=$(awk "BEGIN {printf \"%.1f\", ($space_saved / $total_before) * 100}")
-            fi
-            if [[ "$space_saved" -ge 0 ]]; then
-                space_saved_str="${before_fmt} → ${after_fmt} (−${saved_fmt}, ${savings_percent}%)"
-            else
-                # Cas rare : fichiers plus gros après conversion
-                local increase_fmt=$(_format_size_bytes "$((-space_saved))")
-                space_saved_str="${before_fmt} → ${after_fmt} (+${increase_fmt})"
+    # Note: N'est pas affiché en mode sample ou dry-run (pas représentatif)
+    local total_before=0 total_after=0 space_saved=0 
+    local space_saved_line1="" space_saved_line2=""
+    local show_space_savings=false
+    
+    if [[ "${SAMPLE_MODE:-false}" != true ]] && [[ "${DRYRUN:-false}" != true ]]; then
+        if [[ -f "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && [[ -f "${TOTAL_SIZE_AFTER_FILE:-}" ]]; then
+            total_before=$(cat "$TOTAL_SIZE_BEFORE_FILE" 2>/dev/null || echo 0)
+            total_after=$(cat "$TOTAL_SIZE_AFTER_FILE" 2>/dev/null || echo 0)
+            total_before=$(echo "$total_before" | tr -d '[:space:]')
+            total_after=$(echo "$total_after" | tr -d '[:space:]')
+            [[ -z "$total_before" ]] && total_before=0
+            [[ -z "$total_after" ]] && total_after=0
+            
+            if [[ "$total_before" -gt 0 ]] && [[ "$total_after" -gt 0 ]]; then
+                space_saved=$((total_before - total_after))
+                local before_fmt=$(_format_size_bytes "$total_before")
+                local after_fmt=$(_format_size_bytes "$total_after")
+                local saved_fmt=$(_format_size_bytes "$space_saved")
+                # Calculer le pourcentage d'économie
+                local savings_percent=""
+                if [[ "$total_before" -gt 0 ]]; then
+                    savings_percent=$(awk "BEGIN {printf \"%.1f\", ($space_saved / $total_before) * 100}")
+                fi
+                if [[ "$space_saved" -ge 0 ]]; then
+                    # Ligne 1: tailles avant → après
+                    space_saved_line1="${before_fmt} → ${after_fmt}"
+                    # Ligne 2: économie (alignée à droite)
+                    space_saved_line2="(−${saved_fmt}, ${savings_percent}%)"
+                else
+                    # Cas rare : fichiers plus gros après conversion
+                    local increase_fmt=$(_format_size_bytes "$((-space_saved))")
+                    space_saved_line1="${before_fmt} → ${after_fmt}"
+                    space_saved_line2="(+${increase_fmt})"
+                fi
+                show_space_savings=true
             fi
         fi
     fi
@@ -427,10 +439,11 @@ show_summary() {
         print_summary_item "Anomalies taille" "$size_anomalies"
         print_summary_item "Anomalies intégrité" "$checksum_anomalies"
         print_summary_item "Anomalies VMAF" "$vmaf_anomalies"
-        # Afficher le gain de place si disponible
-        if [[ "$space_saved_str" != "N/A" ]]; then
+        # Afficher le gain de place si disponible (sur deux lignes)
+        if [[ "$show_space_savings" == true ]]; then
             print_summary_separator
-            print_summary_item "Espace économisé" "$space_saved_str" "$GREEN"
+            print_summary_item "Espace économisé" "$space_saved_line1" "$GREEN"
+            print_summary_value_only "$space_saved_line2" "$GREEN"
         fi
         print_summary_footer
     } | tee "$SUMMARY_FILE"
