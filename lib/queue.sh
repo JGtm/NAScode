@@ -170,7 +170,7 @@ _handle_existing_index() {
     # Si l'utilisateur a demandé de conserver l'index, on l'accepte sans demander
     if [[ "$KEEP_INDEX" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            print_info "Utilisation forcée de l'index existant (--keep-index)"
+            print_info "Utilisation forcée de l'index existant"
         fi
         return 0
     fi

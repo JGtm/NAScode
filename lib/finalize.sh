@@ -427,6 +427,22 @@ show_summary() {
         print_empty_state "Aucun fichier à traiter"
     fi
     
+    # Déterminer si on doit afficher la section anomalies
+    # - Anomalies VMAF : seulement si VMAF est activé ET il y a des anomalies
+    # - Autres anomalies : seulement si > 0
+    local has_any_anomaly=false
+    local show_vmaf_anomaly=false
+    
+    if [[ "$size_anomalies" -gt 0 ]] || [[ "$checksum_anomalies" -gt 0 ]]; then
+        has_any_anomaly=true
+    fi
+    
+    # VMAF : afficher seulement si activé ET anomalies détectées
+    if [[ "${VMAF_ENABLED:-false}" == true ]] && [[ "$vmaf_anomalies" -gt 0 ]]; then
+        has_any_anomaly=true
+        show_vmaf_anomaly=true
+    fi
+    
     {
         print_summary_header
         print_summary_item "Date fin" "$(date +"%Y-%m-%d %H:%M:%S")"
@@ -435,10 +451,13 @@ show_summary() {
         print_summary_item "Succès" "$succ" "$GREEN"
         print_summary_item "Ignorés" "$skip" "$YELLOW"
         print_summary_item "Erreurs" "$err" "$RED"
-        print_summary_separator
-        print_summary_item "Anomalies taille" "$size_anomalies"
-        print_summary_item "Anomalies intégrité" "$checksum_anomalies"
-        print_summary_item "Anomalies VMAF" "$vmaf_anomalies"
+        # Section anomalies : affichée uniquement si au moins une anomalie
+        if [[ "$has_any_anomaly" == true ]]; then
+            print_summary_separator
+            [[ "$size_anomalies" -gt 0 ]] && print_summary_item "Anomalies taille" "$size_anomalies" "$YELLOW"
+            [[ "$checksum_anomalies" -gt 0 ]] && print_summary_item "Anomalies intégrité" "$checksum_anomalies" "$RED"
+            [[ "$show_vmaf_anomaly" == true ]] && print_summary_item "Anomalies VMAF" "$vmaf_anomalies" "$YELLOW"
+        fi
         # Afficher le gain de place si disponible (sur deux lignes)
         if [[ "$show_space_savings" == true ]]; then
             print_summary_separator
