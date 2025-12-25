@@ -282,13 +282,23 @@ print_summary_item() {
     local value="$2"
     local color="${3:-$WHITE}"
     # Largeur intérieure totale = 43 caractères
-    # Compenser les caractères multi-bytes (é, è, etc. = 2 bytes mais 1 colonne)
+    # Compenser les caractères multi-bytes (é, è, →, etc. = 2-3 bytes mais 1 colonne)
     local byte_len char_len extra label_width content
+    local val_byte_len val_char_len val_extra val_width
+    
+    # Compensation pour le label
     byte_len=$(echo -n "$label" | wc -c)
     char_len=$(echo -n "$label" | wc -m)
     extra=$((byte_len - char_len))
     label_width=$((20 + extra))
-    content=$(printf "  %-${label_width}s%19s  " "$label" "$value")
+    
+    # Compensation pour la valeur (caractères comme → ou −)
+    val_byte_len=$(echo -n "$value" | wc -c)
+    val_char_len=$(echo -n "$value" | wc -m)
+    val_extra=$((val_byte_len - val_char_len))
+    val_width=$((19 + val_extra))
+    
+    content=$(printf "  %-${label_width}s%${val_width}s  " "$label" "$value")
     echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
 
@@ -298,8 +308,13 @@ print_summary_value_only() {
     local value="$1"
     local color="${2:-$WHITE}"
     # Largeur intérieure totale = 43 caractères, valeur alignée à droite
-    local content
-    content=$(printf "%41s  " "$value")
+    # Compenser les caractères multi-bytes (−, etc.)
+    local byte_len char_len extra width content
+    byte_len=$(echo -n "$value" | wc -c)
+    char_len=$(echo -n "$value" | wc -m)
+    extra=$((byte_len - char_len))
+    width=$((41 + extra))
+    content=$(printf "%${width}s  " "$value")
     echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
 
