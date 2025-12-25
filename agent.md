@@ -159,7 +159,7 @@ git config commit.template .gitmessage.txt
 |-----------|--------------|-------------|
 | Bitrate cible | 2070 kbps | 2035 kbps |
 | Maxrate | 2520 kbps | 3200 kbps |
-| Preset | medium | slow |
+| Preset | medium | medium |
 | Keyint (GOP) | 600 (~25s) | 240 (~10s) |
 | Tune fastdecode | Oui | Non |
 | X265 tuned | Oui | Non |

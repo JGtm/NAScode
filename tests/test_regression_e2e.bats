@@ -327,7 +327,7 @@ teardown() {
     [[ ! "$output" =~ "Conversion interrompue" ]]
     [[ ! "$output" =~ "fichier temporaire conservé" ]]
     
-    # Il doit y avoir un fichier converti
+    # PRIORITÉ: Le fichier converti DOIT être dans output_dir
     local out_files
     out_files=$(find "$OUT_DIR" -type f -name "*.mkv" 2>/dev/null | wc -l)
     [ "$out_files" -ge 1 ]
@@ -355,8 +355,54 @@ teardown() {
     
     [ "$status" -eq 0 ]
     
-    # Après une fin normale, le STOP_FLAG peut exister (créé par cleanup)
-    # mais le message d'interruption ne doit pas avoir été affiché
-    # Ce test vérifie surtout que la conversion a réussi sans faux positif
+    # Après une fin normale, le STOP_FLAG NE DOIT PAS exister
+    # C'est le comportement corrigé: STOP_FLAG n'est créé que lors d'une vraie interruption
+    [ ! -f /tmp/conversion_stop_flag ]
+    
+    # Le message d'interruption ne doit pas avoir été affiché
     [[ ! "$output" =~ "interrompue" ]]
+}
+
+@test "E2E OUTPUT_DIR: fichier converti arrive bien dans output_dir" {
+    # PRIORITÉ: Vérifier que le fichier final est dans le bon répertoire
+    # Régression: fichier restait dans /tmp/video_convert/ au lieu d'être déplacé
+    
+    cp "$FIXTURES_DIR/test_video_2s.mkv" "$SRC_DIR/test_output_dir.mkv"
+    
+    # S'assurer que STOP_FLAG n'existe pas (cause du bug de non-déplacement)
+    rm -f /tmp/conversion_stop_flag
+    
+    run bash -lc '
+        set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+    
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+    echo "=== Contenu OUT_DIR ===" >&3
+    ls -la "$OUT_DIR" >&3 2>&1 || true
+    
+    [ "$status" -eq 0 ]
+    
+    # Le fichier DOIT être dans output_dir
+    local out_file
+    out_file=$(find "$OUT_DIR" -type f -name "*test_output_dir*.mkv" 2>/dev/null | head -1)
+    [ -n "$out_file" ]
+    [ -f "$out_file" ]
+    
+    # Vérifier que le fichier n'est PAS resté dans /tmp
+    local tmp_file
+    tmp_file=$(find /tmp/video_convert -type f -name "*test_output_dir*.mkv" 2>/dev/null | head -1) || tmp_file=""
+    [ -z "$tmp_file" ]
+    
+    # Pas de message d'interruption
+    [[ ! "$output" =~ "Conversion interrompue" ]]
+    [[ ! "$output" =~ "fichier temporaire conservé" ]]
 }

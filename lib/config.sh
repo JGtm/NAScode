@@ -137,7 +137,7 @@ set_conversion_mode_parameters() {
         film)
             # Films : two-pass ABR, qualité maximale
             TARGET_BITRATE_KBPS=2035
-            ENCODER_PRESET="slow"
+            ENCODER_PRESET="medium"
             # ABR avec maxrate/bufsize souples pour qualité constante
             MAXRATE_KBPS=3200
             BUFSIZE_KBPS=4800

@@ -44,7 +44,13 @@ cleanup() {
     if [[ "${_INTERRUPTED:-}" == "1" ]] && [[ ! -f "$STOP_FLAG" ]]; then
         echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
     fi
-    touch "$STOP_FLAG"
+    
+    # IMPORTANT: Ne créer le STOP_FLAG que lors d'une vraie interruption (Ctrl+C, kill, etc.)
+    # En fin normale, le flag ne doit PAS être créé pour éviter de bloquer les transferts asynchrones
+    # qui vérifient ce flag pour savoir s'ils doivent finaliser ou non.
+    if [[ "${_INTERRUPTED:-}" == "1" ]]; then
+        touch "$STOP_FLAG"
+    fi
     
     # Supprimer les messages résiduels des sous-processus en redirigeant stderr
     # vers /dev/null pendant le cleanup

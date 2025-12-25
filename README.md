@@ -8,7 +8,7 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** en 
 - **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
 - **Deux modes de conversion** :
   - `serie` : optimisé vitesse (~1 Go/h), preset medium, CRF ou 2070 kbps
-  - `film` : optimisé qualité, preset slow, two-pass 2035 kbps
+  - `film` : optimisé qualité, preset medium, two-pass 2035 kbps
 - **Paramètres x265 optimisés** pour le mode série :
   - `sao=0` : désactive Sample Adaptive Offset (gain ~5%)
   - `strong-intra-smoothing=0` : préserve les détails fins
@@ -151,7 +151,7 @@ bash convert.sh -l 10 -k
 |-----------|--------------|-------------|
 | Bitrate cible | 2070 kbps | 2035 kbps |
 | Maxrate | 2520 kbps | 3200 kbps |
-| Preset | medium | slow |
+| Preset | medium | medium |
 | Keyint (GOP) | 600 (~25s) | 240 (~10s) |
 | Tune fastdecode | Oui | Non |
 | Optimisations x265 | Oui (tuned) | Non (qualité max) |

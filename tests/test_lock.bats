@@ -157,7 +157,43 @@ teardown() {
     [ ! -f "$TEST_LOCKFILE" ]
 }
 
-@test "cleanup: crée le fichier STOP_FLAG" {
+@test "cleanup: crée le fichier STOP_FLAG seulement si interruption" {
+    rm -f "$TEST_STOP_FLAG"
+    
+    # Test 1: Sans interruption, STOP_FLAG ne doit PAS être créé
+    bash -c "
+        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/progress.sh'
+        source '$LIB_DIR/lock.sh'
+        LOCKFILE='$TEST_LOCKFILE'
+        STOP_FLAG='$TEST_STOP_FLAG'
+        SCRIPT_DIR='$TEST_SCRIPT_DIR'
+        NO_PROGRESS=true
+        _INTERRUPTED=0
+        cleanup
+    " 2>/dev/null || true
+    
+    [ ! -f "$TEST_STOP_FLAG" ]
+    
+    # Test 2: Avec interruption, STOP_FLAG doit être créé
+    bash -c "
+        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/progress.sh'
+        source '$LIB_DIR/lock.sh'
+        LOCKFILE='$TEST_LOCKFILE'
+        STOP_FLAG='$TEST_STOP_FLAG'
+        SCRIPT_DIR='$TEST_SCRIPT_DIR'
+        NO_PROGRESS=true
+        _INTERRUPTED=1
+        cleanup
+    " 2>/dev/null || true
+    
+    [ -f "$TEST_STOP_FLAG" ]
+}
+
+@test "cleanup: STOP_FLAG n'est pas créé en fin normale" {
+    # Régression bug: STOP_FLAG était créé systématiquement, 
+    # ce qui empêchait les transferts asynchrones de finaliser
     rm -f "$TEST_STOP_FLAG"
     
     bash -c "
@@ -168,10 +204,14 @@ teardown() {
         STOP_FLAG='$TEST_STOP_FLAG'
         SCRIPT_DIR='$TEST_SCRIPT_DIR'
         NO_PROGRESS=true
-        cleanup
+        _INTERRUPTED=0
+        setup_traps
+        # Sortie normale
+        exit 0
     " 2>/dev/null || true
     
-    [ -f "$TEST_STOP_FLAG" ]
+    # En fin normale, STOP_FLAG ne doit PAS exister
+    [ ! -f "$TEST_STOP_FLAG" ]
 }
 
 ###########################################################
