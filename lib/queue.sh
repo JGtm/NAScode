@@ -315,7 +315,7 @@ _apply_queue_limitations() {
         _LIMIT_MESSAGE="Sélection aléatoire de $limit_count fichier(s) maximum"
         _LIMIT_MODE="random"
     else
-        _LIMIT_MESSAGE="Traitement de $limit_count fichier(s) maximum"
+        _LIMIT_MESSAGE="$limit_count fichier(s) maximum"
         _LIMIT_MODE="normal"
     fi
     
