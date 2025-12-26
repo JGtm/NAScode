@@ -356,7 +356,7 @@ print_summary_footer() {
 print_phase_start() {
     local title="$1"
     local subtitle="$2"
-    local color="${3:-$CYAN}"
+    local color="${3:-$BLUE}"
     
     echo ""
     echo -e "${color}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
