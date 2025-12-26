@@ -361,7 +361,7 @@ print_active_options() {
     [[ $count -eq 0 ]] && return 0
     
     echo ""
-    echo -e "${DIM}  ┌─ Options actives ──────────────────────────────┐${NOCOLOR}"
+    echo -e "${DIM}  ┌─ Paramètres actifs ──────────────────────────────┐${NOCOLOR}"
     for opt in "${options[@]}"; do
         echo -e "${DIM}  │${NOCOLOR}  $opt"
     done
@@ -404,6 +404,20 @@ format_option_dryrun() {
 # Usage: format_option_opus
 format_option_opus() {
     echo -e "🎵  Audio ${MAGENTA}Opus${NOCOLOR} activé (expérimental)"
+}
+
+# Formate le chemin source pour print_active_options
+# Usage: format_option_source "/chemin/vers/source"
+format_option_source() {
+    local path="$1"
+    echo -e "📂  Source : ${CYAN}${path}${NOCOLOR}"
+}
+
+# Formate le chemin de destination pour print_active_options
+# Usage: format_option_dest "/chemin/vers/destination"
+format_option_dest() {
+    local path="$1"
+    echo -e "📁  Destination : ${CYAN}${path}${NOCOLOR}"
 }
 
 # Affiche une limitation active (fonction legacy, utilisée si pas de regroupement)

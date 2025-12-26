@@ -444,6 +444,10 @@ _show_active_options() {
     
     local options=()
     
+    # Chemins source et destination (toujours affichés)
+    options+=("$(format_option_source "$SOURCE")")
+    options+=("$(format_option_dest "$OUTPUT_DIR")")
+    
     # Option Dry-run (en premier car très important)
     if [[ "$DRYRUN" == true ]]; then
         options+=("$(format_option_dryrun)")

@@ -68,7 +68,7 @@ check_plexignore() {
             return 0
         fi
 
-        ask_question "Créer un fichier .plexignore dans '$OUTPUT_DIR' pour éviter les doublons Plex ?"
+        ask_question "Créer un fichier .plexignore dans le répertoire de destination pour éviter les doublons dans Plex ?"
         read -r response
 
         case "$response" in

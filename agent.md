@@ -4,6 +4,20 @@ Ce dépôt contient un script Bash **modulaire** de conversion vidéo (HEVC/x265
 
 Ce document décrit les attentes lorsque tu fais évoluer le code (humain ou agent).
 
+## Règle Git fondamentale
+
+**Ne JAMAIS modifier directement la branche `main`.**
+
+Toute modification (feature, fix, refactor, doc) doit se faire sur une branche dédiée :
+
+```bash
+# Créer une branche avant toute modification
+git checkout -b feature/nom-explicite   # ou fix/, refactor/, docs/
+# ... travailler ...
+git add . && git commit -m "description"
+# Puis merge via PR ou manuellement après review
+```
+
 ## Priorités
 
 - Priorité n°1 : **fiabilité** (ne pas casser des conversions en cours).
