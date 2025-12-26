@@ -220,6 +220,7 @@ _finalize_conversion_success() {
     if [[ "$NO_PROGRESS" != true ]]; then
         # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
         local elapsed_str="N/A"
+        local elapsed_display="N/A"
         local start_for_file="${FILE_START_TS:-${START_TS:-}}"
         if [[ -n "${start_for_file:-}" ]] && [[ "${start_for_file}" =~ ^[0-9]+$ ]]; then
             local end_ts
@@ -229,9 +230,46 @@ _finalize_conversion_success() {
             local em=$(((elapsed % 3600) / 60))
             local es=$((elapsed % 60))
             elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
+
+            if [[ "$eh" -gt 0 ]]; then
+                elapsed_display="${eh}h${em}m${es}s"
+            else
+                elapsed_display="${em}m${es}s"
+            fi
         fi
 
-        echo -e "  ${GREEN}✅ Fichier converti : $filename (durée: ${elapsed_str})${NOCOLOR}"
+        local display_name
+        display_name="$(basename "${final_output:-$filename}")"
+
+        # Tronquer comme ailleurs (ex: VMAF) : 30 caractères max.
+        local display_name_trunc="$display_name"
+        if [[ ${#display_name_trunc} -gt 30 ]]; then
+            display_name_trunc="${display_name_trunc:0:27}..."
+        fi
+
+        local size_part=""
+        if [[ "${SAMPLE_MODE:-false}" != true ]]; then
+            local before_bytes after_bytes
+            before_bytes=0
+            after_bytes=0
+
+            if [[ -e "$file_original" ]]; then
+                before_bytes=$(stat -c%s "$file_original" 2>/dev/null || stat -f%z "$file_original" 2>/dev/null || echo 0)
+            elif [[ -n "${size_before_mb:-}" ]] && [[ "${size_before_mb}" =~ ^[0-9]+$ ]]; then
+                before_bytes=$((size_before_mb * 1024 * 1024))
+            fi
+
+            if [[ -e "$tmp_output" ]]; then
+                after_bytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
+            fi
+
+            local before_fmt after_fmt
+            before_fmt=$(_format_size_bytes_compact "$before_bytes")
+            after_fmt=$(_format_size_bytes_compact "$after_bytes")
+            size_part=" | ${before_fmt} → ${after_fmt}"
+        fi
+
+        echo -e "  ${GREEN}✅ ${display_name_trunc} | Terminé en ${elapsed_display}${size_part}${NOCOLOR}"
     fi
 
     # Vérifier que le fichier de sortie temporaire existe

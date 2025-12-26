@@ -199,7 +199,7 @@ start_async_transfer() {
     _add_transfer_pid "$transfer_pid"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_info "Transfert lancé en arrière-plan"
+        echo -e "  ${CYAN}${BOX_INFO}${NOCOLOR}  ${CYAN}Transfert lancé en arrière-plan${NOCOLOR}" >&2
     fi
 }
 
