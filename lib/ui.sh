@@ -356,7 +356,7 @@ print_summary_footer() {
 print_phase_start() {
     local title="$1"
     local subtitle="$2"
-    local color="${3:-$BLUE}"
+    local color="${3:-$CYAN}"
     
     echo ""
     echo -e "${color}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
@@ -459,7 +459,7 @@ print_transfer_start() {
     if [[ -n "$nb_files" ]]; then
         subtitle="$nb_files fichier(s) en attente"
     fi
-    print_phase_start "📤 TRANSFERT" "$subtitle" "$BLUE"
+    print_phase_start "📤 TRANSFERT" "$subtitle" "$CYAN"
 }
 
 # Affiche la fin de la section transfert
@@ -493,7 +493,7 @@ print_conversion_start() {
     local nb_files="$1"
     local limitation="${2:-}"
     
-    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$CYAN"
+    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$BLUE"
     
     if [[ -n "$limitation" ]]; then
         print_limitation "$limitation"
