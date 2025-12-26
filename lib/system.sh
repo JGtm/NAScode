@@ -61,8 +61,13 @@ check_plexignore() {
     output_abs=$(cd "$OUTPUT_DIR" && pwd)
     local plexignore_file="$OUTPUT_DIR/.plexignore"
 
+    # Ne pas proposer .plexignore si source et destination sont identiques
+    if [[ "$source_abs" == "$output_abs" ]]; then
+        return 0
+    fi
+
     # Vérifier si OUTPUT_DIR est un sous-dossier de SOURCE
-    if [[ "$output_abs"/ != "$source_abs"/ ]] && [[ "$output_abs" = "$source_abs"/* ]]; then
+    if [[ "$output_abs" = "$source_abs"/* ]]; then
         if [[ -f "$plexignore_file" ]]; then
             print_info "Fichier .plexignore déjà présent dans le répertoire de destination"
             return 0
