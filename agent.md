@@ -4,19 +4,47 @@ Ce dépôt contient un script Bash **modulaire** de conversion vidéo (HEVC/x265
 
 Ce document décrit les attentes lorsque tu fais évoluer le code (humain ou agent).
 
-## Règle Git fondamentale
+---
 
-**Ne JAMAIS modifier directement la branche `main`.**
+## ⛔ RÈGLE OBLIGATOIRE : Ne JAMAIS travailler sur `main`
 
-Toute modification (feature, fix, refactor, doc) doit se faire sur une branche dédiée :
+> **STOP ! Avant TOUTE modification de fichier, vérifie la branche courante.**
+>
+> Si tu es sur `main`, **crée d'abord une branche** avant d'éditer quoi que ce soit.
+
+Cette règle est **non négociable**. Aucune exception.
+
+### Workflow obligatoire
 
 ```bash
-# Créer une branche avant toute modification
-git checkout -b feature/nom-explicite   # ou fix/, refactor/, docs/
-# ... travailler ...
+# 1. TOUJOURS vérifier la branche courante AVANT de modifier un fichier
+git branch --show-current
+
+# 2. Si sur main, créer une branche AVANT toute modification
+git checkout -b fix/description-courte   # ou feature/, refactor/, docs/
+
+# 3. Faire les modifications...
+
+# 4. Commit et push
 git add . && git commit -m "description"
-# Puis merge via PR ou manuellement après review
 ```
+
+### Si tu as modifié main par erreur
+
+```bash
+# Déplacer les changements vers une nouvelle branche
+git stash
+git checkout -b fix/nom-approprié
+git stash pop
+```
+
+### Pourquoi ?
+
+- `main` doit toujours être stable et déployable
+- Les branches permettent la review avant merge
+- Évite les conflits et les régressions
+
+---
 
 ## Priorités
 

@@ -1,7 +1,21 @@
 # Instructions Copilot (repo)
 
 Lis et applique en priorité les règles dans [agent.md](../agent.md).
+## ⛔ PREMIÈRE ACTION OBLIGATOIRE
 
+**Avant TOUTE modification de fichier, exécute :**
+
+```bash
+git branch --show-current
+```
+
+**Si la réponse est `main`, STOP !** Crée une branche AVANT de toucher au code :
+
+```bash
+git checkout -b fix/description-courte   # ou feature/, refactor/, docs/
+```
+
+Cette règle est **non négociable**. Ne jamais modifier directement `main`.
 ## Règles clés (résumé)
 
 - Respecter la modularité : modifications localisées dans le bon module `lib/*.sh`.

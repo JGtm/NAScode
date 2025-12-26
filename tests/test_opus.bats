@@ -11,7 +11,7 @@ setup() {
     # Charger les modules une seule fois (pas via load_base_modules pour éviter readonly conflicts)
     if [[ -z "${_OPUS_TEST_LOADED:-}" ]]; then
         export SCRIPT_DIR="$PROJECT_ROOT"
-        source "$LIB_DIR/colors.sh"
+        source "$LIB_DIR/ui.sh"
         source "$LIB_DIR/config.sh"
         source "$LIB_DIR/utils.sh"
         source "$LIB_DIR/transcode_video.sh"

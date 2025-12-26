@@ -30,7 +30,7 @@ load_base_modules() {
     export SCRIPT_DIR="$PROJECT_ROOT"
     
     # Charger les couleurs (désactivées pour les tests)
-    source "$LIB_DIR/colors.sh"
+    source "$LIB_DIR/ui.sh"
     
     # Charger la détection système
     source "$LIB_DIR/detect.sh"
@@ -45,7 +45,7 @@ load_base_modules() {
 # Charger uniquement les couleurs et config (pour tests isolés)
 load_minimal() {
     export SCRIPT_DIR="$PROJECT_ROOT"
-    source "$LIB_DIR/colors.sh"
+    source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/detect.sh"
     source "$LIB_DIR/config.sh"
 }

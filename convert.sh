@@ -9,7 +9,7 @@
 # encodage two-pass pour une taille prévisible (~1,1 Go/h).
 #
 # Architecture modulaire :
-#   lib/colors.sh     - Codes couleurs ANSI
+#   lib/ui.sh     - Codes couleurs ANSI
 #   lib/config.sh     - Configuration globale et paramètres
 #   lib/utils.sh      - Fonctions utilitaires (MD5, timestamps, etc.)
 #   lib/logging.sh    - Gestion des logs et répertoires
@@ -50,7 +50,7 @@ if [[ ! -d "$LIB_DIR" ]]; then
 fi
 
 # Charger les modules dans l'ordre des dépendances
-source "$LIB_DIR/colors.sh"      # Codes couleurs (pas de dépendances)
+source "$LIB_DIR/ui.sh"      # Codes couleurs (pas de dépendances)
 source "$LIB_DIR/detect.sh"      # Détection outils/système (dépend de rien, modifie PATH)
 source "$LIB_DIR/config.sh"      # Configuration (dépend de colors pour erreurs)
 source "$LIB_DIR/utils.sh"       # Utilitaires (dépend de detect pour HAS_*)

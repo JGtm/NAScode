@@ -11,7 +11,7 @@ setup() {
 
     # Environnement minimal
     export SCRIPT_DIR="$PROJECT_ROOT"
-    source "$LIB_DIR/colors.sh"
+    source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/utils.sh"
 
     # Logs isolés par test (ne pas dépendre de logging.sh qui force ./logs)

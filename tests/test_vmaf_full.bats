@@ -20,7 +20,7 @@ setup() {
     touch "$LOG_SUCCESS"
     
     # Charger les modules requis
-    source "$LIB_DIR/colors.sh"
+    source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/detect.sh"
     source "$LIB_DIR/config.sh"
     source "$LIB_DIR/utils.sh"

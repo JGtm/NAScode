@@ -189,7 +189,7 @@ Conversion/
 ├── lib/
 │   ├── args.sh              # Parsing des arguments
 │   ├── audio_params.sh      # Paramètres audio
-│   ├── colors.sh            # Codes couleur terminal
+│   ├── ui.sh            # Codes couleur terminal
 │   ├── config.sh            # Configuration globale
 │   ├── conversion.sh        # Orchestration FFmpeg
 │   ├── detect.sh            # Détection outils/système

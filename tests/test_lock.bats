@@ -38,7 +38,7 @@ teardown() {
     rm -f "$TEST_LOCKFILE"
     
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
         check_lock
@@ -55,7 +55,7 @@ teardown() {
     echo "$$" > "$TEST_LOCKFILE"
     
     # La fonction devrait quitter avec une erreur
-    run bash -c "source '$LIB_DIR/colors.sh'; source '$LIB_DIR/lock.sh'; LOCKFILE='$TEST_LOCKFILE'; check_lock"
+    run bash -c "source '$LIB_DIR/ui.sh'; source '$LIB_DIR/lock.sh'; LOCKFILE='$TEST_LOCKFILE'; check_lock"
     [ "$status" -eq 1 ]
     [[ "$output" =~ "déjà en cours d'exécution" ]]
 }
@@ -70,7 +70,7 @@ teardown() {
     fi
     
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
         check_lock
@@ -88,7 +88,7 @@ teardown() {
     rm -f "$TEST_LOCKFILE"
     
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
         check_lock
@@ -110,7 +110,7 @@ teardown() {
     [ -f "$TEST_SCRIPT_DIR/x265_2pass.log.cutree" ]
     
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/lock.sh'
         SCRIPT_DIR='$TEST_SCRIPT_DIR'
         NO_PROGRESS=true
@@ -126,7 +126,7 @@ teardown() {
     rm -f "$TEST_SCRIPT_DIR/x265_2pass.log"* 2>/dev/null || true
     
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/lock.sh'
         SCRIPT_DIR='$TEST_SCRIPT_DIR'
         NO_PROGRESS=true
@@ -144,7 +144,7 @@ teardown() {
     [ -f "$TEST_LOCKFILE" ]
     
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/progress.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
@@ -162,7 +162,7 @@ teardown() {
     
     # Test 1: Sans interruption, STOP_FLAG ne doit PAS être créé
     bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/progress.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
@@ -177,7 +177,7 @@ teardown() {
     
     # Test 2: Avec interruption, STOP_FLAG doit être créé
     bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/progress.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
@@ -197,7 +197,7 @@ teardown() {
     rm -f "$TEST_STOP_FLAG"
     
     bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/progress.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
@@ -220,7 +220,7 @@ teardown() {
 
 @test "setup_traps: configure le trap EXIT" {
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/progress.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
@@ -240,7 +240,7 @@ teardown() {
     
     # Exécuter un sous-shell qui setup les traps et quitte
     bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/progress.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
@@ -280,7 +280,7 @@ teardown() {
     
     # Deuxième processus essaie de prendre le lock
     run bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'
         check_lock
@@ -293,7 +293,7 @@ teardown() {
 @test "intégration: lock est libéré après sortie normale" {
     # Exécuter un script qui prend le lock et quitte normalement
     bash -c "
-        source '$LIB_DIR/colors.sh'
+        source '$LIB_DIR/ui.sh'
         source '$LIB_DIR/progress.sh'
         source '$LIB_DIR/lock.sh'
         LOCKFILE='$TEST_LOCKFILE'

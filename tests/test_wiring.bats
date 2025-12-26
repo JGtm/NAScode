@@ -13,7 +13,7 @@ setup() {
     export SCRIPT_DIR="$PROJECT_ROOT"
 
     # Charger les modules dans un ordre proche de convert.sh
-    source "$LIB_DIR/colors.sh"
+    source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/config.sh"
     source "$LIB_DIR/utils.sh"
     source "$LIB_DIR/logging.sh"

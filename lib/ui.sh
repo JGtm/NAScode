@@ -260,6 +260,24 @@ print_indexing_end() {
     echo "" >&2
 }
 
+# Affiche un cadre quand l'index existant est conservé
+# Usage: print_index_kept <message>
+print_index_kept() {
+    local message="$1"
+    # Compenser les caractères UTF-8 multi-octets (accentués)
+    # strlen compte les octets, wc -m compte les caractères visuels
+    local byte_len=${#message}
+    local char_len=$(printf '%s' "$message" | wc -m)
+    local extra=$((byte_len - char_len + 2))
+    local width=$((44 + extra))
+    
+    echo "" >&2
+    echo -e "${MAGENTA}  ┌──────────────────────────────────────────────────┐${NOCOLOR}" >&2
+    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✔${NOCOLOR}  %-${width}s${MAGENTA}│${NOCOLOR}\n" "$message" >&2
+    echo -e "${MAGENTA}  └──────────────────────────────────────────────────┘${NOCOLOR}" >&2
+    echo "" >&2
+}
+
 ###########################################################
 # RÉSUMÉ FINAL
 ###########################################################
@@ -371,7 +389,7 @@ print_active_options() {
 # Formate une option VMAF pour print_active_options
 # Usage: format_option_vmaf
 format_option_vmaf() {
-    echo -e "${CYAN}ℹ${NOCOLOR}  Évaluation VMAF activée"
+    echo -e "${CYAN}ℹ${NOCOLOR}   Évaluation VMAF activée"
 }
 
 # Formate une option limitation pour print_active_options

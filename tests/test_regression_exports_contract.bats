@@ -13,7 +13,7 @@ setup() {
     # Réplique l'environnement minimal attendu par les modules
     export SCRIPT_DIR="$PROJECT_ROOT"
 
-    source "$LIB_DIR/colors.sh"
+    source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/detect.sh"
     source "$LIB_DIR/config.sh"
     source "$LIB_DIR/utils.sh"

@@ -12,7 +12,7 @@ setup() {
     # Charger les modules une seule fois (évite les conflits readonly)
     if [[ -z "${_QUEUE_TEST_LOADED:-}" ]]; then
         export SCRIPT_DIR="$PROJECT_ROOT"
-        source "$LIB_DIR/colors.sh"
+        source "$LIB_DIR/ui.sh"
         source "$LIB_DIR/config.sh"
         source "$LIB_DIR/utils.sh"
         source "$LIB_DIR/queue.sh"

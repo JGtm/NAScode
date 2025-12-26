@@ -228,37 +228,37 @@ _reset_cli_state() {
 }
 
 @test "parse_arguments: --help affiche l'aide et sort 0 (sous-shell)" {
-    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/args.sh; parse_arguments --help'
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --help'
     [ "$status" -eq 0 ]
     [[ "$output" =~ Usage ]] 
 }
 
 @test "parse_arguments: --limit invalide échoue (sous-shell)" {
-    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/args.sh; parse_arguments --limit 0'
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --limit 0'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "--limit" ]]
 }
 
 @test "parse_arguments: --jobs invalide échoue (sous-shell)" {
-    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/args.sh; parse_arguments --jobs 0'
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --jobs 0'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "--jobs" ]]
 }
 
 @test "parse_arguments: --queue inexistant échoue (sous-shell)" {
-    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/args.sh; parse_arguments --queue "/nonexistent/file.queue"'
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --queue "/nonexistent/file.queue"'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "introuvable" ]]
 }
 
 @test "parse_arguments: option inconnue échoue (sous-shell)" {
-    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/args.sh; parse_arguments --definitivement-pas-une-option'
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --definitivement-pas-une-option'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "Option" ]]
 }
 
 @test "config: DRYRUN d'environnement est écrasé à false" {
-    run bash -lc 'export DRYRUN=true; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; echo "$DRYRUN"'
+    run bash -lc 'export DRYRUN=true; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; echo "$DRYRUN"'
     [ "$status" -eq 0 ]
     [ "$output" = "false" ]
 }
@@ -327,13 +327,13 @@ _reset_cli_state() {
 }
 
 @test "parse_arguments: --off-peak invalide échoue (sous-shell)" {
-    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments --off-peak=25:00-06:00'
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments --off-peak=25:00-06:00'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "Format invalide" ]]
 }
 
 @test "parse_arguments: --off-peak format incomplet échoue (sous-shell)" {
-    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/colors.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments --off-peak=22:00'
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments --off-peak=22:00'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "Format invalide" ]]
 }

@@ -18,7 +18,7 @@ setup() {
     # Note: logging.sh utilise readonly, donc on doit travailler autrement
     
     # Charger les modules requis (sans logging.sh qui a des readonly)
-    source "$LIB_DIR/colors.sh"
+    source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/detect.sh"
 }
 
