@@ -242,10 +242,8 @@ print_indexing_start() {
 print_indexing_progress() {
     local current="$1"
     local total="$2"
-    local percent=0
-    [[ "$total" -gt 0 ]] && percent=$((current * 100 / total))
-    # Format : "  │  📊 Indexation : 9999/9999 fichiers (100%)      │"
-    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers ${DIM}(%3d%%)${NOCOLOR}       ${MAGENTA}│${NOCOLOR}" "$current" "$total" "$percent" >&2
+    # Format : "  │  📊 Indexation : 9999/9999 fichiers            │"
+    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers            ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
 }
 
 # Affiche la fin du bloc d'indexation avec le résultat
@@ -468,9 +466,9 @@ print_transfer_start() {
 # Usage: print_transfer_complete
 print_transfer_complete() {
     echo ""
-    echo -e "${BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Tous les transferts terminés${NOCOLOR}${BLUE}        ┃${NOCOLOR}"
-    echo -e "${BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+    echo -e "${CYAN}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Tous les transferts terminés${NOCOLOR}${BLUE}        ┃${NOCOLOR}"
+    echo -e "${CYAN}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
 # Affiche le début de la section VMAF
@@ -506,7 +504,7 @@ print_conversion_start() {
 # Usage: print_conversion_complete
 print_conversion_complete() {
     echo ""
-    echo -e "${CYAN}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Toutes les conversions terminées${NOCOLOR}${CYAN}    ┃${NOCOLOR}"
-    echo -e "${CYAN}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+    echo -e "${BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
+    echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Toutes les conversions terminées${NOCOLOR}${CYAN}    ┃${NOCOLOR}"
+    echo -e "${BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
