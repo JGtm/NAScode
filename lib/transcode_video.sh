@@ -132,13 +132,21 @@ _compute_effective_bitrate_kbps_for_height() {
 
 # Construit le suffixe effectif par fichier à partir des dimensions source.
 # Inclut : bitrate effectif ou CRF + hauteur de sortie estimée (ex: 720p) + preset.
-# Format two-pass: _x265_<bitrate>k_<height>p_<preset>[_tuned][_opus][_sample]
-# Format single-pass: _x265_crf<value>_<height>p_<preset>[_tuned][_opus][_sample]
+# Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_tuned][_opus][_sample]
+# Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_tuned][_opus][_sample]
 _build_effective_suffix_for_dims() {
     local src_width="$1"
     local src_height="$2"
 
-    local suffix="_x265"
+    # Suffixe basé sur le codec (x265, av1, etc.)
+    local codec_suffix="x265"
+    if declare -f get_codec_suffix &>/dev/null; then
+        codec_suffix=$(get_codec_suffix "${VIDEO_CODEC:-hevc}")
+    elif [[ "${VIDEO_CODEC:-hevc}" == "av1" ]]; then
+        codec_suffix="av1"
+    fi
+    
+    local suffix="_${codec_suffix}"
 
     # Résolution de sortie estimée (après downscale éventuel)
     local output_height
@@ -166,8 +174,16 @@ _build_effective_suffix_for_dims() {
     # Preset d'encodage
     suffix="${suffix}_${ENCODER_PRESET}"
 
-    # Indicateur si paramètres x265 spéciaux (tuned)
+    # Indicateur si paramètres encodeur spéciaux (tuned)
+    local has_extra_params=false
     if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
+        has_extra_params=true
+    elif declare -f get_encoder_mode_params &>/dev/null; then
+        local mode_params
+        mode_params=$(get_encoder_mode_params "${VIDEO_ENCODER:-libx265}" "${CONVERSION_MODE:-serie}")
+        [[ -n "$mode_params" ]] && has_extra_params=true
+    fi
+    if [[ "$has_extra_params" == true ]]; then
         suffix="${suffix}_tuned"
     fi
 
@@ -343,6 +359,44 @@ _setup_video_encoding_params() {
     VIDEO_BITRATE="${effective_target}k"
     VIDEO_MAXRATE="${effective_maxrate}k"
     VIDEO_BUFSIZE="${effective_bufsize}k"
+    
+    # Construire les paramètres de base pour l'encodeur (VBV + mode extras)
+    # Pour x265: "vbv-maxrate=X:vbv-bufsize=Y:amp=0:rect=0:..."
+    # Pour svtav1: "tune=0:film-grain=8:..."
+    local encoder="${VIDEO_ENCODER:-libx265}"
+    local vbv_params=""
+    
+    # Paramètres VBV selon l'encodeur
+    case "$encoder" in
+        libx265)
+            vbv_params="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
+            ;;
+        libsvtav1|libaom-av1)
+            # Ces encodeurs utilisent -maxrate/-bufsize directement via FFmpeg
+            vbv_params=""
+            ;;
+    esac
+    
+    # Ajouter les paramètres spécifiques au mode (tuning, optimisations)
+    local mode_params=""
+    if declare -f get_encoder_mode_params &>/dev/null; then
+        mode_params=$(get_encoder_mode_params "$encoder" "${CONVERSION_MODE:-serie}")
+    elif [[ "$encoder" == "libx265" && -n "${X265_EXTRA_PARAMS:-}" ]]; then
+        # Fallback pour rétro-compatibilité
+        mode_params="${X265_EXTRA_PARAMS}"
+    fi
+    
+    # Combiner VBV + mode params
+    ENCODER_BASE_PARAMS="$vbv_params"
+    if [[ -n "$mode_params" ]]; then
+        if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
+            ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:${mode_params}"
+        else
+            ENCODER_BASE_PARAMS="$mode_params"
+        fi
+    fi
+    
+    # Rétro-compatibilité : garder X265_VBV_STRING pour les tests existants
     X265_VBV_STRING="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
 }
 
@@ -350,9 +404,260 @@ _setup_video_encoding_params() {
 # ENCODAGE UNIFIÉ
 ###########################################################
 
+# Retourne le flag des paramètres encodeur (-x265-params, -svtav1-params, etc.)
+# Usage: _get_encoder_params_flag_internal "libx265" -> "-x265-params"
+_get_encoder_params_flag_internal() {
+    local encoder="${1:-libx265}"
+    
+    case "$encoder" in
+        libx265)    echo "-x265-params" ;;
+        libsvtav1)  echo "-svtav1-params" ;;
+        libaom-av1) echo "" ;;  # libaom utilise des options FFmpeg directes
+        *)          echo "" ;;
+    esac
+}
+
+# Construit les paramètres internes de l'encodeur
+# Usage: _build_encoder_params_internal "libx265" "pass1" "vbv-maxrate=2520:vbv-bufsize=3780"
+_build_encoder_params_internal() {
+    local encoder="${1:-libx265}"
+    local mode="$2"           # pass1, pass2, crf
+    local base_params="$3"    # VBV params et extras
+    
+    local full_params=""
+    
+    case "$encoder" in
+        libx265)
+            # x265 : paramètres classiques avec pass=N pour two-pass
+            case "$mode" in
+                "pass1")
+                    full_params="pass=1:${base_params}"
+                    if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
+                        full_params="${full_params}:no-slow-firstpass=1"
+                    fi
+                    ;;
+                "pass2")
+                    full_params="pass=2:${base_params}"
+                    ;;
+                "crf")
+                    full_params="${base_params}"
+                    ;;
+            esac
+            ;;
+            
+        libsvtav1)
+            # SVT-AV1 : paramètres via -svtav1-params
+            # Le two-pass SVT-AV1 utilise --pass 1/2 dans les params
+            case "$mode" in
+                "pass1")
+                    full_params="pass=1"
+                    [[ -n "$base_params" ]] && full_params="${full_params}:${base_params}"
+                    ;;
+                "pass2")
+                    full_params="pass=2"
+                    [[ -n "$base_params" ]] && full_params="${full_params}:${base_params}"
+                    ;;
+                "crf")
+                    full_params="${base_params}"
+                    ;;
+            esac
+            ;;
+            
+        libaom-av1)
+            # libaom-av1 : pas de params flag, utilise -pass directement
+            # Les paramètres seront gérés différemment
+            full_params=""
+            ;;
+            
+        *)
+            full_params="${base_params}"
+            ;;
+    esac
+    
+    echo "$full_params"
+}
+
+# Construit les paramètres spécifiques à l'encodeur pour FFmpeg
+# Usage: _build_encoder_ffmpeg_args <encoder> <mode> <base_params>
+# Retourne: les arguments FFmpeg pour l'encodeur
+_build_encoder_ffmpeg_args() {
+    local encoder="${1:-libx265}"
+    local mode="$2"           # pass1, pass2, crf
+    local base_params="$3"    # VBV params et extras
+    
+    local encoder_args=""
+    local params_flag=""
+    local full_params=""
+    
+    # Obtenir le flag des paramètres encodeur (-x265-params, -svtav1-params, etc.)
+    if declare -f get_encoder_params_flag &>/dev/null; then
+        params_flag=$(get_encoder_params_flag "$encoder")
+    else
+        # Fallback
+        case "$encoder" in
+            libx265)    params_flag="-x265-params" ;;
+            libsvtav1)  params_flag="-svtav1-params" ;;
+            libaom-av1) params_flag="" ;;  # libaom utilise des options directes
+            *)          params_flag="" ;;
+        esac
+    fi
+    
+    # Construire les paramètres selon l'encodeur et le mode
+    case "$encoder" in
+        libx265)
+            # x265 : paramètres classiques avec pass=N pour two-pass
+            case "$mode" in
+                "pass1")
+                    full_params="pass=1:${base_params}"
+                    if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
+                        full_params="${full_params}:no-slow-firstpass=1"
+                    fi
+                    ;;
+                "pass2")
+                    full_params="pass=2:${base_params}"
+                    ;;
+                "crf")
+                    full_params="${base_params}"
+                    ;;
+            esac
+            encoder_args="-c:v libx265 ${params_flag} \"${full_params}\""
+            ;;
+            
+        libsvtav1)
+            # SVT-AV1 : paramètres via -svtav1-params
+            # Note: SVT-AV1 utilise -b:v pour le bitrate cible, pas de pass explicite
+            # Le two-pass SVT-AV1 se fait via --pass 1/2 dans les params
+            case "$mode" in
+                "pass1")
+                    full_params="pass=1:${base_params}"
+                    ;;
+                "pass2")
+                    full_params="pass=2:${base_params}"
+                    ;;
+                "crf")
+                    full_params="${base_params}"
+                    ;;
+            esac
+            if [[ -n "$full_params" ]]; then
+                encoder_args="-c:v libsvtav1 ${params_flag} \"${full_params}\""
+            else
+                encoder_args="-c:v libsvtav1"
+            fi
+            ;;
+            
+        libaom-av1)
+            # libaom-av1 : options directes (pas de -params flag standard)
+            # Two-pass utilise -pass 1/2 comme option FFmpeg directe
+            case "$mode" in
+                "pass1")
+                    encoder_args="-c:v libaom-av1 -pass 1"
+                    ;;
+                "pass2")
+                    encoder_args="-c:v libaom-av1 -pass 2"
+                    ;;
+                "crf")
+                    encoder_args="-c:v libaom-av1"
+                    ;;
+            esac
+            # libaom utilise cpu-used au lieu de preset
+            local aom_cpu_used=4
+            if declare -f convert_preset &>/dev/null; then
+                aom_cpu_used=$(convert_preset "$ENCODER_PRESET" "libaom-av1")
+            fi
+            encoder_args="${encoder_args} -cpu-used ${aom_cpu_used}"
+            ;;
+            
+        *)
+            # Fallback générique
+            encoder_args="-c:v $encoder"
+            ;;
+    esac
+    
+    echo "$encoder_args"
+}
+
+# Retourne l'option -tune appropriée pour l'encodeur
+# Usage: _get_tune_option <encoder>
+_get_tune_option() {
+    local encoder="${1:-libx265}"
+    
+    # Seul x265 supporte -tune fastdecode comme option directe
+    if [[ "$encoder" == "libx265" ]]; then
+        if [[ "${FILM_TUNE_FASTDECODE:-true}" == true ]]; then
+            echo "-tune fastdecode"
+            return
+        fi
+    fi
+    # Les autres encodeurs gèrent le tune via leurs params internes
+    echo ""
+}
+
+# Retourne l'option preset appropriée pour l'encodeur
+# Usage: _get_preset_option <encoder> <preset>
+_get_preset_option() {
+    local encoder="${1:-libx265}"
+    local preset="${2:-medium}"
+    
+    case "$encoder" in
+        libx265)
+            echo "-preset $preset"
+            ;;
+        libsvtav1)
+            # SVT-AV1 utilise -preset avec des valeurs numériques 0-13
+            local svt_preset
+            if declare -f convert_preset &>/dev/null; then
+                svt_preset=$(convert_preset "$preset" "libsvtav1")
+            else
+                svt_preset=5  # Équivalent à "medium"
+            fi
+            echo "-preset $svt_preset"
+            ;;
+        libaom-av1)
+            # libaom utilise -cpu-used (géré dans _build_encoder_ffmpeg_args)
+            echo ""
+            ;;
+        *)
+            echo "-preset $preset"
+            ;;
+    esac
+}
+
+# Retourne l'option bitrate/CRF appropriée pour l'encodeur et le mode
+# Usage: _get_bitrate_option <encoder> <mode>
+_get_bitrate_option() {
+    local encoder="${1:-libx265}"
+    local mode="$2"  # crf ou autre
+    
+    if [[ "$mode" == "crf" ]]; then
+        case "$encoder" in
+            libx265)
+                echo "-crf $CRF_VALUE"
+                ;;
+            libsvtav1)
+                # SVT-AV1 utilise -crf aussi (0-63, défaut ~35)
+                # Mapping approximatif : CRF x265 21 ≈ CRF SVT-AV1 30
+                local svt_crf=$(( CRF_VALUE + 9 ))
+                [[ $svt_crf -gt 63 ]] && svt_crf=63
+                echo "-crf $svt_crf"
+                ;;
+            libaom-av1)
+                # libaom utilise -crf aussi (0-63)
+                local aom_crf=$(( CRF_VALUE + 9 ))
+                [[ $aom_crf -gt 63 ]] && aom_crf=63
+                echo "-crf $aom_crf"
+                ;;
+            *)
+                echo "-crf $CRF_VALUE"
+                ;;
+        esac
+    else
+        echo "-b:v $VIDEO_BITRATE"
+    fi
+}
+
 # Exécute un encodage ffmpeg avec le mode spécifié.
 # Usage: _run_ffmpeg_encode <mode> <input_file> <output_file> <ffmpeg_log> <base_name> 
-#                           <x265_base_params> <audio_params> <stream_mapping>
+#                           <encoder_base_params> <audio_params> <stream_mapping>
 #                           <progress_slot> <is_parallel> <awk_time_func>
 # Modes: "pass1" (analyse), "pass2" (encodage two-pass), "crf" (single-pass)
 # Retourne: 0 si succès, 1 si erreur
@@ -362,7 +667,7 @@ _run_ffmpeg_encode() {
     local output_file="$3"
     local ffmpeg_log="$4"
     local base_name="$5"
-    local x265_base_params="$6"
+    local encoder_base_params="$6"
     local audio_params="$7"
     local stream_mapping="$8"
     local progress_slot="$9"
@@ -371,6 +676,9 @@ _run_ffmpeg_encode() {
 
     START_TS="$(date +%s)"
     
+    # Encodeur à utiliser (défaut: libx265 pour rétro-compatibilité)
+    local encoder="${VIDEO_ENCODER:-libx265}"
+    
     # Construire les options hwaccel (vide si non disponible = fallback software)
     local hwaccel_opts=""
     if [[ -n "${HWACCEL:-}" && "${HWACCEL}" != "none" ]]; then
@@ -378,17 +686,10 @@ _run_ffmpeg_encode() {
     fi
 
     # Configuration selon le mode
-    local x265_params output_dest bitrate_opt
-    local audio_opt stream_opt log_suffix emoji end_msg
+    local output_dest audio_opt stream_opt log_suffix emoji end_msg
     
     case "$mode" in
         "pass1")
-            # Pass 1 : analyse uniquement, pas d'output réel
-            x265_params="pass=1:${x265_base_params}"
-            if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
-                x265_params="${x265_params}:no-slow-firstpass=1"
-            fi
-            bitrate_opt="-b:v $VIDEO_BITRATE"
             audio_opt="-an"
             stream_opt=""
             output_dest="-f null /dev/null"
@@ -397,9 +698,6 @@ _run_ffmpeg_encode() {
             end_msg="Analyse OK"
             ;;
         "pass2")
-            # Pass 2 : encodage final avec audio
-            x265_params="pass=2:${x265_base_params}"
-            bitrate_opt="-b:v $VIDEO_BITRATE"
             audio_opt="$audio_params"
             stream_opt="$stream_mapping -f matroska"
             output_dest="$output_file"
@@ -408,9 +706,6 @@ _run_ffmpeg_encode() {
             end_msg="Terminé ✅"
             ;;
         "crf")
-            # Mode CRF single-pass
-            x265_params="${x265_base_params}"
-            bitrate_opt="-crf $CRF_VALUE"
             audio_opt="$audio_params"
             stream_opt="$stream_mapping -f matroska"
             output_dest="$output_file"
@@ -427,29 +722,55 @@ _run_ffmpeg_encode() {
     # Paramètres GOP selon le mode (film: 240, série: 600)
     local keyint_value="${FILM_KEYINT:-600}"
     
-    # Option tune selon le mode (film: pas de tune, série: fastdecode)
-    local tune_opt=""
-    if [[ "${FILM_TUNE_FASTDECODE:-true}" == true ]]; then
-        tune_opt="-tune fastdecode"
-    fi
+    # Options spécifiques à l'encodeur
+    local tune_opt preset_opt bitrate_opt
+    tune_opt=$(_get_tune_option "$encoder")
+    preset_opt=$(_get_preset_option "$encoder" "$ENCODER_PRESET")
+    bitrate_opt=$(_get_bitrate_option "$encoder" "$mode")
+    
+    # Construire les paramètres encodeur spécifiques
+    local encoder_params_flag encoder_full_params
+    encoder_params_flag=$(_get_encoder_params_flag_internal "$encoder")
+    encoder_full_params=$(_build_encoder_params_internal "$encoder" "$mode" "$encoder_base_params")
 
-    # Exécution FFmpeg
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $SAMPLE_SEEK_PARAMS \
-        $hwaccel_opts \
-        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-        -g "$keyint_value" -keyint_min "$keyint_value" \
-        -c:v libx265 -preset "$ENCODER_PRESET" \
-        $tune_opt $bitrate_opt -x265-params "$x265_params" \
-        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
-        $audio_opt \
-        $stream_opt \
-        $output_dest \
-        -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
-    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    # Exécution FFmpeg avec construction dynamique selon l'encodeur
+    if [[ -n "$encoder_params_flag" && -n "$encoder_full_params" ]]; then
+        # Encodeur avec paramètres spécifiques (x265, svtav1)
+        $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+            $SAMPLE_SEEK_PARAMS \
+            $hwaccel_opts \
+            -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
+            -g "$keyint_value" -keyint_min "$keyint_value" \
+            -c:v "$encoder" $preset_opt \
+            $tune_opt $bitrate_opt $encoder_params_flag "$encoder_full_params" \
+            -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
+            $audio_opt \
+            $stream_opt \
+            $output_dest \
+            -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
+        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+            -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+            -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+            "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    else
+        # Encodeur sans paramètres spécifiques (libaom, etc.)
+        $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+            $SAMPLE_SEEK_PARAMS \
+            $hwaccel_opts \
+            -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
+            -g "$keyint_value" -keyint_min "$keyint_value" \
+            -c:v "$encoder" $preset_opt \
+            $tune_opt $bitrate_opt \
+            -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
+            $audio_opt \
+            $stream_opt \
+            $output_dest \
+            -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
+        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+            -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+            -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+            "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    fi
 
     # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
     local ffmpeg_rc=${PIPESTATUS[0]:-0}
@@ -579,10 +900,16 @@ _execute_conversion() {
         progress_slot=$(acquire_progress_slot)
     fi
 
-    # Paramètres x265 de base (VBV + extra params du mode)
-    local x265_base_params="${X265_VBV_STRING}"
-    if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
-        x265_base_params="${x265_base_params}:${X265_EXTRA_PARAMS}"
+    # Paramètres de base pour l'encodeur (VBV + extra params du mode)
+    # ENCODER_BASE_PARAMS est construit par _setup_video_encoding_params
+    local encoder_base_params="${ENCODER_BASE_PARAMS:-}"
+    
+    # Fallback pour rétro-compatibilité si ENCODER_BASE_PARAMS n'est pas défini
+    if [[ -z "$encoder_base_params" ]]; then
+        encoder_base_params="${X265_VBV_STRING}"
+        if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
+            encoder_base_params="${encoder_base_params}:${X265_EXTRA_PARAMS}"
+        fi
     fi
 
     # Fonction helper pour libérer le slot et retourner en erreur
@@ -597,7 +924,7 @@ _execute_conversion() {
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
         # Mode single-pass CRF (séries uniquement)
         if ! _run_ffmpeg_encode "crf" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                                "$x265_base_params" "$audio_params" "$stream_mapping" \
+                                "$encoder_base_params" "$audio_params" "$stream_mapping" \
                                 "$progress_slot" "$is_parallel" "$awk_time_func"; then
             _cleanup_and_fail
             return 1
@@ -606,7 +933,7 @@ _execute_conversion() {
         # Mode two-pass classique
         # ==================== PASS 1 : ANALYSE ====================
         if ! _run_ffmpeg_encode "pass1" "$tmp_input" "" "$ffmpeg_log_temp" "$base_name" \
-                                "$x265_base_params" "" "" \
+                                "$encoder_base_params" "" "" \
                                 "$progress_slot" "$is_parallel" "$awk_time_func"; then
             _cleanup_and_fail
             return 1
@@ -614,15 +941,18 @@ _execute_conversion() {
 
         # ==================== PASS 2 : ENCODAGE ====================
         if ! _run_ffmpeg_encode "pass2" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                                "$x265_base_params" "$audio_params" "$stream_mapping" \
+                                "$encoder_base_params" "$audio_params" "$stream_mapping" \
                                 "$progress_slot" "$is_parallel" "$awk_time_func"; then
+            # Nettoyage fichiers two-pass (selon encodeur)
             rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+            rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
             _cleanup_and_fail
             return 1
         fi
 
-        # Nettoyage fichiers two-pass
+        # Nettoyage fichiers two-pass (selon encodeur)
         rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+        rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
     fi
 
     # Libérer le slot de progression

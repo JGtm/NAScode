@@ -89,6 +89,15 @@ parse_arguments() {
                 SINGLE_PASS_MODE=false
                 shift
                 ;;
+            -c|--codec)
+                if [[ -n "${2:-}" ]]; then
+                    VIDEO_CODEC="$2"
+                    shift 2
+                else
+                    print_error "--codec doit être suivi d'un nom de codec (hevc, av1)"
+                    exit 1
+                fi
+                ;;
             -j|--jobs)
                 if [[ "${2:-}" =~ ^[0-9]+$ ]] && [[ "$2" -ge 1 ]]; then
                     PARALLEL_JOBS="$2"
@@ -194,6 +203,7 @@ Options :
     -f, --file FILE              Convertir un fichier unique (bypass index/queue) (ARG)
     --opus                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
     -2, --two-pass               Forcer le mode two-pass (défaut : single-pass CRF 23 pour séries)
+    -c, --codec CODEC            Codec vidéo cible : hevc, av1 (ARG) [défaut : hevc]
     -p, --off-peak [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
                                  PLAGE au format HH:MM-HH:MM (ARG optionnel) [défaut : 22:00-06:00]
 

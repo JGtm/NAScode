@@ -38,6 +38,9 @@ load_base_modules() {
     # Charger la configuration
     source "$LIB_DIR/config.sh"
     
+    # Charger les profils de codecs
+    source "$LIB_DIR/codec_profiles.sh"
+    
     # Charger les utilitaires
     source "$LIB_DIR/utils.sh"
 }

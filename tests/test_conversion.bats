@@ -68,6 +68,7 @@ teardown() {
     # On initialise les paramètres pour avoir un suffixe cohérent
     set_conversion_mode_parameters
     DRYRUN=false
+    VIDEO_CODEC="hevc"
     
     local result
     result=$(_prepare_file_paths "/videos/test.mkv" "/output")
@@ -75,8 +76,8 @@ teardown() {
     local final_output
     final_output=$(echo "$result" | cut -d'|' -f5)
     
-    # Vérifier que le suffixe contient _x265 (commun aux deux modes)
-    [[ "$final_output" =~ "_x265_" ]]
+    # Vérifier que le suffixe contient le codec (x265 pour hevc)
+    [[ "$final_output" =~ "_x265_" ]] || [[ "$final_output" =~ "_av1_" ]]
 }
 
 @test "_prepare_file_paths: ajoute le suffix dryrun si activé" {

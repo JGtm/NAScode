@@ -23,17 +23,42 @@ should_skip_conversion() {
     local tolerance_bits=$((BITRATE_CONVERSION_THRESHOLD_KBPS * SKIP_TOLERANCE_PERCENT * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
     
-    # Validation du format x265 et du bitrate
-    if [[ "$codec" == "hevc" || "$codec" == "h265" ]]; then
+    # Détecter si le fichier est déjà encodé dans le codec cible
+    local target_codec="${VIDEO_CODEC:-hevc}"
+    local is_target_codec=false
+    
+    # Utiliser is_codec_match si disponible (codec_profiles.sh chargé)
+    if declare -f is_codec_match &>/dev/null; then
+        if is_codec_match "$codec" "$target_codec"; then
+            is_target_codec=true
+        fi
+    else
+        # Fallback : vérification manuelle pour les codecs connus
+        case "$target_codec" in
+            hevc)
+                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && is_target_codec=true
+                ;;
+            av1)
+                [[ "$codec" == "av1" ]] && is_target_codec=true
+                ;;
+        esac
+    fi
+    
+    # Skip si déjà dans le codec cible avec bitrate optimisé
+    if [[ "$is_target_codec" == true ]]; then
         if [[ "$bitrate" =~ ^[0-9]+$ ]] && [[ "$bitrate" -le "$max_tolerated_bits" ]]; then
-            echo -e "${BLUE}⏭️  SKIPPED (Déjà x265 & bitrate optimisé) : $filename${NOCOLOR}" >&2
+            local codec_display="${target_codec^^}"
+            [[ "$target_codec" == "hevc" ]] && codec_display="x265"
+            echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
             if [[ -n "$LOG_SKIPPED" ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà x265 et bitrate optimisé) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
             fi
             return 0
         fi
         if [[ -n "$LOG_PROGRESS" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Ré-encodage X265) | Bitrate trop élevé | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
+            local codec_display="${target_codec^^}"
+            [[ "$target_codec" == "hevc" ]] && codec_display="X265"
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Ré-encodage ${codec_display}) | Bitrate trop élevé | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
         fi
     fi
     

@@ -25,6 +25,12 @@ VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
 OPUS_ENABLED=false  # Conversion audio Opus (expérimental, problèmes VLC)
 SINGLE_FILE=""       # Chemin vers un fichier unique à convertir (bypass index/queue)
 
+# ----- Codec vidéo -----
+# Codec cible pour l'encodage (hevc, av1)
+# L'encodeur est choisi automatiquement selon le codec (modifiable dans codec_profiles.sh)
+VIDEO_CODEC="hevc"
+VIDEO_ENCODER=""     # Vide = auto-détection selon VIDEO_CODEC
+
 # Mode sample : encoder uniquement un segment de test (30s par défaut)
 SAMPLE_MODE=false
 SAMPLE_DURATION=30      # Durée du segment en secondes
@@ -56,7 +62,7 @@ readonly FFMPEG_MIN_VERSION=8
 
 # Suffixe pour les fichiers
 readonly DRYRUN_SUFFIX="-dryrun-sample"
-SUFFIX_STRING="_x265"  # Suffixe par défaut (sera mis à jour par build_dynamic_suffix)
+SUFFIX_STRING=""  # Suffixe par défaut (sera mis à jour par build_dynamic_suffix selon le codec)
 
 # Exclusions par défaut
 EXCLUDES=("./logs" "./*.sh" "./*.txt" "Converted")
@@ -189,6 +195,18 @@ set_conversion_mode_parameters() {
     BUFSIZE_FFMPEG="${BUFSIZE_KBPS}k"
     X265_VBV_PARAMS="vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}"
     
+    # Initialiser l'encodeur selon le codec (si pas déjà spécifié)
+    if [[ -z "$VIDEO_ENCODER" ]] && declare -f get_codec_encoder &>/dev/null; then
+        VIDEO_ENCODER=$(get_codec_encoder "$VIDEO_CODEC")
+    elif [[ -z "$VIDEO_ENCODER" ]]; then
+        # Fallback si codec_profiles.sh pas encore chargé
+        case "$VIDEO_CODEC" in
+            hevc) VIDEO_ENCODER="libx265" ;;
+            av1)  VIDEO_ENCODER="libsvtav1" ;;
+            *)    VIDEO_ENCODER="libx265" ;;
+        esac
+    fi
+    
     # Construire le suffixe dynamique basé sur les paramètres
     build_dynamic_suffix
 }
@@ -202,9 +220,9 @@ set_conversion_mode_parameters() {
 # dans lib/transcode_video.sh. SUFFIX_STRING sert ici surtout de "preview" et d'interrupteur
 # (vide = suffixe désactivé).
 #
-# Format effectif: _x265_<bitrate>k_<height>p_<preset>[_tuned][_sample]
+# Format effectif: _<codec>_<bitrate>k_<height>p_<preset>[_tuned][_sample]
 # Exemples: _x265_1449k_720p_medium_tuned
-#           _x265_2070k_1080p_medium_tuned
+#           _av1_2070k_1080p_medium
 build_dynamic_suffix() {
     # Ne pas écraser si l'utilisateur a forcé --no-suffix
     if [[ "$FORCE_NO_SUFFIX" == true ]]; then
@@ -212,7 +230,15 @@ build_dynamic_suffix() {
         return
     fi
     
-    local suffix="_x265"
+    # Suffixe basé sur le codec (x265, av1, etc.)
+    local codec_suffix="x265"
+    if declare -f get_codec_suffix &>/dev/null; then
+        codec_suffix=$(get_codec_suffix "$VIDEO_CODEC")
+    elif [[ "$VIDEO_CODEC" == "av1" ]]; then
+        codec_suffix="av1"
+    fi
+    
+    local suffix="_${codec_suffix}"
     
     # Mode single-pass CRF ou two-pass bitrate
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
@@ -228,8 +254,17 @@ build_dynamic_suffix() {
     # Preset d'encodage
     suffix="${suffix}_${ENCODER_PRESET}"
     
-    # Indicateur si paramètres x265 spéciaux (tuned)
-    if [[ -n "$X265_EXTRA_PARAMS" ]]; then
+    # Indicateur si paramètres encodeur spéciaux (tuned)
+    # Vérifie X265_EXTRA_PARAMS pour rétro-compatibilité, ou les params du mode
+    local has_extra_params=false
+    if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
+        has_extra_params=true
+    elif declare -f get_encoder_mode_params &>/dev/null; then
+        local mode_params
+        mode_params=$(get_encoder_mode_params "$VIDEO_ENCODER" "$CONVERSION_MODE")
+        [[ -n "$mode_params" ]] && has_extra_params=true
+    fi
+    if [[ "$has_extra_params" == true ]]; then
         suffix="${suffix}_tuned"
     fi
     

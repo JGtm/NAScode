@@ -44,6 +44,18 @@ git stash pop
 - Les branches permettent la review avant merge
 - Évite les conflits et les régressions
 
+### Exception : opérations Git sur `main`
+
+Les **opérations Git** suivantes sont autorisées directement sur `main` **si l'utilisateur le demande explicitement** :
+
+- `git merge <branche>` — fusionner une branche validée
+- `git pull` — récupérer les mises à jour distantes
+- `git rebase` — réorganiser l'historique (avec précaution)
+
+Ces opérations ne modifient pas directement le code mais gèrent l'historique Git.
+
+**Attention** : toute modification de fichier (code, docs, config) reste interdite sur `main`.
+
 ---
 
 ## Priorités

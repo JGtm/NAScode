@@ -1,10 +1,11 @@
-# 🎬 Conversion Video x265
+# 🎬 Conversion Video x265 / AV1
 
-Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** en batch, optimisé pour les séries et films.
+Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou **AV1** en batch, optimisé pour les séries et films.
 
 ## ✨ Fonctionnalités
 
 ### Encodage
+- **Multi-codec** : support HEVC (x265) et AV1 (libsvtav1, libaom-av1)
 - **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
 - **Deux modes de conversion** :
   - `serie` : optimisé vitesse (~1 Go/h), preset medium, CRF ou 2070 kbps
@@ -100,6 +101,7 @@ bash convert.sh [options]
 | `-o, --output-dir DIR` | Dossier de sortie (défaut: `Converted/`) |
 | `-f, --file FILE` | Convertir un fichier unique (bypass index/queue) |
 | `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
+| `-c, --codec CODEC` | Codec vidéo : `hevc` (défaut) ou `av1` |
 | `-d, --dry-run` | Simulation sans encodage (alias : `--dryrun`) |
 | `-t, --sample` | Mode sample : encode ~30s pour test rapide (alias : `--test`) |
 | `-v, --vmaf` | Activer l'évaluation VMAF |
@@ -136,6 +138,12 @@ bash convert.sh -p -s "/chemin/vers/series"
 # Heures creuses avec plage personnalisée
 bash convert.sh --off-peak=23:00-07:00 -s "/chemin/vers/series"
 
+# Conversion AV1 (codec moderne, meilleur ratio qualité/taille)
+bash convert.sh -c av1 -s "/chemin/vers/videos"
+
+# Mode film en AV1 avec VMAF
+bash convert.sh -m film -c av1 -v -s "/chemin/vers/films"
+
 # Simulation pour vérifier la configuration
 bash convert.sh -d -s "/chemin/source"
 
@@ -162,10 +170,20 @@ bash convert.sh -l 10 -k
 
 ```bash
 CONVERSION_MODE="serie"           # Mode par défaut
+VIDEO_CODEC="hevc"                # Codec vidéo (hevc, av1)
 SORT_MODE="name_asc"              # Tri de la file d'attente
 SAMPLE_DURATION=30                # Durée du segment test (secondes)
 BITRATE_CONVERSION_THRESHOLD_KBPS=2520  # Seuil pour skip
 ```
+
+### Codecs supportés
+
+| Codec | Encodeur | Caractéristiques |
+|-------|----------|------------------|
+| `hevc` | libx265 | Standard actuel, excellent compromis vitesse/qualité |
+| `av1` | libsvtav1 | Nouvelle génération, meilleur ratio qualité/taille, plus lent |
+
+**Note** : Pour changer l'encodeur d'un codec (ex: `libaom-av1` au lieu de `libsvtav1`), modifier `VIDEO_ENCODER` dans `lib/config.sh`.
 
 ### Paramètres x265 (mode série)
 
@@ -189,7 +207,8 @@ Conversion/
 ├── lib/
 │   ├── args.sh              # Parsing des arguments
 │   ├── audio_params.sh      # Paramètres audio
-│   ├── ui.sh            # Codes couleur terminal
+│   ├── codec_profiles.sh    # Profils codecs (HEVC, AV1)
+│   ├── ui.sh                # Codes couleur terminal
 │   ├── config.sh            # Configuration globale
 │   ├── conversion.sh        # Orchestration FFmpeg
 │   ├── detect.sh            # Détection outils/système
@@ -268,6 +287,13 @@ Consultez `logs/Skipped_*.log` - le fichier est probablement déjà en x265 avec
 Le script gère les espaces et caractères spéciaux, mais évitez les caractères de contrôle.
 
 ## 📝 Changelog récent
+
+### v2.3 (Décembre 2025)
+- ✅ **Support multi-codec** : option `-c/--codec` pour choisir HEVC ou AV1
+- ✅ Nouveau module `codec_profiles.sh` pour configuration modulaire des encodeurs
+- ✅ Support libsvtav1 et libaom-av1 pour AV1
+- ✅ Suffixe dynamique par codec (`_x265_`, `_av1_`)
+- ✅ Skip automatique adapté au codec cible
 
 ### v2.2 (Décembre 2025)
 - ✅ Option `-f/--file` pour convertir un fichier unique (bypass index/queue)
