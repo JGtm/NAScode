@@ -190,50 +190,50 @@ parse_arguments() {
 
 show_help() {
     cat << EOF
-Usage : ./conversion.sh [OPTIONS]
+${CYAN}Usage :${NOCOLOR} ./conversion.sh [OPTIONS]
 
-Options :
-    -s, --source DIR             Dossier source (ARG) [défaut : dossier parent]
-    -o, --output-dir DIR         Dossier de destination (ARG) [défaut : \`Converted\` au même niveau que le script]
-    -e, --exclude PATTERN        Ajouter un pattern d'exclusion (ARG)
-    -m, --mode MODE              Mode de conversion : film, serie (ARG) [défaut : serie]
-    -d, --dry-run                Mode simulation sans conversion (FLAG)
-    -x, --no-suffix              Désactiver le suffixe _x265 (FLAG)
-    -r, --random                 Tri aléatoire : sélectionne des fichiers aléatoires (FLAG) [défaut : 10]
-    -l, --limit N                Limiter le traitement à N fichiers (ARG)
-    -j, --jobs N                 Nombre de conversions parallèles (ARG) [défaut : 1]
-    -q, --queue FILE             Utiliser un fichier queue personnalisé (ARG)
-    -n, --no-progress            Désactiver l'affichage des indicateurs de progression (FLAG)
-    -h, --help                   Afficher cette aide (FLAG)
-    -k, --keep-index             Conserver l'index existant sans demande interactive (FLAG)
-    -v, --vmaf                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
-    -t, --sample                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
-    -f, --file FILE              Convertir un fichier unique (bypass index/queue) (ARG)
-    --opus                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
-    -2, --two-pass               Forcer le mode two-pass (défaut : single-pass CRF 23 pour séries)
-    -c, --codec CODEC            Codec vidéo cible : hevc, av1 (ARG) [défaut : hevc]
-    -p, --off-peak [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
+${CYAN}Options :${NOCOLOR}
+    ${GREEN}-s, --source${NOCOLOR} DIR             Dossier source (ARG) [défaut : dossier parent]
+    ${GREEN}-o, --output-dir${NOCOLOR} DIR         Dossier de destination (ARG) [défaut : \`Converted\` au même niveau que le script]
+    ${GREEN}-e, --exclude${NOCOLOR} PATTERN        Ajouter un pattern d'exclusion (ARG)
+    ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, serie (ARG) [défaut : serie]
+    ${GREEN}-d, --dry-run${NOCOLOR}                Mode simulation sans conversion (FLAG)
+    ${GREEN}-x, --no-suffix${NOCOLOR}              Désactiver le suffixe _x265 (FLAG)
+    ${GREEN}-r, --random${NOCOLOR}                 Tri aléatoire : sélectionne des fichiers aléatoires (FLAG) [défaut : 10]
+    ${GREEN}-l, --limit${NOCOLOR} N                Limiter le traitement à N fichiers (ARG)
+    ${GREEN}-j, --jobs${NOCOLOR} N                 Nombre de conversions parallèles (ARG) [défaut : 1]
+    ${GREEN}-q, --queue${NOCOLOR} FILE             Utiliser un fichier queue personnalisé (ARG)
+    ${GREEN}-n, --no-progress${NOCOLOR}            Désactiver l'affichage des indicateurs de progression (FLAG)
+    ${GREEN}-h, --help${NOCOLOR}                   Afficher cette aide (FLAG)
+    ${GREEN}-k, --keep-index${NOCOLOR}             Conserver l'index existant sans demande interactive (FLAG)
+    ${GREEN}-v, --vmaf${NOCOLOR}                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
+    ${GREEN}-t, --sample${NOCOLOR}                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
+    ${GREEN}-f, --file${NOCOLOR} FILE              Convertir un fichier unique (bypass index/queue) (ARG)
+    ${GREEN}--opus${NOCOLOR}                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
+    ${GREEN}-2, --two-pass${NOCOLOR}               Forcer le mode two-pass (défaut : single-pass CRF 23 pour séries)
+    ${GREEN}-c, --codec${NOCOLOR} CODEC            Codec vidéo cible : hevc, av1 (ARG) [défaut : hevc]
+    ${GREEN}-p, --off-peak${NOCOLOR} [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
                                  PLAGE au format HH:MM-HH:MM (ARG optionnel) [défaut : 22:00-06:00]
 
-Remarque sur les options courtes groupées :
-    - Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
+${CYAN}Remarque sur les options courtes groupées :${NOCOLOR}
+    ${DIM}- Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
         par exemple : -xdrk est équivalent à -x -d -r -k.
     - Les options qui attendent un argument (marquées (ARG) ci-dessus : -s, -o, -e, -m, -l, -j, -q)
         doivent être fournies séparément avec leur valeur, par exemple : -l 5 ou --limit 5.
         par exemple : ./conversion.sh -xdrk -l 5  (groupement de flags puis -l 5 séparé),
-                      ./conversion.sh --source /path --limit 10.
+                      ./conversion.sh --source /path --limit 10.${NOCOLOR}
 
-Modes de conversion :
-  film          : Qualité maximale
-  serie         : Bon compromis taille/qualité [défaut]
+${CYAN}Modes de conversion :${NOCOLOR}
+  ${YELLOW}film${NOCOLOR}          : Qualité maximale
+  ${YELLOW}serie${NOCOLOR}         : Bon compromis taille/qualité [défaut]
 
-Mode heures creuses :
-  Limite le traitement aux périodes définies (par défaut 22h-6h).
+${CYAN}Mode heures creuses :${NOCOLOR}
+  ${DIM}Limite le traitement aux périodes définies (par défaut 22h-6h).
   Si un fichier est en cours quand les heures pleines arrivent, il termine.
-  Le script attend ensuite le retour des heures creuses avant de continuer.
+  Le script attend ensuite le retour des heures creuses avant de continuer.${NOCOLOR}
 
-Exemples :
-  ./conversion.sh
+${CYAN}Exemples :${NOCOLOR}
+  ${DIM}./conversion.sh
   ./conversion.sh -s /media/videos -o /media/converted
   ./conversion.sh --mode film --dry-run
   ./conversion.sh --mode serie --no-progress
@@ -242,6 +242,6 @@ Exemples :
   ./conversion.sh --vmaf          Activer l'évaluation VMAF après conversion
   ./conversion.sh --off-peak      Mode heures creuses (22:00-06:00 par défaut)
   ./conversion.sh -p 23:00-07:00  Mode heures creuses personnalisé (23h-7h)
-  ./conversion.sh -f /path/video.mkv  Convertir un fichier spécifique
+  ./conversion.sh -f /path/video.mkv  Convertir un fichier spécifique${NOCOLOR}
 EOF
 }

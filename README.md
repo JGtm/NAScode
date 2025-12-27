@@ -43,12 +43,13 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 ## 📋 Prérequis
 
 - **Système** : GNU/Linux, macOS, Windows (Git Bash/WSL)
-- **FFmpeg** avec `libx265` et optionnellement `libvmaf`
+- **FFmpeg** avec `libx265` (HEVC) et optionnellement `libsvtav1` (AV1), `libvmaf`
 - **Outils** : `bash 4+`, `awk`, `stat`, `md5sum`/`md5`
 
 Vérifier FFmpeg :
 ```bash
 ffmpeg -hide_banner -encoders | grep libx265
+ffmpeg -hide_banner -encoders | grep libsvtav1  # optionnel, pour AV1
 ffmpeg -hide_banner -filters | grep libvmaf
 ```
 
@@ -271,9 +272,28 @@ sudo apt install ffmpeg
 
 # macOS
 brew install ffmpeg
-
-# Windows : télécharger depuis gyan.dev ou utiliser WSL
 ```
+
+### Windows (Git Bash) : FFmpeg avec SVT-AV1
+
+La version "essentials" de FFmpeg (gyan.dev) ne contient pas `libsvtav1` pour l'encodage AV1.
+Si tu utilises Git Bash avec MSYS2, tu peux installer une version complète de FFmpeg :
+
+```bash
+# 1. Installer FFmpeg et SVT-AV1 via pacman (MSYS2)
+pacman -S mingw-w64-ucrt-x86_64-ffmpeg mingw-w64-ucrt-x86_64-svt-av1
+
+# 2. Ajouter MSYS2 au PATH (dans ~/.bashrc)
+echo 'export PATH="/c/msys64/ucrt64/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+
+# 3. Vérifier que libsvtav1 est disponible
+ffmpeg -encoders 2>/dev/null | grep libsvtav1
+```
+
+> **Note** : Si tu n'as pas MSYS2, tu peux aussi télécharger FFmpeg "full" depuis [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) qui inclut SVT-AV1.
+
+> **VMAF** : Si ton FFmpeg principal n'a pas `libvmaf` (comme celui de MSYS2), le script cherche automatiquement un FFmpeg alternatif pour les analyses VMAF (ex: celui de gyan.dev). Tu verras le message "VMAF via FFmpeg alternatif" dans ce cas.
 
 ### Fichiers sautés
 Consultez `logs/Skipped_*.log` - le fichier est probablement déjà en x265 avec un bitrate optimisé.

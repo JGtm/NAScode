@@ -14,6 +14,9 @@ compute_vmaf_score() {
     local total_count="${5:-}"
     local keyframe_pos="${6:-}"  # Position du keyframe (mode sample)
     
+    # FFmpeg à utiliser pour VMAF (peut être différent du principal)
+    local ffmpeg_cmd="${FFMPEG_VMAF:-ffmpeg}"
+    
     # Vérifier que libvmaf est disponible
     if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
         echo "NA"
@@ -103,7 +106,8 @@ compute_vmaf_score() {
     if [[ "$NO_PROGRESS" != true ]] && [[ "$duration_us" -gt 0 ]] && [[ -n "$filename_display" ]]; then
         # Lancer ffmpeg en arrière-plan avec progression vers fichier
         # hwaccel pour accélérer le décodage de l'original
-        ffmpeg -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
+        # Note: On utilise $ffmpeg_cmd qui peut être un FFmpeg alternatif avec libvmaf
+        "$ffmpeg_cmd" -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
             -lavfi "$lavfi_filter" \
             -progress "$progress_file" \
             -f null - >/dev/null 2>&1 &
@@ -150,7 +154,8 @@ compute_vmaf_score() {
         printf "\r%100s\r" "" >&2  # Effacer la ligne de progression
     else
         # Sans barre de progression
-        ffmpeg -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
+        # Note: On utilise $ffmpeg_cmd qui peut être un FFmpeg alternatif avec libvmaf
+        "$ffmpeg_cmd" -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
             -lavfi "$lavfi_filter" \
             -f null - >/dev/null 2>&1
     fi

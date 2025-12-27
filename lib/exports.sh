@@ -126,7 +126,7 @@ export_variables() {
     export HAS_MD5SUM HAS_MD5 HAS_PYTHON3
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
-    export HAS_LIBVMAF VMAF_QUEUE_FILE
+    export HAS_LIBVMAF VMAF_QUEUE_FILE FFMPEG_VMAF
     
     # ========================================================
     # VARIABLES ET FONCTIONS HEURES CREUSES

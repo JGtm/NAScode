@@ -243,7 +243,7 @@ print_indexing_progress() {
     local current="$1"
     local total="$2"
     # Format : "  │  📊 Indexation : 9999/9999 fichiers            │"
-    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers            ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
+    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers             ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
 }
 
 # Affiche la fin du bloc d'indexation avec le résultat

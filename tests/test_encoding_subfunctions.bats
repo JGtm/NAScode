@@ -72,6 +72,11 @@ teardown() {
 }
 
 @test "_setup_video_encoding_params: SVT-AV1 ajoute keyint dans ENCODER_BASE_PARAMS" {
+    # Skip si libsvtav1 n'est pas disponible dans FFmpeg
+    if ! ffmpeg -encoders 2>/dev/null | grep -q libsvtav1; then
+        skip "libsvtav1 non disponible dans FFmpeg"
+    fi
+    
     VIDEO_CODEC="av1"
     VIDEO_ENCODER="libsvtav1"
     CONVERSION_MODE="serie"
@@ -87,6 +92,11 @@ teardown() {
 }
 
 @test "_setup_video_encoding_params: SVT-AV1 inclut tune et enable-overlays" {
+    # Skip si libsvtav1 n'est pas disponible dans FFmpeg
+    if ! ffmpeg -encoders 2>/dev/null | grep -q libsvtav1; then
+        skip "libsvtav1 non disponible dans FFmpeg"
+    fi
+    
     VIDEO_CODEC="av1"
     VIDEO_ENCODER="libsvtav1"
     CONVERSION_MODE="serie"

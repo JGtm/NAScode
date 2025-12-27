@@ -362,6 +362,22 @@ _format_size_bytes() {
     fi
 }
 
+# Formate une taille en format compact (ex: 4.3G, 850M, 12K)
+# Usage: _format_size_bytes_compact <bytes>
+_format_size_bytes_compact() {
+    local bytes="${1:-0}"
+    
+    if [[ "$bytes" -ge 1073741824 ]]; then
+        awk "BEGIN {printf \"%.1fG\", $bytes / 1073741824}"
+    elif [[ "$bytes" -ge 1048576 ]]; then
+        awk "BEGIN {printf \"%.0fM\", $bytes / 1048576}"
+    elif [[ "$bytes" -ge 1024 ]]; then
+        awk "BEGIN {printf \"%.0fK\", $bytes / 1024}"
+    else
+        echo "${bytes}B"
+    fi
+}
+
 show_summary() {
     # Traiter toutes les analyses VMAF en attente
     process_vmaf_queue

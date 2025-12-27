@@ -207,6 +207,14 @@ set_conversion_mode_parameters() {
         esac
     fi
     
+    # Valider que le codec/encodeur est disponible dans FFmpeg
+    if declare -f validate_codec_config &>/dev/null; then
+        if ! validate_codec_config; then
+            print_error "Configuration codec invalide. Vérifiez que FFmpeg supporte l'encodeur $VIDEO_ENCODER."
+            exit 1
+        fi
+    fi
+    
     # Construire le suffixe dynamique basé sur les paramètres
     build_dynamic_suffix
 }

@@ -284,3 +284,57 @@ teardown() {
     [[ "$SUFFIX_STRING" =~ _[0-9]+k_ ]]
     [[ ! "$SUFFIX_STRING" =~ "_crf" ]]
 }
+
+###########################################################
+# Tests de validate_codec_config()
+###########################################################
+
+@test "validate_codec_config: accepte codec hevc avec encodeur disponible" {
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER=""
+    
+    # Skip si libx265 n'est pas disponible
+    if ! ffmpeg -encoders 2>/dev/null | grep -q libx265; then
+        skip "libx265 non disponible"
+    fi
+    
+    # Exécuter directement (pas avec run) pour préserver VIDEO_ENCODER
+    validate_codec_config
+    local status=$?
+    [ "$status" -eq 0 ]
+    [ "$VIDEO_ENCODER" = "libx265" ]
+}
+
+@test "validate_codec_config: rejette codec non supporté" {
+    VIDEO_CODEC="vp9"
+    VIDEO_ENCODER=""
+    
+    run validate_codec_config
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Codec non supporté" ]]
+}
+
+@test "validate_codec_config: rejette encodeur non disponible" {
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="encodeur_inexistant_xyz"
+    
+    run validate_codec_config
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Encodeur non disponible" ]]
+}
+
+@test "set_conversion_mode_parameters: échoue avec codec AV1 si libsvtav1 absent" {
+    # Ce test vérifie que la validation codec est bien appelée
+    VIDEO_CODEC="av1"
+    VIDEO_ENCODER=""
+    CONVERSION_MODE="serie"
+    
+    # Si libsvtav1 est disponible, on skip le test
+    if ffmpeg -encoders 2>/dev/null | grep -q libsvtav1; then
+        skip "libsvtav1 est disponible, test non applicable"
+    fi
+    
+    run set_conversion_mode_parameters
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Encodeur non disponible" || "$output" =~ "Configuration codec invalide" ]]
+}

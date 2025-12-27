@@ -51,6 +51,7 @@ load_minimal() {
     source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/detect.sh"
     source "$LIB_DIR/config.sh"
+    source "$LIB_DIR/codec_profiles.sh"
 }
 
 # Helper pour créer un fichier null-separated

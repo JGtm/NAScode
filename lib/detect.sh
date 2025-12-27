@@ -35,8 +35,61 @@ HAS_GAWK=$(awk 'BEGIN { print systime() }' 2>/dev/null | grep -qE '^[0-9]+$' && 
 HAS_SHA256SUM=$(command -v sha256sum >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_SHASUM=$(command -v shasum >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_OPENSSL=$(command -v openssl >/dev/null 2>&1 && echo 1 || echo 0)
-# Détection de libvmaf dans FFmpeg (pour évaluation qualité vidéo)
-HAS_LIBVMAF=$(ffmpeg -hide_banner -filters 2>/dev/null | grep -q libvmaf && echo 1 || echo 0)
+
+# ----- Détection de libvmaf dans FFmpeg -----
+# Le FFmpeg principal peut ne pas avoir libvmaf (ex: MSYS2 avec SVT-AV1)
+# On cherche un FFmpeg alternatif qui a libvmaf si nécessaire
+HAS_LIBVMAF=0
+FFMPEG_VMAF=""  # FFmpeg à utiliser pour VMAF (peut être différent du principal)
+
+# 1. Vérifier si le FFmpeg principal a libvmaf
+if ffmpeg -hide_banner -filters 2>/dev/null | grep -q libvmaf; then
+    HAS_LIBVMAF=1
+    FFMPEG_VMAF="ffmpeg"
+else
+    # 2. Chercher un FFmpeg alternatif avec libvmaf (typiquement gyan.dev sur Windows)
+    _find_ffmpeg_with_vmaf() {
+        # Obtenir le nom d'utilisateur de façon portable
+        local username="${USER:-${USERNAME:-$(whoami 2>/dev/null)}}"
+        
+        # Répertoires à scanner pour trouver un FFmpeg alternatif
+        local search_dirs=(
+            "/c/Users/$username/AppData/Local/Microsoft/WinGet/Packages"
+            "/c/ffmpeg"
+            "/c/Program Files/ffmpeg"
+            "/c/tools/ffmpeg"
+        )
+        
+        # Chercher ffmpeg (ou ffmpeg.exe) dans ces répertoires
+        for search_dir in "${search_dirs[@]}"; do
+            if [[ -d "$search_dir" ]]; then
+                # Utiliser find pour chercher ffmpeg dans ce répertoire
+                while IFS= read -r -d '' path; do
+                    if [[ -x "$path" ]] && "$path" -hide_banner -filters 2>/dev/null | grep -q libvmaf; then
+                        echo "$path"
+                        return 0
+                    fi
+                done < <(find "$search_dir" -maxdepth 5 \( -name "ffmpeg" -o -name "ffmpeg.exe" \) -type f -print0 2>/dev/null)
+            fi
+        done
+        
+        # Aussi vérifier les autres ffmpeg dans le PATH (via type -a)
+        while IFS= read -r path; do
+            if [[ -x "$path" ]] && [[ "$path" != "$(which ffmpeg)" ]] && "$path" -hide_banner -filters 2>/dev/null | grep -q libvmaf; then
+                echo "$path"
+                return 0
+            fi
+        done < <(type -ap ffmpeg 2>/dev/null)
+        
+        return 1
+    }
+    
+    FFMPEG_VMAF=$(_find_ffmpeg_with_vmaf)
+    if [[ -n "$FFMPEG_VMAF" ]]; then
+        HAS_LIBVMAF=1
+    fi
+    unset -f _find_ffmpeg_with_vmaf
+fi
 
 # ----- Détection de l'environnement MSYS/MinGW/Git Bash sur Windows -----
 IS_MSYS=0

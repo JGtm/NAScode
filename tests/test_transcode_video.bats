@@ -151,6 +151,11 @@ teardown() {
 ###########################################################
 
 @test "_build_effective_suffix_for_dims: AV1 utilise suffixe _av1" {
+    # Skip si libsvtav1 n'est pas disponible dans FFmpeg
+    if ! ffmpeg -encoders 2>/dev/null | grep -q libsvtav1; then
+        skip "libsvtav1 non disponible dans FFmpeg"
+    fi
+    
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=false
     VIDEO_CODEC="av1"
@@ -163,6 +168,11 @@ teardown() {
 }
 
 @test "_build_effective_suffix_for_dims: AV1 CRF utilise suffixe _av1" {
+    # Skip si libsvtav1 n'est pas disponible dans FFmpeg
+    if ! ffmpeg -encoders 2>/dev/null | grep -q libsvtav1; then
+        skip "libsvtav1 non disponible dans FFmpeg"
+    fi
+    
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     VIDEO_CODEC="av1"

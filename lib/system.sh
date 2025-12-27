@@ -220,6 +220,10 @@ check_vmaf() {
     fi
     
     if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
+        # Si on utilise un FFmpeg alternatif pour VMAF, afficher une info
+        if [[ -n "${FFMPEG_VMAF:-}" ]] && [[ "$FFMPEG_VMAF" != "ffmpeg" ]]; then
+            echo -e "  ${CYAN}ℹ${NOCOLOR}  VMAF via FFmpeg alternatif (libvmaf détecté)"
+        fi
         # L'affichage sera groupé avec les autres options dans show_active_options
         return 0
     else
