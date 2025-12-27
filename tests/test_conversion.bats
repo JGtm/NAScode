@@ -127,6 +127,36 @@ teardown() {
 }
 
 ###########################################################
+# Tests de should_skip_conversion() - Multi-codec
+###########################################################
+
+@test "should_skip_conversion: skip si av1 avec bitrate bas quand cible av1" {
+    VIDEO_CODEC="av1"
+    run should_skip_conversion "av1" "2000000" "test.mkv" "/source/test.mkv"
+    [ "$status" -eq 0 ]
+}
+
+@test "should_skip_conversion: pas de skip si av1 avec bitrate élevé quand cible av1" {
+    VIDEO_CODEC="av1"
+    run should_skip_conversion "av1" "5000000" "test.mkv" "/source/test.mkv"
+    [ "$status" -ne 0 ]
+}
+
+@test "should_skip_conversion: skip si av1 avec bitrate bas quand cible hevc (codec meilleur)" {
+    # AV1 est plus moderne que HEVC, donc on skip même si on cible HEVC
+    VIDEO_CODEC="hevc"
+    run should_skip_conversion "av1" "2000000" "test.mkv" "/source/test.mkv"
+    [ "$status" -eq 0 ]
+}
+
+@test "should_skip_conversion: pas de skip si hevc quand cible av1" {
+    # HEVC n'est pas meilleur que AV1, donc on convertit
+    VIDEO_CODEC="av1"
+    run should_skip_conversion "hevc" "2000000" "test.mkv" "/source/test.mkv"
+    [ "$status" -ne 0 ]
+}
+
+###########################################################
 # Tests de _get_temp_filename()
 ###########################################################
 

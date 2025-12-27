@@ -91,7 +91,15 @@ parse_arguments() {
                 ;;
             -c|--codec)
                 if [[ -n "${2:-}" ]]; then
-                    VIDEO_CODEC="$2"
+                    case "$2" in
+                        hevc|av1)
+                            VIDEO_CODEC="$2"
+                            ;;
+                        *)
+                            print_error "Codec invalide : '$2'. Valeurs acceptées : hevc, av1"
+                            exit 1
+                            ;;
+                    esac
                     shift 2
                 else
                     print_error "--codec doit être suivi d'un nom de codec (hevc, av1)"

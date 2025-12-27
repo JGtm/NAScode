@@ -82,6 +82,34 @@ is_codec_supported() {
     esac
 }
 
+# Retourne le "rang" d'un codec (plus élevé = plus moderne/meilleur)
+# Utilisé pour déterminer si un fichier est déjà dans un codec "meilleur"
+# Usage: get_codec_rank "av1" -> 2, get_codec_rank "hevc" -> 1
+get_codec_rank() {
+    local codec="$1"
+    case "$codec" in
+        av1)   echo 2 ;;   # Plus moderne, meilleur ratio qualité/taille
+        hevc)  echo 1 ;;   # Standard actuel
+        h265)  echo 1 ;;   # Alias HEVC
+        *)     echo 0 ;;   # Non-supporté (h264, etc.)
+    esac
+}
+
+# Vérifie si un codec source est "meilleur ou égal" au codec cible
+# Un fichier AV1 ne devrait pas être ré-encodé en HEVC
+# Usage: is_codec_better_or_equal "av1" "hevc" -> 0 (true, AV1 >= HEVC)
+#        is_codec_better_or_equal "hevc" "av1" -> 1 (false, HEVC < AV1)
+is_codec_better_or_equal() {
+    local source_codec="$1"
+    local target_codec="$2"
+    
+    local source_rank target_rank
+    source_rank=$(get_codec_rank "$source_codec")
+    target_rank=$(get_codec_rank "$target_codec")
+    
+    [[ "$source_rank" -ge "$target_rank" ]]
+}
+
 # Liste les codecs supportés
 # Usage: list_supported_codecs -> "hevc av1"
 list_supported_codecs() {

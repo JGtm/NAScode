@@ -114,6 +114,61 @@ teardown() {
 }
 
 ###########################################################
+# Tests get_codec_rank()
+###########################################################
+
+@test "get_codec_rank: av1 a le rang le plus élevé" {
+    av1_rank=$(get_codec_rank "av1")
+    hevc_rank=$(get_codec_rank "hevc")
+    [ "$av1_rank" -gt "$hevc_rank" ]
+}
+
+@test "get_codec_rank: hevc et h265 ont le même rang" {
+    hevc_rank=$(get_codec_rank "hevc")
+    h265_rank=$(get_codec_rank "h265")
+    [ "$hevc_rank" -eq "$h265_rank" ]
+}
+
+@test "get_codec_rank: h264 a rang 0 (non supporté)" {
+    result=$(get_codec_rank "h264")
+    [ "$result" -eq 0 ]
+}
+
+###########################################################
+# Tests is_codec_better_or_equal()
+###########################################################
+
+@test "is_codec_better_or_equal: av1 >= hevc" {
+    run is_codec_better_or_equal "av1" "hevc"
+    [ "$status" -eq 0 ]
+}
+
+@test "is_codec_better_or_equal: av1 >= av1" {
+    run is_codec_better_or_equal "av1" "av1"
+    [ "$status" -eq 0 ]
+}
+
+@test "is_codec_better_or_equal: hevc >= hevc" {
+    run is_codec_better_or_equal "hevc" "hevc"
+    [ "$status" -eq 0 ]
+}
+
+@test "is_codec_better_or_equal: hevc < av1 (false)" {
+    run is_codec_better_or_equal "hevc" "av1"
+    [ "$status" -ne 0 ]
+}
+
+@test "is_codec_better_or_equal: h264 < hevc (false)" {
+    run is_codec_better_or_equal "h264" "hevc"
+    [ "$status" -ne 0 ]
+}
+
+@test "is_codec_better_or_equal: h265 >= hevc (alias)" {
+    run is_codec_better_or_equal "h265" "hevc"
+    [ "$status" -eq 0 ]
+}
+
+###########################################################
 # Tests get_encoder_mode_params()
 ###########################################################
 

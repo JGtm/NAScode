@@ -23,41 +23,46 @@ should_skip_conversion() {
     local tolerance_bits=$((BITRATE_CONVERSION_THRESHOLD_KBPS * SKIP_TOLERANCE_PERCENT * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
     
-    # Détecter si le fichier est déjà encodé dans le codec cible
+    # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible
     local target_codec="${VIDEO_CODEC:-hevc}"
-    local is_target_codec=false
+    local is_better_or_equal_codec=false
     
-    # Utiliser is_codec_match si disponible (codec_profiles.sh chargé)
-    if declare -f is_codec_match &>/dev/null; then
-        if is_codec_match "$codec" "$target_codec"; then
-            is_target_codec=true
+    # Utiliser is_codec_better_or_equal si disponible (codec_profiles.sh chargé)
+    if declare -f is_codec_better_or_equal &>/dev/null; then
+        if is_codec_better_or_equal "$codec" "$target_codec"; then
+            is_better_or_equal_codec=true
         fi
     else
         # Fallback : vérification manuelle pour les codecs connus
-        case "$target_codec" in
-            hevc)
-                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && is_target_codec=true
-                ;;
+        # Rang : av1 > hevc > autres
+        case "$codec" in
             av1)
-                [[ "$codec" == "av1" ]] && is_target_codec=true
+                # AV1 est meilleur ou égal à tout
+                is_better_or_equal_codec=true
+                ;;
+            hevc|h265)
+                # HEVC est égal à HEVC, mais pas meilleur que AV1
+                [[ "$target_codec" == "hevc" ]] && is_better_or_equal_codec=true
                 ;;
         esac
     fi
     
-    # Skip si déjà dans le codec cible avec bitrate optimisé
-    if [[ "$is_target_codec" == true ]]; then
+    # Skip si déjà dans un codec meilleur/égal avec bitrate optimisé
+    if [[ "$is_better_or_equal_codec" == true ]]; then
         if [[ "$bitrate" =~ ^[0-9]+$ ]] && [[ "$bitrate" -le "$max_tolerated_bits" ]]; then
-            local codec_display="${target_codec^^}"
-            [[ "$target_codec" == "hevc" ]] && codec_display="x265"
+            # Affichage adapté au codec source
+            local codec_display="${codec^^}"
+            [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="x265"
             echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
             if [[ -n "$LOG_SKIPPED" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
             fi
             return 0
         fi
+        # Log si ré-encodage nécessaire malgré le bon codec (bitrate trop élevé)
         if [[ -n "$LOG_PROGRESS" ]]; then
-            local codec_display="${target_codec^^}"
-            [[ "$target_codec" == "hevc" ]] && codec_display="X265"
+            local codec_display="${codec^^}"
+            [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
             echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Ré-encodage ${codec_display}) | Bitrate trop élevé | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
         fi
     fi

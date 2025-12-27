@@ -29,6 +29,7 @@ _reset_cli_state() {
     NO_PROGRESS=false
     PARALLEL_JOBS=1
     CONVERSION_MODE="serie"
+    VIDEO_CODEC="hevc"
     SOURCE="/source"
     OUTPUT_DIR="/output"
     CUSTOM_QUEUE=""
@@ -68,6 +69,36 @@ _reset_cli_state() {
 
     parse_arguments --mode film
     [ "$CONVERSION_MODE" = "film" ]
+}
+
+@test "parse_arguments: -c/--codec affecte VIDEO_CODEC" {
+    _reset_cli_state
+
+    parse_arguments --codec av1
+    [ "$VIDEO_CODEC" = "av1" ]
+}
+
+@test "parse_arguments: -c avec valeur hevc" {
+    _reset_cli_state
+
+    parse_arguments -c hevc
+    [ "$VIDEO_CODEC" = "hevc" ]
+}
+
+@test "parse_arguments: --codec combinable avec --mode" {
+    _reset_cli_state
+
+    parse_arguments -m film -c av1
+    [ "$CONVERSION_MODE" = "film" ]
+    [ "$VIDEO_CODEC" = "av1" ]
+}
+
+@test "parse_arguments: codec invalide échoue" {
+    _reset_cli_state
+
+    run parse_arguments --codec xyz
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "invalide" ]] || [[ "$output" =~ "Invalid" ]]
 }
 
 @test "parse_arguments: active dry-run via -d" {
