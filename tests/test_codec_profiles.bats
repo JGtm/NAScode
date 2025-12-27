@@ -188,6 +188,11 @@ teardown() {
     [[ "$result" =~ "tune=0" ]]
 }
 
+@test "get_encoder_mode_params: libsvtav1 serie retourne enable-overlays=1" {
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ "$result" =~ "enable-overlays=1" ]]
+}
+
 @test "get_encoder_mode_params: libsvtav1 film retourne film-grain" {
     result=$(get_encoder_mode_params "libsvtav1" "film")
     [[ "$result" =~ "film-grain" ]]

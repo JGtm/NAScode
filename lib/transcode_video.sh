@@ -395,6 +395,29 @@ _setup_video_encoding_params() {
             ENCODER_BASE_PARAMS="$mode_params"
         fi
     fi
+
+    # SVT-AV1: inclure le keyint dans -svtav1-params (en plus du -g générique)
+    # pour coller à la commande type et garder un paramétrage centralisé.
+    if [[ "$encoder" == "libsvtav1" ]]; then
+        if [[ "$ENCODER_BASE_PARAMS" != *"keyint="* ]]; then
+            local mode_keyint=""
+            if declare -f get_mode_keyint &>/dev/null; then
+                mode_keyint=$(get_mode_keyint "${CONVERSION_MODE:-serie}")
+            else
+                case "${CONVERSION_MODE:-serie}" in
+                    film) mode_keyint="240" ;;
+                    *)    mode_keyint="600" ;;
+                esac
+            fi
+            if [[ -n "$mode_keyint" ]]; then
+                if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
+                    ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:keyint=${mode_keyint}"
+                else
+                    ENCODER_BASE_PARAMS="keyint=${mode_keyint}"
+                fi
+            fi
+        fi
+    fi
     
     # Rétro-compatibilité : garder X265_VBV_STRING pour les tests existants
     X265_VBV_STRING="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
@@ -605,7 +628,11 @@ _get_preset_option() {
         libsvtav1)
             # SVT-AV1 utilise -preset avec des valeurs numériques 0-13
             local svt_preset
-            if declare -f convert_preset &>/dev/null; then
+            if [[ -n "${SVTAV1_PRESET:-}" ]]; then
+                svt_preset="$SVTAV1_PRESET"
+            elif [[ -n "${SVTAV1_PRESET_DEFAULT:-}" ]]; then
+                svt_preset="$SVTAV1_PRESET_DEFAULT"
+            elif declare -f convert_preset &>/dev/null; then
                 svt_preset=$(convert_preset "$preset" "libsvtav1")
             else
                 svt_preset=5  # Équivalent à "medium"
@@ -635,8 +662,16 @@ _get_bitrate_option() {
                 ;;
             libsvtav1)
                 # SVT-AV1 utilise -crf aussi (0-63, défaut ~35)
-                # Mapping approximatif : CRF x265 21 ≈ CRF SVT-AV1 30
-                local svt_crf=$(( CRF_VALUE + 9 ))
+                # Valeur configurable (commande type: -crf 32)
+                local svt_crf=""
+                if [[ -n "${SVTAV1_CRF:-}" ]]; then
+                    svt_crf="$SVTAV1_CRF"
+                elif [[ -n "${SVTAV1_CRF_DEFAULT:-}" ]]; then
+                    svt_crf="$SVTAV1_CRF_DEFAULT"
+                else
+                    # Mapping approximatif : CRF x265 21 ≈ CRF SVT-AV1 30
+                    svt_crf=$(( CRF_VALUE + 9 ))
+                fi
                 [[ $svt_crf -gt 63 ]] && svt_crf=63
                 echo "-crf $svt_crf"
                 ;;

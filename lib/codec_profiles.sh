@@ -18,6 +18,15 @@
 VIDEO_CODEC="${VIDEO_CODEC:-hevc}"      # Codec cible : hevc, av1
 VIDEO_ENCODER=""                         # Encodeur (auto si vide)
 
+# ----- Réglages par défaut AV1 (SVT-AV1) -----
+# Ces valeurs ne sont pas "en dur" dans la commande FFmpeg : elles sont configurables
+# via variables (lib/config.sh ou export environnement) et utilisées lors de la
+# construction des options.
+SVTAV1_TUNE_DEFAULT="${SVTAV1_TUNE_DEFAULT:-0}"
+SVTAV1_ENABLE_OVERLAYS_DEFAULT="${SVTAV1_ENABLE_OVERLAYS_DEFAULT:-1}"
+SVTAV1_PRESET_DEFAULT="${SVTAV1_PRESET_DEFAULT:-8}"
+SVTAV1_CRF_DEFAULT="${SVTAV1_CRF_DEFAULT:-32}"
+
 ###########################################################
 # FONCTIONS D'ACCÈS AUX PROFILS
 ###########################################################
@@ -139,9 +148,9 @@ get_encoder_mode_params() {
         libsvtav1)
             case "$mode" in
                 # Séries : preset rapide, grain synthétique désactivé
-                serie) echo "tune=0" ;;
+                serie) echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}" ;;
                 # Films : qualité max, film grain preservation
-                film)  echo "tune=0:film-grain=8:film-grain-denoise=0" ;;
+                film)  echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}:film-grain=8:film-grain-denoise=0" ;;
                 *)     echo "" ;;
             esac
             ;;
