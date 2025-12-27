@@ -66,7 +66,7 @@ Ces opérations ne modifient pas directement le code mais gèrent l'historique G
 
 ## Principes de conception
 
-- Respecter l’architecture modulaire existante (`convert.sh` charge `lib/*.sh`).
+- Respecter l’architecture modulaire existante (`nascode` charge `lib/*.sh`).
 - Éviter les “gros” scripts monolithiques : préférer des helpers dédiés (ex: `_compute_*`, `_build_*`).
 - Garder les fonctions **petites** et **testables** (entrées/sorties claires).
 - Ne pas casser les interfaces existantes sans raison (noms de variables exportées, signatures de fonctions, logs).
@@ -77,23 +77,23 @@ Ces opérations ne modifient pas directement le code mais gèrent l'historique G
 ### Lancer une conversion
 
 ```bash
-bash convert.sh [options]
+bash nascode [options]
 ```
 
 Exemples courants :
 
 ```bash
 # Simulation (ne transcode pas)
-bash convert.sh -d -s "/chemin/source"
+bash nascode -d -s "/chemin/source"
 
 # Mode série (défaut)
-bash convert.sh -s "/chemin/vers/series"
+bash nascode -s "/chemin/vers/series"
 
 # Mode film + VMAF
-bash convert.sh -m film -v -s "/chemin/vers/films"
+bash nascode -m film -v -s "/chemin/vers/films"
 
 # Test rapide (30s)
-bash convert.sh -t -r -l 5
+bash nascode -t -r -l 5
 ```
 
 ### Lancer les tests
@@ -114,7 +114,7 @@ Sur Git Bash / Windows, `run_tests.sh` essaie aussi `${HOME}/.local/bin/bats` si
 
 ## Dossiers et fichiers clés
 
-- `convert.sh` : point d’entrée, charge les modules `lib/`.
+- `nascode` : point d’entrée, charge les modules `lib/`.
 - `lib/config.sh` : configuration globale, paramètres par mode (`serie` / `film`).
 - `lib/transcode_video.sh` : logique vidéo (pix_fmt, downscale 1080p, suffixe effectif, adaptation bitrate 720p).
 - `lib/conversion.sh` : orchestration FFmpeg (construction des commandes, passes, etc.).
@@ -129,7 +129,7 @@ Sur Git Bash / Windows, `run_tests.sh` essaie aussi `${HOME}/.local/bin/bats` si
 - Lockfile : `/tmp/conversion_video.lock`
 - Stop flag : `/tmp/conversion_stop_flag`
 
-En cas de blocage après un crash (si aucun `convert.sh` ne tourne) :
+En cas de blocage après un crash (si aucun `nascode` ne tourne) :
 
 ```bash
 rm -f /tmp/conversion_video.lock /tmp/conversion_stop_flag
@@ -137,7 +137,7 @@ rm -f /tmp/conversion_video.lock /tmp/conversion_stop_flag
 
 ### Windows (Git Bash / WSL)
 
-- Chemins : éviter les chemins relatifs ambiguës ; `convert.sh` convertit `SOURCE` en chemin absolu.
+- Chemins : éviter les chemins relatifs ambiguës ; `nascode` convertit `SOURCE` en chemin absolu.
 - Outils : `ffmpeg`, `ffprobe`, `awk`, `stat` doivent être disponibles.
 
 ## Conventions de code (Bash)

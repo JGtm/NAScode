@@ -32,7 +32,7 @@ teardown() {
 @test "dry-run: exécution complète OK, queue/logs créés, exclusions respectées" {
         run bash -lc 'set -euo pipefail;
             cd "$WORKDIR";
-            printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+            printf "n\n" | bash "$PROJECT_ROOT/nascode" \
                 -s "$SRC_DIR" -o "$OUT_DIR" \
                 --dry-run --keep-index --no-suffix --no-progress \
                 --exclude "\\.part$" \

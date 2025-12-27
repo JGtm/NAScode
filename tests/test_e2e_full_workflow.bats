@@ -56,7 +56,7 @@ teardown() {
     # Note: single-pass (CRF) est le mode par défaut pour les séries, pas besoin d'option
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -89,7 +89,7 @@ teardown() {
 @test "E2E single-pass: log de succès créé après conversion" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -114,7 +114,7 @@ teardown() {
 @test "E2E single-pass: checksum vérifié (intégrité source)" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -142,7 +142,7 @@ teardown() {
 @test "E2E two-pass: fichier H.264 converti en HEVC avec succès" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --keep-index \
             --no-suffix \
@@ -174,7 +174,7 @@ teardown() {
 @test "E2E two-pass: fichiers temporaires nettoyés après conversion" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --keep-index \
             --no-suffix \
@@ -218,7 +218,7 @@ teardown() {
     
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --opus \
@@ -247,7 +247,7 @@ teardown() {
     
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -285,7 +285,7 @@ teardown() {
     
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -316,7 +316,7 @@ teardown() {
     
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -356,7 +356,7 @@ teardown() {
 @test "E2E résumé: summary affiché en fin de traitement" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -374,7 +374,7 @@ teardown() {
 @test "E2E résumé: fichier Summary.log créé" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -398,7 +398,7 @@ teardown() {
 @test "E2E métadonnées: durée préservée après conversion" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -429,7 +429,7 @@ teardown() {
 @test "E2E métadonnées: résolution préservée (pas de downscale sur 320x240)" {
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -465,7 +465,7 @@ teardown() {
     
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \

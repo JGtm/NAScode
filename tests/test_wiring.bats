@@ -12,7 +12,7 @@ setup() {
     # Réplique l'environnement minimal attendu par config.sh
     export SCRIPT_DIR="$PROJECT_ROOT"
 
-    # Charger les modules dans un ordre proche de convert.sh
+    # Charger les modules dans un ordre proche de nascode
     source "$LIB_DIR/ui.sh"
     source "$LIB_DIR/config.sh"
     source "$LIB_DIR/utils.sh"

@@ -57,7 +57,7 @@ ffmpeg -hide_banner -filters | grep libvmaf
 ```bash
 git clone <repo_url> Conversion
 cd Conversion
-chmod +x convert.sh
+chmod +x nascode
 ```
 
 ## 🧪 Tests
@@ -90,7 +90,7 @@ git config commit.template .gitmessage.txt
 ## 📖 Usage
 
 ```bash
-bash convert.sh [options]
+bash nascode [options]
 ```
 
 ### Options principales
@@ -121,34 +121,34 @@ bash convert.sh [options]
 
 ```bash
 # Conversion standard d'un dossier de séries
-bash convert.sh -s "/chemin/vers/series"
+bash nascode -s "/chemin/vers/series"
 
 # Convertir un fichier spécifique
-bash convert.sh -f "/chemin/vers/video.mkv"
+bash nascode -f "/chemin/vers/video.mkv"
 
 # Mode film avec évaluation VMAF
-bash convert.sh -m film -v -s "/chemin/vers/films"
+bash nascode -m film -v -s "/chemin/vers/films"
 
 # Test rapide sur 5 fichiers aléatoires (30s chacun)
-bash convert.sh -t -v -r -l 5
+bash nascode -t -v -r -l 5
 
 # Heures creuses (plage par défaut 22:00-06:00)
-bash convert.sh -p -s "/chemin/vers/series"
+bash nascode -p -s "/chemin/vers/series"
 
 # Heures creuses avec plage personnalisée
-bash convert.sh --off-peak=23:00-07:00 -s "/chemin/vers/series"
+bash nascode --off-peak=23:00-07:00 -s "/chemin/vers/series"
 
 # Conversion AV1 (codec moderne, meilleur ratio qualité/taille)
-bash convert.sh -c av1 -s "/chemin/vers/videos"
+bash nascode -c av1 -s "/chemin/vers/videos"
 
 # Mode film en AV1 avec VMAF
-bash convert.sh -m film -c av1 -v -s "/chemin/vers/films"
+bash nascode -m film -c av1 -v -s "/chemin/vers/films"
 
 # Simulation pour vérifier la configuration
-bash convert.sh -d -s "/chemin/source"
+bash nascode -d -s "/chemin/source"
 
 # Conversion avec limite et index conservé
-bash convert.sh -l 10 -k
+bash nascode -l 10 -k
 ```
 
 ## ⚙️ Configuration
@@ -203,7 +203,7 @@ Quand `-p/--off-peak` est activé :
 
 ```
 Conversion/
-├── convert.sh          # Script principal
+├── nascode            # Script principal
 ├── lib/
 │   ├── args.sh              # Parsing des arguments
 │   ├── audio_params.sh      # Paramètres audio
@@ -259,7 +259,7 @@ Le score VMAF (Video Multi-Method Assessment Fusion) évalue la qualité percept
 
 ```bash
 # Activer VMAF avec mode test
-bash convert.sh -v -t
+bash nascode -v -t
 ```
 
 ## 🛠️ Dépannage
@@ -281,7 +281,7 @@ Consultez `logs/Skipped_*.log` - le fichier est probablement déjà en x265 avec
 ### Erreurs d'encodage
 1. Vérifiez `logs/Error_*.log`
 2. Vérifiez l'espace disque dans `/tmp`
-3. Testez avec un seul fichier : `bash convert.sh -l 1`
+3. Testez avec un seul fichier : `bash nascode -l 1`
 
 ### Caractères spéciaux dans les noms
 Le script gère les espaces et caractères spéciaux, mais évitez les caractères de contrôle.

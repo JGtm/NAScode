@@ -53,7 +53,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -99,7 +99,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -123,7 +123,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -155,7 +155,7 @@ teardown() {
         set -euo pipefail
         cd "$WORKDIR"
         export HWACCEL=""
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -185,7 +185,7 @@ teardown() {
         set -euo pipefail
         cd "$WORKDIR"
         export HWACCEL="none"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -228,7 +228,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -270,7 +270,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -309,7 +309,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -344,7 +344,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
@@ -375,7 +375,7 @@ teardown() {
     run bash -lc '
         set -euo pipefail
         cd "$WORKDIR"
-        printf "n\n" | bash "$PROJECT_ROOT/convert.sh" \
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \

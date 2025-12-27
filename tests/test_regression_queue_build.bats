@@ -28,7 +28,7 @@ teardown() {
 @test "--limit: le run ne traite que N éléments" {
         run bash -lc 'set -euo pipefail;
             cd "$WORKDIR";
-            printf "n\n" | bash "$PROJECT_ROOT/convert.sh" -s "$SRC_DIR" -o "$OUT_DIR" -d -k -x -n -l 1
+            printf "n\n" | bash "$PROJECT_ROOT/nascode" -s "$SRC_DIR" -o "$OUT_DIR" -d -k -x -n -l 1
         '
     [ "$status" -eq 0 ]
 
