@@ -59,6 +59,11 @@ cleanup() {
     # Envoyer SIGTERM aux jobs en arrière-plan
     kill $(jobs -p) 2>/dev/null || true
     
+    # Tuer tous les processus enfants du process group (inclut les sous-processus
+    # lancés par des pipes/subshells qui échappent à jobs -p)
+    # Le - devant $$ cible tout le process group
+    kill -- -$$ 2>/dev/null || true
+    
     # Attendre que tous les processus enfants se terminent proprement
     # Cela évite que leurs messages s'affichent après le retour au prompt
     wait 2>/dev/null || true
