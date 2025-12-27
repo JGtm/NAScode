@@ -81,9 +81,22 @@ parse_arguments() {
                     exit 1
                 fi
                 ;;
-            --opus)
-                OPUS_ENABLED=true
-                shift
+            -a|--audio)
+                if [[ -n "${2:-}" ]]; then
+                    case "$2" in
+                        copy|aac|ac3|opus)
+                            AUDIO_CODEC="$2"
+                            ;;
+                        *)
+                            print_error "Codec audio invalide : '$2'. Valeurs acceptées : copy, aac, ac3, opus"
+                            exit 1
+                            ;;
+                    esac
+                    shift 2
+                else
+                    print_error "-a/--audio doit être suivi d'un nom de codec (copy, aac, ac3, opus)"
+                    exit 1
+                fi
                 ;;
             -2|--two-pass)
                 SINGLE_PASS_MODE=false
@@ -209,7 +222,7 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-v, --vmaf${NOCOLOR}                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
     ${GREEN}-t, --sample${NOCOLOR}                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
     ${GREEN}-f, --file${NOCOLOR} FILE              Convertir un fichier unique (bypass index/queue) (ARG)
-    ${GREEN}--opus${NOCOLOR}                       Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround)
+    ${GREEN}-a, --audio${NOCOLOR} CODEC           Codec audio : copy, aac, ac3, opus (ARG) [défaut : copy]
     ${GREEN}-2, --two-pass${NOCOLOR}               Forcer le mode two-pass (défaut : single-pass CRF 23 pour séries)
     ${GREEN}-c, --codec${NOCOLOR} CODEC            Codec vidéo cible : hevc, av1 (ARG) [défaut : hevc]
     ${GREEN}-p, --off-peak${NOCOLOR} [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses

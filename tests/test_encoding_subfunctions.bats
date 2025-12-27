@@ -148,7 +148,7 @@ teardown() {
 ###########################################################
 
 @test "_build_audio_params: retourne copy par défaut" {
-    OPUS_ENABLED=false
+    AUDIO_CODEC="copy"
     
     local result
     result=$(_build_audio_params "/fake/file.mkv")
@@ -234,7 +234,7 @@ teardown() {
 
 @test "_build_effective_suffix_for_dims: utilise src_width/src_height" {
     # Les variables readonly sont définies par config.sh
-    OPUS_ENABLED=false
+    AUDIO_CODEC="copy"
     SAMPLE_MODE=false
     
     local result
@@ -249,7 +249,7 @@ teardown() {
     # TARGET_BITRATE_KBPS=2070, ADAPTIVE_720P_SCALE_PERCENT=70
     # Forcer two-pass pour tester le bitrate adapté
     SINGLE_PASS_MODE=false
-    OPUS_ENABLED=false
+    AUDIO_CODEC="copy"
     SAMPLE_MODE=false
     
     local result

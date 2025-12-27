@@ -23,7 +23,7 @@ export_variables() {
     export -f _run_ffmpeg_encode _execute_conversion
     
     # --- Fonctions audio et sous-titres ---
-    export -f _get_audio_conversion_info _build_audio_params _build_stream_mapping
+    export -f _get_audio_target_bitrate _get_audio_conversion_info _build_audio_params _build_stream_mapping
     
     # ========================================================
     # FONCTIONS DE PRÉPARATION ET FINALISATION
@@ -81,8 +81,10 @@ export_variables() {
     export ADAPTIVE_BITRATE_BY_RESOLUTION ADAPTIVE_720P_MAX_HEIGHT ADAPTIVE_720P_SCALE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
     
-    # --- Variables audio Opus ---
-    export OPUS_ENABLED OPUS_TARGET_BITRATE_KBPS OPUS_CONVERSION_THRESHOLD_KBPS
+    # --- Variables audio ---
+    export AUDIO_CODEC AUDIO_BITRATE_KBPS
+    export AUDIO_BITRATE_AAC_DEFAULT AUDIO_BITRATE_AC3_DEFAULT AUDIO_BITRATE_OPUS_DEFAULT
+    export AUDIO_CONVERSION_THRESHOLD_KBPS
     
     # ========================================================
     # VARIABLES DE CHEMINS

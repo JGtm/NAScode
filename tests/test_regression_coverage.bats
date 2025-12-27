@@ -165,11 +165,11 @@ STUB
 }
 
 ###########################################################
-# SECTION 3: AUDIO OPUS COPY VS CONVERT (DÉCISIONNEL)
+# SECTION 3: AUDIO CODEC COPY VS CONVERT (DÉCISIONNEL)
 ###########################################################
 
-@test "OPUS: _get_audio_conversion_info retourne copy si Opus désactivé" {
-    OPUS_ENABLED=false
+@test "AUDIO: _get_audio_conversion_info retourne copy si AUDIO_CODEC=copy" {
+    AUDIO_CODEC="copy"
     
     local result
     result=$(_get_audio_conversion_info "/fake/file.mkv")
@@ -180,40 +180,14 @@ STUB
     [ "$should_convert" -eq 0 ]
 }
 
-@test "OPUS: audio déjà en Opus n'est pas reconverti (stub)" {
-    # Créer un stub ffprobe qui simule un fichier avec audio Opus
+@test "AUDIO: audio déjà en AAC n'est pas reconverti si cible AAC (stub)" {
+    # Créer un stub ffprobe qui simule un fichier avec audio AAC
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
-# Simuler audio Opus à 128kbps
-echo "codec_name=opus"
-echo "bit_rate=128000"
-exit 0
-STUB
-    chmod +x "$stub_dir/ffprobe"
-    
-    PATH="$stub_dir:$PATH"
-    OPUS_ENABLED=true
-    
-    local result
-    result=$(_get_audio_conversion_info "/fake/opus_audio.mkv")
-    
-    # should_convert doit être 0 (déjà Opus)
-    local should_convert
-    should_convert=$(echo "$result" | cut -d'|' -f3)
-    [ "$should_convert" -eq 0 ]
-}
-
-@test "OPUS: audio AAC haut bitrate déclenche conversion (stub)" {
-    # Créer un stub ffprobe qui simule un fichier avec audio AAC haut bitrate
-    local stub_dir="$TEST_TEMP_DIR/stub"
-    mkdir -p "$stub_dir"
-    
-    cat > "$stub_dir/ffprobe" << 'STUB'
-#!/bin/bash
-# Simuler audio AAC à 256kbps (> seuil 160 par défaut)
+# Simuler audio AAC à 256kbps
 echo "codec_name=aac"
 echo "bit_rate=256000"
 exit 0
@@ -221,19 +195,44 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     
     PATH="$stub_dir:$PATH"
-    OPUS_ENABLED=true
-    # OPUS_CONVERSION_THRESHOLD_KBPS est readonly à 160, on utilise la valeur par défaut
+    AUDIO_CODEC="aac"
     
     local result
     result=$(_get_audio_conversion_info "/fake/aac_audio.mkv")
     
-    # should_convert doit être 1 (AAC 256k > seuil 160k)
+    # should_convert doit être 0 (déjà AAC)
+    local should_convert
+    should_convert=$(echo "$result" | cut -d'|' -f3)
+    [ "$should_convert" -eq 0 ]
+}
+
+@test "AUDIO: audio E-AC3 haut bitrate déclenche conversion vers AAC (stub)" {
+    # Créer un stub ffprobe qui simule un fichier avec audio E-AC3 haut bitrate
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+# Simuler audio E-AC3 à 768kbps (> seuil 160 par défaut)
+echo "codec_name=eac3"
+echo "bit_rate=768000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    
+    PATH="$stub_dir:$PATH"
+    AUDIO_CODEC="aac"
+    
+    local result
+    result=$(_get_audio_conversion_info "/fake/eac3_audio.mkv")
+    
+    # should_convert doit être 1 (E-AC3 768k > seuil 160k et codec différent)
     local should_convert
     should_convert=$(echo "$result" | cut -d'|' -f3)
     [ "$should_convert" -eq 1 ]
 }
 
-@test "OPUS: audio AAC bas bitrate ne déclenche pas conversion (stub)" {
+@test "AUDIO: audio AAC bas bitrate ne déclenche pas conversion (stub)" {
     # Créer un stub ffprobe qui simule un fichier avec audio AAC bas bitrate
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
@@ -248,8 +247,8 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     
     PATH="$stub_dir:$PATH"
-    OPUS_ENABLED=true
-    # OPUS_CONVERSION_THRESHOLD_KBPS est readonly à 160, on utilise la valeur par défaut
+    AUDIO_CODEC="opus"
+    # AUDIO_CONVERSION_THRESHOLD_KBPS est readonly à 160, on utilise la valeur par défaut
     
     local result
     result=$(_get_audio_conversion_info "/fake/aac_low.mkv")
@@ -260,8 +259,8 @@ STUB
     [ "$should_convert" -eq 0 ]
 }
 
-@test "OPUS: _build_audio_params retourne copy si conversion non nécessaire" {
-    OPUS_ENABLED=false
+@test "AUDIO: _build_audio_params retourne copy si AUDIO_CODEC=copy" {
+    AUDIO_CODEC="copy"
     
     local result
     result=$(_build_audio_params "/fake/file.mkv")
@@ -269,29 +268,29 @@ STUB
     [[ "$result" == "-c:a copy" ]]
 }
 
-@test "OPUS: _build_audio_params retourne libopus si conversion nécessaire (stub)" {
-    # Créer un stub ffprobe qui simule audio AAC haut bitrate
+@test "AUDIO: _build_audio_params retourne aac si conversion vers AAC (stub)" {
+    # Créer un stub ffprobe qui simule audio E-AC3 haut bitrate
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
-echo "codec_name=aac"
-echo "bit_rate=320000"
+echo "codec_name=eac3"
+echo "bit_rate=768000"
 exit 0
 STUB
     chmod +x "$stub_dir/ffprobe"
     
     PATH="$stub_dir:$PATH"
-    OPUS_ENABLED=true
-    # OPUS_TARGET_BITRATE_KBPS est readonly à 128, on utilise la valeur par défaut
+    AUDIO_CODEC="aac"
+    AUDIO_BITRATE_KBPS=0
     
     local result
-    result=$(_build_audio_params "/fake/high_aac.mkv")
+    result=$(_build_audio_params "/fake/high_eac3.mkv")
     
-    # Doit contenir libopus et le bitrate cible (128k par défaut)
-    [[ "$result" =~ "libopus" ]]
-    [[ "$result" =~ "128k" ]]
+    # Doit contenir aac et le bitrate cible (160k par défaut)
+    [[ "$result" =~ "aac" ]]
+    [[ "$result" =~ "160k" ]] || [[ "$result" =~ "${AUDIO_BITRATE_AAC_DEFAULT}k" ]]
 }
 
 ###########################################################

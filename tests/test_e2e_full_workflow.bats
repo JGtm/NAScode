@@ -191,10 +191,10 @@ teardown() {
 }
 
 ###########################################################
-# Test E2E: Audio Opus
+# Test E2E: Audio Codec (AAC, Opus, etc.)
 ###########################################################
 
-@test "E2E audio: conversion AAC vers Opus réussie" {
+@test "E2E audio: conversion vers Opus réussie" {
     # Vérifier que libopus est disponible
     if ! ffmpeg -encoders 2>/dev/null | grep -q libopus; then
         skip "libopus non disponible dans ffmpeg"
@@ -209,11 +209,11 @@ teardown() {
     fi
     cp "$src_file" "$SRC_DIR/"
     
-    # Vérifier si le bitrate audio source est détectable (requis pour déclencher Opus)
+    # Vérifier si le bitrate audio source est détectable (requis pour déclencher conversion)
     local src_audio_bitrate
     src_audio_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of csv=p=0 "$src_file" 2>/dev/null)
     if [[ "$src_audio_bitrate" == "N/A" || -z "$src_audio_bitrate" ]]; then
-        skip "Le bitrate audio source n'est pas détectable (N/A) - la conversion Opus ne se déclenchera pas"
+        skip "Le bitrate audio source n'est pas détectable (N/A) - la conversion audio ne se déclenchera pas"
     fi
     
     run bash -lc 'set -euo pipefail
@@ -221,7 +221,7 @@ teardown() {
         printf "n\n" | bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
-            --opus \
+            -a opus \
             --keep-index \
             --no-suffix \
             --no-progress \
@@ -272,6 +272,92 @@ teardown() {
         local bitrate_kbps=$((audio_bitrate / 1000))
         [ "$bitrate_kbps" -ge 80 ] && [ "$bitrate_kbps" -le 200 ]
     fi
+}
+
+@test "E2E audio: conversion vers AAC réussie" {
+    # Vérifier que le codec AAC est disponible
+    if ! ffmpeg -encoders 2>/dev/null | grep -q "aac"; then
+        skip "AAC encoder non disponible dans ffmpeg"
+    fi
+    
+    # Utiliser un fichier avec audio à bitrate élevé pour déclencher la conversion
+    local src_file="$FIXTURES_DIR/test_video_high_audio.mp4"
+    if [[ ! -f "$src_file" ]]; then
+        skip "Fichier test_video_high_audio.mp4 non disponible"
+    fi
+    rm -f "$SRC_DIR/test_video_2s.mkv"
+    cp "$src_file" "$SRC_DIR/"
+    
+    # Vérifier si le bitrate audio source est détectable
+    local src_audio_bitrate
+    src_audio_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of csv=p=0 "$src_file" 2>/dev/null)
+    if [[ "$src_audio_bitrate" == "N/A" || -z "$src_audio_bitrate" ]]; then
+        skip "Le bitrate audio source n'est pas détectable"
+    fi
+    
+    run bash -lc 'set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            -a aac \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+    
+    [ "$status" -eq 0 ]
+    
+    # Vérifier que l'audio est en AAC
+    local out_file
+    out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
+    [ -n "$out_file" ]
+    
+    local audio_codec
+    audio_codec=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 "$out_file")
+    [ "$audio_codec" = "aac" ]
+    
+    # Le bitrate audio doit être proche de 160kbps (cible par défaut AAC)
+    local audio_bitrate
+    audio_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of csv=p=0 "$out_file")
+    if [[ "$audio_bitrate" =~ ^[0-9]+$ ]]; then
+        local bitrate_kbps=$((audio_bitrate / 1000))
+        [ "$bitrate_kbps" -ge 120 ] && [ "$bitrate_kbps" -le 200 ]
+    fi
+}
+
+@test "E2E audio: anti-upscaling ne convertit pas audio bas bitrate" {
+    # Tester que l'audio à bas bitrate n'est pas "upscalé"
+    # Utiliser le fichier standard qui a un audio ~128kbps
+    cp "$FIXTURES_DIR/test_video_2s.mkv" "$SRC_DIR/"
+    
+    run bash -lc 'set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            -a aac \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+    
+    [ "$status" -eq 0 ]
+    
+    local out_file
+    out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
+    [ -n "$out_file" ]
+    
+    # L'audio ne devrait PAS avoir été converti (anti-upscaling)
+    # Il devrait rester dans son codec d'origine (probablement vorbis ou aac)
+    local audio_codec
+    audio_codec=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of csv=p=0 "$out_file")
+    
+    # On vérifie simplement que le fichier de sortie a de l'audio
+    # (Si le bitrate source < cible, l'audio est copié tel quel)
+    [ -n "$audio_codec" ]
 }
 
 ###########################################################

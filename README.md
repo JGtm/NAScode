@@ -28,7 +28,7 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 - **File d'attente intelligente** avec index persistant
 - **Modes de tri** : par taille (asc/desc) ou par nom (asc/desc)
 - **Skip automatique** : fichiers déjà en x265 avec bitrate optimisé
-- **Suffixe dynamique** reflétant les paramètres : `_x265_2070k_medium_tuned`
+- **Suffixe dynamique** reflétant les paramètres : `_x265_crf23_1080p_medium`
 - **Transfert vérifié** avec checksum SHA256
 
 ### Évaluation qualité
@@ -37,8 +37,13 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 - Analyse VMAF en batch à la fin des conversions
 
 ### Audio
-- Copie de l'audio source (`-c:a copy`)
-- *[Préparé]* Conversion Opus 128 kbps (désactivé, en attente support VLC)
+- **Multi-codec** : choix du codec audio via `-a/--audio`
+  - `copy` (défaut) : copie l'audio source sans modification
+  - `aac` : AAC 160 kbps (excellent pour séries)
+  - `ac3` : Dolby Digital 384 kbps
+  - `opus` : Opus 128 kbps (très efficace)
+- **Anti-upscaling intelligent** : ne convertit que si le gain est réel (>20%)
+- Suffixe audio dans le nom de fichier (`_aac`, `_opus`, etc.)
 
 ## 📋 Prérequis
 
@@ -103,10 +108,10 @@ bash nascode [options]
 | `-f, --file FILE` | Convertir un fichier unique (bypass index/queue) |
 | `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
 | `-c, --codec CODEC` | Codec vidéo : `hevc` (défaut) ou `av1` |
-| `-d, --dry-run` | Simulation sans encodage (alias : `--dryrun`) |
-| `-t, --sample` | Mode sample : encode ~30s pour test rapide (alias : `--test`) |
+| `-a, --audio CODEC` | Codec audio : `copy` (défaut), `aac`, `ac3`, `opus` |
+| `-d, --dry-run` | Simulation sans encodage |
+| `-t, --sample` | Mode sample : encode ~30s pour test rapide |
 | `-v, --vmaf` | Activer l'évaluation VMAF |
-| `--opus` | Convertir l'audio en Opus 128kbps (expérimental, problèmes VLC surround) |
 | `-2, --two-pass` | Forcer le mode two-pass (défaut : single-pass CRF pour séries) |
 | `-l, --limit N` | Limiter à N fichiers |
 | `-r, --random` | Sélection aléatoire des fichiers |
@@ -116,7 +121,7 @@ bash nascode [options]
 | `-e, --exclude PATTERN` | Exclure des fichiers (glob) |
 | `-q, --queue FILE` | Utiliser une file d'attente personnalisée |
 | `-p, --off-peak [HH:MM-HH:MM]` | Mode heures creuses (défaut : `22:00-06:00`) |
-| `-h, --help` | Afficher l'aide |
+| `-h, --help` | Afficher l'aide colorée |
 
 ### Exemples
 
@@ -145,6 +150,9 @@ bash nascode -c av1 -s "/chemin/vers/videos"
 # Mode film en AV1 avec VMAF
 bash nascode -m film -c av1 -v -s "/chemin/vers/films"
 
+# Conversion audio vers AAC (réduit la taille si source E-AC3/DTS)
+bash nascode -a aac -s "/chemin/vers/series"
+
 # Simulation pour vérifier la configuration
 bash nascode -d -s "/chemin/source"
 
@@ -163,9 +171,20 @@ bash nascode -l 10 -k
 | Preset | medium | medium |
 | Keyint (GOP) | 600 (~25s) | 240 (~10s) |
 | Tune fastdecode | Oui | Non |
-| Optimisations x265 | Oui (tuned) | Non (qualité max) |
+| Optimisations x265 | Oui | Non (qualité max) |
 | Pass 1 rapide | Oui | Non |
 | Mode par défaut | Single-pass CRF | Two-pass forcé |
+
+### Codecs audio
+
+| Codec | Bitrate | Usage recommandé |
+|-------|---------|------------------|
+| `copy` | - | Défaut, conserve l'original |
+| `aac` | 160 kbps | Séries (excellent compromis) |
+| `ac3` | 384 kbps | Compatibilité lecteurs anciens |
+| `opus` | 128 kbps | Maximum d'efficacité |
+
+> **Logique anti-upscaling** : la conversion audio n'est déclenchée que si le bitrate source dépasse la cible de +20% minimum. Cela évite de "gonfler" un audio déjà compressé.
 
 ### Variables modifiables (`lib/config.sh`)
 
@@ -308,12 +327,22 @@ Le script gère les espaces et caractères spéciaux, mais évitez les caractèr
 
 ## 📝 Changelog récent
 
+### v2.4 (Décembre 2025)
+- ✅ **Audio multi-codec** : option `-a/--audio` pour choisir AAC, AC3, Opus ou copy
+- ✅ **Logique anti-upscaling** : ne convertit l'audio que si gain réel (>20%)
+- ✅ Bitrates optimisés : AAC 160k, AC3 384k, Opus 128k
+- ✅ Suffixe audio dans le nom de fichier (`_aac`, `_opus`, etc.)
+- ✅ Refactoring audio : nouveau module `audio_params.sh` dédié
+- ✅ Aide colorée avec options mises en évidence
+- ✅ Affichage codec vidéo dans les paramètres actifs
+
 ### v2.3 (Décembre 2025)
-- ✅ **Support multi-codec** : option `-c/--codec` pour choisir HEVC ou AV1
+- ✅ **Support multi-codec vidéo** : option `-c/--codec` pour choisir HEVC ou AV1
 - ✅ Nouveau module `codec_profiles.sh` pour configuration modulaire des encodeurs
 - ✅ Support libsvtav1 et libaom-av1 pour AV1
 - ✅ Suffixe dynamique par codec (`_x265_`, `_av1_`)
 - ✅ Skip automatique adapté au codec cible
+- ✅ Validation encodeur FFmpeg avant conversion
 
 ### v2.2 (Décembre 2025)
 - ✅ Option `-f/--file` pour convertir un fichier unique (bypass index/queue)

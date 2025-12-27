@@ -195,14 +195,14 @@ teardown() {
 }
 
 ###########################################################
-# Tests des paramètres audio (préparation pour réactivation)
+# Tests des paramètres audio
 ###########################################################
 
-@test "config: OPUS_TARGET_BITRATE_KBPS défini et valide" {
-    # OPUS_TARGET_BITRATE_KBPS est readonly et déjà chargé par load_base_modules
-    [ -n "$OPUS_TARGET_BITRATE_KBPS" ]
-    [ "$OPUS_TARGET_BITRATE_KBPS" -gt 0 ]
-    [ "$OPUS_TARGET_BITRATE_KBPS" -lt 512 ]  # Plage raisonnable pour Opus
+@test "config: AUDIO_BITRATE_AAC_DEFAULT défini et valide" {
+    # AUDIO_BITRATE_AAC_DEFAULT est readonly et déjà chargé par load_base_modules
+    [ -n "$AUDIO_BITRATE_AAC_DEFAULT" ]
+    [ "$AUDIO_BITRATE_AAC_DEFAULT" -gt 0 ]
+    [ "$AUDIO_BITRATE_AAC_DEFAULT" -le 512 ]  # Plage raisonnable pour AAC
 }
 
 ###########################################################

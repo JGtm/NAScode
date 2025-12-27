@@ -22,8 +22,16 @@ PARALLEL_JOBS=1
 NO_PROGRESS=false
 CONVERSION_MODE="serie"
 VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
-OPUS_ENABLED=false  # Conversion audio Opus (expérimental, problèmes VLC)
 SINGLE_FILE=""       # Chemin vers un fichier unique à convertir (bypass index/queue)
+
+# ----- Codec audio -----
+# Options : copy (défaut), aac, ac3, opus
+# - copy : garde l'audio original (pas de réencodage)
+# - aac  : AAC, très compatible, bon compromis qualité/taille
+# - ac3  : Dolby Digital, compatible TV/receivers
+# - opus : Meilleure compression, moins compatible
+AUDIO_CODEC="copy"
+AUDIO_BITRATE_KBPS=0  # 0 = utiliser le défaut selon le codec
 
 # ----- Codec vidéo -----
 # Codec cible pour l'encodage (hevc, av1)
@@ -118,11 +126,16 @@ readonly ADAPTIVE_720P_MAX_HEIGHT=720
 # Exemple : 70 => 2070k (1080p) devient ~1449k (720p)
 readonly ADAPTIVE_720P_SCALE_PERCENT=70
 
-# ----- Paramètres audio Opus (expérimental) -----
-# Note : la conversion Opus peut causer des problèmes avec VLC pour le surround.
-# Utiliser --opus pour activer cette fonctionnalité.
-readonly OPUS_TARGET_BITRATE_KBPS=128
-readonly OPUS_CONVERSION_THRESHOLD_KBPS=160
+# ----- Paramètres audio par codec -----
+# Bitrates par défaut (kbps) pour chaque codec audio
+# Ces valeurs sont utilisées si AUDIO_BITRATE_KBPS=0 (auto)
+readonly AUDIO_BITRATE_AAC_DEFAULT=160      # AAC : 160k pour 5.1 (transparent pour séries)
+readonly AUDIO_BITRATE_AC3_DEFAULT=384      # AC3 : 384k minimum correct pour 5.1
+readonly AUDIO_BITRATE_OPUS_DEFAULT=128     # Opus : 128k excellent (plus efficace)
+
+# Seuil de conversion : ne convertir l'audio que si le bitrate source dépasse ce seuil
+# Cela évite de "gonfler" un audio déjà compressé à bas débit
+readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
 
 ###########################################################
 # GESTION DES MODES DE CONVERSION
@@ -262,24 +275,12 @@ build_dynamic_suffix() {
     # Preset d'encodage
     suffix="${suffix}_${ENCODER_PRESET}"
     
-    # Indicateur si paramètres encodeur spéciaux (tuned)
-    # Vérifie X265_EXTRA_PARAMS pour rétro-compatibilité, ou les params du mode
-    local has_extra_params=false
-    if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
-        has_extra_params=true
-    elif declare -f get_encoder_mode_params &>/dev/null; then
-        local mode_params
-        mode_params=$(get_encoder_mode_params "$VIDEO_ENCODER" "$CONVERSION_MODE")
-        [[ -n "$mode_params" ]] && has_extra_params=true
-    fi
-    if [[ "$has_extra_params" == true ]]; then
-        suffix="${suffix}_tuned"
-    fi
-    
-    # Indicateur conversion audio Opus
-    if [[ "${OPUS_ENABLED:-false}" == true ]]; then
-        suffix="${suffix}_opus"
-    fi
+    # Indicateur du codec audio (si différent de copy)
+    case "${AUDIO_CODEC:-copy}" in
+        aac)  suffix="${suffix}_aac" ;;
+        ac3)  suffix="${suffix}_ac3" ;;
+        opus) suffix="${suffix}_opus" ;;
+    esac
     
     # Indicateur mode sample (segment de test)
     if [[ "$SAMPLE_MODE" == true ]]; then

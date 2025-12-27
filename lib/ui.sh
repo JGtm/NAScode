@@ -297,24 +297,24 @@ print_summary_item() {
     local label="$1"
     local value="$2"
     local color="${3:-$WHITE}"
-    # Largeur intérieure totale = 43 caractères
-    # Compenser les caractères multi-bytes (é, è, →, etc. = 2-3 bytes mais 1 colonne)
-    local byte_len char_len extra label_width content
-    local val_byte_len val_char_len val_extra val_width
+    # Largeur intérieure totale = 43 colonnes visuelles
+    # Format: "  <label><padding><value>  " avec au moins 1 espace entre label et value
     
-    # Compensation pour le label
-    byte_len=$(echo -n "$label" | wc -c)
-    char_len=$(echo -n "$label" | wc -m)
-    extra=$((byte_len - char_len))
-    label_width=$((20 + extra))
+    local label_cols value_cols total_content_width
+    local available_padding content_padding content
     
-    # Compensation pour la valeur (caractères comme → ou −)
-    val_byte_len=$(echo -n "$value" | wc -c)
-    val_char_len=$(echo -n "$value" | wc -m)
-    val_extra=$((val_byte_len - val_char_len))
-    val_width=$((19 + val_extra))
+    label_cols=$(printf '%s' "$label" | wc -m)
+    value_cols=$(printf '%s' "$value" | wc -m)
     
-    content=$(printf "  %-${label_width}s%${val_width}s  " "$label" "$value")
+    # Contenu sans padding: 2 espaces début + label + value + 2 espaces fin = 4 + label + value
+    # Total disponible = 43, donc padding = 43 - 4 - label_cols - value_cols
+    total_content_width=$((label_cols + value_cols))
+    available_padding=$((39 - total_content_width))
+    [[ $available_padding -lt 1 ]] && available_padding=1
+    
+    content_padding=$(printf '%*s' "$available_padding" '')
+    content="  ${label}${content_padding}${value}  "
+    
     echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
 
@@ -323,14 +323,16 @@ print_summary_item() {
 print_summary_value_only() {
     local value="$1"
     local color="${2:-$WHITE}"
-    # Largeur intérieure totale = 43 caractères, valeur alignée à droite
-    # Compenser les caractères multi-bytes (−, etc.)
-    local byte_len char_len extra width content
-    byte_len=$(echo -n "$value" | wc -c)
-    char_len=$(echo -n "$value" | wc -m)
-    extra=$((byte_len - char_len))
-    width=$((41 + extra))
-    content=$(printf "%${width}s  " "$value")
+    # Largeur intérieure totale = 43 colonnes, valeur alignée à droite avec 2 espaces de marge
+    local value_cols value_pad padding content
+    
+    value_cols=$(printf '%s' "$value" | wc -m)
+    value_pad=$((41 - value_cols))
+    [[ $value_pad -lt 0 ]] && value_pad=0
+    
+    padding=$(printf '%*s' "$value_pad" '')
+    content="${padding}${value}  "
+    
     echo -e "${GREEN}  ║${NOCOLOR}${color}${content}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
 
@@ -416,10 +418,43 @@ format_option_dryrun() {
     echo -e "🔍  Mode ${YELLOW}dry-run${NOCOLOR} : simulation sans conversion"
 }
 
-# Formate une option Opus pour print_active_options
-# Usage: format_option_opus
-format_option_opus() {
-    echo -e "🎵  Audio ${MAGENTA}Opus${NOCOLOR} activé (expérimental)"
+# Formate une option de codec vidéo pour print_active_options
+# Usage: format_option_video
+format_option_video() {
+    local codec="${VIDEO_CODEC:-hevc}"
+    case "$codec" in
+        av1)
+            echo -e "🎬  Codec vidéo ${MAGENTA}AV1${NOCOLOR} (SVT-AV1)"
+            ;;
+        hevc)
+            echo -e "🎬  Codec vidéo ${MAGENTA}HEVC${NOCOLOR} (x265)"
+            ;;
+        *)
+            echo -e "🎬  Codec vidéo ${MAGENTA}${codec^^}${NOCOLOR}"
+            ;;
+    esac
+}
+
+# Formate une option de codec audio pour print_active_options
+# Usage: format_option_audio
+format_option_audio() {
+    local codec="${AUDIO_CODEC:-copy}"
+    
+    case "$codec" in
+        aac)
+            echo -e "🎵  Codec audio ${MAGENTA}AAC${NOCOLOR} @ ${AUDIO_BITRATE_AAC_DEFAULT:-160}k"
+            ;;
+        ac3)
+            echo -e "🎵  Codec audio ${MAGENTA}AC3${NOCOLOR} (Dolby Digital) @ ${AUDIO_BITRATE_AC3_DEFAULT:-384}k"
+            ;;
+        opus)
+            echo -e "🎵  Codec audio ${MAGENTA}Opus${NOCOLOR} @ ${AUDIO_BITRATE_OPUS_DEFAULT:-128}k"
+            ;;
+        *)
+            # copy ou autre : pas d'affichage
+            return 1
+            ;;
+    esac
 }
 
 # Formate le chemin source pour print_active_options

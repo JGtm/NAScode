@@ -453,6 +453,9 @@ _show_active_options() {
         options+=("$(format_option_dryrun)")
     fi
     
+    # Codec vidéo (toujours affiché)
+    options+=("$(format_option_video)")
+    
     # Option VMAF
     if [[ "$VMAF_ENABLED" == true && "$HAS_LIBVMAF" -eq 1 ]]; then
         options+=("$(format_option_vmaf)")
@@ -463,9 +466,9 @@ _show_active_options() {
         options+=("$(format_option_sample)")
     fi
     
-    # Option Opus
-    if [[ "$OPUS_ENABLED" == true ]]; then
-        options+=("$(format_option_opus)")
+    # Option Codec Audio (si différent de copy)
+    if [[ "${AUDIO_CODEC:-copy}" != "copy" ]]; then
+        options+=("$(format_option_audio)")
     fi
     
     # Option Limitation

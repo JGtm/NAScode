@@ -154,7 +154,25 @@ _build_effective_suffix_for_dims() {
 
     # Mode single-pass CRF ou two-pass bitrate
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-        suffix="${suffix}_crf${CRF_VALUE}"
+        # Calculer le CRF effectif selon l'encodeur
+        local effective_crf="$CRF_VALUE"
+        case "${VIDEO_ENCODER:-libx265}" in
+            libsvtav1)
+                if [[ -n "${SVTAV1_CRF:-}" ]]; then
+                    effective_crf="$SVTAV1_CRF"
+                elif [[ -n "${SVTAV1_CRF_DEFAULT:-}" ]]; then
+                    effective_crf="$SVTAV1_CRF_DEFAULT"
+                else
+                    effective_crf=$(( CRF_VALUE + 9 ))
+                fi
+                [[ $effective_crf -gt 63 ]] && effective_crf=63
+                ;;
+            libaom-av1)
+                effective_crf=$(( CRF_VALUE + 9 ))
+                [[ $effective_crf -gt 63 ]] && effective_crf=63
+                ;;
+        esac
+        suffix="${suffix}_crf${effective_crf}"
     else
         # Bitrate effectif (selon hauteur) pour two-pass
         local effective_bitrate_kbps
@@ -174,23 +192,12 @@ _build_effective_suffix_for_dims() {
     # Preset d'encodage
     suffix="${suffix}_${ENCODER_PRESET}"
 
-    # Indicateur si paramètres encodeur spéciaux (tuned)
-    local has_extra_params=false
-    if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
-        has_extra_params=true
-    elif declare -f get_encoder_mode_params &>/dev/null; then
-        local mode_params
-        mode_params=$(get_encoder_mode_params "${VIDEO_ENCODER:-libx265}" "${CONVERSION_MODE:-serie}")
-        [[ -n "$mode_params" ]] && has_extra_params=true
-    fi
-    if [[ "$has_extra_params" == true ]]; then
-        suffix="${suffix}_tuned"
-    fi
-
-    # Indicateur conversion audio Opus
-    if [[ "${OPUS_ENABLED:-false}" == true ]]; then
-        suffix="${suffix}_opus"
-    fi
+    # Indicateur du codec audio (si différent de copy)
+    case "${AUDIO_CODEC:-copy}" in
+        aac)  suffix="${suffix}_aac" ;;
+        ac3)  suffix="${suffix}_ac3" ;;
+        opus) suffix="${suffix}_opus" ;;
+    esac
 
     # Indicateur mode sample (segment de test)
     if [[ "${SAMPLE_MODE:-false}" == true ]]; then
@@ -198,78 +205,6 @@ _build_effective_suffix_for_dims() {
     fi
 
     echo "$suffix"
-}
-
-###########################################################
-# ANALYSE AUDIO ET PARAMÈTRES OPUS (expérimental)
-###########################################################
-
-# Analyse l'audio d'un fichier et détermine si la conversion Opus est avantageuse.
-# Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert to opus)
-_get_audio_conversion_info() {
-    local input_file="$1"
-    
-    # Si Opus désactivé, toujours copier
-    if [[ "${OPUS_ENABLED:-false}" != true ]]; then
-        echo "copy|0|0"
-        return 0
-    fi
-    
-    # Récupérer les infos audio du premier flux audio
-    local audio_info
-    audio_info=$(ffprobe -v error \
-        -select_streams a:0 \
-        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-        -of default=noprint_wrappers=1 \
-        "$input_file" 2>/dev/null || true)
-    
-    local audio_codec audio_bitrate audio_bitrate_tag
-    audio_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
-    audio_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
-    audio_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
-    
-    # Utiliser le tag BPS si bitrate direct non disponible
-    if [[ -z "$audio_bitrate" || "$audio_bitrate" == "N/A" ]]; then
-        audio_bitrate="$audio_bitrate_tag"
-    fi
-    
-    # Convertir en kbps
-    audio_bitrate=$(clean_number "$audio_bitrate")
-    local audio_bitrate_kbps=0
-    if [[ -n "$audio_bitrate" && "$audio_bitrate" =~ ^[0-9]+$ ]]; then
-        audio_bitrate_kbps=$((audio_bitrate / 1000))
-    fi
-    
-    # Déterminer si la conversion est avantageuse
-    local should_convert=0
-    
-    # Ne pas convertir si déjà en Opus
-    if [[ "$audio_codec" == "opus" ]]; then
-        should_convert=0
-    # Convertir si le bitrate source est supérieur au seuil
-    elif [[ "$audio_bitrate_kbps" -gt "${OPUS_CONVERSION_THRESHOLD_KBPS:-160}" ]]; then
-        should_convert=1
-    fi
-    
-    echo "${audio_codec}|${audio_bitrate_kbps}|${should_convert}"
-}
-
-# Construit les paramètres audio FFmpeg selon l'analyse
-_build_audio_params() {
-    local input_file="$1"
-    
-    local audio_info should_convert
-    audio_info=$(_get_audio_conversion_info "$input_file")
-    should_convert=$(echo "$audio_info" | cut -d'|' -f3)
-    
-    if [[ "$should_convert" -eq 1 ]]; then
-        # Conversion vers Opus avec normalisation des layouts audio
-        # -af "aformat=channel_layouts=..." normalise les layouts non-standard
-        echo "-c:a libopus -b:a ${OPUS_TARGET_BITRATE_KBPS:-128}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
-    else
-        # Copier l'audio tel quel
-        echo "-c:a copy"
-    fi
 }
 
 ###########################################################

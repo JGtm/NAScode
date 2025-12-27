@@ -26,6 +26,7 @@ setup() {
     source "$LIB_DIR/queue.sh"
     source "$LIB_DIR/vmaf.sh"
     source "$LIB_DIR/media_probe.sh"
+    source "$LIB_DIR/audio_params.sh"
     source "$LIB_DIR/transcode_video.sh"
     source "$LIB_DIR/conversion.sh"
     source "$LIB_DIR/processing.sh"

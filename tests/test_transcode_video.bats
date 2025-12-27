@@ -89,8 +89,8 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
-    # Vérifier le pattern : _<codec>_<bitrate>k_<height>p_<preset>_tuned
-    [[ "$result" =~ ^_x265_[0-9]+k_720p_medium_tuned$ ]]
+    # Vérifier le pattern : _<codec>_<bitrate>k_<height>p_<preset>
+    [[ "$result" =~ ^_x265_[0-9]+k_720p_medium$ ]]
     [[ "$result" =~ "_1449k_" ]]
 }
 
@@ -101,8 +101,8 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
-    # Vérifier le pattern : _<codec>_<bitrate>k_<height>p_<preset>_tuned
-    [[ "$result" =~ ^_x265_[0-9]+k_1080p_medium_tuned$ ]]
+    # Vérifier le pattern : _<codec>_<bitrate>k_<height>p_<preset>
+    [[ "$result" =~ ^_x265_[0-9]+k_1080p_medium$ ]]
     [[ "$result" =~ "_2070k_" ]]
 }
 
@@ -117,8 +117,8 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
-    # Vérifier le pattern CRF : _<codec>_crf<N>_<height>p_<preset>_tuned
-    [[ "$result" =~ ^_x265_crf[0-9]+_1080p_medium_tuned$ ]]
+    # Vérifier le pattern CRF : _<codec>_crf<N>_<height>p_<preset>
+    [[ "$result" =~ ^_x265_crf[0-9]+_1080p_medium$ ]]
 }
 
 @test "_build_effective_suffix_for_dims: affiche CRF en mode single-pass (720p)" {
@@ -128,8 +128,8 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
-    # Vérifier le pattern CRF : _<codec>_crf<N>_<height>p_<preset>_tuned
-    [[ "$result" =~ ^_x265_crf[0-9]+_720p_medium_tuned$ ]]
+    # Vérifier le pattern CRF : _<codec>_crf<N>_<height>p_<preset>
+    [[ "$result" =~ ^_x265_crf[0-9]+_720p_medium$ ]]
 }
 
 @test "_build_effective_suffix_for_dims: CRF identique quelle que soit la résolution" {

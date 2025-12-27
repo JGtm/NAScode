@@ -43,6 +43,9 @@ load_base_modules() {
     
     # Charger les utilitaires
     source "$LIB_DIR/utils.sh"
+    
+    # Charger les paramètres audio
+    source "$LIB_DIR/audio_params.sh"
 }
 
 # Charger uniquement les couleurs et config (pour tests isolés)
