@@ -172,3 +172,97 @@ teardown() {
     result=$(_build_effective_suffix_for_dims 1920 1080)
     [[ "$result" =~ ^_av1_crf ]]
 }
+
+###########################################################
+# Tests _get_preset_option() pour SVT-AV1
+###########################################################
+
+@test "_get_preset_option: libx265 retourne -preset medium" {
+    ENCODER_PRESET="medium"
+    result=$(_get_preset_option "libx265" "medium")
+    [ "$result" = "-preset medium" ]
+}
+
+@test "_get_preset_option: libsvtav1 utilise SVTAV1_PRESET_DEFAULT" {
+    # SVTAV1_PRESET_DEFAULT=8 par défaut dans codec_profiles.sh
+    result=$(_get_preset_option "libsvtav1" "medium")
+    [ "$result" = "-preset 8" ]
+}
+
+@test "_get_preset_option: libsvtav1 avec SVTAV1_PRESET override" {
+    SVTAV1_PRESET="6"
+    result=$(_get_preset_option "libsvtav1" "medium")
+    [ "$result" = "-preset 6" ]
+    unset SVTAV1_PRESET
+}
+
+###########################################################
+# Tests _get_bitrate_option() pour SVT-AV1
+###########################################################
+
+@test "_get_bitrate_option: libx265 CRF retourne -crf N" {
+    CRF_VALUE=21
+    result=$(_get_bitrate_option "libx265" "crf")
+    [ "$result" = "-crf 21" ]
+}
+
+@test "_get_bitrate_option: libsvtav1 CRF utilise SVTAV1_CRF_DEFAULT" {
+    # SVTAV1_CRF_DEFAULT=32 par défaut
+    result=$(_get_bitrate_option "libsvtav1" "crf")
+    [ "$result" = "-crf 32" ]
+}
+
+@test "_get_bitrate_option: libsvtav1 avec SVTAV1_CRF override" {
+    SVTAV1_CRF="28"
+    result=$(_get_bitrate_option "libsvtav1" "crf")
+    [ "$result" = "-crf 28" ]
+    unset SVTAV1_CRF
+}
+
+@test "_get_bitrate_option: two-pass retourne -b:v" {
+    VIDEO_BITRATE="2070k"
+    result=$(_get_bitrate_option "libx265" "pass2")
+    [ "$result" = "-b:v 2070k" ]
+}
+
+###########################################################
+# Tests _build_encoder_params_internal() pour SVT-AV1
+###########################################################
+
+@test "_build_encoder_params_internal: libsvtav1 pass1 inclut pass=1" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass1" "tune=0")
+    [[ "$result" =~ "pass=1" ]]
+    [[ "$result" =~ "tune=0" ]]
+}
+
+@test "_build_encoder_params_internal: libsvtav1 pass2 inclut pass=2" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass2" "tune=0:keyint=240")
+    [[ "$result" =~ "pass=2" ]]
+    [[ "$result" =~ "keyint=240" ]]
+}
+
+@test "_build_encoder_params_internal: libsvtav1 crf sans pass" {
+    result=$(_build_encoder_params_internal "libsvtav1" "crf" "tune=0:enable-overlays=1")
+    [[ ! "$result" =~ "pass=" ]]
+    [[ "$result" =~ "tune=0" ]]
+    [[ "$result" =~ "enable-overlays=1" ]]
+}
+
+###########################################################
+# Tests _get_encoder_params_flag_internal()
+###########################################################
+
+@test "_get_encoder_params_flag_internal: libx265 retourne -x265-params" {
+    result=$(_get_encoder_params_flag_internal "libx265")
+    [ "$result" = "-x265-params" ]
+}
+
+@test "_get_encoder_params_flag_internal: libsvtav1 retourne -svtav1-params" {
+    result=$(_get_encoder_params_flag_internal "libsvtav1")
+    [ "$result" = "-svtav1-params" ]
+}
+
+@test "_get_encoder_params_flag_internal: libaom-av1 retourne vide" {
+    result=$(_get_encoder_params_flag_internal "libaom-av1")
+    [ -z "$result" ]
+}

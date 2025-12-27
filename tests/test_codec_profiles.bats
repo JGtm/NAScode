@@ -319,3 +319,42 @@ teardown() {
     source "$LIB_DIR/codec_profiles.sh"
     [ "$VIDEO_CODEC" = "av1" ]
 }
+
+###########################################################
+# Tests SVTAV1 defaults (variables configurables)
+###########################################################
+
+@test "SVTAV1_CRF_DEFAULT: défaut est 32" {
+    [ "${SVTAV1_CRF_DEFAULT:-}" = "32" ]
+}
+
+@test "SVTAV1_PRESET_DEFAULT: défaut est 8" {
+    [ "${SVTAV1_PRESET_DEFAULT:-}" = "8" ]
+}
+
+@test "SVTAV1_TUNE_DEFAULT: défaut est 0" {
+    [ "${SVTAV1_TUNE_DEFAULT:-}" = "0" ]
+}
+
+@test "SVTAV1_ENABLE_OVERLAYS_DEFAULT: défaut est 1" {
+    [ "${SVTAV1_ENABLE_OVERLAYS_DEFAULT:-}" = "1" ]
+}
+
+###########################################################
+# Tests build_tune_option()
+###########################################################
+
+@test "build_tune_option: libx265 serie retourne -tune fastdecode" {
+    result=$(build_tune_option "libx265" "serie")
+    [ "$result" = "-tune fastdecode" ]
+}
+
+@test "build_tune_option: libx265 film retourne vide" {
+    result=$(build_tune_option "libx265" "film")
+    [ -z "$result" ]
+}
+
+@test "build_tune_option: libsvtav1 retourne vide (tune via params)" {
+    result=$(build_tune_option "libsvtav1" "serie")
+    [ -z "$result" ]
+}

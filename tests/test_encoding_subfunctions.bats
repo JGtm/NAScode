@@ -71,6 +71,36 @@ teardown() {
     [[ "$X265_VBV_STRING" =~ "vbv-bufsize=" ]]
 }
 
+@test "_setup_video_encoding_params: SVT-AV1 ajoute keyint dans ENCODER_BASE_PARAMS" {
+    VIDEO_CODEC="av1"
+    VIDEO_ENCODER="libsvtav1"
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    get_video_stream_props() { echo "1920|1080|yuv420p10le"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    # Vérifier que keyint est présent dans les params SVT-AV1
+    [[ "$ENCODER_BASE_PARAMS" =~ "keyint=" ]]
+}
+
+@test "_setup_video_encoding_params: SVT-AV1 inclut tune et enable-overlays" {
+    VIDEO_CODEC="av1"
+    VIDEO_ENCODER="libsvtav1"
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    get_video_stream_props() { echo "1920|1080|yuv420p10le"; }
+    export -f get_video_stream_props
+    
+    _setup_video_encoding_params "/fake/file.mkv"
+    
+    [[ "$ENCODER_BASE_PARAMS" =~ "tune=" ]]
+    [[ "$ENCODER_BASE_PARAMS" =~ "enable-overlays=" ]]
+}
+
 ###########################################################
 # Tests de _setup_sample_mode_params()
 ###########################################################
