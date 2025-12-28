@@ -74,7 +74,7 @@ readonly DRYRUN_SUFFIX="-dryrun-sample"
 SUFFIX_STRING=""  # Suffixe par défaut (sera mis à jour par build_dynamic_suffix selon le codec)
 
 # Exclusions par défaut
-EXCLUDES=("./logs" "./*.sh" "./*.txt" "Converted")
+EXCLUDES=("./logs" "./*.sh" "./*.txt" "Converted" "tests" "ConversionPy")
 
 # ----- Paramètres système -----
 readonly TMP_DIR="/tmp/video_convert"

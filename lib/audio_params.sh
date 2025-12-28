@@ -5,36 +5,43 @@
 # Fonctions pures qui retournent des valeurs via echo,
 # sans muter de variables globales.
 #
-# Logique "Smart Codec" :
-#   - Si la source a un codec "meilleur" que la cible, on le garde
-#   - Mais on applique la limite de bitrate définie pour ce codec source
-#   - Options --force-audio pour bypasser cette logique
+# Logique "Smart Codec" (optimisation taille) :
+#   - Opus et AAC sont très efficaces → on les garde si bitrate OK
+#   - E-AC3 et AC3 sont inefficaces → on convertit vers Opus
+#   - FLAC/TrueHD (lossless) → on garde toujours
+#   - Options --force-audio pour forcer la conversion
 ###########################################################
 
 ###########################################################
-# HIÉRARCHIE DES CODECS AUDIO
+# HIÉRARCHIE DES CODECS AUDIO (EFFICACITÉ)
 ###########################################################
 
-# Retourne le "rang" d'efficacité d'un codec audio (plus élevé = meilleur)
-# Basé sur l'efficacité de compression à qualité perceptuelle équivalente
+# Retourne le "rang" d'efficacité d'un codec audio (plus élevé = plus efficace = plus compact)
+# Ce rang détermine si on GARDE le codec source ou si on le CONVERTIT
 # Usage: get_audio_codec_rank "opus" -> 5
 get_audio_codec_rank() {
     local codec="$1"
     # Normaliser le nom du codec (ffprobe peut retourner des variantes)
+    # Efficacité = qualité / taille (Opus 128k ≈ AAC 160k >> E-AC3 384k >> AC3 640k)
     case "$codec" in
-        opus|libopus)           echo 5 ;;   # Le plus efficace
-        aac|aac_latm)           echo 4 ;;   # Très bon, polyvalent
-        eac3|ec-3|dd+)          echo 3 ;;   # E-AC3 (Dolby Digital Plus)
-        ac3|a52|dca)            echo 2 ;;   # AC3/DTS (rétro-compatibilité)
-        flac)                   echo 6 ;;   # Lossless (rang spécial, toujours garder)
-        truehd|mlp)             echo 7 ;;   # TrueHD (lossless Atmos)
-        dts|dts-hd|dtshd)       echo 2 ;;   # DTS classique (comme AC3)
-        pcm*|s16le|s24le)       echo 1 ;;   # PCM non compressé (à convertir)
-        mp3|mp2)                echo 1 ;;   # Anciens codecs (à convertir)
-        vorbis)                 echo 3 ;;   # Vorbis (similaire E-AC3)
-        *)                      echo 0 ;;   # Inconnu
+        opus|libopus)           echo 5 ;;   # Très efficace (128k)
+        aac|aac_latm)           echo 4 ;;   # Très efficace (160k)
+        eac3|ec-3|dd+)          echo 2 ;;   # Inefficace (384k) → convertir
+        ac3|a52|dca)            echo 1 ;;   # Inefficace (640k) → convertir
+        flac)                   echo 10 ;;  # Lossless (toujours garder)
+        truehd|mlp)             echo 10 ;;  # TrueHD lossless (toujours garder)
+        dts|dts-hd|dtshd)       echo 1 ;;   # DTS classique → convertir
+        pcm*|s16le|s24le)       echo 0 ;;   # PCM non compressé → convertir
+        mp3|mp2)                echo 0 ;;   # Anciens codecs → convertir
+        vorbis)                 echo 3 ;;   # Vorbis (efficace, proche AAC)
+        *)                      echo 0 ;;   # Inconnu → convertir
     esac
 }
+
+# Rang minimum pour considérer un codec comme "efficace" (à garder)
+# Opus (5), AAC (4), Vorbis (3) sont efficaces
+# E-AC3 (2), AC3 (1), autres (0) sont inefficaces
+AUDIO_CODEC_EFFICIENT_THRESHOLD=3
 
 # Retourne le bitrate cible (kbps) pour un codec audio donné
 # Usage: get_audio_codec_target_bitrate "opus" -> 128
@@ -49,6 +56,24 @@ get_audio_codec_target_bitrate() {
         dts|dts-hd|dtshd|dca)   echo "${AUDIO_BITRATE_AC3_DEFAULT:-640}" ;;  # Comme AC3
         *)                      echo "0" ;;  # Inconnu : pas de limite
     esac
+}
+
+# Vérifie si un codec source est "efficace" (rang >= seuil)
+# Usage: is_audio_codec_efficient "opus" -> 0 (true)
+is_audio_codec_efficient() {
+    local codec="$1"
+    local rank
+    rank=$(get_audio_codec_rank "$codec")
+    [[ "$rank" -ge "${AUDIO_CODEC_EFFICIENT_THRESHOLD:-3}" ]]
+}
+
+# Vérifie si un codec est lossless (FLAC, TrueHD, etc.)
+# Usage: is_audio_codec_lossless "flac" -> 0 (true)
+is_audio_codec_lossless() {
+    local codec="$1"
+    local rank
+    rank=$(get_audio_codec_rank "$codec")
+    [[ "$rank" -ge 10 ]]
 }
 
 # Vérifie si un codec source est "meilleur ou égal" au codec cible
@@ -160,23 +185,23 @@ _get_smart_audio_decision() {
         return 0
     fi
     
-    # --- Logique Smart Codec ---
+    # --- Logique Smart Codec (optimisation taille) ---
+    # Principe : on convertit les codecs inefficaces (E-AC3, AC3) vers Opus
+    #            on garde les codecs efficaces (Opus, AAC) si bitrate OK
     
-    # Cas 1 : Codec source inconnu → sécurité, on copie
+    # Cas 1 : Codec source inconnu → convertir vers cible par sécurité
     if [[ -z "$source_codec" ]]; then
-        echo "copy|unknown|0|unknown_codec"
+        echo "convert|${target_codec}|${target_bitrate}|unknown_codec"
         return 0
     fi
     
     # Cas 2 : Codec lossless (FLAC, TrueHD) → toujours garder
-    local source_rank
-    source_rank=$(get_audio_codec_rank "$source_codec")
-    if [[ "$source_rank" -ge 6 ]]; then
+    if is_audio_codec_lossless "$source_codec"; then
         echo "copy|${source_codec}|0|lossless_keep"
         return 0
     fi
     
-    # Cas 3 : Source = même codec que cible
+    # Cas 3 : Source = même codec que cible (variantes incluses)
     if [[ "$source_codec" == "$target_codec" ]] || \
        [[ "$source_codec" == "libopus" && "$target_codec" == "opus" ]] || \
        [[ "$source_codec" == "aac_latm" && "$target_codec" == "aac" ]]; then
@@ -192,41 +217,30 @@ _get_smart_audio_decision() {
         return 0
     fi
     
-    # Cas 4 : Codec source MEILLEUR que cible → garder source, mais appliquer sa limite
-    if is_audio_codec_better_or_equal "$source_codec" "$target_codec"; then
+    # Cas 4 : Codec source EFFICACE (Opus, AAC, Vorbis) → garder si bitrate OK
+    if is_audio_codec_efficient "$source_codec"; then
         local source_limit
         source_limit=$(get_audio_codec_target_bitrate "$source_codec")
         
         if [[ "$source_limit" -eq 0 ]]; then
-            # Pas de limite pour ce codec (rare pour lossy)
-            echo "copy|${source_codec}|0|better_codec_no_limit"
+            # Pas de limite définie pour ce codec
+            echo "copy|${source_codec}|0|efficient_codec_no_limit"
         elif [[ "$source_bitrate_kbps" -eq 0 ]]; then
-            echo "copy|${source_codec}|0|better_codec_unknown_bitrate"
+            echo "copy|${source_codec}|0|efficient_codec_unknown_bitrate"
         elif [[ "$source_bitrate_kbps" -le "$source_limit" ]]; then
-            echo "copy|${source_codec}|0|better_codec_bitrate_ok"
+            echo "copy|${source_codec}|0|efficient_codec_bitrate_ok"
         elif [[ "$source_bitrate_kbps" -gt $((source_limit * 110 / 100)) ]]; then
-            # Downscale dans le même codec (meilleur)
-            echo "downscale|${source_codec}|${source_limit}|better_codec_downscale"
+            # Downscale dans le même codec efficace
+            echo "downscale|${source_codec}|${source_limit}|efficient_codec_downscale"
         else
-            echo "copy|${source_codec}|0|better_codec_margin_ok"
+            echo "copy|${source_codec}|0|efficient_codec_margin_ok"
         fi
         return 0
     fi
     
-    # Cas 5 : Codec source MOINS BON que cible → convertir vers cible
-    if [[ "$source_bitrate_kbps" -eq 0 ]]; then
-        # Bitrate inconnu, on convertit par sécurité
-        echo "convert|${target_codec}|${target_bitrate}|worse_codec_convert"
-    elif [[ "$source_bitrate_kbps" -le "$target_bitrate" ]]; then
-        # Anti-upscaling : source déjà petit, on copie
-        echo "copy|${source_codec}|0|worse_codec_anti_upscale"
-    elif [[ "$source_bitrate_kbps" -gt $((target_bitrate * 110 / 100)) ]]; then
-        # Gain significatif → convertir
-        echo "convert|${target_codec}|${target_bitrate}|worse_codec_convert_gain"
-    else
-        # Marge de 10% → copier
-        echo "copy|${source_codec}|0|worse_codec_margin_ok"
-    fi
+    # Cas 5 : Codec source INEFFICACE (E-AC3, AC3, DTS, MP3, etc.) → TOUJOURS convertir vers cible
+    # Ces codecs sont trop lourds par rapport à Opus, on convertit pour économiser de la place
+    echo "convert|${target_codec}|${target_bitrate}|inefficient_codec_convert"
 }
 
 # Analyse l'audio d'un fichier et détermine si la conversion est avantageuse.

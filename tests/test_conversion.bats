@@ -111,6 +111,19 @@ teardown() {
     # Le seuil dynamique = MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)
     # Pour série : 2520 * 1.1 = 2772 kbps = 2772000 bits
     set_conversion_mode_parameters
+    
+    # Stub ffprobe pour simuler audio déjà optimisé (Opus 128k)
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=opus"
+echo "bit_rate=128000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+    
     run should_skip_conversion "hevc" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
 }
@@ -136,6 +149,19 @@ teardown() {
 @test "should_skip_conversion: skip si av1 avec bitrate bas quand cible av1" {
     VIDEO_CODEC="av1"
     set_conversion_mode_parameters  # Initialise MAXRATE_KBPS pour av1/serie (~1800 kbps)
+    
+    # Stub ffprobe pour simuler audio déjà optimisé
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=opus"
+echo "bit_rate=128000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+    
     # Bitrate de 1500 kbps = 1500000 bits, bien sous le seuil AV1 (~1980 kbps)
     run should_skip_conversion "av1" "1500000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
@@ -153,6 +179,19 @@ teardown() {
     # AV1 est plus moderne que HEVC, donc on skip même si on cible HEVC
     VIDEO_CODEC="hevc"
     set_conversion_mode_parameters
+    
+    # Stub ffprobe pour simuler audio déjà optimisé
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=opus"
+echo "bit_rate=128000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+    
     run should_skip_conversion "av1" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
 }

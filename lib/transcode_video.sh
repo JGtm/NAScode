@@ -842,31 +842,34 @@ _setup_sample_mode_params() {
 }
 
 ###########################################################
-# EXÉCUTION VIDEO PASSTHROUGH (audio seulement)
+# EXÉCUTION FFMPEG UNIFIÉE
 ###########################################################
 
-# Exécute une conversion où la vidéo est copiée et seul l'audio est traité.
-# Utilisé quand la vidéo est déjà conforme mais l'audio peut être optimisé.
-# Usage: _execute_video_passthrough <input> <output> <log> <duration> <basename>
-_execute_video_passthrough() {
-    local tmp_input="$1"
-    local tmp_output="$2"
-    local ffmpeg_log_temp="$3"
-    local duration_secs="$4"
-    local base_name="$5"
+# Fonction unifiée pour l'exécution FFmpeg avec différents modes.
+# Combine la logique de passthrough, CRF et two-pass en une seule fonction.
+#
+# Usage: _execute_ffmpeg_pipeline <mode> <input> <output> <log> <duration> <basename>
+# Modes:
+#   - passthrough : vidéo copiée, seul l'audio est traité
+#   - crf         : single-pass CRF (quality-based)
+#   - twopass     : two-pass ABR (bitrate-based)
+#
+# Retourne: 0 si succès, 1 si erreur
+_execute_ffmpeg_pipeline() {
+    local mode="$1"
+    local tmp_input="$2"
+    local tmp_output="$3"
+    local ffmpeg_log_temp="$4"
+    local duration_secs="$5"
+    local base_name="$6"
 
+    # Chronos : début du traitement
     FILE_START_TS="$(date +%s)"
     START_TS="$FILE_START_TS"
 
-    # Préparer les paramètres audio (conversion selon config)
-    local audio_params
-    audio_params=$(_build_audio_params "$tmp_input")
-
-    # Préparer le mapping des streams (filtre sous-titres FR)
-    local stream_mapping
-    stream_mapping=$(_build_stream_mapping "$tmp_input")
-
-    # Script AWK pour progression
+    # ===== PRÉPARATION COMMUNE =====
+    
+    # Script AWK pour progression (gawk vs BSD awk)
     local awk_time_func
     if [[ "$HAS_GAWK" -eq 1 ]]; then
         awk_time_func='function get_time() { return systime() }'
@@ -889,68 +892,7 @@ _execute_video_passthrough() {
     fi
     EFFECTIVE_DURATION="$effective_duration"
 
-    # Exécution FFmpeg : vidéo en copy, audio selon config
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        -i "$tmp_input" \
-        -c:v copy \
-        $audio_params \
-        $stream_mapping -f matroska \
-        "$tmp_output" \
-        -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
-
-    local ffmpeg_rc=${PIPESTATUS[0]:-0}
-    local awk_rc=${PIPESTATUS[1]:-0}
-
-    # Libérer le slot
-    if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-        release_progress_slot "$progress_slot"
-    fi
-
-    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
-        return 0
-    fi
-
-    # Gestion d'erreur
-    if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]]; then
-        log_error "Erreur lors du remuxage (video passthrough)"
-        if [[ -f "$ffmpeg_log_temp" ]]; then
-            local err_preview
-            err_preview=$(tail -10 "$ffmpeg_log_temp" 2>/dev/null || echo "(log indisponible)")
-            echo -e "${RED}--- Extrait du log FFmpeg ---${NOCOLOR}"
-            echo "$err_preview"
-            echo -e "${RED}-----------------------------${NOCOLOR}"
-        fi
-    fi
-    
-    return 1
-}
-
-###########################################################
-# EXÉCUTION DE LA CONVERSION FFMPEG
-###########################################################
-
-_execute_conversion() {
-    local tmp_input="$1"
-    local tmp_output="$2"
-    local ffmpeg_log_temp="$3"
-    local duration_secs="$4"
-    local base_name="$5"
-
-    # Chronos : début du traitement de ce fichier
-    FILE_START_TS="$(date +%s)"
-    START_TS="$FILE_START_TS"
-
-    # Préparer les paramètres vidéo (adaptés à la résolution source)
-    _setup_video_encoding_params "$tmp_input"
-    
-    # Préparer les paramètres du mode sample si activé
-    _setup_sample_mode_params "$tmp_input" "$duration_secs"
-
-    # Préparer les paramètres audio (copy ou conversion Opus)
+    # Préparer les paramètres audio
     local audio_params
     audio_params=$(_build_audio_params "$tmp_input")
 
@@ -958,76 +900,112 @@ _execute_conversion() {
     local stream_mapping
     stream_mapping=$(_build_stream_mapping "$tmp_input")
 
-    # Script AWK adapté selon la disponibilité de systime() (gawk vs awk BSD)
-    local awk_time_func
-    if [[ "$HAS_GAWK" -eq 1 ]]; then
-        awk_time_func='function get_time() { return systime() }'
-    else
-        awk_time_func='function get_time() { cmd="date +%s"; cmd | getline t; close(cmd); return t }'
-    fi
-
-    # Acquérir un slot pour affichage de progression en mode parallèle
-    local progress_slot=0
-    local is_parallel=0
-    if [[ "${PARALLEL_JOBS:-1}" -gt 1 ]]; then
-        is_parallel=1
-        progress_slot=$(acquire_progress_slot)
-    fi
-
-    # Paramètres de base pour l'encodeur (VBV + extra params du mode)
-    # ENCODER_BASE_PARAMS est construit par _setup_video_encoding_params
-    local encoder_base_params="${ENCODER_BASE_PARAMS:-}"
-    
-    # Fallback pour rétro-compatibilité si ENCODER_BASE_PARAMS n'est pas défini
-    if [[ -z "$encoder_base_params" ]]; then
-        encoder_base_params="${X265_VBV_STRING}"
-        if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
-            encoder_base_params="${encoder_base_params}:${X265_EXTRA_PARAMS}"
-        fi
-    fi
-
-    # Fonction helper pour libérer le slot et retourner en erreur
-    _cleanup_and_fail() {
+    # Helper pour libérer le slot et retourner en erreur
+    _pipeline_cleanup_and_fail() {
         if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
             release_progress_slot "$progress_slot"
         fi
         return 1
     }
 
-    # ==================== CHOIX DU MODE D'ENCODAGE ====================
-    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-        # Mode single-pass CRF (séries uniquement)
-        if ! _run_ffmpeg_encode "crf" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                                "$encoder_base_params" "$audio_params" "$stream_mapping" \
-                                "$progress_slot" "$is_parallel" "$awk_time_func"; then
-            _cleanup_and_fail
-            return 1
+    # Helper pour afficher les erreurs FFmpeg
+    _pipeline_show_error() {
+        local error_msg="$1"
+        local log_file="$2"
+        
+        if [[ "${_INTERRUPTED:-0}" -ne 1 ]]; then
+            log_error "$error_msg"
+            if [[ -f "$log_file" ]]; then
+                local err_preview
+                err_preview=$(tail -10 "$log_file" 2>/dev/null || echo "(log indisponible)")
+                echo -e "${RED}--- Extrait du log FFmpeg ---${NOCOLOR}"
+                echo "$err_preview"
+                echo -e "${RED}-----------------------------${NOCOLOR}"
+            fi
         fi
-    else
-        # Mode two-pass classique
-        # ==================== PASS 1 : ANALYSE ====================
-        if ! _run_ffmpeg_encode "pass1" "$tmp_input" "" "$ffmpeg_log_temp" "$base_name" \
-                                "$encoder_base_params" "" "" \
-                                "$progress_slot" "$is_parallel" "$awk_time_func"; then
-            _cleanup_and_fail
-            return 1
-        fi
+    }
 
-        # ==================== PASS 2 : ENCODAGE ====================
-        if ! _run_ffmpeg_encode "pass2" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
-                                "$encoder_base_params" "$audio_params" "$stream_mapping" \
-                                "$progress_slot" "$is_parallel" "$awk_time_func"; then
-            # Nettoyage fichiers two-pass (selon encodeur)
-            rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
-            rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
-            _cleanup_and_fail
-            return 1
-        fi
+    # ===== EXÉCUTION SELON LE MODE =====
+    
+    case "$mode" in
+        "passthrough")
+            # Mode passthrough : vidéo copiée, audio traité
+            $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+                -i "$tmp_input" \
+                -c:v copy \
+                $audio_params \
+                $stream_mapping -f matroska \
+                "$tmp_output" \
+                -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
+            awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+                -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+                -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
+                "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
-        # Nettoyage fichiers two-pass (selon encodeur)
-        rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
-        rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
-    fi
+            local ffmpeg_rc=${PIPESTATUS[0]:-0}
+            local awk_rc=${PIPESTATUS[1]:-0}
+
+            if [[ "$ffmpeg_rc" -ne 0 || "$awk_rc" -ne 0 ]]; then
+                _pipeline_show_error "Erreur lors du remuxage (video passthrough)" "$ffmpeg_log_temp"
+                _pipeline_cleanup_and_fail
+                return 1
+            fi
+            ;;
+
+        "crf"|"twopass")
+            # Modes avec encodage vidéo : préparer les paramètres vidéo
+            _setup_video_encoding_params "$tmp_input"
+            _setup_sample_mode_params "$tmp_input" "$duration_secs"
+
+            # Paramètres de base pour l'encodeur
+            local encoder_base_params="${ENCODER_BASE_PARAMS:-}"
+            if [[ -z "$encoder_base_params" ]]; then
+                encoder_base_params="${X265_VBV_STRING}"
+                if [[ -n "${X265_EXTRA_PARAMS:-}" ]]; then
+                    encoder_base_params="${encoder_base_params}:${X265_EXTRA_PARAMS}"
+                fi
+            fi
+
+            if [[ "$mode" == "crf" ]]; then
+                # Mode single-pass CRF
+                if ! _run_ffmpeg_encode "crf" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
+                                        "$encoder_base_params" "$audio_params" "$stream_mapping" \
+                                        "$progress_slot" "$is_parallel" "$awk_time_func"; then
+                    _pipeline_cleanup_and_fail
+                    return 1
+                fi
+            else
+                # Mode two-pass
+                # Pass 1 : Analyse
+                if ! _run_ffmpeg_encode "pass1" "$tmp_input" "" "$ffmpeg_log_temp" "$base_name" \
+                                        "$encoder_base_params" "" "" \
+                                        "$progress_slot" "$is_parallel" "$awk_time_func"; then
+                    _pipeline_cleanup_and_fail
+                    return 1
+                fi
+
+                # Pass 2 : Encodage
+                if ! _run_ffmpeg_encode "pass2" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
+                                        "$encoder_base_params" "$audio_params" "$stream_mapping" \
+                                        "$progress_slot" "$is_parallel" "$awk_time_func"; then
+                    rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+                    rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
+                    _pipeline_cleanup_and_fail
+                    return 1
+                fi
+
+                # Nettoyage fichiers two-pass
+                rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
+                rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
+            fi
+            ;;
+
+        *)
+            log_error "Mode FFmpeg inconnu: $mode"
+            _pipeline_cleanup_and_fail
+            return 1
+            ;;
+    esac
 
     # Libérer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
@@ -1035,5 +1013,27 @@ _execute_conversion() {
     fi
 
     return 0
+}
+
+###########################################################
+# WRAPPERS RÉTRO-COMPATIBLES
+###########################################################
+
+# Exécute une conversion où la vidéo est copiée et seul l'audio est traité.
+# Wrapper rétro-compatible pour _execute_ffmpeg_pipeline "passthrough"
+# Usage: _execute_video_passthrough <input> <output> <log> <duration> <basename>
+_execute_video_passthrough() {
+    _execute_ffmpeg_pipeline "passthrough" "$@"
+}
+
+# Exécute la conversion vidéo complète (CRF ou two-pass selon config).
+# Wrapper rétro-compatible pour _execute_ffmpeg_pipeline
+# Usage: _execute_conversion <input> <output> <log> <duration> <basename>
+_execute_conversion() {
+    local mode="twopass"
+    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+        mode="crf"
+    fi
+    _execute_ffmpeg_pipeline "$mode" "$@"
 }
 

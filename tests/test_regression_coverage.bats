@@ -206,14 +206,15 @@ STUB
     [ "$should_convert" -eq 1 ]
 }
 
-@test "AUDIO: audio E-AC3 haut bitrate déclenche conversion vers AAC (stub)" {
-    # Créer un stub ffprobe qui simule un fichier avec audio E-AC3 haut bitrate
+@test "AUDIO: audio E-AC3 déclenche conversion vers codec efficace (stub)" {
+    # Créer un stub ffprobe qui simule un fichier avec audio E-AC3
+    # E-AC3 est un codec INEFFICACE → toujours convertir vers Opus/AAC
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
-# Simuler audio E-AC3 à 768kbps (> seuil 160 par défaut)
+# Simuler audio E-AC3 à 768kbps
 echo "codec_name=eac3"
 echo "bit_rate=768000"
 exit 0
@@ -221,12 +222,12 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     
     PATH="$stub_dir:$PATH"
-    AUDIO_CODEC="aac"
+    AUDIO_CODEC="opus"  # Cible Opus (efficace)
     
     local result
     result=$(_get_audio_conversion_info "/fake/eac3_audio.mkv")
     
-    # should_convert doit être 1 (E-AC3 768k > seuil 160k et codec différent)
+    # should_convert doit être 1 (E-AC3 est inefficace → toujours convertir)
     local should_convert
     should_convert=$(echo "$result" | cut -d'|' -f3)
     [ "$should_convert" -eq 1 ]

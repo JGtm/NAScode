@@ -200,21 +200,20 @@ teardown() {
         skip "libopus non disponible dans ffmpeg"
     fi
     
-    # Utiliser un fichier MP4 avec audio à bitrate élevé (>160 kbps) pour déclencher la conversion
-    # Note: MKV ne stocke pas le bitrate audio dans les métadonnées, MP4 oui
-    rm -f "$SRC_DIR/test_video_2s.mkv"
-    local src_file="$FIXTURES_DIR/test_video_high_audio.mp4"
+    # Recréer complètement les dossiers pour un environnement propre
+    rm -rf "$SRC_DIR" "$OUT_DIR"
+    mkdir -p "$SRC_DIR" "$OUT_DIR"
+    
+    # Utiliser un fichier HEVC avec audio à bitrate élevé pour déclencher la conversion audio
+    # Ce fichier a un audio haut bitrate qui sera converti en Opus
+    local src_file="$FIXTURES_DIR/test_video_hevc_highaudio_2s.mkv"
     if [[ ! -f "$src_file" ]]; then
-        skip "Fichier test_video_high_audio.mp4 non disponible"
+        skip "Fichier test_video_hevc_highaudio_2s.mkv non disponible"
     fi
     cp "$src_file" "$SRC_DIR/"
     
-    # Vérifier si le bitrate audio source est détectable (requis pour déclencher conversion)
-    local src_audio_bitrate
-    src_audio_bitrate=$(ffprobe -v error -select_streams a:0 -show_entries stream=bit_rate -of csv=p=0 "$src_file" 2>/dev/null)
-    if [[ "$src_audio_bitrate" == "N/A" || -z "$src_audio_bitrate" ]]; then
-        skip "Le bitrate audio source n'est pas détectable (N/A) - la conversion audio ne se déclenchera pas"
-    fi
+    # Nettoyer les index précédents
+    rm -f "$WORKDIR"/logs/Index* 2>/dev/null || true
     
     run bash -lc 'set -euo pipefail
         cd "$WORKDIR"

@@ -194,9 +194,49 @@ bash nascode -l 10 -k
 | `ac3` | 640 kbps | Rétro-compatibilité | 4e |
 | `copy` | - | Conserve l'original | - |
 
-> **Logique Smart Codec** : Par défaut, si la source a un codec plus efficace que la cible, il est conservé (ex: source Opus → cible AAC → on garde Opus). Le bitrate est limité selon le codec effectif. Utilisez `--force-audio` pour forcer la conversion vers le codec cible.
+### 🎯 Matrices de décision
 
-> **Anti-upscaling** : la conversion audio n'est déclenchée que si le bitrate source dépasse la cible de +10% minimum. Cela évite de "gonfler" un audio déjà compressé.
+#### Audio (cible par défaut : AAC 160 kbps)
+
+Le script utilise une logique **smart codec** optimisée pour la taille des fichiers :
+
+| Codec source | Statut | Bitrate source | Action | Résultat |
+|--------------|--------|----------------|--------|----------|
+| **FLAC/TrueHD** | Lossless | - | `copy` | Conservé (qualité max) |
+| **Opus** | Efficace | ≤ 128k | `copy` | Conservé tel quel |
+| **Opus** | Efficace | > 128k | `downscale` | Opus → 128k |
+| **AAC** | Efficace | ≤ 160k | `copy` | Conservé tel quel |
+| **AAC** | Efficace | > 176k* | `downscale` | AAC → 160k |
+| **E-AC3** | Inefficace | * | `convert` | → AAC 160k |
+| **AC3/DTS** | Inefficace | * | `convert` | → AAC 160k |
+| **MP3/autres** | Inefficace | * | `convert` | → AAC 160k |
+
+> \* Marge de 10% appliquée pour éviter les micro-conversions (176k = 160k × 1.1)
+
+**Hiérarchie d'efficacité** (qualité/taille) :
+- 🥇 **Opus** (128k) ≈ **AAC** (160k) — *très efficaces, conservés*
+- 🥉 Vorbis — *efficace, conservé*
+- ❌ E-AC3 (384k), AC3 (640k), DTS — *inefficaces, convertis*
+
+#### Vidéo (cible : HEVC x265)
+
+| Codec source | Bitrate | Action | Résultat |
+|--------------|---------|--------|----------|
+| **HEVC** | ≤ seuil* | `passthrough` | Vidéo copiée, audio traité |
+| **HEVC** | > seuil* | `encode` | Réencodage HEVC |
+| **H.264/AVC** | * | `encode` | Conversion → HEVC |
+| **MPEG4/autres** | * | `encode` | Conversion → HEVC |
+| **4K (2160p)** | * | `encode + scale` | Downscale → 1080p |
+
+> \* Seuil = `MAXRATE × (1 + tolérance)` : série 2772 kbps, film 3520 kbps (tolérance 10%)
+
+#### Options `--force`
+
+| Option | Effet |
+|--------|-------|
+| `--force-audio` | Ignore la logique smart, force conversion vers AAC |
+| `--force-video` | Ignore le passthrough, force réencodage HEVC |
+| `--force` | Active les deux options ci-dessus |
 
 ### Variables modifiables (`lib/config.sh`)
 

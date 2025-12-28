@@ -328,12 +328,20 @@ for test_file in "${TEST_FILES[@]}"; do
     
     # Affichage condensé : afficher le résultat final
     if [[ "$VERBOSE" != true ]]; then
+        # Indicateur de skip : ⚠ si des tests ont été ignorés
+        skip_indicator=""
+        skip_indicator_plain=""
+        if [[ $local_skipped -gt 0 ]]; then
+            skip_indicator=" ${YELLOW}⚠${NC}"
+            skip_indicator_plain=" ⚠"
+        fi
+        
         if [[ $local_failed -eq 0 ]]; then
-            printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-45s ${DIM}(%2d/%-2d)${NC}\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" >/dev/tty
-            printf "✓  [%2d/%-2d] %-45s (%2d/%-2d)\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" >> "$LOG_FILE"
+            printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-45s ${DIM}(%2d/%-2d)${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator" >/dev/tty
+            printf "✓  [%2d/%-2d] %-45s (%2d/%-2d)%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
         else
-            printf "\r${RED}✗${NC}  [%2d/%-2d] %-45s ${RED}%2d échec(s)${NC} ${DIM}/ %-2d${NC}\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" >/dev/tty
-            printf "✗  [%2d/%-2d] %-45s %2d échec(s) / %-2d\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" >> "$LOG_FILE"
+            printf "\r${RED}✗${NC}  [%2d/%-2d] %-45s ${RED}%2d échec(s)${NC} ${DIM}/ %-2d${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator" >/dev/tty
+            printf "✗  [%2d/%-2d] %-45s %2d échec(s) / %-2d%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
             
             # Stocker pour le résumé
             FAILED_FILES+=("$test_file")

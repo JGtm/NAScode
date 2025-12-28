@@ -83,10 +83,9 @@ STUB
     [ "$should_convert" -eq 1 ]
 }
 
-@test "anti-upscaling: bitrate source inconnu codec moins bon → conversion (stub)" {
+@test "codec inefficace: E-AC3 toujours converti même sans bitrate détectable (stub)" {
     # Stub ffprobe pour simuler audio E-AC3 sans bitrate détectable
-    # E-AC3 (rang 3) < AAC (rang 4) donc codec moins bon
-    # Avec bitrate inconnu sur codec moins bon, la logique smart convertit par sécurité
+    # E-AC3 est un codec INEFFICACE (rang 2) → toujours convertir vers codec efficace
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -98,20 +97,20 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     PATH="$stub_dir:$PATH"
     
-    AUDIO_CODEC="aac"
+    AUDIO_CODEC="opus"  # Cible Opus (efficace)
     AUDIO_BITRATE_KBPS=0
     
     local result should_convert
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Smart codec: E-AC3 (moins bon que AAC) avec bitrate inconnu → convert
+    # E-AC3 est inefficace → TOUJOURS convertir vers Opus
     [ "$should_convert" -eq 1 ]
 }
 
-@test "anti-upscaling: bitrate source ≤ cible → pas de conversion (stub)" {
-    # Stub ffprobe pour simuler audio AC3 à 128kbps (< cible AAC 160k)
-    # AC3 (rang 2) < AAC (rang 4) mais anti-upscaling car 128k < 160k
+@test "codec inefficace: AC3 toujours converti même à bas bitrate (stub)" {
+    # Stub ffprobe pour simuler audio AC3 à 128kbps (< cible Opus 128k)
+    # AC3 est un codec INEFFICACE (rang 1) → toujours convertir, pas d'anti-upscaling
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -123,7 +122,7 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     PATH="$stub_dir:$PATH"
     
-    AUDIO_CODEC="aac"  # Cible AAC 160k
+    AUDIO_CODEC="opus"  # Cible Opus 128k
     AUDIO_BITRATE_KBPS=0
     
     local result should_convert source_codec source_bitrate
@@ -135,14 +134,14 @@ STUB
     # Vérifier que le format de retour est correct
     [ "$source_codec" = "ac3" ]
     [ "$source_bitrate" -eq 128 ]
-    # Règle anti-upscaling: 128k ≤ 160k → should_convert=0
-    [ "$should_convert" -eq 0 ]
+    # AC3 est inefficace → TOUJOURS convertir vers Opus
+    [ "$should_convert" -eq 1 ]
 }
 
-@test "anti-upscaling: bitrate source dans la marge 10% → pas de conversion (stub)" {
+@test "codec inefficace: E-AC3 toujours converti même à bitrate modéré (stub)" {
     # Stub ffprobe pour simuler audio E-AC3 à 170kbps
-    # Cible AAC 160k, seuil = 160 * 1.1 = 176k
-    # 170k < 176k donc pas de conversion
+    # E-AC3 est un codec INEFFICACE → toujours convertir vers Opus
+    # Pas de marge de tolérance pour les codecs inefficaces
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -154,34 +153,32 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     PATH="$stub_dir:$PATH"
     
-    AUDIO_CODEC="aac"  # Cible AAC 160k
+    AUDIO_CODEC="opus"  # Cible Opus 128k
     AUDIO_BITRATE_KBPS=0
     
     local result should_convert
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Règle 4: 170k < 176k (seuil 10%) → should_convert=0
-    [ "$should_convert" -eq 0 ]
+    # E-AC3 est inefficace → TOUJOURS convertir vers Opus
+    [ "$should_convert" -eq 1 ]
 }
 
-@test "anti-upscaling: bitrate source > seuil 10% → conversion (stub)" {
-    # Stub ffprobe pour simuler audio E-AC3 à 180kbps
-    # Cible AAC 160k, seuil = 160 * 1.1 = 176k
-    # E-AC3 (rang 3) < AAC (rang 4) donc codec moins bon
-    # 180k > 176k donc conversion
+@test "codec inefficace: E-AC3 à haut bitrate converti (stub)" {
+    # Stub ffprobe pour simuler audio E-AC3 à 384kbps
+    # E-AC3 est un codec INEFFICACE → toujours convertir vers Opus
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
 echo "codec_name=eac3"
-echo "bit_rate=180000"
+echo "bit_rate=384000"
 exit 0
 STUB
     chmod +x "$stub_dir/ffprobe"
     PATH="$stub_dir:$PATH"
     
-    AUDIO_CODEC="aac"  # Cible AAC 160k
+    AUDIO_CODEC="opus"  # Cible Opus 128k
     AUDIO_BITRATE_KBPS=0
     
     local result should_convert source_codec source_bitrate
@@ -192,8 +189,8 @@ STUB
     
     # Vérifier le format de retour
     [ "$source_codec" = "eac3" ]
-    [ "$source_bitrate" -eq 180 ]
-    # Règle: E-AC3 < AAC et 180k > 176k → should_convert=1
+    [ "$source_bitrate" -eq 384 ]
+    # E-AC3 est inefficace → TOUJOURS convertir vers Opus
     [ "$should_convert" -eq 1 ]
 }
 
@@ -223,10 +220,10 @@ STUB
     [ "$should_convert" -eq 1 ]
 }
 
-@test "smart-codec: source meilleure conservée même si cible différente (stub)" {
+@test "smart-codec: source efficace conservée même si cible différente (stub)" {
     # Stub ffprobe pour simuler audio AAC à 256kbps
-    # AAC (rang 4) > AC3 (rang 2) donc AAC est MEILLEUR
-    # Smart codec: on garde le codec source (AAC) au lieu de downgrader vers AC3
+    # AAC (rang 4) est EFFICACE (seuil = 3)
+    # Smart codec: on garde le codec source (AAC) au lieu de downgrader vers AC3 (inefficace)
     # Mais on vérifie si le bitrate source dépasse la limite AAC (160k)
     # 256k > 160k * 1.1 = 176k donc downscale dans le même codec (AAC)
     local stub_dir="$TEST_TEMP_DIR/stub"
@@ -240,14 +237,14 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     PATH="$stub_dir:$PATH"
     
-    AUDIO_CODEC="ac3"  # Cible AC3 (moins bon que AAC)
+    AUDIO_CODEC="ac3"  # Cible AC3 (inefficace)
     AUDIO_BITRATE_KBPS=0
     
     local result should_convert
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Smart codec: AAC meilleur que AC3, 256k > 176k (limite AAC) → downscale
+    # Smart codec: AAC efficace, 256k > 176k (limite AAC) → downscale
     [ "$should_convert" -eq 1 ]
 }
 
@@ -576,29 +573,29 @@ STUB
     [ "$rank" -eq 4 ]
 }
 
-@test "get_audio_codec_rank: eac3 est rang 3" {
+@test "get_audio_codec_rank: eac3 est rang 2 (inefficace)" {
     local rank
     rank=$(get_audio_codec_rank "eac3")
-    [ "$rank" -eq 3 ]
-}
-
-@test "get_audio_codec_rank: ac3 est rang 2" {
-    local rank
-    rank=$(get_audio_codec_rank "ac3")
     [ "$rank" -eq 2 ]
 }
 
-@test "get_audio_codec_rank: flac est lossless (rang >= 6)" {
+@test "get_audio_codec_rank: ac3 est rang 1 (inefficace)" {
+    local rank
+    rank=$(get_audio_codec_rank "ac3")
+    [ "$rank" -eq 1 ]
+}
+
+@test "get_audio_codec_rank: flac est lossless (rang 10)" {
     local rank
     rank=$(get_audio_codec_rank "flac")
-    [ "$rank" -ge 6 ]
+    [ "$rank" -eq 10 ]
 }
 
 @test "is_audio_codec_better_or_equal: opus >= aac" {
     is_audio_codec_better_or_equal "opus" "aac"
 }
 
-@test "is_audio_codec_better_or_equal: aac >= eac3" {
+@test "is_audio_codec_better_or_equal: aac >= eac3 (aac efficace, eac3 inefficace)" {
     is_audio_codec_better_or_equal "aac" "eac3"
 }
 
@@ -616,6 +613,50 @@ STUB
     local bitrate
     bitrate=$(get_audio_codec_target_bitrate "aac")
     [ "$bitrate" -eq 160 ]
+}
+
+###########################################################
+# Tests des fonctions is_audio_codec_efficient et is_audio_codec_lossless
+###########################################################
+
+@test "is_audio_codec_efficient: opus est efficace" {
+    is_audio_codec_efficient "opus"
+}
+
+@test "is_audio_codec_efficient: aac est efficace" {
+    is_audio_codec_efficient "aac"
+}
+
+@test "is_audio_codec_efficient: vorbis est efficace" {
+    is_audio_codec_efficient "vorbis"
+}
+
+@test "is_audio_codec_efficient: eac3 n'est PAS efficace" {
+    ! is_audio_codec_efficient "eac3"
+}
+
+@test "is_audio_codec_efficient: ac3 n'est PAS efficace" {
+    ! is_audio_codec_efficient "ac3"
+}
+
+@test "is_audio_codec_efficient: mp3 n'est PAS efficace" {
+    ! is_audio_codec_efficient "mp3"
+}
+
+@test "is_audio_codec_lossless: flac est lossless" {
+    is_audio_codec_lossless "flac"
+}
+
+@test "is_audio_codec_lossless: truehd est lossless" {
+    is_audio_codec_lossless "truehd"
+}
+
+@test "is_audio_codec_lossless: opus n'est PAS lossless" {
+    ! is_audio_codec_lossless "opus"
+}
+
+@test "is_audio_codec_lossless: aac n'est PAS lossless" {
+    ! is_audio_codec_lossless "aac"
 }
 
 ###########################################################
