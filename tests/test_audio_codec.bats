@@ -238,6 +238,59 @@ STUB
 }
 
 ###########################################################
+# Tests de _should_convert_audio()
+###########################################################
+
+@test "_should_convert_audio: retourne 1 (false) si AUDIO_CODEC=copy" {
+    AUDIO_CODEC="copy"
+    
+    run _should_convert_audio "/fake/file.mkv"
+    [ "$status" -eq 1 ]
+}
+
+@test "_should_convert_audio: retourne 0 (true) si conversion avantageuse (stub)" {
+    # Stub ffprobe pour simuler audio E-AC3 à 640kbps
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=eac3"
+echo "bit_rate=640000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+    
+    AUDIO_CODEC="aac"  # Cible AAC 160k
+    AUDIO_BITRATE_KBPS=0
+    
+    run _should_convert_audio "/fake/file.mkv"
+    # 640k >> 160k * 1.1 → conversion avantageuse → retourne 0 (true)
+    [ "$status" -eq 0 ]
+}
+
+@test "_should_convert_audio: retourne 1 (false) si même codec (stub)" {
+    # Stub ffprobe pour simuler audio AAC à 160kbps
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=aac"
+echo "bit_rate=160000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+    
+    AUDIO_CODEC="aac"
+    AUDIO_BITRATE_KBPS=0
+    
+    run _should_convert_audio "/fake/file.mkv"
+    # Même codec → pas de conversion → retourne 1 (false)
+    [ "$status" -eq 1 ]
+}
+
+###########################################################
 # Tests de _get_audio_target_bitrate()
 ###########################################################
 

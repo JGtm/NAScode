@@ -27,7 +27,8 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 ### Gestion des fichiers
 - **File d'attente intelligente** avec index persistant
 - **Modes de tri** : par taille (asc/desc) ou par nom (asc/desc)
-- **Skip automatique** : fichiers déjà en x265 avec bitrate optimisé
+- **Skip automatique** : fichiers déjà en x265/AV1 avec bitrate optimisé
+- **Video passthrough** : si la vidéo est conforme mais l'audio peut être optimisé, seul l'audio est réencodé (vidéo copiée)
 - **Suffixe dynamique** reflétant les paramètres : `_x265_crf23_1080p_medium`
 - **Transfert vérifié** avec checksum SHA256
 

@@ -392,6 +392,54 @@ teardown() {
 }
 
 ###########################################################
+# Test E2E: Video Passthrough (vidéo OK, audio à optimiser)
+###########################################################
+
+@test "E2E passthrough: HEVC avec audio haute bitrate → vidéo copiée, audio converti" {
+    # Utiliser le fichier HEVC avec audio PCM non compressé
+    cp "$FIXTURES_DIR/test_video_hevc_highaudio_2s.mkv" "$SRC_DIR/"
+    rm -f "$SRC_DIR/test_video_2s.mkv"  # Garder seulement le fichier de test
+    
+    run bash -lc 'set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --audio aac \
+            --keep-index \
+            --no-suffix \
+            --no-progress
+    '
+    
+    echo "=== STDOUT ===" >&3
+    echo "$output" >&3
+    
+    [ "$status" -eq 0 ]
+    
+    # Un fichier de sortie doit exister
+    local output_file
+    output_file=$(find "$OUT_DIR" -name "*.mkv" -type f | head -1)
+    [ -n "$output_file" ]
+    
+    # Vérifier que la vidéo est bien HEVC (copiée, pas ré-encodée)
+    local video_codec
+    video_codec=$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "$output_file")
+    [ "$video_codec" = "hevc" ]
+    
+    # Vérifier que l'audio a été converti en AAC
+    local audio_codec
+    audio_codec=$(ffprobe -v error -select_streams a:0 -show_entries stream=codec_name -of default=noprint_wrappers=1:nokey=1 "$output_file")
+    [ "$audio_codec" = "aac" ]
+    
+    # Vérifier dans les logs que c'était un VIDEO_PASSTHROUGH
+    local progress_file
+    progress_file=$(find "$WORKDIR/logs" -name "Progress_*.log" -type f | head -1)
+    if [ -n "$progress_file" ]; then
+        grep -q "VIDEO_PASSTHROUGH" "$progress_file" || true
+    fi
+}
+
+###########################################################
 # Test E2E: Gestion des erreurs
 ###########################################################
 

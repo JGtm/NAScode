@@ -11,7 +11,7 @@ export_variables() {
     # FONCTIONS DE CONVERSION PRINCIPALES
     # ========================================================
     export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel
-    export -f should_skip_conversion clean_number custom_pv
+    export -f should_skip_conversion _determine_conversion_mode clean_number custom_pv
     
     # --- Fonctions de paramètres vidéo (video_params.sh) ---
     export -f _select_output_pix_fmt _build_downscale_filter_if_needed
@@ -20,10 +20,11 @@ export_variables() {
     
     # --- Fonctions d'encodage (transcode_video.sh) ---
     export -f _setup_video_encoding_params _setup_sample_mode_params
-    export -f _run_ffmpeg_encode _execute_conversion
+    export -f _run_ffmpeg_encode _execute_conversion _execute_video_passthrough
     
     # --- Fonctions audio et sous-titres ---
     export -f _get_audio_target_bitrate _get_audio_conversion_info _build_audio_params _build_stream_mapping
+    export -f _should_convert_audio
     
     # ========================================================
     # FONCTIONS DE PRÉPARATION ET FINALISATION
@@ -72,7 +73,7 @@ export_variables() {
     # ========================================================
     # VARIABLES DE CONFIGURATION ENCODAGE
     # ========================================================
-    export DRYRUN CONVERSION_MODE KEEP_INDEX SORT_MODE
+    export DRYRUN CONVERSION_MODE CONVERSION_ACTION KEEP_INDEX SORT_MODE
     export ENCODER_PRESET TARGET_BITRATE_KBPS TARGET_BITRATE_FFMPEG HWACCEL
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
     export X265_EXTRA_PARAMS X265_PASS1_FAST

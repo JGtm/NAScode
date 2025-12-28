@@ -166,6 +166,40 @@ teardown() {
 }
 
 ###########################################################
+# Tests de _determine_conversion_mode() et CONVERSION_ACTION
+###########################################################
+
+@test "_determine_conversion_mode: mode skip si pas de codec" {
+    set_conversion_mode_parameters
+    CONVERSION_ACTION=""
+    _determine_conversion_mode "" "5000000" "test.mkv" "/source/test.mkv" || true
+    [ "$CONVERSION_ACTION" = "skip" ]
+}
+
+@test "_determine_conversion_mode: mode skip si vidéo conforme (hevc + bitrate ok)" {
+    set_conversion_mode_parameters
+    AUDIO_CODEC="copy"  # Pas de conversion audio
+    CONVERSION_ACTION=""
+    # Fichier fictif - _should_convert_audio retournera 1 (false) car AUDIO_CODEC=copy
+    _determine_conversion_mode "hevc" "2000000" "test.mkv" "/nonexistent/test.mkv" || true
+    [ "$CONVERSION_ACTION" = "skip" ]
+}
+
+@test "_determine_conversion_mode: mode full si h264" {
+    set_conversion_mode_parameters
+    CONVERSION_ACTION=""
+    _determine_conversion_mode "h264" "2000000" "test.mkv" "/source/test.mkv" || true
+    [ "$CONVERSION_ACTION" = "full" ]
+}
+
+@test "_determine_conversion_mode: mode full si hevc avec bitrate élevé" {
+    set_conversion_mode_parameters
+    CONVERSION_ACTION=""
+    _determine_conversion_mode "hevc" "5000000" "test.mkv" "/source/test.mkv" || true
+    [ "$CONVERSION_ACTION" = "full" ]
+}
+
+###########################################################
 # Tests de _get_temp_filename()
 ###########################################################
 
