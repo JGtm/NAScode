@@ -24,47 +24,69 @@ get_full_media_metadata() {
     parsed=$(echo "$output" | awk -F= '
     BEGIN {
         v_idx=-1; a_idx=-1;
-        v_codec=""; v_bitrate=0; v_width=0; v_height=0; v_pix_fmt=""; v_bps=0;
-        a_codec=""; a_bitrate=0; a_bps=0;
+        # Global results
+        res_v_bitrate=0; res_v_codec=""; res_v_width=0; res_v_height=0; res_v_pix_fmt="";
+        res_a_codec=""; res_a_bitrate=0;
+        
+        # Format info
         f_duration=0; f_bitrate=0;
-        current_index=-1; current_type="";
+        
+        # Current stream info
+        curr_idx=-1; curr_type=""; curr_codec=""; curr_bitrate=0; curr_width=0; curr_height=0; curr_pix_fmt=""; curr_bps=0;
     }
-    /^index=/ { current_index=$2 }
-    /^codec_type=/ { current_type=$2 }
-    /^codec_name=/ { 
-        if (current_type=="video" && v_idx==-1) { v_idx=current_index; v_codec=$2 }
-        if (current_type=="audio" && a_idx==-1) { a_idx=current_index; a_codec=$2 }
+
+    # Function to commit current stream
+    function commit_stream() {
+        if (curr_idx == -1) return;
+        
+        if (curr_type == "video" && v_idx == -1) {
+            v_idx = curr_idx;
+            res_v_codec = curr_codec;
+            res_v_bitrate = curr_bitrate;
+            if (res_v_bitrate == 0 || res_v_bitrate == "N/A") res_v_bitrate = curr_bps;
+            res_v_width = curr_width;
+            res_v_height = curr_height;
+            res_v_pix_fmt = curr_pix_fmt;
+        }
+        if (curr_type == "audio" && a_idx == -1) {
+            a_idx = curr_idx;
+            res_a_codec = curr_codec;
+            res_a_bitrate = curr_bitrate;
+            if (res_a_bitrate == 0 || res_a_bitrate == "N/A") res_a_bitrate = curr_bps;
+        }
     }
+
+    /^index=/ {
+        commit_stream();
+        curr_idx = $2;
+        # Reset current stream vars
+        curr_type=""; curr_codec=""; curr_bitrate=0; curr_width=0; curr_height=0; curr_pix_fmt=""; curr_bps=0;
+    }
+
+    /^codec_type=/ { curr_type = $2 }
+    /^codec_name=/ { curr_codec = $2 }
     /^bit_rate=/ {
-        if (current_type=="video" && current_index==v_idx) v_bitrate=$2
-        if (current_type=="audio" && current_index==a_idx) a_bitrate=$2
-        if (current_index==-1) f_bitrate=$2  # format bit_rate n a pas d index
+        if (curr_idx != -1) curr_bitrate = $2
+        else f_bitrate = $2
     }
-    /^width=/ { if (current_type=="video" && current_index==v_idx) v_width=$2 }
-    /^height=/ { if (current_type=="video" && current_index==v_idx) v_height=$2 }
-    /^pix_fmt=/ { if (current_type=="video" && current_index==v_idx) v_pix_fmt=$2 }
-    /^TAG:BPS=/ {
-        if (current_type=="video" && current_index==v_idx) v_bps=$2
-        if (current_type=="audio" && current_index==a_idx) a_bps=$2
-    }
-    /^duration=/ { f_duration=$2 }
+    /^width=/ { curr_width = $2 }
+    /^height=/ { curr_height = $2 }
+    /^pix_fmt=/ { curr_pix_fmt = $2 }
+    /^TAG:BPS=/ { curr_bps = $2 }
+    /^duration=/ { f_duration = $2 }
     
     END {
-        # Logique bitrate vidéo : stream > bps > container
-        final_v_bitrate = v_bitrate;
-        if (final_v_bitrate == 0 || final_v_bitrate == "N/A") final_v_bitrate = v_bps;
-        if (final_v_bitrate == 0 || final_v_bitrate == "N/A") final_v_bitrate = f_bitrate;
+        commit_stream(); # Commit the last stream
         
-        # Logique bitrate audio : stream > bps
-        final_a_bitrate = a_bitrate;
-        if (final_a_bitrate == 0 || final_a_bitrate == "N/A") final_a_bitrate = a_bps;
+        # Final logic
+        if (res_v_bitrate == 0 || res_v_bitrate == "N/A") res_v_bitrate = f_bitrate;
         
-        # Nettoyage "N/A"
-        if (final_v_bitrate == "N/A") final_v_bitrate=0;
-        if (final_a_bitrate == "N/A") final_a_bitrate=0;
+        # Cleanup
+        if (res_v_bitrate == "N/A") res_v_bitrate=0;
+        if (res_a_bitrate == "N/A") res_a_bitrate=0;
         if (f_duration == "N/A") f_duration=0;
         
-        print final_v_bitrate "|" v_codec "|" f_duration "|" v_width "|" v_height "|" v_pix_fmt "|" a_codec "|" final_a_bitrate
+        print res_v_bitrate "|" res_v_codec "|" f_duration "|" res_v_width "|" res_v_height "|" res_v_pix_fmt "|" res_a_codec "|" res_a_bitrate
     }
     ')
     

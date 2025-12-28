@@ -72,7 +72,7 @@ translate_error() {
 # Compte le nombre de tests dans un fichier .bats
 count_tests_in_file() {
     local file="$1"
-    grep -c '^@test ' "$file" 2>/dev/null || echo "0"
+    grep -c '^@test ' "$file" 2>/dev/null || true
 }
 
 # Parse la sortie TAP de bats pour extraire les résultats
