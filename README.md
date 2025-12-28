@@ -40,11 +40,16 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 ### Audio
 - **Multi-codec** : choix du codec audio via `-a/--audio`
   - `copy` (défaut) : copie l'audio source sans modification
-  - `aac` : AAC 160 kbps (excellent pour séries)
-  - `ac3` : Dolby Digital 384 kbps
-  - `opus` : Opus 128 kbps (très efficace)
-- **Anti-upscaling intelligent** : ne convertit que si le gain est réel (>20%)
-- Suffixe audio dans le nom de fichier (`_aac`, `_opus`, etc.)
+  - `aac` : AAC 160 kbps (polyvalent)
+  - `ac3` : Dolby Digital 640 kbps (rétro-compatibilité)
+  - `eac3` : E-AC3/DD+ 384 kbps (séries HD/Atmos)
+  - `opus` : Opus 128 kbps (le plus efficace)
+- **Smart Codec** : si la source a un codec plus efficace que la cible, il est conservé
+  - Hiérarchie : Opus > AAC > E-AC3 > AC3 > FLAC (lossless)
+  - Le bitrate est limité selon le codec effectif (pas d'upscaling)
+  - Utiliser `--force-audio` pour forcer la conversion vers le codec cible
+- **Anti-upscaling intelligent** : ne convertit que si le gain est réel (>10%)
+- Suffixe audio dans le nom de fichier (`_aac`, `_opus`, `_eac3`, etc.)
 
 ## 📋 Prérequis
 
@@ -109,7 +114,7 @@ bash nascode [options]
 | `-f, --file FILE` | Convertir un fichier unique (bypass index/queue) |
 | `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
 | `-c, --codec CODEC` | Codec vidéo : `hevc` (défaut) ou `av1` |
-| `-a, --audio CODEC` | Codec audio : `copy` (défaut), `aac`, `ac3`, `opus` |
+| `-a, --audio CODEC` | Codec audio : `copy` (défaut), `aac`, `ac3`, `eac3`, `opus` |
 | `-d, --dry-run` | Simulation sans encodage |
 | `-t, --sample` | Mode sample : encode ~30s pour test rapide |
 | `-v, --vmaf` | Activer l'évaluation VMAF |
@@ -122,6 +127,9 @@ bash nascode [options]
 | `-e, --exclude PATTERN` | Exclure des fichiers (glob) |
 | `-q, --queue FILE` | Utiliser une file d'attente personnalisée |
 | `-p, --off-peak [HH:MM-HH:MM]` | Mode heures creuses (défaut : `22:00-06:00`) |
+| `--force-audio` | Forcer la conversion audio vers le codec cible (bypass smart codec) |
+| `--force-video` | Forcer le réencodage vidéo (bypass smart codec) |
+| `--force` | Raccourci pour `--force-audio` et `--force-video` |
 | `-h, --help` | Afficher l'aide colorée |
 
 ### Exemples
@@ -178,24 +186,29 @@ bash nascode -l 10 -k
 
 ### Codecs audio
 
-| Codec | Bitrate | Usage recommandé |
-|-------|---------|------------------|
-| `copy` | - | Défaut, conserve l'original |
-| `aac` | 160 kbps | Séries (excellent compromis) |
-| `ac3` | 384 kbps | Compatibilité lecteurs anciens |
-| `opus` | 128 kbps | Maximum d'efficacité |
+| Codec | Bitrate | Usage recommandé | Rang efficacité |
+|-------|---------|------------------|-----------------|
+| `opus` | 128 kbps | Maximum d'efficacité | 🥇 1er |
+| `aac` | 160 kbps | Polyvalent, compatible | 🥈 2e |
+| `eac3` | 384 kbps | Séries HD, Atmos | 🥉 3e |
+| `ac3` | 640 kbps | Rétro-compatibilité | 4e |
+| `copy` | - | Conserve l'original | - |
 
-> **Logique anti-upscaling** : la conversion audio n'est déclenchée que si le bitrate source dépasse la cible de +10% minimum. Cela évite de "gonfler" un audio déjà compressé.
+> **Logique Smart Codec** : Par défaut, si la source a un codec plus efficace que la cible, il est conservé (ex: source Opus → cible AAC → on garde Opus). Le bitrate est limité selon le codec effectif. Utilisez `--force-audio` pour forcer la conversion vers le codec cible.
+
+> **Anti-upscaling** : la conversion audio n'est déclenchée que si le bitrate source dépasse la cible de +10% minimum. Cela évite de "gonfler" un audio déjà compressé.
 
 ### Variables modifiables (`lib/config.sh`)
 
 ```bash
 CONVERSION_MODE="serie"           # Mode par défaut
 VIDEO_CODEC="hevc"                # Codec vidéo (hevc, av1)
-AUDIO_CODEC="aac"                 # Codec audio (aac, ac3, opus, copy)
+AUDIO_CODEC="aac"                 # Codec audio (aac, ac3, eac3, opus, copy)
 SORT_MODE="name_asc"              # Tri de la file d'attente
 SAMPLE_DURATION=30                # Durée du segment test (secondes)
 SKIP_TOLERANCE_PERCENT=10         # Tolérance pour skip (% au-dessus du maxrate)
+FORCE_AUDIO_CODEC=false           # Forcer la conversion audio (bypass smart codec)
+FORCE_VIDEO_CODEC=false           # Forcer le réencodage vidéo (bypass smart codec)
 ```
 
 > **Seuil de skip dynamique** : le seuil est calculé automatiquement selon `MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)`. Il s'adapte au mode (série/film) et au codec (HEVC/AV1).

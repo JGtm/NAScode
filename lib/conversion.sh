@@ -159,7 +159,7 @@ _prepare_file_paths() {
     [[ -n "$relative_dir" ]] && final_dir="$output_dir/$relative_dir"
     local base_name="${filename%.*}"
 
-    # Suffixe effectif (par fichier) : inclut bitrate adapté + résolution.
+    # Suffixe effectif (par fichier) : inclut bitrate adapté + résolution + codec audio effectif.
     # Fallback : si les fonctions ne sont pas chargées (tests/unitaires), on garde SUFFIX_STRING.
     local effective_suffix="$SUFFIX_STRING"
     if [[ -n "$SUFFIX_STRING" ]] && declare -f get_video_stream_props &>/dev/null && declare -f _build_effective_suffix_for_dims &>/dev/null; then
@@ -167,7 +167,8 @@ _prepare_file_paths() {
         stream_props=$(get_video_stream_props "$file_original")
         local input_width input_height _pix_fmt
         IFS='|' read -r input_width input_height _pix_fmt <<< "$stream_props"
-        effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height")
+        # Passer le fichier original pour déterminer le codec audio effectif (smart codec)
+        effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height" "$file_original")
     fi
 
     if [[ "$DRYRUN" == true ]]; then

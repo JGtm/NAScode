@@ -127,15 +127,24 @@ readonly ADAPTIVE_720P_MAX_HEIGHT=720
 readonly ADAPTIVE_720P_SCALE_PERCENT=70
 
 # ----- Paramètres audio par codec -----
-# Bitrates par défaut (kbps) pour chaque codec audio
+# Bitrates cibles (kbps) pour chaque codec audio
 # Ces valeurs sont utilisées si AUDIO_BITRATE_KBPS=0 (auto)
-readonly AUDIO_BITRATE_AAC_DEFAULT=160      # AAC : 160k pour 5.1 (transparent pour séries)
-readonly AUDIO_BITRATE_AC3_DEFAULT=384      # AC3 : 384k minimum correct pour 5.1
+# Hiérarchie qualité/efficacité (du meilleur au moins bon) :
+#   Opus > AAC > E-AC3 > AC3 > FLAC (lossless, cas spécial)
 readonly AUDIO_BITRATE_OPUS_DEFAULT=128     # Opus : 128k excellent (plus efficace)
+readonly AUDIO_BITRATE_AAC_DEFAULT=160      # AAC : 160k pour 5.1 (polyvalent)
+readonly AUDIO_BITRATE_EAC3_DEFAULT=384     # E-AC3 (DD+) : 384k pour séries HD/Atmos
+readonly AUDIO_BITRATE_AC3_DEFAULT=640      # AC3 (Dolby) : 640k rétro-compatibilité
+readonly AUDIO_BITRATE_FLAC_DEFAULT=0       # FLAC : variable (lossless, pas de limite)
 
 # Seuil de conversion : ne convertir l'audio que si le bitrate source dépasse ce seuil
 # Cela évite de "gonfler" un audio déjà compressé à bas débit
 readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
+
+# ----- Mode FORCE (bypasse la logique smart codec) -----
+# Si activé, force la conversion vers le codec cible même si la source est "meilleure"
+FORCE_AUDIO_CODEC=false   # --force-audio : force le codec audio cible
+FORCE_VIDEO_CODEC=false   # --force-video : force le réencodage vidéo
 
 ###########################################################
 # GESTION DES MODES DE CONVERSION

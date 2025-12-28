@@ -84,17 +84,17 @@ parse_arguments() {
             -a|--audio)
                 if [[ -n "${2:-}" ]]; then
                     case "$2" in
-                        copy|aac|ac3|opus)
+                        copy|aac|ac3|eac3|opus)
                             AUDIO_CODEC="$2"
                             ;;
                         *)
-                            print_error "Codec audio invalide : '$2'. Valeurs acceptées : copy, aac, ac3, opus"
+                            print_error "Codec audio invalide : '$2'. Valeurs acceptées : copy, aac, ac3, eac3, opus"
                             exit 1
                             ;;
                     esac
                     shift 2
                 else
-                    print_error "-a/--audio doit être suivi d'un nom de codec (copy, aac, ac3, opus)"
+                    print_error "-a/--audio doit être suivi d'un nom de codec (copy, aac, ac3, eac3, opus)"
                     exit 1
                 fi
                 ;;
@@ -149,6 +149,20 @@ parse_arguments() {
                     # Pas de plage fournie, utiliser les valeurs par défaut
                     shift
                 fi
+                ;;
+            --force-audio)
+                FORCE_AUDIO_CODEC=true
+                shift
+                ;;
+            --force-video)
+                FORCE_VIDEO_CODEC=true
+                shift
+                ;;
+            --force)
+                # Raccourci pour forcer les deux
+                FORCE_AUDIO_CODEC=true
+                FORCE_VIDEO_CODEC=true
+                shift
                 ;;
             -*) 
                 # On vérifie si l'argument est une option courte groupée
@@ -222,11 +236,14 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-v, --vmaf${NOCOLOR}                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
     ${GREEN}-t, --sample${NOCOLOR}                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
     ${GREEN}-f, --file${NOCOLOR} FILE              Convertir un fichier unique (bypass index/queue) (ARG)
-    ${GREEN}-a, --audio${NOCOLOR} CODEC           Codec audio : copy, aac, ac3, opus (ARG) [défaut : copy]
-    ${GREEN}-2, --two-pass${NOCOLOR}               Forcer le mode two-pass (défaut : single-pass CRF 23 pour séries)
+    ${GREEN}-a, --audio${NOCOLOR} CODEC            Codec audio cible : copy, aac, ac3, eac3, opus (ARG) [défaut : aac]
+    ${GREEN}-2, --two-pass${NOCOLOR}               Forcer le mode two-pass (défaut : single-pass CRF 21 pour séries)
     ${GREEN}-c, --codec${NOCOLOR} CODEC            Codec vidéo cible : hevc, av1 (ARG) [défaut : hevc]
     ${GREEN}-p, --off-peak${NOCOLOR} [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
                                  PLAGE au format HH:MM-HH:MM (ARG optionnel) [défaut : 22:00-06:00]
+    ${GREEN}--force-audio${NOCOLOR}                Forcer la conversion audio vers le codec cible (bypass smart codec)
+    ${GREEN}--force-video${NOCOLOR}                Forcer le réencodage vidéo (bypass smart codec)
+    ${GREEN}--force${NOCOLOR}                      Raccourci pour --force-audio et --force-video
 
 ${CYAN}Remarque sur les options courtes groupées :${NOCOLOR}
     ${DIM}- Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
@@ -235,6 +252,12 @@ ${CYAN}Remarque sur les options courtes groupées :${NOCOLOR}
         doivent être fournies séparément avec leur valeur, par exemple : -l 5 ou --limit 5.
         par exemple : ./conversion.sh -xdrk -l 5  (groupement de flags puis -l 5 séparé),
                       ./conversion.sh --source /path --limit 10.${NOCOLOR}
+
+${CYAN}Logique Smart Codec (audio) :${NOCOLOR}
+  ${DIM}Par défaut, si la source a un codec audio plus efficace que la cible, il est conservé.
+  Hiérarchie (du meilleur au moins bon) : Opus > AAC > E-AC3 > AC3
+  Le bitrate est limité selon le codec effectif (ex: Opus max 128k, AAC max 160k).
+  Utilisez --force-audio pour toujours convertir vers le codec cible.${NOCOLOR}
 
 ${CYAN}Modes de conversion :${NOCOLOR}
   ${YELLOW}film${NOCOLOR}          : Qualité maximale

@@ -132,13 +132,15 @@ _compute_effective_bitrate_kbps_for_height() {
 
 # Construit le suffixe effectif par fichier à partir des dimensions source.
 # Inclut : bitrate effectif ou CRF + hauteur de sortie estimée (ex: 720p) + preset.
-# Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_tuned][_opus][_sample]
-# Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_tuned][_opus][_sample]
+# Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_<audio_codec>][_sample]
+# Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_<audio_codec>][_sample]
+# Usage: _build_effective_suffix_for_dims <width> <height> [input_file]
 _build_effective_suffix_for_dims() {
     local src_width="$1"
     local src_height="$2"
+    local input_file="${3:-}"
 
-    # Suffixe basé sur le codec (x265, av1, etc.)
+    # Suffixe basé sur le codec vidéo (x265, av1, etc.)
     local codec_suffix="x265"
     if declare -f get_codec_suffix &>/dev/null; then
         codec_suffix=$(get_codec_suffix "${VIDEO_CODEC:-hevc}")
@@ -192,11 +194,25 @@ _build_effective_suffix_for_dims() {
     # Preset d'encodage
     suffix="${suffix}_${ENCODER_PRESET}"
 
-    # Indicateur du codec audio (si différent de copy)
-    case "${AUDIO_CODEC:-copy}" in
-        aac)  suffix="${suffix}_aac" ;;
-        ac3)  suffix="${suffix}_ac3" ;;
-        opus) suffix="${suffix}_opus" ;;
+    # Indicateur du codec audio effectif (smart codec logic)
+    # Si on a le fichier d'entrée, utiliser la logique smart pour déterminer le codec effectif
+    local audio_suffix=""
+    if [[ -n "$input_file" && -f "$input_file" ]] && declare -f _get_effective_audio_codec &>/dev/null; then
+        audio_suffix=$(_get_effective_audio_codec "$input_file")
+    else
+        # Fallback : utiliser le codec cible configuré
+        audio_suffix="${AUDIO_CODEC:-copy}"
+    fi
+    
+    # Ajouter le suffixe audio (sauf si copy)
+    case "$audio_suffix" in
+        copy|unknown|"")  ;;  # Pas de suffixe pour copy
+        aac)   suffix="${suffix}_aac" ;;
+        ac3)   suffix="${suffix}_ac3" ;;
+        eac3)  suffix="${suffix}_eac3" ;;
+        opus)  suffix="${suffix}_opus" ;;
+        flac)  suffix="${suffix}_flac" ;;
+        *)     suffix="${suffix}_${audio_suffix}" ;;  # Autres codecs
     esac
 
     # Indicateur mode sample (segment de test)
