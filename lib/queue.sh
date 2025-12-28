@@ -201,13 +201,20 @@ _handle_existing_index() {
 
 _count_total_video_files() {
     local exclude_dir_name="$1"
+    local count=0
     
-    # Calcul du nombre total de fichiers candidats (lent, mais nécessaire pour l'affichage de progression)
-    find "$SOURCE" \
+    # Calcul du nombre total de fichiers candidats (applique les mêmes exclusions que l'indexation)
+    while IFS= read -r -d $'\0' f; do
+        # Appliquer les mêmes exclusions que _index_video_files
+        if is_excluded "$f"; then continue; fi
+        if [[ "$f" =~ \.(sh|txt)$ ]]; then continue; fi
+        ((count++))
+    done < <(find "$SOURCE" \
         -wholename "$exclude_dir_name" -prune \
         -o \
-        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null | \
-    tr -cd '\0' | wc -c
+        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null)
+    
+    echo "$count"
 }
 
 _index_video_files() {
