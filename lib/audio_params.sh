@@ -230,24 +230,57 @@ _get_smart_audio_decision() {
 }
 
 # Analyse l'audio d'un fichier et détermine si la conversion est avantageuse.
-# RÉTRO-COMPATIBILITÉ : utilise _get_smart_audio_decision en interne
+# RÉTRO-COMPATIBILITÉ : retourne le format original source_codec|source_bitrate_kbps|should_convert
 # Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert)
 _get_audio_conversion_info() {
     local input_file="$1"
     
-    local decision
+    # Si mode copy, toujours copier (format original)
+    if [[ "${AUDIO_CODEC:-copy}" == "copy" ]]; then
+        echo "copy|0|0"
+        return 0
+    fi
+    
+    # Récupérer les infos audio du premier flux audio (pour le bitrate source)
+    local audio_info
+    audio_info=$(ffprobe -v error \
+        -select_streams a:0 \
+        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
+        -of default=noprint_wrappers=1 \
+        "$input_file" 2>/dev/null || true)
+    
+    local source_codec source_bitrate source_bitrate_tag
+    source_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
+    source_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
+    source_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
+    
+    # Utiliser le tag BPS si bitrate direct non disponible
+    if [[ -z "$source_bitrate" || "$source_bitrate" == "N/A" ]]; then
+        source_bitrate="$source_bitrate_tag"
+    fi
+    
+    # Convertir en kbps
+    if declare -f clean_number &>/dev/null; then
+        source_bitrate=$(clean_number "$source_bitrate")
+    fi
+    local source_bitrate_kbps=0
+    if [[ -n "$source_bitrate" && "$source_bitrate" =~ ^[0-9]+$ ]]; then
+        source_bitrate_kbps=$((source_bitrate / 1000))
+    fi
+    
+    # Utiliser la décision smart pour déterminer should_convert
+    local decision action
     decision=$(_get_smart_audio_decision "$input_file")
+    action=$(echo "$decision" | cut -d'|' -f1)
     
-    local action effective_codec target_bitrate reason
-    IFS='|' read -r action effective_codec target_bitrate reason <<< "$decision"
-    
-    # Déterminer should_convert pour rétro-compatibilité
+    # Déterminer should_convert
     local should_convert=0
     if [[ "$action" == "convert" || "$action" == "downscale" ]]; then
         should_convert=1
     fi
     
-    echo "${effective_codec}|${target_bitrate}|${should_convert}"
+    # Retourner le format original : source_codec|source_bitrate_kbps|should_convert
+    echo "${source_codec}|${source_bitrate_kbps}|${should_convert}"
 }
 
 # Détermine si l'audio d'un fichier doit être converti.

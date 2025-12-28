@@ -180,14 +180,14 @@ STUB
     [ "$should_convert" -eq 0 ]
 }
 
-@test "AUDIO: audio déjà en AAC n'est pas reconverti si cible AAC (stub)" {
-    # Créer un stub ffprobe qui simule un fichier avec audio AAC
+@test "AUDIO: audio AAC haut bitrate déclenche downscale si cible AAC (stub)" {
+    # Créer un stub ffprobe qui simule un fichier avec audio AAC haut bitrate
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
-# Simuler audio AAC à 256kbps
+# Simuler audio AAC à 256kbps (> cible 160k * 1.1 = 176k)
 echo "codec_name=aac"
 echo "bit_rate=256000"
 exit 0
@@ -200,10 +200,10 @@ STUB
     local result
     result=$(_get_audio_conversion_info "/fake/aac_audio.mkv")
     
-    # should_convert doit être 0 (déjà AAC)
+    # Smart codec: même codec AAC mais 256k > 176k → should_convert=1 (downscale)
     local should_convert
     should_convert=$(echo "$result" | cut -d'|' -f3)
-    [ "$should_convert" -eq 0 ]
+    [ "$should_convert" -eq 1 ]
 }
 
 @test "AUDIO: audio E-AC3 haut bitrate déclenche conversion vers AAC (stub)" {

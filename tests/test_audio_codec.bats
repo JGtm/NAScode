@@ -57,8 +57,10 @@ teardown() {
 # Tests de la logique anti-upscaling
 ###########################################################
 
-@test "anti-upscaling: même codec → pas de conversion (stub)" {
+@test "anti-upscaling: même codec mais bitrate élevé → downscale (stub)" {
     # Stub ffprobe pour simuler audio AAC à 256kbps
+    # Même codec (AAC) mais bitrate source > cible * 1.1 (176k)
+    # Nouvelle logique smart : downscale pour réduire le bitrate
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -77,12 +79,14 @@ STUB
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Règle 1: Même codec → should_convert=0
-    [ "$should_convert" -eq 0 ]
+    # Règle smart codec: Même codec mais 256k > 176k → downscale (should_convert=1)
+    [ "$should_convert" -eq 1 ]
 }
 
-@test "anti-upscaling: bitrate source inconnu → pas de conversion (stub)" {
+@test "anti-upscaling: bitrate source inconnu codec moins bon → conversion (stub)" {
     # Stub ffprobe pour simuler audio E-AC3 sans bitrate détectable
+    # E-AC3 (rang 3) < AAC (rang 4) donc codec moins bon
+    # Avec bitrate inconnu sur codec moins bon, la logique smart convertit par sécurité
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -101,12 +105,13 @@ STUB
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Règle 2: Bitrate inconnu → should_convert=0 (sécurité)
-    [ "$should_convert" -eq 0 ]
+    # Smart codec: E-AC3 (moins bon que AAC) avec bitrate inconnu → convert
+    [ "$should_convert" -eq 1 ]
 }
 
 @test "anti-upscaling: bitrate source ≤ cible → pas de conversion (stub)" {
     # Stub ffprobe pour simuler audio AC3 à 128kbps (< cible AAC 160k)
+    # AC3 (rang 2) < AAC (rang 4) mais anti-upscaling car 128k < 160k
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -121,13 +126,16 @@ STUB
     AUDIO_CODEC="aac"  # Cible AAC 160k
     AUDIO_BITRATE_KBPS=0
     
-    local result should_convert source_bitrate
+    local result should_convert source_codec source_bitrate
     result=$(_get_audio_conversion_info "/fake/file.mkv")
+    source_codec=$(echo "$result" | cut -d'|' -f1)
     source_bitrate=$(echo "$result" | cut -d'|' -f2)
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Règle 3: 128k ≤ 160k → should_convert=0 (anti-upscaling)
+    # Vérifier que le format de retour est correct
+    [ "$source_codec" = "ac3" ]
     [ "$source_bitrate" -eq 128 ]
+    # Règle anti-upscaling: 128k ≤ 160k → should_convert=0
     [ "$should_convert" -eq 0 ]
 }
 
@@ -160,6 +168,7 @@ STUB
 @test "anti-upscaling: bitrate source > seuil 10% → conversion (stub)" {
     # Stub ffprobe pour simuler audio E-AC3 à 180kbps
     # Cible AAC 160k, seuil = 160 * 1.1 = 176k
+    # E-AC3 (rang 3) < AAC (rang 4) donc codec moins bon
     # 180k > 176k donc conversion
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
@@ -175,13 +184,16 @@ STUB
     AUDIO_CODEC="aac"  # Cible AAC 160k
     AUDIO_BITRATE_KBPS=0
     
-    local result should_convert source_bitrate
+    local result should_convert source_codec source_bitrate
     result=$(_get_audio_conversion_info "/fake/file.mkv")
+    source_codec=$(echo "$result" | cut -d'|' -f1)
     source_bitrate=$(echo "$result" | cut -d'|' -f2)
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Règle 4: 180k > 176k (seuil 10%) → should_convert=1
+    # Vérifier le format de retour
+    [ "$source_codec" = "eac3" ]
     [ "$source_bitrate" -eq 180 ]
+    # Règle: E-AC3 < AAC et 180k > 176k → should_convert=1
     [ "$should_convert" -eq 1 ]
 }
 
@@ -211,10 +223,12 @@ STUB
     [ "$should_convert" -eq 1 ]
 }
 
-@test "anti-upscaling: conversion vers AC3 refusée si pas de gain (stub)" {
+@test "smart-codec: source meilleure conservée même si cible différente (stub)" {
     # Stub ffprobe pour simuler audio AAC à 256kbps
-    # Cible AC3 384k, seuil = 384 * 1.1 = 422.4k
-    # 256k < 384k donc pas de conversion (on perdrait de la qualité)
+    # AAC (rang 4) > AC3 (rang 2) donc AAC est MEILLEUR
+    # Smart codec: on garde le codec source (AAC) au lieu de downgrader vers AC3
+    # Mais on vérifie si le bitrate source dépasse la limite AAC (160k)
+    # 256k > 160k * 1.1 = 176k donc downscale dans le même codec (AAC)
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -226,15 +240,15 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     PATH="$stub_dir:$PATH"
     
-    AUDIO_CODEC="ac3"  # Cible AC3 384k
+    AUDIO_CODEC="ac3"  # Cible AC3 (moins bon que AAC)
     AUDIO_BITRATE_KBPS=0
     
     local result should_convert
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # 256k < 384k → should_convert=0 (anti-upscaling)
-    [ "$should_convert" -eq 0 ]
+    # Smart codec: AAC meilleur que AC3, 256k > 176k (limite AAC) → downscale
+    [ "$should_convert" -eq 1 ]
 }
 
 ###########################################################
@@ -544,4 +558,134 @@ STUB
     
     run format_option_audio
     [ "$status" -ne 0 ]
+}
+
+###########################################################
+# Tests de la hiérarchie des codecs audio (smart codec)
+###########################################################
+
+@test "get_audio_codec_rank: opus est le meilleur (rang 5)" {
+    local rank
+    rank=$(get_audio_codec_rank "opus")
+    [ "$rank" -eq 5 ]
+}
+
+@test "get_audio_codec_rank: aac est rang 4" {
+    local rank
+    rank=$(get_audio_codec_rank "aac")
+    [ "$rank" -eq 4 ]
+}
+
+@test "get_audio_codec_rank: eac3 est rang 3" {
+    local rank
+    rank=$(get_audio_codec_rank "eac3")
+    [ "$rank" -eq 3 ]
+}
+
+@test "get_audio_codec_rank: ac3 est rang 2" {
+    local rank
+    rank=$(get_audio_codec_rank "ac3")
+    [ "$rank" -eq 2 ]
+}
+
+@test "get_audio_codec_rank: flac est lossless (rang >= 6)" {
+    local rank
+    rank=$(get_audio_codec_rank "flac")
+    [ "$rank" -ge 6 ]
+}
+
+@test "is_audio_codec_better_or_equal: opus >= aac" {
+    is_audio_codec_better_or_equal "opus" "aac"
+}
+
+@test "is_audio_codec_better_or_equal: aac >= eac3" {
+    is_audio_codec_better_or_equal "aac" "eac3"
+}
+
+@test "is_audio_codec_better_or_equal: aac < opus (retourne false)" {
+    ! is_audio_codec_better_or_equal "aac" "opus"
+}
+
+@test "get_audio_codec_target_bitrate: opus retourne 128" {
+    local bitrate
+    bitrate=$(get_audio_codec_target_bitrate "opus")
+    [ "$bitrate" -eq 128 ]
+}
+
+@test "get_audio_codec_target_bitrate: aac retourne 160" {
+    local bitrate
+    bitrate=$(get_audio_codec_target_bitrate "aac")
+    [ "$bitrate" -eq 160 ]
+}
+
+###########################################################
+# Tests des options --force-audio et --force-video
+###########################################################
+
+@test "args: --force-audio définit FORCE_AUDIO_CODEC=true" {
+    source "$LIB_DIR/args.sh"
+    
+    FORCE_AUDIO_CODEC=false
+    parse_arguments --force-audio
+    
+    [ "$FORCE_AUDIO_CODEC" = "true" ]
+}
+
+@test "args: --force-video définit FORCE_VIDEO_CODEC=true" {
+    source "$LIB_DIR/args.sh"
+    
+    FORCE_VIDEO_CODEC=false
+    parse_arguments --force-video
+    
+    [ "$FORCE_VIDEO_CODEC" = "true" ]
+}
+
+@test "args: --force définit les deux flags" {
+    source "$LIB_DIR/args.sh"
+    
+    FORCE_AUDIO_CODEC=false
+    FORCE_VIDEO_CODEC=false
+    parse_arguments --force
+    
+    [ "$FORCE_AUDIO_CODEC" = "true" ]
+    [ "$FORCE_VIDEO_CODEC" = "true" ]
+}
+
+@test "args: -a eac3 est accepté" {
+    source "$LIB_DIR/args.sh"
+    
+    AUDIO_CODEC="copy"
+    parse_arguments -a eac3
+    
+    [ "$AUDIO_CODEC" = "eac3" ]
+}
+
+###########################################################
+# Tests de la logique smart codec avec FORCE
+###########################################################
+
+@test "smart-codec: FORCE_AUDIO_CODEC force la conversion même si même codec (stub)" {
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=aac"
+echo "bit_rate=140000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+    
+    AUDIO_CODEC="aac"
+    FORCE_AUDIO_CODEC=true
+    
+    local result should_convert
+    result=$(_get_audio_conversion_info "/fake/file.mkv")
+    should_convert=$(echo "$result" | cut -d'|' -f3)
+    
+    # Sans FORCE: même codec + bitrate OK → copy (should_convert=0)
+    # Avec FORCE: même codec mais 140k < 160k → copy (pas besoin de downscale)
+    [ "$should_convert" -eq 0 ]
+    
+    FORCE_AUDIO_CODEC=false  # Reset
 }
