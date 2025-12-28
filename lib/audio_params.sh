@@ -130,8 +130,11 @@ _get_audio_target_bitrate() {
 # Décision intelligente pour l'audio : garde le codec meilleur, applique limite bitrate
 # Retourne: action|codec_effectif|bitrate_cible|raison
 # Actions: copy (garder tel quel), convert (vers codec cible), downscale (même codec, bitrate réduit)
+# Usage: _get_smart_audio_decision <input_file> [opt_source_codec] [opt_source_bitrate_kbps]
 _get_smart_audio_decision() {
     local input_file="$1"
+    local opt_source_codec="${2:-}"
+    local opt_source_bitrate_kbps="${3:-}"
     
     # Si mode copy explicite, toujours copier
     if [[ "${AUDIO_CODEC:-copy}" == "copy" ]]; then
@@ -139,31 +142,39 @@ _get_smart_audio_decision() {
         return 0
     fi
     
-    # Récupérer les infos audio du premier flux audio
-    local audio_info
-    audio_info=$(ffprobe -v error \
-        -select_streams a:0 \
-        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-        -of default=noprint_wrappers=1 \
-        "$input_file" 2>/dev/null || true)
+    local source_codec source_bitrate_kbps
     
-    local source_codec source_bitrate source_bitrate_tag
-    source_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
-    source_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
-    source_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
-    
-    # Utiliser le tag BPS si bitrate direct non disponible
-    if [[ -z "$source_bitrate" || "$source_bitrate" == "N/A" ]]; then
-        source_bitrate="$source_bitrate_tag"
-    fi
-    
-    # Convertir en kbps
-    if declare -f clean_number &>/dev/null; then
-        source_bitrate=$(clean_number "$source_bitrate")
-    fi
-    local source_bitrate_kbps=0
-    if [[ -n "$source_bitrate" && "$source_bitrate" =~ ^[0-9]+$ ]]; then
-        source_bitrate_kbps=$((source_bitrate / 1000))
+    if [[ -n "$opt_source_codec" ]]; then
+        # Utilisation des métadonnées fournies (optimisation)
+        source_codec="$opt_source_codec"
+        source_bitrate_kbps="${opt_source_bitrate_kbps:-0}"
+    else
+        # Récupérer les infos audio du premier flux audio
+        local audio_info
+        audio_info=$(ffprobe -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
+            -of default=noprint_wrappers=1 \
+            "$input_file" 2>/dev/null || true)
+        
+        local source_bitrate source_bitrate_tag
+        source_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
+        source_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
+        source_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
+        
+        # Utiliser le tag BPS si bitrate direct non disponible
+        if [[ -z "$source_bitrate" || "$source_bitrate" == "N/A" ]]; then
+            source_bitrate="$source_bitrate_tag"
+        fi
+        
+        # Convertir en kbps
+        if declare -f clean_number &>/dev/null; then
+            source_bitrate=$(clean_number "$source_bitrate")
+        fi
+        source_bitrate_kbps=0
+        if [[ -n "$source_bitrate" && "$source_bitrate" =~ ^[0-9]+$ ]]; then
+            source_bitrate_kbps=$((source_bitrate / 1000))
+        fi
     fi
     
     local target_codec="${AUDIO_CODEC:-aac}"
@@ -246,8 +257,11 @@ _get_smart_audio_decision() {
 # Analyse l'audio d'un fichier et détermine si la conversion est avantageuse.
 # RÉTRO-COMPATIBILITÉ : retourne le format original source_codec|source_bitrate_kbps|should_convert
 # Retourne: codec|bitrate_kbps|should_convert (0=copy, 1=convert)
+# Usage: _get_audio_conversion_info <input_file> [opt_source_codec] [opt_source_bitrate_kbps]
 _get_audio_conversion_info() {
     local input_file="$1"
+    local opt_source_codec="${2:-}"
+    local opt_source_bitrate_kbps="${3:-}"
     
     # Si mode copy, toujours copier (format original)
     if [[ "${AUDIO_CODEC:-copy}" == "copy" ]]; then
@@ -255,36 +269,43 @@ _get_audio_conversion_info() {
         return 0
     fi
     
-    # Récupérer les infos audio du premier flux audio (pour le bitrate source)
-    local audio_info
-    audio_info=$(ffprobe -v error \
-        -select_streams a:0 \
-        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-        -of default=noprint_wrappers=1 \
-        "$input_file" 2>/dev/null || true)
+    local source_codec source_bitrate_kbps
     
-    local source_codec source_bitrate source_bitrate_tag
-    source_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
-    source_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
-    source_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
-    
-    # Utiliser le tag BPS si bitrate direct non disponible
-    if [[ -z "$source_bitrate" || "$source_bitrate" == "N/A" ]]; then
-        source_bitrate="$source_bitrate_tag"
-    fi
-    
-    # Convertir en kbps
-    if declare -f clean_number &>/dev/null; then
-        source_bitrate=$(clean_number "$source_bitrate")
-    fi
-    local source_bitrate_kbps=0
-    if [[ -n "$source_bitrate" && "$source_bitrate" =~ ^[0-9]+$ ]]; then
-        source_bitrate_kbps=$((source_bitrate / 1000))
+    if [[ -n "$opt_source_codec" ]]; then
+        source_codec="$opt_source_codec"
+        source_bitrate_kbps="${opt_source_bitrate_kbps:-0}"
+    else
+        # Récupérer les infos audio du premier flux audio (pour le bitrate source)
+        local audio_info
+        audio_info=$(ffprobe -v error \
+            -select_streams a:0 \
+            -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
+            -of default=noprint_wrappers=1 \
+            "$input_file" 2>/dev/null || true)
+        
+        local source_bitrate source_bitrate_tag
+        source_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
+        source_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
+        source_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
+        
+        # Utiliser le tag BPS si bitrate direct non disponible
+        if [[ -z "$source_bitrate" || "$source_bitrate" == "N/A" ]]; then
+            source_bitrate="$source_bitrate_tag"
+        fi
+        
+        # Convertir en kbps
+        if declare -f clean_number &>/dev/null; then
+            source_bitrate=$(clean_number "$source_bitrate")
+        fi
+        source_bitrate_kbps=0
+        if [[ -n "$source_bitrate" && "$source_bitrate" =~ ^[0-9]+$ ]]; then
+            source_bitrate_kbps=$((source_bitrate / 1000))
+        fi
     fi
     
     # Utiliser la décision smart pour déterminer should_convert
     local decision action
-    decision=$(_get_smart_audio_decision "$input_file")
+    decision=$(_get_smart_audio_decision "$input_file" "$source_codec" "$source_bitrate_kbps")
     action=$(echo "$decision" | cut -d'|' -f1)
     
     # Déterminer should_convert
@@ -299,13 +320,15 @@ _get_audio_conversion_info() {
 
 # Détermine si l'audio d'un fichier doit être converti.
 # Wrapper simple pour _get_smart_audio_decision.
-# Usage: _should_convert_audio <input_file>
+# Usage: _should_convert_audio <input_file> [opt_source_codec] [opt_source_bitrate_kbps]
 # Retourne: 0 si l'audio doit être converti/downscalé, 1 sinon
 _should_convert_audio() {
     local input_file="$1"
+    local opt_source_codec="${2:-}"
+    local opt_source_bitrate_kbps="${3:-}"
     
     local decision action
-    decision=$(_get_smart_audio_decision "$input_file")
+    decision=$(_get_smart_audio_decision "$input_file" "$opt_source_codec" "$opt_source_bitrate_kbps")
     action=$(echo "$decision" | cut -d'|' -f1)
     
     if [[ "$action" == "convert" || "$action" == "downscale" ]]; then
@@ -319,13 +342,15 @@ _should_convert_audio() {
 ###########################################################
 
 # Construit les paramètres audio FFmpeg selon la logique smart codec
-# Usage: _build_audio_params <input_file>
+# Usage: _build_audio_params <input_file> [opt_source_codec] [opt_source_bitrate_kbps]
 # Retourne: les paramètres FFmpeg pour l'audio (-c:a ... -b:a ...)
 _build_audio_params() {
     local input_file="$1"
+    local opt_source_codec="${2:-}"
+    local opt_source_bitrate_kbps="${3:-}"
     
     local decision action effective_codec target_bitrate reason
-    decision=$(_get_smart_audio_decision "$input_file")
+    decision=$(_get_smart_audio_decision "$input_file" "$opt_source_codec" "$opt_source_bitrate_kbps")
     IFS='|' read -r action effective_codec target_bitrate reason <<< "$decision"
     
     case "$action" in
@@ -379,13 +404,15 @@ _build_audio_params() {
 ###########################################################
 
 # Retourne le codec audio effectif qui sera utilisé (pour le suffixe)
-# Usage: _get_effective_audio_codec <input_file>
+# Usage: _get_effective_audio_codec <input_file> [opt_source_codec] [opt_source_bitrate_kbps]
 # Retourne: le nom du codec (opus, aac, ac3, eac3, flac, copy)
 _get_effective_audio_codec() {
     local input_file="$1"
+    local opt_source_codec="${2:-}"
+    local opt_source_bitrate_kbps="${3:-}"
     
     local decision action effective_codec
-    decision=$(_get_smart_audio_decision "$input_file")
+    decision=$(_get_smart_audio_decision "$input_file" "$opt_source_codec" "$opt_source_bitrate_kbps")
     IFS='|' read -r action effective_codec _ _ <<< "$decision"
     
     if [[ "$action" == "copy" && "$effective_codec" != "copy" && "$effective_codec" != "unknown" ]]; then

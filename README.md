@@ -23,6 +23,7 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
   - Pas de tune fastdecode (qualité prioritaire)
 - **Format 10-bit** (`yuv420p10le`) pour une meilleure qualité
 - **Accélération matérielle** : CUDA (Windows/Linux) ou VideoToolbox (macOS)
+- **Adaptation intelligente du bitrate** : réduit automatiquement le bitrate cible si la résolution de sortie est inférieure à 1080p (ex: 720p), évitant le gaspillage d'espace.
 
 ### Gestion des fichiers
 - **File d'attente intelligente** avec index persistant

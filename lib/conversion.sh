@@ -10,13 +10,15 @@
 CONVERSION_ACTION=""
 
 # Détermine le mode de conversion à appliquer pour un fichier.
-# Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original>
+# Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original> [opt_audio_codec] [opt_audio_bitrate]
 # Définit CONVERSION_ACTION et retourne 0 si une action est nécessaire, 1 si skip total
 _determine_conversion_mode() {
     local codec="$1"
     local bitrate="$2"
     local filename="$3"
     local file_original="$4"
+    local opt_audio_codec="${5:-}"
+    local opt_audio_bitrate="${6:-}"
     
     CONVERSION_ACTION=""
     
@@ -56,7 +58,8 @@ _determine_conversion_mode() {
     
     if [[ "$video_is_ok" == true ]]; then
         # Vidéo OK - vérifier si l'audio peut être optimisé
-        if declare -f _should_convert_audio &>/dev/null && _should_convert_audio "$file_original"; then
+        # On passe les métadonnées audio si disponibles pour éviter un nouveau probe
+        if declare -f _should_convert_audio &>/dev/null && _should_convert_audio "$file_original" "$opt_audio_codec" "$opt_audio_bitrate"; then
             # Audio à optimiser → mode passthrough vidéo
             CONVERSION_ACTION="video_passthrough"
             return 0
@@ -77,9 +80,11 @@ should_skip_conversion() {
     local bitrate="$2"
     local filename="$3"
     local file_original="$4"
+    local opt_audio_codec="${5:-}"
+    local opt_audio_bitrate="${6:-}"
     
     # Déterminer le mode de conversion
-    _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original"
+    _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate"
     local result=$?
     
     # Affichage et logging selon le mode
@@ -139,6 +144,10 @@ should_skip_conversion() {
 _prepare_file_paths() {
     local file_original="$1"
     local output_dir="$2"
+    local opt_width="${3:-}"
+    local opt_height="${4:-}"
+    local opt_audio_codec="${5:-}"
+    local opt_audio_bitrate="${6:-}"
     
     local filename_raw=$(basename "$file_original")
     local filename=$(echo "$filename_raw" | tr -d '\r\n')
@@ -162,13 +171,23 @@ _prepare_file_paths() {
     # Suffixe effectif (par fichier) : inclut bitrate adapté + résolution + codec audio effectif.
     # Fallback : si les fonctions ne sont pas chargées (tests/unitaires), on garde SUFFIX_STRING.
     local effective_suffix="$SUFFIX_STRING"
-    if [[ -n "$SUFFIX_STRING" ]] && declare -f get_video_stream_props &>/dev/null && declare -f _build_effective_suffix_for_dims &>/dev/null; then
-        local stream_props
-        stream_props=$(get_video_stream_props "$file_original")
-        local input_width input_height _pix_fmt
-        IFS='|' read -r input_width input_height _pix_fmt <<< "$stream_props"
+    if [[ -n "$SUFFIX_STRING" ]] && declare -f _build_effective_suffix_for_dims &>/dev/null; then
+        local input_width="$opt_width"
+        local input_height="$opt_height"
+        
+        # Si pas de dimensions fournies, on probe (fallback)
+        if [[ -z "$input_width" || -z "$input_height" ]] && declare -f get_video_stream_props &>/dev/null; then
+            local stream_props
+            stream_props=$(get_video_stream_props "$file_original")
+            local _pix_fmt
+            IFS='|' read -r input_width input_height _pix_fmt <<< "$stream_props"
+        fi
+        
         # Passer le fichier original pour déterminer le codec audio effectif (smart codec)
-        effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height" "$file_original")
+        # Si on a les métadonnées audio, on pourrait optimiser _build_effective_suffix_for_dims aussi
+        # mais pour l'instant on laisse comme ça (il appellera _get_effective_audio_codec qui re-probera si pas d'args)
+        # TODO: Optimiser _build_effective_suffix_for_dims pour accepter les args audio
+        effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate")
     fi
 
     if [[ "$DRYRUN" == true ]]; then
@@ -315,11 +334,36 @@ convert_file() {
     local file_original="$1"
     local output_dir="$2"
     
+    # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel
+    # Format: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
+    local full_metadata
+    if declare -f get_full_media_metadata &>/dev/null; then
+        full_metadata=$(get_full_media_metadata "$file_original")
+    else
+        # Fallback (pour tests ou si fonction manquante)
+        local v_meta=$(get_video_metadata "$file_original")
+        local v_props=$(get_video_stream_props "$file_original")
+        local v_bitrate v_codec duration_secs
+        IFS='|' read -r v_bitrate v_codec duration_secs <<< "$v_meta"
+        local v_width v_height v_pix_fmt
+        IFS='|' read -r v_width v_height v_pix_fmt <<< "$v_props"
+        # Audio probe séparé
+        local a_info=$(_get_audio_conversion_info "$file_original")
+        local a_codec a_bitrate _
+        IFS='|' read -r a_codec a_bitrate _ <<< "$a_info"
+        full_metadata="${v_bitrate}|${v_codec}|${duration_secs}|${v_width}|${v_height}|${v_pix_fmt}|${a_codec}|${a_bitrate}"
+    fi
+    
+    local v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate
+    IFS='|' read -r v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate <<< "$full_metadata"
+    
+    # 2. Préparation des chemins (avec métadonnées pour suffixe)
     local path_info
-    path_info=$(_prepare_file_paths "$file_original" "$output_dir") || return 1
+    path_info=$(_prepare_file_paths "$file_original" "$output_dir" "$v_width" "$v_height" "$a_codec" "$a_bitrate") || return 1
     
     IFS='|' read -r filename final_dir base_name effective_suffix final_output <<< "$path_info"
     
+    # 3. Vérifications standard
     if _check_output_exists "$file_original" "$filename" "$final_output"; then
         increment_processed_count || true
         return 0
@@ -338,19 +382,22 @@ convert_file() {
     
     _check_disk_space "$file_original" || return 1
     
-    local metadata_info
-    if ! metadata_info=$(_analyze_video "$file_original" "$filename"); then
-        # Analyse a indiqué qu'on doit skip ce fichier
+    # 4. Analyse et décision de conversion (avec métadonnées déjà acquises)
+    # On appelle should_skip_conversion directement avec les métadonnées
+    if should_skip_conversion "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate"; then
+        # Alimenter la queue avec le prochain candidat si limite active
+        if [[ "$LIMIT_FILES" -gt 0 ]]; then
+            update_queue || true
+        fi
         increment_processed_count || true
         return 0
     fi
-    IFS='|' read -r bitrate codec duration_secs <<< "$metadata_info"
     
     local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
     
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
     
-    # Choix du mode de conversion selon CONVERSION_ACTION (défini par _analyze_video → should_skip_conversion)
+    # Choix du mode de conversion selon CONVERSION_ACTION (défini par should_skip_conversion)
     local conversion_success=false
     if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
         # Mode passthrough : vidéo copiée, seul l'audio est converti

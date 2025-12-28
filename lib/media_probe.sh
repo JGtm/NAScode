@@ -3,6 +3,74 @@
 # ANALYSE DES MÉTADONNÉES VIDÉO
 ###########################################################
 
+# Récupère TOUTES les métadonnées nécessaires en un seul appel ffprobe.
+# Optimise les performances en évitant les appels multiples.
+# Usage: get_full_media_metadata <file>
+# Retourne: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
+get_full_media_metadata() {
+    local file="$1"
+    
+    # Appel unique ffprobe pour format + streams
+    # On récupère tout ce qui est potentiellement utile
+    local output
+    output=$(ffprobe -v error \
+        -show_entries format=duration,bit_rate \
+        -show_entries stream=index,codec_type,codec_name,bit_rate,width,height,pix_fmt:stream_tags=BPS \
+        -of default=noprint_wrappers=1 \
+        "$file" 2>/dev/null || true)
+    
+    # Parsing avec awk pour extraire les infos vidéo (premier flux vidéo) et audio (premier flux audio)
+    local parsed
+    parsed=$(echo "$output" | awk -F= '
+    BEGIN {
+        v_idx=-1; a_idx=-1;
+        v_codec=""; v_bitrate=0; v_width=0; v_height=0; v_pix_fmt=""; v_bps=0;
+        a_codec=""; a_bitrate=0; a_bps=0;
+        f_duration=0; f_bitrate=0;
+        current_index=-1; current_type="";
+    }
+    /^index=/ { current_index=$2 }
+    /^codec_type=/ { current_type=$2 }
+    /^codec_name=/ { 
+        if (current_type=="video" && v_idx==-1) { v_idx=current_index; v_codec=$2 }
+        if (current_type=="audio" && a_idx==-1) { a_idx=current_index; a_codec=$2 }
+    }
+    /^bit_rate=/ {
+        if (current_type=="video" && current_index==v_idx) v_bitrate=$2
+        if (current_type=="audio" && current_index==a_idx) a_bitrate=$2
+        if (current_index==-1) f_bitrate=$2  # format bit_rate n a pas d index
+    }
+    /^width=/ { if (current_type=="video" && current_index==v_idx) v_width=$2 }
+    /^height=/ { if (current_type=="video" && current_index==v_idx) v_height=$2 }
+    /^pix_fmt=/ { if (current_type=="video" && current_index==v_idx) v_pix_fmt=$2 }
+    /^TAG:BPS=/ {
+        if (current_type=="video" && current_index==v_idx) v_bps=$2
+        if (current_type=="audio" && current_index==a_idx) a_bps=$2
+    }
+    /^duration=/ { f_duration=$2 }
+    
+    END {
+        # Logique bitrate vidéo : stream > bps > container
+        final_v_bitrate = v_bitrate;
+        if (final_v_bitrate == 0 || final_v_bitrate == "N/A") final_v_bitrate = v_bps;
+        if (final_v_bitrate == 0 || final_v_bitrate == "N/A") final_v_bitrate = f_bitrate;
+        
+        # Logique bitrate audio : stream > bps
+        final_a_bitrate = a_bitrate;
+        if (final_a_bitrate == 0 || final_a_bitrate == "N/A") final_a_bitrate = a_bps;
+        
+        # Nettoyage "N/A"
+        if (final_v_bitrate == "N/A") final_v_bitrate=0;
+        if (final_a_bitrate == "N/A") final_a_bitrate=0;
+        if (f_duration == "N/A") f_duration=0;
+        
+        print final_v_bitrate "|" v_codec "|" f_duration "|" v_width "|" v_height "|" v_pix_fmt "|" a_codec "|" final_a_bitrate
+    }
+    ')
+    
+    echo "$parsed"
+}
+
 get_video_metadata() {
     local file="$1"
     local metadata_output

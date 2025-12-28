@@ -137,11 +137,13 @@ _compute_effective_bitrate_kbps_for_height() {
 # Inclut : bitrate effectif ou CRF + hauteur de sortie estimée (ex: 720p) + preset.
 # Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_<audio_codec>][_sample]
 # Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_<audio_codec>][_sample]
-# Usage: _build_effective_suffix_for_dims <width> <height> [input_file]
+# Usage: _build_effective_suffix_for_dims <width> <height> [input_file] [opt_audio_codec] [opt_audio_bitrate]
 _build_effective_suffix_for_dims() {
     local src_width="$1"
     local src_height="$2"
     local input_file="${3:-}"
+    local opt_audio_codec="${4:-}"
+    local opt_audio_bitrate="${5:-}"
 
     # Suffixe basé sur le codec vidéo (x265, av1, etc.)
     local codec_suffix="x265"
@@ -200,7 +202,7 @@ _build_effective_suffix_for_dims() {
     # Indicateur du codec audio effectif (smart codec logic)
     local audio_suffix=""
     if [[ -n "$input_file" && -f "$input_file" ]] && declare -f _get_effective_audio_codec &>/dev/null; then
-        audio_suffix=$(_get_effective_audio_codec "$input_file")
+        audio_suffix=$(_get_effective_audio_codec "$input_file" "$opt_audio_codec" "$opt_audio_bitrate")
     else
         audio_suffix="${AUDIO_CODEC:-copy}"
     fi
