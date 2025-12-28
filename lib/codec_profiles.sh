@@ -104,6 +104,30 @@ get_codec_rank() {
     esac
 }
 
+# Retourne le facteur d'efficacité d'un codec (en pourcentage)
+# Référence : H.264 = 100 (baseline)
+# Plus le facteur est bas, plus le codec est efficace.
+# Utilisé pour adapter les bitrates cibles selon le codec.
+#
+# Usage: get_codec_efficiency "av1" -> 50
+#        TARGET_KBPS = BASE_BITRATE_KBPS * efficiency / 100
+#
+# Valeurs basées sur les études de compression comparatives :
+# - H.264 : référence (100%)
+# - HEVC  : ~30% plus efficace que H.264 → 70%
+# - AV1   : ~50% plus efficace que H.264 → 50%
+# - VVC   : ~65% plus efficace que H.264 → 35% (futur)
+get_codec_efficiency() {
+    local codec="$1"
+    case "$codec" in
+        h264|avc)  echo 100 ;;  # Référence
+        hevc|h265) echo 70 ;;   # ~30% plus efficace
+        av1)       echo 50 ;;   # ~50% plus efficace
+        vvc|h266)  echo 35 ;;   # ~65% plus efficace (futur)
+        *)         echo 100 ;;  # Inconnu → prudent (bitrate H.264)
+    esac
+}
+
 # Vérifie si un codec source est "meilleur ou égal" au codec cible
 # Un fichier AV1 ne devrait pas être ré-encodé en HEVC
 # Usage: is_codec_better_or_equal "av1" "hevc" -> 0 (true, AV1 >= HEVC)

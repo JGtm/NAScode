@@ -151,12 +151,63 @@ teardown() {
     [[ "$ENCODER_PRESET" =~ ^(ultrafast|superfast|veryfast|faster|fast|medium|slow|slower|veryslow|placebo)$ ]]
 }
 
-@test "set_conversion_mode_parameters: calcule le seuil de conversion" {
+@test "set_conversion_mode_parameters: MAXRATE > TARGET (seuil dynamique)" {
     CONVERSION_MODE="serie"
     set_conversion_mode_parameters
     
-    # Seuil = TARGET * 1.2 arrondi = 2070 * 1.2 = 2484, arrondi à 2520
-    [ "$BITRATE_CONVERSION_THRESHOLD_KBPS" -gt "$TARGET_BITRATE_KBPS" ]
+    # Le seuil de skip est maintenant dynamique : MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)
+    # Vérifier que MAXRATE est bien supérieur au TARGET
+    [ "$MAXRATE_KBPS" -gt "$TARGET_BITRATE_KBPS" ]
+}
+
+###########################################################
+# Tests des bitrates adaptatifs par codec
+###########################################################
+
+@test "set_conversion_mode_parameters: HEVC utilise bitrates de référence" {
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER=""
+    CONVERSION_MODE="serie"
+    set_conversion_mode_parameters
+    
+    # HEVC est la référence (efficacité 70%), bitrate ~2070 kbps
+    [ "$TARGET_BITRATE_KBPS" -ge 2000 ] && [ "$TARGET_BITRATE_KBPS" -le 2150 ]
+}
+
+@test "set_conversion_mode_parameters: AV1 a un bitrate plus bas que HEVC" {
+    VIDEO_ENCODER=""
+    CONVERSION_MODE="serie"
+    
+    VIDEO_CODEC="hevc"
+    set_conversion_mode_parameters
+    local hevc_target="$TARGET_BITRATE_KBPS"
+    
+    VIDEO_CODEC="av1"
+    VIDEO_ENCODER=""
+    set_conversion_mode_parameters
+    local av1_target="$TARGET_BITRATE_KBPS"
+    
+    # AV1 (efficacité 50%) devrait avoir un bitrate ~30% plus bas que HEVC (70%)
+    [ "$av1_target" -lt "$hevc_target" ]
+}
+
+@test "set_conversion_mode_parameters: ratio AV1/HEVC cohérent avec efficacité" {
+    VIDEO_ENCODER=""
+    CONVERSION_MODE="serie"
+    
+    VIDEO_CODEC="hevc"
+    set_conversion_mode_parameters
+    local hevc_target="$TARGET_BITRATE_KBPS"
+    
+    VIDEO_CODEC="av1"
+    VIDEO_ENCODER=""
+    set_conversion_mode_parameters
+    local av1_target="$TARGET_BITRATE_KBPS"
+    
+    # Ratio AV1/HEVC devrait être ~50/70 = 0.714
+    # Avec une tolérance de ±5%
+    local ratio_percent=$((av1_target * 100 / hevc_target))
+    [ "$ratio_percent" -ge 68 ] && [ "$ratio_percent" -le 76 ]
 }
 
 ###########################################################

@@ -131,10 +131,36 @@ STUB
     [ "$should_convert" -eq 0 ]
 }
 
-@test "anti-upscaling: bitrate source dans la marge 20% → pas de conversion (stub)" {
+@test "anti-upscaling: bitrate source dans la marge 10% → pas de conversion (stub)" {
+    # Stub ffprobe pour simuler audio E-AC3 à 170kbps
+    # Cible AAC 160k, seuil = 160 * 1.1 = 176k
+    # 170k < 176k donc pas de conversion
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=eac3"
+echo "bit_rate=170000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+    
+    AUDIO_CODEC="aac"  # Cible AAC 160k
+    AUDIO_BITRATE_KBPS=0
+    
+    local result should_convert
+    result=$(_get_audio_conversion_info "/fake/file.mkv")
+    should_convert=$(echo "$result" | cut -d'|' -f3)
+    
+    # Règle 4: 170k < 176k (seuil 10%) → should_convert=0
+    [ "$should_convert" -eq 0 ]
+}
+
+@test "anti-upscaling: bitrate source > seuil 10% → conversion (stub)" {
     # Stub ffprobe pour simuler audio E-AC3 à 180kbps
-    # Cible AAC 160k, seuil = 160 * 1.2 = 192k
-    # 180k < 192k donc pas de conversion
+    # Cible AAC 160k, seuil = 160 * 1.1 = 176k
+    # 180k > 176k donc conversion
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -149,46 +175,20 @@ STUB
     AUDIO_CODEC="aac"  # Cible AAC 160k
     AUDIO_BITRATE_KBPS=0
     
-    local result should_convert
-    result=$(_get_audio_conversion_info "/fake/file.mkv")
-    should_convert=$(echo "$result" | cut -d'|' -f3)
-    
-    # Règle 4: 180k < 192k (seuil 20%) → should_convert=0
-    [ "$should_convert" -eq 0 ]
-}
-
-@test "anti-upscaling: bitrate source > seuil 20% → conversion (stub)" {
-    # Stub ffprobe pour simuler audio E-AC3 à 768kbps
-    # Cible AAC 160k, seuil = 160 * 1.2 = 192k
-    # 768k > 192k donc conversion
-    local stub_dir="$TEST_TEMP_DIR/stub"
-    mkdir -p "$stub_dir"
-    cat > "$stub_dir/ffprobe" << 'STUB'
-#!/bin/bash
-echo "codec_name=eac3"
-echo "bit_rate=768000"
-exit 0
-STUB
-    chmod +x "$stub_dir/ffprobe"
-    PATH="$stub_dir:$PATH"
-    
-    AUDIO_CODEC="aac"  # Cible AAC 160k
-    AUDIO_BITRATE_KBPS=0
-    
     local result should_convert source_bitrate
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     source_bitrate=$(echo "$result" | cut -d'|' -f2)
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # Règle 4: 768k > 192k (seuil 20%) → should_convert=1
-    [ "$source_bitrate" -eq 768 ]
+    # Règle 4: 180k > 176k (seuil 10%) → should_convert=1
+    [ "$source_bitrate" -eq 180 ]
     [ "$should_convert" -eq 1 ]
 }
 
 @test "anti-upscaling: conversion vers Opus avec gain suffisant (stub)" {
     # Stub ffprobe pour simuler audio AAC à 256kbps
-    # Cible Opus 128k, seuil = 128 * 1.2 = 153.6k
-    # 256k > 153.6k donc conversion
+    # Cible Opus 128k, seuil = 128 * 1.1 = 140.8k
+    # 256k > 140.8k donc conversion
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -207,13 +207,13 @@ STUB
     result=$(_get_audio_conversion_info "/fake/file.mkv")
     should_convert=$(echo "$result" | cut -d'|' -f3)
     
-    # 256k > 153.6k → should_convert=1
+    # 256k > 140.8k → should_convert=1
     [ "$should_convert" -eq 1 ]
 }
 
 @test "anti-upscaling: conversion vers AC3 refusée si pas de gain (stub)" {
     # Stub ffprobe pour simuler audio AAC à 256kbps
-    # Cible AC3 384k, seuil = 384 * 1.2 = 460.8k
+    # Cible AC3 384k, seuil = 384 * 1.1 = 422.4k
     # 256k < 384k donc pas de conversion (on perdrait de la qualité)
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"

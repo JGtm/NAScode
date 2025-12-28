@@ -85,8 +85,8 @@ _get_audio_conversion_info() {
     # Règle 3 : Ne pas convertir si le bitrate source est déjà ≤ cible (anti-upscaling)
     elif [[ "$source_bitrate_kbps" -le "$target_bitrate" ]]; then
         should_convert=0
-    # Règle 4 : Convertir si on gagne au moins 20% de bitrate
-    elif [[ "$source_bitrate_kbps" -gt $((target_bitrate * 120 / 100)) ]]; then
+    # Règle 4 : Convertir si on gagne au moins 10% de bitrate
+    elif [[ "$source_bitrate_kbps" -gt $((target_bitrate * 110 / 100)) ]]; then
         should_convert=1
     fi
     

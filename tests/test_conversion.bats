@@ -102,26 +102,29 @@ teardown() {
 ###########################################################
 
 @test "should_skip_conversion: skip si pas de codec" {
+    set_conversion_mode_parameters  # Initialise MAXRATE_KBPS
     run should_skip_conversion "" "5000000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
 }
 
 @test "should_skip_conversion: skip si hevc avec bitrate bas" {
-    # Utiliser les valeurs par défaut (readonly)
-    # Le seuil par défaut est ~2500 kbps, on teste avec un bitrate bien en dessous
-    # Bitrate sous le seuil
+    # Le seuil dynamique = MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)
+    # Pour série : 2520 * 1.1 = 2772 kbps = 2772000 bits
+    set_conversion_mode_parameters
     run should_skip_conversion "hevc" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
 }
 
 @test "should_skip_conversion: pas de skip si hevc avec bitrate élevé" {
-    # Bitrate au-dessus du seuil (5 Mbps >> seuil de ~2.5 Mbps)
+    # Bitrate au-dessus du seuil dynamique (5 Mbps >> seuil)
+    set_conversion_mode_parameters
     run should_skip_conversion "hevc" "5000000" "test.mkv" "/source/test.mkv"
     [ "$status" -ne 0 ]
 }
 
 @test "should_skip_conversion: pas de skip si h264 même avec bitrate bas" {
     # H264 doit toujours être converti (pas de skip basé sur le bitrate)
+    set_conversion_mode_parameters
     run should_skip_conversion "h264" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -ne 0 ]
 }
@@ -132,12 +135,16 @@ teardown() {
 
 @test "should_skip_conversion: skip si av1 avec bitrate bas quand cible av1" {
     VIDEO_CODEC="av1"
-    run should_skip_conversion "av1" "2000000" "test.mkv" "/source/test.mkv"
+    set_conversion_mode_parameters  # Initialise MAXRATE_KBPS pour av1/serie (~1800 kbps)
+    # Bitrate de 1500 kbps = 1500000 bits, bien sous le seuil AV1 (~1980 kbps)
+    run should_skip_conversion "av1" "1500000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
 }
 
 @test "should_skip_conversion: pas de skip si av1 avec bitrate élevé quand cible av1" {
     VIDEO_CODEC="av1"
+    set_conversion_mode_parameters
+    # Bitrate de 5000 kbps, bien au-dessus du seuil AV1 (~1980 kbps)
     run should_skip_conversion "av1" "5000000" "test.mkv" "/source/test.mkv"
     [ "$status" -ne 0 ]
 }
@@ -145,6 +152,7 @@ teardown() {
 @test "should_skip_conversion: skip si av1 avec bitrate bas quand cible hevc (codec meilleur)" {
     # AV1 est plus moderne que HEVC, donc on skip même si on cible HEVC
     VIDEO_CODEC="hevc"
+    set_conversion_mode_parameters
     run should_skip_conversion "av1" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
 }
@@ -152,6 +160,7 @@ teardown() {
 @test "should_skip_conversion: pas de skip si hevc quand cible av1" {
     # HEVC n'est pas meilleur que AV1, donc on convertit
     VIDEO_CODEC="av1"
+    set_conversion_mode_parameters
     run should_skip_conversion "hevc" "2000000" "test.mkv" "/source/test.mkv"
     [ "$status" -ne 0 ]
 }

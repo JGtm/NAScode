@@ -86,6 +86,7 @@ teardown() {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=false
     VIDEO_CODEC="hevc"
+    AUDIO_CODEC="copy"  # Forcer copy pour un suffixe prévisible
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
@@ -98,6 +99,7 @@ teardown() {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=false
     VIDEO_CODEC="hevc"
+    AUDIO_CODEC="copy"  # Forcer copy pour un suffixe prévisible
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
@@ -114,6 +116,7 @@ teardown() {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     VIDEO_CODEC="hevc"
+    AUDIO_CODEC="copy"  # Forcer copy pour un suffixe prévisible
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
@@ -125,6 +128,7 @@ teardown() {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     VIDEO_CODEC="hevc"
+    AUDIO_CODEC="copy"  # Forcer copy pour un suffixe prévisible
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
