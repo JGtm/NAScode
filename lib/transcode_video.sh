@@ -218,8 +218,25 @@ _build_effective_suffix_for_dims() {
 _build_stream_mapping() {
     local input_file="$1"
     
+    # Mapper uniquement la vidéo principale (évite les flux "attached_pic" type cover art)
+    # On choisit le premier flux vidéo dont disposition.attached_pic != 1.
+    # Fallback: v:0
+    local video_sel="0"
+    local video_streams
+    video_streams=$(ffprobe -v error -select_streams v \
+        -show_entries stream=index:stream_disposition=attached_pic \
+        -of csv=p=0 "$input_file" 2>/dev/null || true)
+
+    if [[ -n "$video_streams" ]]; then
+        local candidate
+        candidate=$(echo "$video_streams" | awk -F',' '($2+0)!=1 {print NR-1; exit}')
+        if [[ -n "$candidate" ]] && [[ "$candidate" =~ ^[0-9]+$ ]]; then
+            video_sel="$candidate"
+        fi
+    fi
+
     # Toujours mapper vidéo et audio
-    local mapping="-map 0:v -map 0:a?"
+    local mapping="-map 0:v:${video_sel} -map 0:a?"
     
     # Récupérer les index des sous-titres français
     # On cherche les streams de type subtitle avec language=fre ou fra
