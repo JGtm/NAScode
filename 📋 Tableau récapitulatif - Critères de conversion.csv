@@ -1,0 +1,40 @@
+﻿📋 Tableau récapitulatif : Critères de conversion;;;;;
+🎬 VIDÉO — Décision de skip/conversion;;;;;
+Codec source;Codec cible;Bitrate source;Seuil (MAXRATE × 1.1);Décision;
+h264;hevc;Quelconque;—;✅ CONVERTIR (codec inférieur);
+h264;av1;Quelconque;—;✅ CONVERTIR (codec inférieur);
+hevc;hevc;≤ 2772 kbps;2520 × 1.1;⏭️ SKIP (déjà optimisé);
+hevc;hevc;> 2772 kbps;2520 × 1.1;✅ CONVERTIR (bitrate trop haut);
+hevc;av1;Quelconque;—;✅ CONVERTIR (upgrade codec);
+av1;hevc;≤ 2772 kbps;2520 × 1.1;⏭️ SKIP (codec supérieur);
+av1;hevc;> 2772 kbps;2520 × 1.1;⏭️ SKIP (codec supérieur);
+av1;av1;≤ 1980 kbps;1800 × 1.1;⏭️ SKIP (déjà optimisé);
+av1;av1;> 1980 kbps;1800 × 1.1;✅ CONVERTIR (bitrate trop haut);
+"Note : Un codec ""supérieur"" (AV1 > HEVC > H264) n'est jamais ré-encodé vers un codec inférieur.";;;;;
+;;;;;
+🔊 AUDIO — Décision de conversion (défaut: AAC 160k);;;;;
+Codec source;Bitrate source;Codec cible;Cible;Seuil (+10%);Décision
+aac;≤ 160 kbps;aac;160k;176k;⏭️ COPY (déjà AAC optimisé)
+aac;161-175 kbps;aac;160k;176k;⏭️ COPY (dans la marge 10%)
+aac;> 176 kbps;aac;160k;176k;✅ CONVERTIR (gain > 10%)
+eac3;≤ 160 kbps;aac;160k;176k;⏭️ COPY (bitrate ≤ cible)
+eac3;161-175 kbps;aac;160k;176k;⏭️ COPY (dans la marge 10%)
+eac3;> 176 kbps;aac;160k;176k;✅ CONVERTIR (gain > 10%)
+ac3;> 176 kbps;aac;160k;176k;✅ CONVERTIR (gain > 10%)
+truehd;Quelconque;aac;160k;—;✅ CONVERTIR (lossless → lossy)
+dts-hd;Quelconque;aac;160k;—;✅ CONVERTIR (lossless → lossy)
+Inconnu;—;aac;160k;—;⏭️ COPY (sécurité)
+📊 Bitrates par codec (mode série 1080p);;;;;
+Codec;Efficacité;Target;Maxrate;Bufsize;Seuil skip
+HEVC;70%;2070 kbps;2520 kbps;3780 kbps;2772 kbps
+AV1;50%;1478 kbps;1800 kbps;2700 kbps;1980 kbps
+🎯 Exemple concret;;;;;
+Fichier source : Pachinko.S01E01.mkv;;;;;
+;;;;;
+Vidéo : AV1 @ 2400 kbps;;;;;
+Audio : E-AC3 @ 640 kbps;;;;;
+Cible : -c av1 -a aac;;;;;
+;;;;;
+Flux;Source;Cible;Seuil;Décision;
+Vidéo;AV1 2400 kbps;AV1 1800 kbps max;1980 kbps;✅ CONVERTIR (2400 > 1980);
+Audio;E-AC3 640 kbps;AAC 160 kbps;176 kbps;✅ CONVERTIR (640 > 176);
