@@ -826,6 +826,94 @@ _setup_sample_mode_params() {
 }
 
 ###########################################################
+# EXÉCUTION VIDEO PASSTHROUGH (audio seulement)
+###########################################################
+
+# Exécute une conversion où la vidéo est copiée et seul l'audio est traité.
+# Utilisé quand la vidéo est déjà conforme mais l'audio peut être optimisé.
+# Usage: _execute_video_passthrough <input> <output> <log> <duration> <basename>
+_execute_video_passthrough() {
+    local tmp_input="$1"
+    local tmp_output="$2"
+    local ffmpeg_log_temp="$3"
+    local duration_secs="$4"
+    local base_name="$5"
+
+    FILE_START_TS="$(date +%s)"
+    START_TS="$FILE_START_TS"
+
+    # Préparer les paramètres audio (conversion selon config)
+    local audio_params
+    audio_params=$(_build_audio_params "$tmp_input")
+
+    # Préparer le mapping des streams (filtre sous-titres FR)
+    local stream_mapping
+    stream_mapping=$(_build_stream_mapping "$tmp_input")
+
+    # Script AWK pour progression
+    local awk_time_func
+    if [[ "$HAS_GAWK" -eq 1 ]]; then
+        awk_time_func='function get_time() { return systime() }'
+    else
+        awk_time_func='function get_time() { cmd="date +%s"; cmd | getline t; close(cmd); return t }'
+    fi
+
+    # Acquérir un slot pour affichage de progression
+    local progress_slot=0
+    local is_parallel=0
+    if [[ "${PARALLEL_JOBS:-1}" -gt 1 ]]; then
+        is_parallel=1
+        progress_slot=$(acquire_progress_slot)
+    fi
+
+    # Durée effective pour la progression
+    local effective_duration="$duration_secs"
+    if [[ -z "$effective_duration" || "$effective_duration" == "N/A" ]]; then
+        effective_duration=0
+    fi
+    EFFECTIVE_DURATION="$effective_duration"
+
+    # Exécution FFmpeg : vidéo en copy, audio selon config
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        -i "$tmp_input" \
+        -c:v copy \
+        $audio_params \
+        $stream_mapping -f matroska \
+        "$tmp_output" \
+        -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
+    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+
+    local ffmpeg_rc=${PIPESTATUS[0]:-0}
+    local awk_rc=${PIPESTATUS[1]:-0}
+
+    # Libérer le slot
+    if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+        release_progress_slot "$progress_slot"
+    fi
+
+    if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
+        return 0
+    fi
+
+    # Gestion d'erreur
+    if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]]; then
+        log_error "Erreur lors du remuxage (video passthrough)"
+        if [[ -f "$ffmpeg_log_temp" ]]; then
+            local err_preview
+            err_preview=$(tail -10 "$ffmpeg_log_temp" 2>/dev/null || echo "(log indisponible)")
+            echo -e "${RED}--- Extrait du log FFmpeg ---${NOCOLOR}"
+            echo "$err_preview"
+            echo -e "${RED}-----------------------------${NOCOLOR}"
+        fi
+    fi
+    
+    return 1
+}
+
+###########################################################
 # EXÉCUTION DE LA CONVERSION FFMPEG
 ###########################################################
 

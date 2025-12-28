@@ -93,6 +93,23 @@ _get_audio_conversion_info() {
     echo "${source_codec}|${source_bitrate_kbps}|${should_convert}"
 }
 
+# Détermine si l'audio d'un fichier doit être converti.
+# Wrapper simple pour _get_audio_conversion_info.
+# Usage: _should_convert_audio <input_file>
+# Retourne: 0 si l'audio doit être converti, 1 sinon
+_should_convert_audio() {
+    local input_file="$1"
+    
+    local audio_info should_convert
+    audio_info=$(_get_audio_conversion_info "$input_file")
+    should_convert=$(echo "$audio_info" | cut -d'|' -f3)
+    
+    if [[ "$should_convert" -eq 1 ]]; then
+        return 0  # Doit être converti
+    fi
+    return 1  # Pas besoin de conversion
+}
+
 ###########################################################
 # CONSTRUCTION PARAMÈTRES FFMPEG
 ###########################################################

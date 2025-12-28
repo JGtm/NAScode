@@ -3,23 +3,30 @@
 # LOGIQUE DE SKIP ET CONVERSION
 ###########################################################
 
-should_skip_conversion() {
+# Modes de conversion possibles (retournés par _determine_conversion_mode)
+# - "skip"             : fichier ignoré (vidéo conforme, audio OK ou mode copy)
+# - "video_passthrough": vidéo copiée, seul l'audio est converti
+# - "full"             : conversion complète (vidéo + audio)
+CONVERSION_ACTION=""
+
+# Détermine le mode de conversion à appliquer pour un fichier.
+# Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original>
+# Définit CONVERSION_ACTION et retourne 0 si une action est nécessaire, 1 si skip total
+_determine_conversion_mode() {
     local codec="$1"
     local bitrate="$2"
     local filename="$3"
     local file_original="$4"
     
+    CONVERSION_ACTION=""
+    
     # --- Validation fichier vidéo ---
     if [[ -z "$codec" ]]; then
-        echo -e "${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
-        if [[ -n "$LOG_SKIPPED" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
-        fi
-        return 0
+        CONVERSION_ACTION="skip"
+        return 1
     fi
     
     # Calcul dynamique du seuil : MAXRATE_KBPS * (1 + tolérance)
-    # S'adapte automatiquement au mode (film/série) et au codec (HEVC/AV1)
     local base_threshold_bits=$((MAXRATE_KBPS * 1000))
     local tolerance_bits=$((MAXRATE_KBPS * SKIP_TOLERANCE_PERCENT * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
@@ -28,45 +35,99 @@ should_skip_conversion() {
     local target_codec="${VIDEO_CODEC:-hevc}"
     local is_better_or_equal_codec=false
     
-    # Utiliser is_codec_better_or_equal si disponible (codec_profiles.sh chargé)
     if declare -f is_codec_better_or_equal &>/dev/null; then
         if is_codec_better_or_equal "$codec" "$target_codec"; then
             is_better_or_equal_codec=true
         fi
     else
-        # Fallback : vérification manuelle pour les codecs connus
-        # Rang : av1 > hevc > autres
         case "$codec" in
-            av1)
-                # AV1 est meilleur ou égal à tout
-                is_better_or_equal_codec=true
-                ;;
-            hevc|h265)
-                # HEVC est égal à HEVC, mais pas meilleur que AV1
-                [[ "$target_codec" == "hevc" ]] && is_better_or_equal_codec=true
-                ;;
+            av1) is_better_or_equal_codec=true ;;
+            hevc|h265) [[ "$target_codec" == "hevc" ]] && is_better_or_equal_codec=true ;;
         esac
     fi
     
-    # Skip si déjà dans un codec meilleur/égal avec bitrate optimisé
+    # Vidéo conforme (bon codec + bitrate optimisé) ?
+    local video_is_ok=false
     if [[ "$is_better_or_equal_codec" == true ]]; then
         if [[ "$bitrate" =~ ^[0-9]+$ ]] && [[ "$bitrate" -le "$max_tolerated_bits" ]]; then
-            # Affichage adapté au codec source
-            local codec_display="${codec^^}"
-            [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="x265"
-            echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
-            if [[ -n "$LOG_SKIPPED" ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
-            fi
-            return 0
-        fi
-        # Log si ré-encodage nécessaire malgré le bon codec (bitrate trop élevé)
-        if [[ -n "$LOG_PROGRESS" ]]; then
-            local codec_display="${codec^^}"
-            [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Ré-encodage ${codec_display}) | Bitrate trop élevé | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
+            video_is_ok=true
         fi
     fi
+    
+    if [[ "$video_is_ok" == true ]]; then
+        # Vidéo OK - vérifier si l'audio peut être optimisé
+        if declare -f _should_convert_audio &>/dev/null && _should_convert_audio "$file_original"; then
+            # Audio à optimiser → mode passthrough vidéo
+            CONVERSION_ACTION="video_passthrough"
+            return 0
+        else
+            # Audio OK aussi → skip complet
+            CONVERSION_ACTION="skip"
+            return 1
+        fi
+    fi
+    
+    # Vidéo non conforme → conversion complète
+    CONVERSION_ACTION="full"
+    return 0
+}
+
+should_skip_conversion() {
+    local codec="$1"
+    local bitrate="$2"
+    local filename="$3"
+    local file_original="$4"
+    
+    # Déterminer le mode de conversion
+    _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original"
+    local result=$?
+    
+    # Affichage et logging selon le mode
+    case "$CONVERSION_ACTION" in
+        "skip")
+            if [[ -z "$codec" ]]; then
+                echo -e "${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
+                if [[ -n "$LOG_SKIPPED" ]]; then
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+                fi
+            else
+                local codec_display="${codec^^}"
+                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="x265"
+                echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
+                if [[ -n "$LOG_SKIPPED" ]]; then
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+                fi
+            fi
+            return 0
+            ;;
+        "video_passthrough")
+            # Log discret - comportement transparent pour l'utilisateur
+            if [[ -n "$LOG_PROGRESS" ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | VIDEO_PASSTHROUGH | Audio à optimiser | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
+            fi
+            return 1  # Ne pas skip - traiter le fichier
+            ;;
+        "full")
+            # Détecter si le fichier est dans un codec meilleur/égal mais avec bitrate trop élevé
+            local target_codec="${VIDEO_CODEC:-hevc}"
+            local is_better_or_equal=false
+            if declare -f is_codec_better_or_equal &>/dev/null; then
+                is_codec_better_or_equal "$codec" "$target_codec" && is_better_or_equal=true
+            else
+                case "$codec" in
+                    av1) is_better_or_equal=true ;;
+                    hevc|h265) [[ "$target_codec" == "hevc" ]] && is_better_or_equal=true ;;
+                esac
+            fi
+            
+            if [[ "$is_better_or_equal" == true && -n "$LOG_PROGRESS" ]]; then
+                local codec_display="${codec^^}"
+                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Ré-encodage ${codec_display}) | Bitrate trop élevé | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
+            fi
+            return 1
+            ;;
+    esac
     
     return 1
 }
@@ -288,7 +349,21 @@ convert_file() {
     
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
     
-    if _execute_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name"; then
+    # Choix du mode de conversion selon CONVERSION_ACTION (défini par _analyze_video → should_skip_conversion)
+    local conversion_success=false
+    if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
+        # Mode passthrough : vidéo copiée, seul l'audio est converti
+        if _execute_video_passthrough "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name"; then
+            conversion_success=true
+        fi
+    else
+        # Mode standard : conversion complète (vidéo + audio)
+        if _execute_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name"; then
+            conversion_success=true
+        fi
+    fi
+    
+    if [[ "$conversion_success" == true ]]; then
         _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$size_before_mb"
     else
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
