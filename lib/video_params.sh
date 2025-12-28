@@ -7,15 +7,17 @@
 ###########################################################
 
 ###########################################################
-# PIXEL FORMAT
+# API INTERNE (compat exports/tests)
+#
+# Ces fonctions (préfixées par _) étaient historiquement dans
+# lib/transcode_video.sh et sont exportées via lib/exports.sh.
+# On les centralise ici pour éviter les duplications.
 ###########################################################
 
 # Détermine le pixel format de sortie.
 # - Si la source est 10-bit (Main10 etc.), on garde du 10-bit (yuv420p10le)
 # - Sinon on reste en 8-bit (yuv420p)
-# Usage: select_output_pix_fmt <input_pix_fmt>
-# Retourne: yuv420p ou yuv420p10le
-select_output_pix_fmt() {
+_select_output_pix_fmt() {
     local input_pix_fmt="$1"
     local out_pix_fmt="yuv420p"
 
@@ -28,14 +30,9 @@ select_output_pix_fmt() {
     echo "$out_pix_fmt"
 }
 
-###########################################################
-# DOWNSCALE
-###########################################################
-
 # Construit le filtre vidéo (optionnel) pour limiter la résolution à 1080p.
-# Usage: build_downscale_filter <width> <height>
-# Retourne: chaîne vide si pas de downscale, sinon le filtre scale=...
-build_downscale_filter() {
+# Retourne une chaîne vide si aucun downscale n'est requis.
+_build_downscale_filter_if_needed() {
     local width="$1"
     local height="$2"
 
@@ -62,14 +59,9 @@ build_downscale_filter() {
     echo "$s"
 }
 
-###########################################################
-# CALCUL HAUTEUR DE SORTIE
-###########################################################
-
 # Estime la hauteur de sortie après application éventuelle du downscale 1080p.
-# Usage: compute_output_height <src_width> <src_height>
-# Retourne: hauteur estimée (vide si entrées invalides)
-compute_output_height() {
+# Retourne vide si les entrées sont invalides.
+_compute_output_height_for_bitrate() {
     local src_width="$1"
     local src_height="$2"
 
@@ -109,14 +101,8 @@ compute_output_height() {
     echo "$computed_height"
 }
 
-###########################################################
-# ADAPTATION BITRATE PAR RÉSOLUTION
-###########################################################
-
 # Calcule un bitrate effectif (kbps) selon la hauteur de sortie estimée.
-# Usage: compute_effective_bitrate <base_kbps> <output_height>
-# Retourne: bitrate adapté en kbps
-compute_effective_bitrate() {
+_compute_effective_bitrate_kbps_for_height() {
     local base_kbps="$1"
     local output_height="$2"
 
@@ -147,6 +133,141 @@ compute_effective_bitrate() {
     echo "$base_kbps"
 }
 
+# Construit le suffixe effectif par fichier à partir des dimensions source.
+# Inclut : bitrate effectif ou CRF + hauteur de sortie estimée (ex: 720p) + preset.
+# Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_<audio_codec>][_sample]
+# Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_<audio_codec>][_sample]
+# Usage: _build_effective_suffix_for_dims <width> <height> [input_file]
+_build_effective_suffix_for_dims() {
+    local src_width="$1"
+    local src_height="$2"
+    local input_file="${3:-}"
+
+    # Suffixe basé sur le codec vidéo (x265, av1, etc.)
+    local codec_suffix="x265"
+    if declare -f get_codec_suffix &>/dev/null; then
+        codec_suffix=$(get_codec_suffix "${VIDEO_CODEC:-hevc}")
+    elif [[ "${VIDEO_CODEC:-hevc}" == "av1" ]]; then
+        codec_suffix="av1"
+    fi
+
+    local suffix="_${codec_suffix}"
+
+    # Résolution de sortie estimée (après downscale éventuel)
+    local output_height
+    output_height=$(_compute_output_height_for_bitrate "$src_width" "$src_height")
+
+    # Mode single-pass CRF ou two-pass bitrate
+    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+        # Calculer le CRF effectif selon l'encodeur
+        local effective_crf="$CRF_VALUE"
+        case "${VIDEO_ENCODER:-libx265}" in
+            libsvtav1)
+                if [[ -n "${SVTAV1_CRF:-}" ]]; then
+                    effective_crf="$SVTAV1_CRF"
+                elif [[ -n "${SVTAV1_CRF_DEFAULT:-}" ]]; then
+                    effective_crf="$SVTAV1_CRF_DEFAULT"
+                else
+                    effective_crf=$(( CRF_VALUE + 9 ))
+                fi
+                [[ $effective_crf -gt 63 ]] && effective_crf=63
+                ;;
+            libaom-av1)
+                effective_crf=$(( CRF_VALUE + 9 ))
+                [[ $effective_crf -gt 63 ]] && effective_crf=63
+                ;;
+        esac
+        suffix="${suffix}_crf${effective_crf}"
+    else
+        # Bitrate effectif (selon hauteur) pour two-pass
+        local effective_bitrate_kbps
+        effective_bitrate_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
+        if [[ -n "$effective_bitrate_kbps" ]] && [[ "$effective_bitrate_kbps" =~ ^[0-9]+$ ]]; then
+            suffix="${suffix}_${effective_bitrate_kbps}k"
+        else
+            suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
+        fi
+    fi
+
+    # Ajout de la résolution (si connue)
+    if [[ -n "$output_height" ]] && [[ "$output_height" =~ ^[0-9]+$ ]]; then
+        suffix="${suffix}_${output_height}p"
+    fi
+
+    # Preset d'encodage
+    suffix="${suffix}_${ENCODER_PRESET}"
+
+    # Indicateur du codec audio effectif (smart codec logic)
+    local audio_suffix=""
+    if [[ -n "$input_file" && -f "$input_file" ]] && declare -f _get_effective_audio_codec &>/dev/null; then
+        audio_suffix=$(_get_effective_audio_codec "$input_file")
+    else
+        audio_suffix="${AUDIO_CODEC:-copy}"
+    fi
+
+    case "$audio_suffix" in
+        copy|unknown|"")  ;;
+        aac)   suffix="${suffix}_aac" ;;
+        ac3)   suffix="${suffix}_ac3" ;;
+        eac3)  suffix="${suffix}_eac3" ;;
+        opus)  suffix="${suffix}_opus" ;;
+        flac)  suffix="${suffix}_flac" ;;
+        *)     suffix="${suffix}_${audio_suffix}" ;;
+    esac
+
+    if [[ "${SAMPLE_MODE:-false}" == true ]]; then
+        suffix="${suffix}_sample"
+    fi
+
+    echo "$suffix"
+}
+
+###########################################################
+# PIXEL FORMAT
+###########################################################
+
+# Détermine le pixel format de sortie.
+# - Si la source est 10-bit (Main10 etc.), on garde du 10-bit (yuv420p10le)
+# - Sinon on reste en 8-bit (yuv420p)
+# Usage: select_output_pix_fmt <input_pix_fmt>
+# Retourne: yuv420p ou yuv420p10le
+select_output_pix_fmt() {
+    _select_output_pix_fmt "$@"
+}
+
+###########################################################
+# DOWNSCALE
+###########################################################
+
+# Construit le filtre vidéo (optionnel) pour limiter la résolution à 1080p.
+# Usage: build_downscale_filter <width> <height>
+# Retourne: chaîne vide si pas de downscale, sinon le filtre scale=...
+build_downscale_filter() {
+    _build_downscale_filter_if_needed "$@"
+}
+
+###########################################################
+# CALCUL HAUTEUR DE SORTIE
+###########################################################
+
+# Estime la hauteur de sortie après application éventuelle du downscale 1080p.
+# Usage: compute_output_height <src_width> <src_height>
+# Retourne: hauteur estimée (vide si entrées invalides)
+compute_output_height() {
+    _compute_output_height_for_bitrate "$@"
+}
+
+###########################################################
+# ADAPTATION BITRATE PAR RÉSOLUTION
+###########################################################
+
+# Calcule un bitrate effectif (kbps) selon la hauteur de sortie estimée.
+# Usage: compute_effective_bitrate <base_kbps> <output_height>
+# Retourne: bitrate adapté en kbps
+compute_effective_bitrate() {
+    _compute_effective_bitrate_kbps_for_height "$@"
+}
+
 ###########################################################
 # CALCUL COMPLET DES PARAMÈTRES VIDÉO
 ###########################################################
@@ -167,23 +288,23 @@ compute_video_params() {
 
     # Pixel format de sortie
     local output_pix_fmt
-    output_pix_fmt=$(select_output_pix_fmt "$input_pix_fmt")
+    output_pix_fmt=$(_select_output_pix_fmt "$input_pix_fmt")
 
     # Filtre de downscale si nécessaire
     local downscale_filter filter_opts=""
-    downscale_filter=$(build_downscale_filter "$input_width" "$input_height")
+    downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
     if [[ -n "$downscale_filter" ]]; then
         filter_opts="-vf $downscale_filter"
     fi
 
     # Calcul du bitrate adapté à la résolution de sortie
     local output_height
-    output_height=$(compute_output_height "$input_width" "$input_height")
+    output_height=$(_compute_output_height_for_bitrate "$input_width" "$input_height")
 
     local effective_target effective_maxrate effective_bufsize
-    effective_target=$(compute_effective_bitrate "${TARGET_BITRATE_KBPS}" "$output_height")
-    effective_maxrate=$(compute_effective_bitrate "${MAXRATE_KBPS}" "$output_height")
-    effective_bufsize=$(compute_effective_bitrate "${BUFSIZE_KBPS}" "$output_height")
+    effective_target=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
+    effective_maxrate=$(_compute_effective_bitrate_kbps_for_height "${MAXRATE_KBPS}" "$output_height")
+    effective_bufsize=$(_compute_effective_bitrate_kbps_for_height "${BUFSIZE_KBPS}" "$output_height")
 
     local video_bitrate="${effective_target}k"
     local video_maxrate="${effective_maxrate}k"

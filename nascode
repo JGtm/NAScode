@@ -65,6 +65,8 @@ source "$LIB_DIR/queue.sh"       # Queue (dépend de colors, config, utils, logg
 source "$LIB_DIR/vmaf.sh"        # VMAF (dépend de colors, config, utils, logging)
 source "$LIB_DIR/media_probe.sh" # Propriétés média (dépend de utils)
 source "$LIB_DIR/audio_params.sh" # Paramètres audio (dépend de config, utils)
+source "$LIB_DIR/video_params.sh" # Paramètres vidéo (pix_fmt/downscale/bitrate/suffix)
+source "$LIB_DIR/stream_mapping.sh" # Mapping streams (sous-titres)
 source "$LIB_DIR/transcode_video.sh" # Transcodage vidéo (dépend de media_probe, config, codec_profiles, audio_params)
 source "$LIB_DIR/conversion.sh"  # Conversion (dépend de tout sauf finalize)
 source "$LIB_DIR/processing.sh"  # Traitement (dépend de conversion, queue, off_peak)

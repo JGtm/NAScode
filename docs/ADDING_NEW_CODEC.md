@@ -34,32 +34,50 @@ get_codec_encoder() {
 
 ### 1.2 `get_codec_suffix()`
 
-Définir le suffixe fichier (vide = pas de suffixe additionnel).
+Définir le suffixe de fichier utilisé dans le nom de sortie.
 
 ```bash
 get_codec_suffix() {
     case "${1:-hevc}" in
-        hevc|h265) echo "" ;;
+        hevc|h265) echo "x265" ;;
         av1)       echo "av1" ;;
         vvc|h266)  echo "vvc" ;;  # ← AJOUTER
-        *)         echo "" ;;
+        *)         echo "x265" ;;
     esac
 }
 ```
 
 ### 1.3 `is_codec_match()`
 
-Ajouter les variantes de nommage (ffprobe peut retourner différents noms).
+Ajouter les variantes de nommage.
+
+Dans le code, `is_codec_match()` s'appuie sur `get_codec_ffmpeg_names()` : pour ajouter des alias (ex: `h266`, `vvenc`, etc.), il faut d'abord les déclarer dans `get_codec_ffmpeg_names()`.
+
+```bash
+get_codec_ffmpeg_names() {
+    case "${1:-hevc}" in
+        hevc|h265) echo "hevc h265" ;;
+        av1)       echo "av1" ;;
+        vvc|h266)  echo "vvc h266 vvenc" ;;  # ← AJOUTER (adapter si besoin)
+        *)         echo "" ;;
+    esac
+}
+```
+
+Puis `is_codec_match()` n'a généralement pas besoin de changer :
 
 ```bash
 is_codec_match() {
-    local detected="$1" target="$2"
-    case "$target" in
-        hevc) [[ "$detected" =~ ^(hevc|h265|x265)$ ]] ;;
-        av1)  [[ "$detected" =~ ^(av1|av01|libaom|svtav1)$ ]] ;;
-        vvc)  [[ "$detected" =~ ^(vvc|h266|vvenc)$ ]] ;;  # ← AJOUTER
-        *)    [[ "$detected" == "$target" ]] ;;
-    esac
+    local source_codec="$1" target_codec="$2"
+    local known_names
+    known_names=$(get_codec_ffmpeg_names "$target_codec")
+
+    for name in $known_names; do
+        if [[ "$source_codec" == "$name" ]]; then
+            return 0
+        fi
+    done
+    return 1
 }
 ```
 
@@ -257,18 +275,31 @@ Ajouter le codec dans la validation CLI.
 
 ```bash
 -c|--codec)
-    shift
-    case "$1" in
-        hevc|av1|vvc)  # ← AJOUTER vvc
-            VIDEO_CODEC="$1"
-            ;;
-        *)
-            log_error "Codec non supporté: $1 (valides: hevc, av1, vvc)"  # ← MAJ message
-            exit 1
-            ;;
-    esac
+    if [[ -n "${2:-}" ]]; then
+        case "$2" in
+            hevc|av1|vvc)  # ← AJOUTER vvc
+                VIDEO_CODEC="$2"
+                ;;
+            *)
+                print_error "Codec invalide : '$2'. Valeurs acceptées : hevc, av1, vvc"  # ← MAJ message
+                exit 1
+                ;;
+        esac
+        shift 2
+    else
+        print_error "--codec doit être suivi d'un nom de codec (hevc, av1, vvc)"
+        exit 1
+    fi
     ;;
 ```
+
+---
+
+## 2bis. Logique vidéo & mapping (refacto)
+
+- La logique "paramètres vidéo" (pix_fmt, downscale, bitrate adaptatif, suffixe effectif) est centralisée dans `lib/video_params.sh`.
+- Le mapping des streams (video/audio/subs) est centralisé dans `lib/stream_mapping.sh`.
+- `lib/transcode_video.sh` orchestre l'encodage et appelle ces helpers : évite d'y dupliquer des fonctions.
 
 ---
 
@@ -368,8 +399,8 @@ Ajouter les tests pour chaque fonction modifiée :
 ### 3.2 tests/test_args.bats
 
 ```bash
-@test "parse_args: --codec vvc accepté" {
-    parse_args --codec vvc
+@test "parse_arguments: --codec vvc accepté" {
+    parse_arguments --codec vvc
     [ "$VIDEO_CODEC" = "vvc" ]
 }
 ```
@@ -385,9 +416,9 @@ Ajouter les tests pour chaque fonction modifiée :
 
 | Codec | Encoder FFmpeg | Suffixe | Qualité |
 |-------|----------------|---------|---------|
-| HEVC/H.265 | libx265 | _(aucun)_ | ⭐⭐ |
-| AV1 | libsvtav1 | `.av1` | ⭐⭐⭐ |
-| VVC/H.266 | libvvenc | `.vvc` | ⭐⭐⭐⭐ |
+| HEVC/H.265 | libx265 | `_x265` | ⭐⭐ |
+| AV1 | libsvtav1 | `_av1` | ⭐⭐⭐ |
+| VVC/H.266 | libvvenc | `_vvc` | ⭐⭐⭐⭐ |
 ```
 
 ### 4.2 Section "Options CLI"

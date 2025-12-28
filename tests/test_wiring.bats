@@ -14,7 +14,9 @@ setup() {
 
     # Charger les modules dans un ordre proche de nascode
     source "$LIB_DIR/ui.sh"
+    source "$LIB_DIR/detect.sh"
     source "$LIB_DIR/config.sh"
+    source "$LIB_DIR/codec_profiles.sh"
     source "$LIB_DIR/utils.sh"
     source "$LIB_DIR/logging.sh"
     source "$LIB_DIR/progress.sh"
@@ -24,6 +26,9 @@ setup() {
     source "$LIB_DIR/queue.sh"
     source "$LIB_DIR/vmaf.sh"
     source "$LIB_DIR/media_probe.sh"
+    source "$LIB_DIR/audio_params.sh"
+    source "$LIB_DIR/video_params.sh"
+    source "$LIB_DIR/stream_mapping.sh"
     source "$LIB_DIR/transcode_video.sh"
     source "$LIB_DIR/conversion.sh"
     source "$LIB_DIR/processing.sh"

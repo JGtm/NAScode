@@ -159,3 +159,38 @@ count_subtitle_streams() {
     
     echo "$count"
 }
+
+###########################################################
+# MAPPING COMPLET (VIDÉO/AUDIO/SOUS-TITRES)
+###########################################################
+
+# Construit les paramètres de mapping des streams pour ffmpeg.
+# - Mappe tous les flux vidéo et audio
+# - Filtre les sous-titres pour ne garder que le français (fre/fra)
+# - Fallback: si aucun sous-titre FR trouvé, garde tous les sous-titres
+# Retourne une chaîne de paramètres -map pour ffmpeg.
+_build_stream_mapping() {
+    local input_file="$1"
+
+    # Toujours mapper vidéo et audio
+    local mapping="-map 0:v -map 0:a?"
+
+    # Récupérer les index des sous-titres français
+    local fr_subs
+    fr_subs=$(ffprobe -v error -select_streams s \
+        -show_entries stream=index:stream_tags=language \
+        -of csv=p=0 "$input_file" 2>/dev/null | \
+        awk -F',' '$2 ~ /^(fre|fra|french)$/{print $1}' || true)
+
+    if [[ -n "$fr_subs" ]]; then
+        while IFS= read -r idx; do
+            if [[ -n "$idx" ]] && [[ "$idx" =~ ^[0-9]+$ ]]; then
+                mapping="$mapping -map 0:$idx"
+            fi
+        done <<< "$fr_subs"
+    else
+        mapping="$mapping -map 0:s?"
+    fi
+
+    echo "$mapping"
+}

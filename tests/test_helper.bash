@@ -46,6 +46,10 @@ load_base_modules() {
     
     # Charger les paramètres audio
     source "$LIB_DIR/audio_params.sh"
+
+    # Charger les paramètres vidéo et le mapping streams
+    source "$LIB_DIR/video_params.sh"
+    source "$LIB_DIR/stream_mapping.sh"
 }
 
 # Charger uniquement les couleurs et config (pour tests isolés)

@@ -12,9 +12,13 @@ setup() {
     if [[ -z "${_AUDIO_TEST_LOADED:-}" ]]; then
         export SCRIPT_DIR="$PROJECT_ROOT"
         source "$LIB_DIR/ui.sh"
+        source "$LIB_DIR/detect.sh"
         source "$LIB_DIR/config.sh"
+        source "$LIB_DIR/codec_profiles.sh"
         source "$LIB_DIR/utils.sh"
         source "$LIB_DIR/audio_params.sh"
+        source "$LIB_DIR/video_params.sh"
+        source "$LIB_DIR/stream_mapping.sh"
         source "$LIB_DIR/transcode_video.sh"
         # Initialiser le mode conversion (définit TARGET_BITRATE_KBPS, etc.)
         set_conversion_mode_parameters "series"
