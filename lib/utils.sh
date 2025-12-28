@@ -87,8 +87,11 @@ count_null_separated() {
 # Vérifier si un fichier doit être exclu
 is_excluded() {
     local f="$1"
+    local f_norm
+    # Normaliser les backslashes éventuels (Windows) en slashes
+    f_norm="${f//\\//}"
     # Utilise la regex pré-compilée pour une vérification O(1) au lieu de O(n)
-    if [[ -n "$EXCLUDES_REGEX" ]] && [[ "$f" =~ $EXCLUDES_REGEX ]]; then
+    if [[ -n "$EXCLUDES_REGEX" ]] && [[ "$f_norm" =~ $EXCLUDES_REGEX ]]; then
         return 0
     fi
     return 1

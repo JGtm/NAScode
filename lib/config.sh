@@ -325,16 +325,36 @@ build_dynamic_suffix() {
 # Regex pré-compilée des exclusions (construite au démarrage pour optimiser is_excluded)
 _build_excludes_regex() {
     local regex=""
+    local ex ex_norm escaped pat
+
     for ex in "${EXCLUDES[@]}"; do
-        # Échapper les caractères spéciaux regex et convertir * en .*
-        local escaped
-        escaped=$(printf '%s' "$ex" | sed 's/[][\/.^$]/\\&/g; s/\*/\.\*/g')
-        if [[ -n "$regex" ]]; then
-            regex="${regex}|^${escaped}"
+        # Normalisation: slashes + suppression de ./ et du / final
+        ex_norm="${ex//\\//}"
+        ex_norm="${ex_norm#./}"
+        ex_norm="${ex_norm%/}"
+        [[ -z "$ex_norm" ]] && continue
+
+        # Échapper les caractères spéciaux regex (en gardant * pour le glob)
+        escaped=$(printf '%s' "$ex_norm" | sed 's/[][\/.^$+?(){}|]/\\&/g')
+        # Conversion glob: * => .*
+        escaped="${escaped//\*/.*}"
+
+        # Si le pattern ressemble à un nom de dossier simple (sans / ni *)
+        # on le fait matcher comme segment de chemin (ex: /tests/ partout).
+        if [[ "$ex_norm" != *"/"* ]] && [[ "$ex_norm" != *"*"* ]]; then
+            pat="(^|/)${escaped}(/|$)"
         else
-            regex="^${escaped}"
+            # Sinon on matche sur le chemin complet (substring)
+            pat="$escaped"
+        fi
+
+        if [[ -n "$regex" ]]; then
+            regex="${regex}|${pat}"
+        else
+            regex="$pat"
         fi
     done
+
     echo "$regex"
 }
 EXCLUDES_REGEX="$(_build_excludes_regex)"

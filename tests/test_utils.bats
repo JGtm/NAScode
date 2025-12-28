@@ -86,6 +86,16 @@ teardown() {
 # Tests de is_excluded()
 ###########################################################
 
+@test "_build_excludes_regex + is_excluded: exclut un dossier 'tests' partout" {
+    EXCLUDES=("tests")
+    EXCLUDES_REGEX="$(_build_excludes_regex)"
+
+    is_excluded "/c/Users/Guillaume/Downloads/Series/NAScode/tests/fixtures/test_video_2s.mkv"
+    [ "$?" -eq 0 ]
+
+    ! is_excluded "/c/Users/Guillaume/Downloads/Series/NAScode/testsuite/fixtures/test_video_2s.mkv"
+}
+
 @test "is_excluded: détecte un fichier dans /Converted/" {
     EXCLUDES_REGEX='/Converted/|/\.plexignore|\.part$'
     

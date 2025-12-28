@@ -34,6 +34,7 @@ _reset_cli_state() {
     OUTPUT_DIR="/output"
     CUSTOM_QUEUE=""
     EXCLUDES=()
+    EXCLUDES_REGEX=""
     # Heures creuses
     OFF_PEAK_ENABLED=false
     OFF_PEAK_START="22:00"
@@ -62,6 +63,9 @@ _reset_cli_state() {
     [ "${#EXCLUDES[@]}" -eq 2 ]
     [ "${EXCLUDES[0]}" = "\\.part$" ]
     [ "${EXCLUDES[1]}" = "/Converted/" ]
+
+    # La regex pré-compilée doit être recalculée (sinon les exclusions CLI ne s'appliquent pas)
+    [[ -n "$EXCLUDES_REGEX" ]]
 }
 
 @test "parse_arguments: -m/--mode affecte CONVERSION_MODE" {
