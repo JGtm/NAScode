@@ -184,24 +184,29 @@ bash nascode -l 10 -k
 | `ac3` | 384 kbps | Compatibilité lecteurs anciens |
 | `opus` | 128 kbps | Maximum d'efficacité |
 
-> **Logique anti-upscaling** : la conversion audio n'est déclenchée que si le bitrate source dépasse la cible de +20% minimum. Cela évite de "gonfler" un audio déjà compressé.
+> **Logique anti-upscaling** : la conversion audio n'est déclenchée que si le bitrate source dépasse la cible de +10% minimum. Cela évite de "gonfler" un audio déjà compressé.
 
 ### Variables modifiables (`lib/config.sh`)
 
 ```bash
 CONVERSION_MODE="serie"           # Mode par défaut
 VIDEO_CODEC="hevc"                # Codec vidéo (hevc, av1)
+AUDIO_CODEC="aac"                 # Codec audio (aac, ac3, opus, copy)
 SORT_MODE="name_asc"              # Tri de la file d'attente
 SAMPLE_DURATION=30                # Durée du segment test (secondes)
-BITRATE_CONVERSION_THRESHOLD_KBPS=2520  # Seuil pour skip
+SKIP_TOLERANCE_PERCENT=10         # Tolérance pour skip (% au-dessus du maxrate)
 ```
+
+> **Seuil de skip dynamique** : le seuil est calculé automatiquement selon `MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)`. Il s'adapte au mode (série/film) et au codec (HEVC/AV1).
 
 ### Codecs supportés
 
-| Codec | Encodeur | Caractéristiques |
-|-------|----------|------------------|
-| `hevc` | libx265 | Standard actuel, excellent compromis vitesse/qualité |
-| `av1` | libsvtav1 | Nouvelle génération, meilleur ratio qualité/taille, plus lent |
+| Codec | Encodeur | Efficacité | Bitrate série | Bitrate film |
+|-------|----------|------------|---------------|--------------|
+| `hevc` | libx265 | 70% | 2070 kbps | 2035 kbps |
+| `av1` | libsvtav1 | 50% | 1478 kbps | 1453 kbps |
+
+> **Bitrates adaptatifs** : les bitrates sont automatiquement ajustés selon l'efficacité du codec. Un codec plus moderne (AV1) obtient un bitrate plus bas pour une qualité équivalente.
 
 **Note** : Pour changer l'encodeur d'un codec (ex: `libaom-av1` au lieu de `libsvtav1`), modifier `VIDEO_ENCODER` dans `lib/config.sh`.
 

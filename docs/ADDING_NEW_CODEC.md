@@ -6,7 +6,7 @@ Ce document décrit les étapes pour ajouter le support d'un nouveau codec vidé
 
 ## 📋 Checklist rapide
 
-- [ ] `lib/codec_profiles.sh` — Fonctions codec/encoder
+- [ ] `lib/codec_profiles.sh` — Fonctions codec/encoder + efficacité
 - [ ] `lib/args.sh` — Validation CLI `--codec`
 - [ ] `tests/test_codec_profiles.bats` — Tests unitaires codec
 - [ ] `tests/test_transcode_video.bats` — Tests encoding
@@ -102,7 +102,30 @@ get_codec_rank() {
 }
 ```
 
-### 1.7 `get_encoder_mode_params()`
+### 1.7 `get_codec_efficiency()`
+
+**⚠️ IMPORTANT** : Définir le facteur d'efficacité du codec.
+
+Cette valeur est utilisée pour **ajuster automatiquement les bitrates** selon l'efficacité de compression du codec. Les bitrates de référence sont définis pour HEVC (70%), et sont automatiquement ajustés.
+
+```bash
+get_codec_efficiency() {
+    case "$1" in
+        h264|avc)  echo 100 ;;  # Référence
+        hevc|h265) echo 70 ;;   # ~30% plus efficace que H.264
+        av1)       echo 50 ;;   # ~50% plus efficace que H.264
+        vvc|h266)  echo 35 ;;   # ← AJOUTER (~65% plus efficace)
+        *)         echo 100 ;;  # Inconnu → prudent
+    esac
+}
+```
+
+**Impact** : Pour un bitrate de référence HEVC de 2520 kbps :
+- HEVC : 2520 × 70/70 = **2520 kbps**
+- AV1 : 2520 × 50/70 = **1800 kbps**
+- VVC : 2520 × 35/70 = **1260 kbps**
+
+### 1.8 `get_encoder_mode_params()`
 
 Définir les paramètres spécifiques par mode (serie/film).
 

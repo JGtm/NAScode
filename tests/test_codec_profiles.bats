@@ -135,6 +135,42 @@ teardown() {
 }
 
 ###########################################################
+# Tests get_codec_efficiency()
+###########################################################
+
+@test "get_codec_efficiency: h264 est la référence (100%)" {
+    result=$(get_codec_efficiency "h264")
+    [ "$result" -eq 100 ]
+}
+
+@test "get_codec_efficiency: hevc est plus efficace que h264" {
+    hevc_eff=$(get_codec_efficiency "hevc")
+    h264_eff=$(get_codec_efficiency "h264")
+    [ "$hevc_eff" -lt "$h264_eff" ]
+}
+
+@test "get_codec_efficiency: av1 est plus efficace que hevc" {
+    av1_eff=$(get_codec_efficiency "av1")
+    hevc_eff=$(get_codec_efficiency "hevc")
+    [ "$av1_eff" -lt "$hevc_eff" ]
+}
+
+@test "get_codec_efficiency: hevc = 70%" {
+    result=$(get_codec_efficiency "hevc")
+    [ "$result" -eq 70 ]
+}
+
+@test "get_codec_efficiency: av1 = 50%" {
+    result=$(get_codec_efficiency "av1")
+    [ "$result" -eq 50 ]
+}
+
+@test "get_codec_efficiency: codec inconnu retourne 100 (prudent)" {
+    result=$(get_codec_efficiency "unknown_codec")
+    [ "$result" -eq 100 ]
+}
+
+###########################################################
 # Tests is_codec_better_or_equal()
 ###########################################################
 

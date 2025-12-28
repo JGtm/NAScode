@@ -18,9 +18,10 @@ should_skip_conversion() {
         return 0
     fi
     
-    # Calcul de la tolérance en bits
-    local base_threshold_bits=$((BITRATE_CONVERSION_THRESHOLD_KBPS * 1000))
-    local tolerance_bits=$((BITRATE_CONVERSION_THRESHOLD_KBPS * SKIP_TOLERANCE_PERCENT * 10))
+    # Calcul dynamique du seuil : MAXRATE_KBPS * (1 + tolérance)
+    # S'adapte automatiquement au mode (film/série) et au codec (HEVC/AV1)
+    local base_threshold_bits=$((MAXRATE_KBPS * 1000))
+    local tolerance_bits=$((MAXRATE_KBPS * SKIP_TOLERANCE_PERCENT * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
     
     # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible

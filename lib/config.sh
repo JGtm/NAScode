@@ -25,12 +25,13 @@ VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
 SINGLE_FILE=""       # Chemin vers un fichier unique à convertir (bypass index/queue)
 
 # ----- Codec audio -----
-# Options : copy (défaut), aac, ac3, opus
+# Options : aac (défaut), copy, ac3, opus
+# - aac  : AAC 160k, très compatible, bon compromis qualité/taille (défaut)
 # - copy : garde l'audio original (pas de réencodage)
-# - aac  : AAC, très compatible, bon compromis qualité/taille
 # - ac3  : Dolby Digital, compatible TV/receivers
 # - opus : Meilleure compression, moins compatible
-AUDIO_CODEC="copy"
+# Note : la conversion n'a lieu que si on y gagne (anti-upscaling intelligent)
+AUDIO_CODEC="aac"
 AUDIO_BITRATE_KBPS=0  # 0 = utiliser le défaut selon le codec
 
 # ----- Codec vidéo -----
@@ -80,9 +81,8 @@ readonly TMP_DIR="/tmp/video_convert"
 readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans /tmp
 
 # ----- Paramètres de conversion -----
-# SEUIL DE BITRATE DE CONVERSION (KBPS)
-# Fichiers avec bitrate inférieur à ce seuil ne seront pas reconvertis
-readonly BITRATE_CONVERSION_THRESHOLD_KBPS=2520
+# Le seuil de skip est maintenant dynamique : MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)
+# Il s'adapte automatiquement au mode (film/série) et au codec (HEVC/AV1)
 
 # ----- Limitation de résolution (downscale automatique) -----
 # Objectif : éviter de compresser du 1440p/2160p avec un bitrate prévu pour du 1080p.
@@ -141,10 +141,14 @@ readonly AUDIO_CONVERSION_THRESHOLD_KBPS=160
 # GESTION DES MODES DE CONVERSION
 ###########################################################
 
-# Two-pass encoding : bitrate cible pour 1,1 Go/h en 1080p
-# Calcul : 1,1 Go = 1,1 * 1024 * 8 Mbits = 9011 Mbits
-#          9011 / 3600s = 2503 kbps total
-#          Video = ~2300-2400 kbps (audio ~128 kbps)
+# Bitrates de RÉFÉRENCE (équivalent HEVC)
+# Ces valeurs sont ajustées automatiquement selon l'efficacité du codec cible.
+# Calcul : 1,1 Go/h en 1080p → 2503 kbps total → ~2400 kbps vidéo
+#
+# L'efficacité des codecs (définie dans codec_profiles.sh) :
+#   H.264 = 100% (référence), HEVC = 70%, AV1 = 50%, VVC = 35%
+# Formule : TARGET_KBPS = BASE_TARGET * (efficiency_codec / efficiency_hevc)
+#         = BASE_TARGET * (efficiency_codec / 70)
 
 # Paramètres x265 additionnels par mode (optimisations vitesse/qualité)
 X265_EXTRA_PARAMS=""
@@ -152,14 +156,17 @@ X265_EXTRA_PARAMS=""
 X265_PASS1_FAST=false
 
 set_conversion_mode_parameters() {
+    # Bitrates de référence HEVC (seront ajustés selon le codec)
+    local base_target_kbps base_maxrate_kbps base_bufsize_kbps
+    
     case "$CONVERSION_MODE" in
         film)
             # Films : two-pass ABR, qualité maximale
-            TARGET_BITRATE_KBPS=2035
+            # Bitrates de référence (HEVC)
+            base_target_kbps=2035
+            base_maxrate_kbps=3200
+            base_bufsize_kbps=4800
             ENCODER_PRESET="medium"
-            # ABR avec maxrate/bufsize souples pour qualité constante
-            MAXRATE_KBPS=3200
-            BUFSIZE_KBPS=4800
             # Films : pas de paramètres x265 spéciaux (défauts optimaux)
             X265_EXTRA_PARAMS=""
             # Pass 1 complète pour une analyse approfondie (qualité max)
@@ -173,10 +180,11 @@ set_conversion_mode_parameters() {
             ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 21 (single-pass)
-            TARGET_BITRATE_KBPS=2070
+            # Bitrates de référence (HEVC)
+            base_target_kbps=2070
+            base_maxrate_kbps=2520
+            base_bufsize_kbps=$(( (base_maxrate_kbps * 3) / 2 ))
             ENCODER_PRESET="medium"
-            MAXRATE_KBPS=2520
-            BUFSIZE_KBPS=$(( (MAXRATE_KBPS * 3) / 2 ))
             # Séries : optimisations vitesse/qualité adaptées au contenu série
             # - amp=0, rect=0 : désactive AMP/RECT (gain vitesse ~10%, perte qualité négligeable)
             # - sao=0 : désactive Sample Adaptive Offset (gain ~5%, perte minime sur séries)
@@ -202,6 +210,21 @@ set_conversion_mode_parameters() {
             exit 1
             ;;
     esac
+    
+    # Appliquer le facteur d'efficacité du codec cible
+    # Les bitrates de référence sont pour HEVC (efficacité=70)
+    # Formule : bitrate_codec = bitrate_hevc * (efficacité_codec / 70)
+    local codec_efficiency=70  # HEVC par défaut
+    if declare -f get_codec_efficiency &>/dev/null; then
+        codec_efficiency=$(get_codec_efficiency "${VIDEO_CODEC:-hevc}")
+    fi
+    
+    # Calculer les bitrates ajustés
+    # Exemples : HEVC → *70/70=*1, AV1 → *50/70≈*0.71, VVC → *35/70=*0.5
+    TARGET_BITRATE_KBPS=$(( base_target_kbps * codec_efficiency / 70 ))
+    MAXRATE_KBPS=$(( base_maxrate_kbps * codec_efficiency / 70 ))
+    BUFSIZE_KBPS=$(( base_bufsize_kbps * codec_efficiency / 70 ))
+    
     # Valeurs dérivées utilisées par ffmpeg/x265
     TARGET_BITRATE_FFMPEG="${TARGET_BITRATE_KBPS}k"
     MAXRATE_FFMPEG="${MAXRATE_KBPS}k"
