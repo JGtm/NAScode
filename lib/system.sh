@@ -130,7 +130,7 @@ check_output_suffix() {
         print_info "Option --no-suffix activée. Le suffixe est désactivé par commande."
     
     # 2. Si un suffixe personnalisé a été fourni via -S ou --suffix
-    elif [[ -n "$CUSTOM_SUFFIX_STRING" ]]; then
+    elif [[ -n "${CUSTOM_SUFFIX_STRING:-}" ]]; then
         # On utilise la valeur fournie par l'option courte/longue
         SUFFIX_STRING="$CUSTOM_SUFFIX_STRING"
 
