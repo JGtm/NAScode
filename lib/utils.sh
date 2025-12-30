@@ -18,8 +18,8 @@ import sys,hashlib
 print(hashlib.md5(sys.stdin.read().encode()).hexdigest()[:8])
 PY
     else
-        # repli : utiliser un hash shell simple (non cryptographique mais stable)
-        printf "%s" "$input" | awk '{s=0; for(i=1;i<=length($0);i++){s=(s*31+and(255, ord=ord(substr($0,i,1))));} printf "%08x", s}' 2>/dev/null || echo "00000000"
+        # repli : utiliser cksum (POSIX) - non cryptographique mais stable et portable
+        printf "%s" "$input" | cksum | awk '{printf "%08x", $1}' 2>/dev/null || echo "00000000"
     fi
 }
 

@@ -263,20 +263,7 @@ teardown() {
 }
 
 ###########################################################
-# Tests _get_encoder_params_flag_internal()
+# Note: _get_encoder_params_flag_internal() a été supprimée (duplication).
+# Utiliser get_encoder_params_flag() de codec_profiles.sh à la place.
+# Les tests correspondants sont dans test_codec_profiles.bats.
 ###########################################################
-
-@test "_get_encoder_params_flag_internal: libx265 retourne -x265-params" {
-    result=$(_get_encoder_params_flag_internal "libx265")
-    [ "$result" = "-x265-params" ]
-}
-
-@test "_get_encoder_params_flag_internal: libsvtav1 retourne -svtav1-params" {
-    result=$(_get_encoder_params_flag_internal "libsvtav1")
-    [ "$result" = "-svtav1-params" ]
-}
-
-@test "_get_encoder_params_flag_internal: libaom-av1 retourne vide" {
-    result=$(_get_encoder_params_flag_internal "libaom-av1")
-    [ -z "$result" ]
-}

@@ -52,6 +52,7 @@ SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour V
 # Mode single-pass CRF pour séries (plus rapide, taille variable)
 # Activé par défaut pour le mode "serie", désactivé automatiquement pour "film"
 SINGLE_PASS_MODE=true
+CRF_VALUE=21  # Valeur CRF par défaut (0=lossless, 18=excellent, 23=défaut x265)
 
 # Mode de tri pour la construction de la file d'attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
