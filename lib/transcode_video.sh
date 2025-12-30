@@ -82,13 +82,8 @@ _setup_video_encoding_params() {
     esac
     
     # Ajouter les paramètres spécifiques au mode (tuning, optimisations)
-    local mode_params=""
-    if declare -f get_encoder_mode_params &>/dev/null; then
-        mode_params=$(get_encoder_mode_params "$encoder" "${CONVERSION_MODE:-serie}")
-    elif [[ "$encoder" == "libx265" && -n "${X265_EXTRA_PARAMS:-}" ]]; then
-        # Fallback pour rétro-compatibilité
-        mode_params="${X265_EXTRA_PARAMS}"
-    fi
+    local mode_params
+    mode_params=$(get_encoder_mode_params "$encoder" "${CONVERSION_MODE:-serie}")
     
     # Combiner VBV + mode params
     ENCODER_BASE_PARAMS="$vbv_params"
@@ -104,15 +99,8 @@ _setup_video_encoding_params() {
     # pour coller à la commande type et garder un paramétrage centralisé.
     if [[ "$encoder" == "libsvtav1" ]]; then
         if [[ "$ENCODER_BASE_PARAMS" != *"keyint="* ]]; then
-            local mode_keyint=""
-            if declare -f get_mode_keyint &>/dev/null; then
-                mode_keyint=$(get_mode_keyint "${CONVERSION_MODE:-serie}")
-            else
-                case "${CONVERSION_MODE:-serie}" in
-                    film) mode_keyint="240" ;;
-                    *)    mode_keyint="600" ;;
-                esac
-            fi
+            local mode_keyint
+            mode_keyint=$(get_mode_keyint "${CONVERSION_MODE:-serie}")
             if [[ -n "$mode_keyint" ]]; then
                 if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
                     ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:keyint=${mode_keyint}"
@@ -217,17 +205,7 @@ _build_encoder_ffmpeg_args() {
     local full_params=""
     
     # Obtenir le flag des paramètres encodeur (-x265-params, -svtav1-params, etc.)
-    if declare -f get_encoder_params_flag &>/dev/null; then
-        params_flag=$(get_encoder_params_flag "$encoder")
-    else
-        # Fallback
-        case "$encoder" in
-            libx265)    params_flag="-x265-params" ;;
-            libsvtav1)  params_flag="-svtav1-params" ;;
-            libaom-av1) params_flag="" ;;  # libaom utilise des options directes
-            *)          params_flag="" ;;
-        esac
-    fi
+    params_flag=$(get_encoder_params_flag "$encoder")
     
     # Construire les paramètres selon l'encodeur et le mode
     case "$encoder" in
@@ -287,10 +265,8 @@ _build_encoder_ffmpeg_args() {
                     ;;
             esac
             # libaom utilise cpu-used au lieu de preset
-            local aom_cpu_used=4
-            if declare -f convert_preset &>/dev/null; then
-                aom_cpu_used=$(convert_preset "$ENCODER_PRESET" "libaom-av1")
-            fi
+            local aom_cpu_used
+            aom_cpu_used=$(convert_preset "$ENCODER_PRESET" "libaom-av1")
             encoder_args="${encoder_args} -cpu-used ${aom_cpu_used}"
             ;;
             
@@ -336,10 +312,8 @@ _get_preset_option() {
                 svt_preset="$SVTAV1_PRESET"
             elif [[ -n "${SVTAV1_PRESET_DEFAULT:-}" ]]; then
                 svt_preset="$SVTAV1_PRESET_DEFAULT"
-            elif declare -f convert_preset &>/dev/null; then
-                svt_preset=$(convert_preset "$preset" "libsvtav1")
             else
-                svt_preset=5  # Équivalent à "medium"
+                svt_preset=$(convert_preset "$preset" "libsvtav1")
             fi
             echo "-preset $svt_preset"
             ;;

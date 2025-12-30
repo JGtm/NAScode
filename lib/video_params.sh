@@ -152,27 +152,15 @@ _build_effective_suffix_for_dims() {
     local codec_suffix="x265"
     local use_source_codec=false
     
-    if [[ -n "$source_video_codec" ]] && declare -f is_codec_better_or_equal &>/dev/null; then
-        if is_codec_better_or_equal "$source_video_codec" "${VIDEO_CODEC:-hevc}"; then
-            use_source_codec=true
-        fi
+    if [[ -n "$source_video_codec" ]] && is_codec_better_or_equal "$source_video_codec" "${VIDEO_CODEC:-hevc}"; then
+        use_source_codec=true
     fi
     
     if [[ "$use_source_codec" == true ]]; then
         # Utiliser le codec source pour le suffixe
-        if declare -f get_codec_suffix &>/dev/null; then
-            codec_suffix=$(get_codec_suffix "$source_video_codec")
-        else
-            case "$source_video_codec" in
-                av1) codec_suffix="av1" ;;
-                hevc|h265) codec_suffix="x265" ;;
-                *) codec_suffix="$source_video_codec" ;;
-            esac
-        fi
-    elif declare -f get_codec_suffix &>/dev/null; then
+        codec_suffix=$(get_codec_suffix "$source_video_codec")
+    else
         codec_suffix=$(get_codec_suffix "${VIDEO_CODEC:-hevc}")
-    elif [[ "${VIDEO_CODEC:-hevc}" == "av1" ]]; then
-        codec_suffix="av1"
     fi
 
     local suffix="_${codec_suffix}"

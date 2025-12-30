@@ -149,32 +149,10 @@ _get_smart_audio_decision() {
         source_codec="$opt_source_codec"
         source_bitrate_kbps="${opt_source_bitrate_kbps:-0}"
     else
-        # Récupérer les infos audio du premier flux audio
-        local audio_info
-        audio_info=$(ffprobe -v error \
-            -select_streams a:0 \
-            -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-            -of default=noprint_wrappers=1 \
-            "$input_file" 2>/dev/null || true)
-        
-        local source_bitrate source_bitrate_tag
-        source_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
-        source_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
-        source_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
-        
-        # Utiliser le tag BPS si bitrate direct non disponible
-        if [[ -z "$source_bitrate" || "$source_bitrate" == "N/A" ]]; then
-            source_bitrate="$source_bitrate_tag"
-        fi
-        
-        # Convertir en kbps
-        if declare -f clean_number &>/dev/null; then
-            source_bitrate=$(clean_number "$source_bitrate")
-        fi
-        source_bitrate_kbps=0
-        if [[ -n "$source_bitrate" && "$source_bitrate" =~ ^[0-9]+$ ]]; then
-            source_bitrate_kbps=$((source_bitrate / 1000))
-        fi
+        # Utiliser la fonction centralisée dans media_probe.sh
+        local audio_probe
+        audio_probe=$(_probe_audio_info "$input_file")
+        IFS='|' read -r source_codec source_bitrate_kbps <<< "$audio_probe"
     fi
     
     local target_codec="${AUDIO_CODEC:-aac}"
@@ -275,32 +253,10 @@ _get_audio_conversion_info() {
         source_codec="$opt_source_codec"
         source_bitrate_kbps="${opt_source_bitrate_kbps:-0}"
     else
-        # Récupérer les infos audio du premier flux audio (pour le bitrate source)
-        local audio_info
-        audio_info=$(ffprobe -v error \
-            -select_streams a:0 \
-            -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
-            -of default=noprint_wrappers=1 \
-            "$input_file" 2>/dev/null || true)
-        
-        local source_bitrate source_bitrate_tag
-        source_codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
-        source_bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
-        source_bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
-        
-        # Utiliser le tag BPS si bitrate direct non disponible
-        if [[ -z "$source_bitrate" || "$source_bitrate" == "N/A" ]]; then
-            source_bitrate="$source_bitrate_tag"
-        fi
-        
-        # Convertir en kbps
-        if declare -f clean_number &>/dev/null; then
-            source_bitrate=$(clean_number "$source_bitrate")
-        fi
-        source_bitrate_kbps=0
-        if [[ -n "$source_bitrate" && "$source_bitrate" =~ ^[0-9]+$ ]]; then
-            source_bitrate_kbps=$((source_bitrate / 1000))
-        fi
+        # Utiliser la fonction centralisée dans media_probe.sh
+        local audio_probe
+        audio_probe=$(_probe_audio_info "$input_file")
+        IFS='|' read -r source_codec source_bitrate_kbps <<< "$audio_probe"
     fi
     
     # Utiliser la décision smart pour déterminer should_convert

@@ -13,6 +13,12 @@ export_variables() {
     export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel
     export -f should_skip_conversion _determine_conversion_mode clean_number custom_pv
     
+    # --- Fonctions codec_profiles.sh (gestion des codecs vidéo) ---
+    export -f get_codec_encoder get_codec_suffix get_codec_ffmpeg_names
+    export -f is_codec_match is_codec_supported get_codec_rank get_codec_efficiency
+    export -f is_codec_better_or_equal convert_preset validate_codec_config
+    export -f get_encoder_mode_params get_mode_keyint get_encoder_params_flag
+    
     # --- Fonctions de paramètres vidéo (video_params.sh) ---
     export -f _select_output_pix_fmt _build_downscale_filter_if_needed
     export -f _compute_output_height_for_bitrate _compute_effective_bitrate_kbps_for_height
@@ -24,7 +30,7 @@ export_variables() {
     
     # --- Fonctions audio et sous-titres ---
     export -f _get_audio_target_bitrate _get_audio_conversion_info _build_audio_params _build_stream_mapping
-    export -f _should_convert_audio
+    export -f _should_convert_audio _probe_audio_info
     
     # ========================================================
     # FONCTIONS DE PRÉPARATION ET FINALISATION
