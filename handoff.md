@@ -45,3 +45,24 @@
 
 ### Branches en cours
 - `refactor/improve-maintainability` - prêt à merger
+
+## Session suivante (30/12/2025)
+
+### Sujet
+- Repenser le mode "skip" quand la sortie existe déjà, pour gérer les variantes (sous-titres / audio) sans ré-encoder inutilement.
+
+### Décision de design (proposée, pas encore implémentée)
+- Ajouter un "smart skip" local par fichier: si le fichier de sortie exact n'existe pas, chercher dans le sous-dossier de sortie (`final_dir`) un autre `.mkv` commençant par le même `base_name`.
+- Valider "même contenu" via durée (±2s) (et optionnellement résolution), puis appliquer les critères NAScode (codec/bitrate + logique audio smart) sur le candidat.
+- Limiter le coût via `MAX_CANDIDATES` + top N probes + early-exit.
+
+### Fichier de plan
+- Voir `docs/PLAN_smart_skip_base_name.md`.
+
+### Derniers prompts
+- "aIde moi à trouver une idée intelligente pour repenser le mode skip"
+- "Ok fais moi une vue d'ensemble pour ce design et un plan"
+- "Ok mets moi ce plan dans un fichiers"
+
+### Branche en cours
+- `feature/smart-skip-best-existing`
