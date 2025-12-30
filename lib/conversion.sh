@@ -92,15 +92,15 @@ should_skip_conversion() {
         "skip")
             if [[ -z "$codec" ]]; then
                 echo -e "${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
-                if [[ -n "$LOG_SKIPPED" ]]; then
-                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+                if [[ -n "$LOG_SESSION" ]]; then
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
             else
                 local codec_display="${codec^^}"
                 [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="x265"
                 echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
-                if [[ -n "$LOG_SKIPPED" ]]; then
-                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+                if [[ -n "$LOG_SESSION" ]]; then
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
             fi
             return 0
@@ -148,13 +148,14 @@ _prepare_file_paths() {
     local opt_height="${4:-}"
     local opt_audio_codec="${5:-}"
     local opt_audio_bitrate="${6:-}"
+    local source_video_codec="${7:-}"
     
     local filename_raw=$(basename "$file_original")
     local filename=$(echo "$filename_raw" | tr -d '\r\n')
     
     if [[ -z "$filename" ]]; then
-        if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR filename empty | $file_original" >> "$LOG_ERROR" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR filename empty | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         return 1
     fi
@@ -188,10 +189,8 @@ _prepare_file_paths() {
         fi
         
         # Passer le fichier original pour déterminer le codec audio effectif (smart codec)
-        # Si on a les métadonnées audio, on pourrait optimiser _build_effective_suffix_for_dims aussi
-        # mais pour l'instant on laisse comme ça (il appellera _get_effective_audio_codec qui re-probera si pas d'args)
-        # TODO: Optimiser _build_effective_suffix_for_dims pour accepter les args audio
-        effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate")
+        # Passer aussi le codec vidéo source pour utiliser le bon suffixe en cas de passthrough
+        effective_suffix=$(_build_effective_suffix_for_dims "$input_width" "$input_height" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate" "$source_video_codec")
     fi
 
     if [[ "$DRYRUN" == true ]]; then
@@ -214,8 +213,8 @@ _check_output_exists() {
     
     if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
         echo -e "${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
-        if [[ -n "$LOG_SKIPPED" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
 
         # Alimenter la queue avec le prochain candidat si limite active
@@ -254,6 +253,7 @@ _setup_temp_files_and_logs() {
     
     mkdir -p "$final_dir" 2>/dev/null || true
     if [[ "$NO_PROGRESS" != true ]]; then
+        echo ""
         echo -e "▶️  Démarrage du fichier : $filename"
     fi
     if [[ -n "$LOG_PROGRESS" ]]; then
@@ -266,8 +266,8 @@ _check_disk_space() {
     
     local free_space_mb=$(df -m "$TMP_DIR" | awk 'NR==2 {print $4}' 2>/dev/null) || return 0
     if [[ "$free_space_mb" -lt "$MIN_TMP_FREE_MB" ]]; then
-        if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERREUR Espace disque insuffisant dans $TMP_DIR ($free_space_mb MB libres) | $file_original" >> "$LOG_ERROR" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR Espace disque insuffisant dans $TMP_DIR ($free_space_mb MB libres) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         return 1
     fi
@@ -308,8 +308,8 @@ _copy_to_temp_storage() {
 
     if ! custom_pv "$file_original" "$tmp_input" "$CYAN"; then
         echo -e "${RED}❌ ERREUR Impossible de déplacer (custom_pv) : $file_original${NOCOLOR}"
-        if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR custom_pv copy failed | $file_original" >> "$LOG_ERROR" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR custom_pv copy failed | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null
         return 1
@@ -363,7 +363,7 @@ convert_file() {
     
     # 2. Préparation des chemins (avec métadonnées pour suffixe)
     local path_info
-    path_info=$(_prepare_file_paths "$file_original" "$output_dir" "$v_width" "$v_height" "$a_codec" "$a_bitrate") || return 1
+    path_info=$(_prepare_file_paths "$file_original" "$output_dir" "$v_width" "$v_height" "$a_codec" "$a_bitrate" "$v_codec") || return 1
     
     IFS='|' read -r filename final_dir base_name effective_suffix final_output <<< "$path_info"
     

@@ -69,7 +69,7 @@ parse_arguments() {
                 shift
                 ;;
             --suffix)
-                # Si un argument suit et ne commence pas par tiret, c'est le suffixe perso
+                # Si un argument suit et ne commence pas par tiret, c'est le suffixe personnalisé
                 if [[ -n "${2:-}" ]] && [[ "${2:0:1}" != "-" ]]; then
                     CUSTOM_SUFFIX_STRING="$2"
                     shift 2

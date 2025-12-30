@@ -91,7 +91,7 @@ export_variables() {
     # VARIABLES DE CHEMINS
     # ========================================================
     export SOURCE OUTPUT_DIR TMP_DIR SCRIPT_DIR
-    export LOG_DIR LOG_SUCCESS LOG_SKIPPED LOG_ERROR LOG_PROGRESS SUMMARY_FILE
+    export LOG_DIR LOG_SESSION LOG_PROGRESS SUMMARY_FILE
     export QUEUE INDEX INDEX_META INDEX_READABLE
     
     # ========================================================

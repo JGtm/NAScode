@@ -38,17 +38,9 @@ teardown() {
     grep -q 'readonly LOG_DIR="./logs"' "$LIB_DIR/logging.sh"
 }
 
-@test "logging: LOG_SUCCESS contient le timestamp" {
+@test "logging: LOG_SESSION contient le timestamp" {
     # Vérifier la structure du chemin
-    grep -q 'LOG_SUCCESS="$LOG_DIR/Success_${EXECUTION_TIMESTAMP}.log"' "$LIB_DIR/logging.sh"
-}
-
-@test "logging: LOG_SKIPPED contient le timestamp" {
-    grep -q 'LOG_SKIPPED="$LOG_DIR/Skipped_${EXECUTION_TIMESTAMP}.log"' "$LIB_DIR/logging.sh"
-}
-
-@test "logging: LOG_ERROR contient le timestamp" {
-    grep -q 'LOG_ERROR="$LOG_DIR/Error_${EXECUTION_TIMESTAMP}.log"' "$LIB_DIR/logging.sh"
+    grep -q 'LOG_SESSION="$LOG_DIR/Session_${EXECUTION_TIMESTAMP}.log"' "$LIB_DIR/logging.sh"
 }
 
 @test "logging: SUMMARY_FILE contient le timestamp" {
@@ -129,18 +121,14 @@ teardown() {
     mkdir -p "$test_log_dir"
     
     # Simuler la création des logs
-    local log_success="$test_log_dir/Success_test.log"
-    local log_skipped="$test_log_dir/Skipped_test.log"
-    local log_error="$test_log_dir/Error_test.log"
+    local log_session="$test_log_dir/Session_test.log"
     local summary="$test_log_dir/Summary_test.log"
     
-    for log_file in "$log_success" "$log_skipped" "$log_error" "$summary"; do
+    for log_file in "$log_session" "$summary"; do
         touch "$log_file"
     done
     
-    [ -f "$log_success" ]
-    [ -f "$log_skipped" ]
-    [ -f "$log_error" ]
+    [ -f "$log_session" ]
     [ -f "$summary" ]
 }
 

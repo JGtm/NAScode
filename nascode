@@ -125,7 +125,11 @@ main() {
         return
     fi
     
-    # Convertir SOURCE en chemin absolu pour éviter les problèmes de répertoire courant
+    # Vérifier que SOURCE existe avant de convertir en chemin absolu
+    if [[ ! -d "$SOURCE" ]]; then
+        echo -e "${RED}❌ ERREUR: Le répertoire source n'existe pas : $SOURCE${NOCOLOR}"
+        exit 1
+    fi
     SOURCE=$(cd "$SOURCE" && pwd)
     
     # Vérifications initiales

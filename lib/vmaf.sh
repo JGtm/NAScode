@@ -291,8 +291,8 @@ process_vmaf_queue() {
         fi
         
         # Logger le score VMAF
-        if [[ -n "$LOG_SUCCESS" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SUCCESS" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | $file_original → $final_actual | score:${vmaf_score} | quality:${vmaf_quality:-NA}" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         
         if [[ "$NO_PROGRESS" != true ]]; then

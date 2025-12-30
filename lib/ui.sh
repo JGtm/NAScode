@@ -195,7 +195,6 @@ print_success_box() {
 # Usage: print_transfer_item "Nom du fichier"
 print_transfer_item() {
     local filename="$1"
-    echo ""
     echo -e "${CYAN}  ┌─ 📥 ${WHITE}${filename}${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
 }
@@ -242,8 +241,8 @@ print_indexing_start() {
 print_indexing_progress() {
     local current="$1"
     local total="$2"
-    # Format : "  │  📊 Indexation : 9999/9999 fichiers            │"
-    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers             ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
+    # Format : "  │  📊 Indexation : 9999/9999 fichiers             │"
+    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers              ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
 }
 
 # Affiche la fin du bloc d'indexation avec le résultat

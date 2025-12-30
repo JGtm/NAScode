@@ -190,7 +190,7 @@ done
 ###########################################################
 
 print_and_log "${CYAN}═══════════════════════════════════════════════════════${NC}"
-print_and_log "${CYAN}         Tests Unitaires - Conversion Script           ${NC}"
+print_and_log "${CYAN}         Tests Unitaires - NAScode Script              ${NC}"
 print_and_log "${CYAN}═══════════════════════════════════════════════════════${NC}"
 print_and_log ""
 print_and_log "${DIM}Bats: $(bats --version) | Log: logs/tests/tests_${TIMESTAMP}.log${NC}"
