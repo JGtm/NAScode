@@ -68,7 +68,7 @@ parse_arguments() {
                 REGENERATE_INDEX=true
                 shift
                 ;;
-            --suffix)
+            -S|--suffix)
                 # Si un argument suit et ne commence pas par tiret, c'est le suffixe personnalisé
                 if [[ -n "${2:-}" ]] && [[ "${2:0:1}" != "-" ]]; then
                     CUSTOM_SUFFIX_STRING="$2"
@@ -246,6 +246,7 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-e, --exclude${NOCOLOR} PATTERN        Ajouter un pattern d'exclusion (ARG)
     ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, serie (ARG) [défaut : serie]
     ${GREEN}-d, --dry-run${NOCOLOR}                Mode simulation sans conversion (FLAG)
+    ${GREEN}-S  --suffix${NOCOLOR} [STRING]             Activer un suffixe dynamique ou définir un suffixe personnalisé (ARG optionnel)
     ${GREEN}-x, --no-suffix${NOCOLOR}              Désactiver le suffixe _x265 (FLAG)
     ${GREEN}-r, --random${NOCOLOR}                 Tri aléatoire : sélectionne des fichiers aléatoires (FLAG) [défaut : 10]
     ${GREEN}-l, --limit${NOCOLOR} N                Limiter le traitement à N fichiers (ARG)
@@ -254,6 +255,7 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-n, --no-progress${NOCOLOR}            Désactiver l'affichage des indicateurs de progression (FLAG)
     ${GREEN}-h, --help${NOCOLOR}                   Afficher cette aide (FLAG)
     ${GREEN}-k, --keep-index${NOCOLOR}             Conserver l'index existant sans demande interactive (FLAG)
+    ${GREEN}-R, --regenerate-index${NOCOLOR}       Forcer la régénération de l'index au démarrage (FLAG)
     ${GREEN}-v, --vmaf${NOCOLOR}                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
     ${GREEN}-t, --sample${NOCOLOR}                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
     ${GREEN}-f, --file${NOCOLOR} FILE              Convertir un fichier unique (bypass index/queue) (ARG)
