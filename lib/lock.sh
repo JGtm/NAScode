@@ -42,6 +42,7 @@ cleanup() {
     # et pas déjà signalé par STOP_FLAG
     # Note: On utilise une variable pour détecter les signaux plutôt que le code de sortie
     if [[ "${_INTERRUPTED:-}" == "1" ]] && [[ ! -f "$STOP_FLAG" ]]; then
+        echo ""
         echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
     fi
     

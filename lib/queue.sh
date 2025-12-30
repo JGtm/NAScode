@@ -69,7 +69,7 @@ _validate_index_source() {
     # Si régénération forcée demandée
     if [[ "${REGENERATE_INDEX:-false}" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}⚠️  Régénération forcée de l'index demandée.${NOCOLOR}"
+            echo -e "${YELLOW}  ⚠️  Régénération forcée de l'index demandée.${NOCOLOR}"
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
@@ -164,7 +164,7 @@ _handle_existing_index() {
     # Vérifier que l'index n'est pas vide
     if ! [[ -s "$INDEX" ]]; then 
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}Index vide, régénération nécessaire...${NOCOLOR}"
+            echo -e "${YELLOW} Index vide, régénération nécessaire...${NOCOLOR}"
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1

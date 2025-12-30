@@ -17,9 +17,8 @@ LIMIT_FILES=0
 CUSTOM_QUEUE=""
 SOURCE="../"
 OUTPUT_DIR="$SCRIPT_DIR/Converted"
-FORCE_NO_SUFFIX=false
-SUFFIX_ENABLED=false      # -S sans argument : activer le suffixe sans question
-CUSTOM_SUFFIX_STRING=""   # Suffixe personnalisé via -S/--suffix
+# Mode suffixe : ask (défaut, question interactive), on (-S), off (-x), custom:xxx (-S "xxx")
+SUFFIX_MODE="ask"
 REGENERATE_INDEX=false    # Régénérer l'index via -R/--regenerate-index
 PARALLEL_JOBS=1
 NO_PROGRESS=false
@@ -281,7 +280,7 @@ set_conversion_mode_parameters() {
 #           _av1_2070k_1080p_medium
 build_dynamic_suffix() {
     # Ne pas écraser si l'utilisateur a forcé --no-suffix
-    if [[ "$FORCE_NO_SUFFIX" == true ]]; then
+    if [[ "$SUFFIX_MODE" == "off" ]]; then
         SUFFIX_STRING=""
         return
     fi

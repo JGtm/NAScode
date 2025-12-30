@@ -173,9 +173,9 @@ _prepare_file_paths() {
     # Fallback : si les fonctions ne sont pas chargées (tests/unitaires), on garde SUFFIX_STRING.
     local effective_suffix="$SUFFIX_STRING"
     
-    # Si un suffixe personnalisé est forcé, on l'utilise tel quel (sauf si vide)
-    if [[ -n "${CUSTOM_SUFFIX_STRING:-}" ]]; then
-        effective_suffix="$CUSTOM_SUFFIX_STRING"
+    # Si un suffixe personnalisé est forcé via -S "valeur", on l'utilise tel quel
+    if [[ "${SUFFIX_MODE:-ask}" == custom:* ]]; then
+        effective_suffix="${SUFFIX_MODE#custom:}"
     elif [[ -n "$SUFFIX_STRING" ]] && declare -f _build_effective_suffix_for_dims &>/dev/null; then
         local input_width="$opt_width"
         local input_height="$opt_height"

@@ -21,7 +21,7 @@ _reset_cli_state() {
     DRYRUN=false
     RANDOM_MODE=false
     LIMIT_FILES=0
-    FORCE_NO_SUFFIX=false
+    SUFFIX_MODE="ask"
     KEEP_INDEX=false
     VMAF_ENABLED=false
     SAMPLE_MODE=false
@@ -127,19 +127,19 @@ _reset_cli_state() {
 
     parse_arguments -xdrk
 
-    [ "$FORCE_NO_SUFFIX" = "true" ]
+    [ "$SUFFIX_MODE" = "off" ]
     [ "$DRYRUN" = "true" ]
     [ "$RANDOM_MODE" = "true" ]
     [ "$KEEP_INDEX" = "true" ]
     [ "$LIMIT_FILES" -eq "$RANDOM_MODE_DEFAULT_LIMIT" ]
 }
 
-@test "parse_arguments: -x active FORCE_NO_SUFFIX" {
+@test "parse_arguments: -x active SUFFIX_MODE=off" {
     _reset_cli_state
 
     parse_arguments -x
 
-    [ "$FORCE_NO_SUFFIX" = "true" ]
+    [ "$SUFFIX_MODE" = "off" ]
     [ "$DRYRUN" = "false" ]
 }
 
@@ -166,34 +166,63 @@ _reset_cli_state() {
     [ "$REGENERATE_INDEX" = "true" ]
 }
 
-@test "parse_arguments: --suffix définit CUSTOM_SUFFIX_STRING" {
+@test "parse_arguments: --suffix définit SUFFIX_MODE=custom:xxx" {
     _reset_cli_state
 
     parse_arguments --suffix "_custom"
 
-    [ "$CUSTOM_SUFFIX_STRING" = "_custom" ]
+    [ "$SUFFIX_MODE" = "custom:_custom" ]
 }
 
-@test "parse_arguments: --suffix sans argument active le suffixe dynamique" {
+@test "parse_arguments: --suffix sans argument active SUFFIX_MODE=on" {
     _reset_cli_state
-    FORCE_NO_SUFFIX=true # On simule qu'il était désactivé
 
     parse_arguments --suffix
 
-    [ "$FORCE_NO_SUFFIX" = "false" ]
-    [ -z "$CUSTOM_SUFFIX_STRING" ]
+    [ "$SUFFIX_MODE" = "on" ]
 }
 
-@test "parse_arguments: --suffix suivi d'une option active le suffixe dynamique" {
+@test "parse_arguments: --suffix suivi d'une option active SUFFIX_MODE=on" {
     _reset_cli_state
-    FORCE_NO_SUFFIX=true
 
     parse_arguments --suffix -v
 
-    [ "$FORCE_NO_SUFFIX" = "false" ]
-    [ -z "$CUSTOM_SUFFIX_STRING" ]
+    [ "$SUFFIX_MODE" = "on" ]
     [ "$VMAF_ENABLED" = "true" ]
 }
+
+@test "parse_arguments: -S (forme courte) avec valeur définit SUFFIX_MODE=custom:xxx" {
+    _reset_cli_state
+
+    parse_arguments -S "_mon_suffixe"
+
+    [ "$SUFFIX_MODE" = "custom:_mon_suffixe" ]
+}
+
+@test "parse_arguments: -S (forme courte) sans argument active SUFFIX_MODE=on" {
+    _reset_cli_state
+
+    parse_arguments -S
+
+    [ "$SUFFIX_MODE" = "on" ]
+}
+
+@test "parse_arguments: -S suivi de -d (autre option) active SUFFIX_MODE=on" {
+    _reset_cli_state
+
+    parse_arguments -S -d
+
+    [ "$SUFFIX_MODE" = "on" ]
+    [ "$DRYRUN" = "true" ]
+}
+
+@test "parse_arguments: SUFFIX_MODE par défaut est ask" {
+    _reset_cli_state
+
+    # Ne pas parser d'argument
+    [ "$SUFFIX_MODE" = "ask" ]
+}
+
 @test "parse_arguments: -n active NO_PROGRESS" {
     _reset_cli_state
 

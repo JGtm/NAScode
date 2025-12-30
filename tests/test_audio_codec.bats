@@ -490,7 +490,7 @@ STUB
 
 @test "config: build_dynamic_suffix inclut _aac si AUDIO_CODEC=aac" {
     AUDIO_CODEC="aac"
-    FORCE_NO_SUFFIX=false
+    SUFFIX_MODE="ask"
     SAMPLE_MODE=false
     
     build_dynamic_suffix

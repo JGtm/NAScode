@@ -27,7 +27,7 @@ parse_arguments() {
                 shift 
                 ;;
             -x|--no-suffix) 
-                FORCE_NO_SUFFIX=true
+                SUFFIX_MODE="off"
                 shift 
                 ;;
             -r|--random)
@@ -71,12 +71,11 @@ parse_arguments() {
             -S|--suffix)
                 # Si un argument suit et ne commence pas par tiret, c'est le suffixe personnalisé
                 if [[ -n "${2:-}" ]] && [[ "${2:0:1}" != "-" ]]; then
-                    CUSTOM_SUFFIX_STRING="$2"
+                    SUFFIX_MODE="custom:$2"
                     shift 2
                 else
                     # Sinon, on active le suffixe dynamique (bypass la question interactive)
-                    SUFFIX_ENABLED=true
-                    FORCE_NO_SUFFIX=false
+                    SUFFIX_MODE="on"
                     shift
                 fi
                 ;;

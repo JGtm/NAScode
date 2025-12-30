@@ -93,6 +93,7 @@ check_plexignore() {
     if [[ "$output_abs" = "$source_abs"/* ]]; then
         if [[ -f "$plexignore_file" ]]; then
             _plex_line "Fichier .plexignore déjà présent dans le répertoire de destination"
+            echo ""
             return 0
         fi
 
@@ -106,6 +107,7 @@ check_plexignore() {
                 ;;
             [nN]|*)
                 _plex_line "Création de .plexignore ignorée"
+                echo ""
                 ;;
         esac
     fi
@@ -124,72 +126,74 @@ check_output_suffix() {
         is_same_dir=true
     fi
 
-    # 1. Si l'utilisateur a désactivé le suffixe via -x
-    if [[ "$FORCE_NO_SUFFIX" == true ]]; then
-        SUFFIX_STRING=""
-        print_info "Option --no-suffix activée. Le suffixe est désactivé par commande."
-    
-    # 2. Si un suffixe personnalisé a été fourni via -S "valeur"
-    elif [[ -n "${CUSTOM_SUFFIX_STRING:-}" ]]; then
-        # On utilise la valeur fournie par l'option courte/longue
-        SUFFIX_STRING="$CUSTOM_SUFFIX_STRING"
-        echo -e "  ${YELLOW}⚠️  Utilisation forcée du suffixe de sortie : ${SUFFIX_STRING}${NOCOLOR}"
-    
-    # 3. Si -S sans argument : activer le suffixe dynamique sans question
-    elif [[ "${SUFFIX_ENABLED:-false}" == true ]]; then
-        # SUFFIX_STRING garde sa valeur par défaut (suffixe dynamique)
-        print_success "Suffixe de sortie activé (option -S)"
-    
-    else
-        # 3. Logique interactive par défaut (si pas de -x et pas de -S)
-        local suffix_example_1080 suffix_example_720
-        suffix_example_1080="${SUFFIX_STRING}"
-        suffix_example_720=""
-        if declare -f _build_effective_suffix_for_dims &>/dev/null; then
-            suffix_example_1080=$(_build_effective_suffix_for_dims 1920 1080)
-            suffix_example_720=$(_build_effective_suffix_for_dims 1280 720)
-        fi
-
-        # Affichage succinct : garder seulement "<bitrate>_<height>" (ex: 2070k_1080p)
-        local hint_1080 hint_720
-        hint_1080="$suffix_example_1080"
-         hint_720="$suffix_example_720"
-                 if [[ "$hint_1080" == _x265_* ]]; then
-            local _rest _br _res
-            _rest="${hint_1080#_x265_}"
-            IFS='_' read -r _br _res _ <<< "$_rest"
-            if [[ -n "$_br" && -n "$_res" ]]; then
-                hint_1080="${_br}_${_res}"
+    # Gestion du suffixe selon SUFFIX_MODE : off, on, custom:xxx, ask (défaut)
+    case "${SUFFIX_MODE:-ask}" in
+        off)
+            # -x / --no-suffix : désactiver le suffixe
+            SUFFIX_STRING=""
+            print_info "Option --no-suffix activée. Le suffixe est désactivé par commande."
+            ;;
+        custom:*)
+            # -S "valeur" : suffixe personnalisé
+            SUFFIX_STRING="${SUFFIX_MODE#custom:}"
+            echo -e "  ${YELLOW}⚠️  Utilisation forcée du suffixe de sortie : ${SUFFIX_STRING}${NOCOLOR}"
+            ;;
+        on)
+            # -S sans argument : activer le suffixe dynamique sans question
+            # SUFFIX_STRING garde sa valeur par défaut (suffixe dynamique)
+            print_success "Suffixe de sortie activé (option -S)"
+            ;;
+        ask|*)
+            # Mode interactif par défaut
+            local suffix_example_1080 suffix_example_720
+            suffix_example_1080="${SUFFIX_STRING}"
+            suffix_example_720=""
+            if declare -f _build_effective_suffix_for_dims &>/dev/null; then
+                suffix_example_1080=$(_build_effective_suffix_for_dims 1920 1080)
+                suffix_example_720=$(_build_effective_suffix_for_dims 1280 720)
             fi
-        fi
-        if [[ "$hint_720" == _x265_* ]]; then
-            local _rest2 _br2 _res2
-            _rest2="${hint_720#_x265_}"
-            IFS='_' read -r _br2 _res2 _ <<< "$_rest2"
-            if [[ -n "$_br2" && -n "$_res2" ]]; then
-                hint_720="${_br2}_${_res2}"
-            fi
-        fi
 
-        if [[ -n "$suffix_example_720" ]] && [[ "$suffix_example_720" != "$suffix_example_1080" ]]; then
-            ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080 / $hint_720"
-        else
-            ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080"
-        fi
-        read -r response
-        
-        case "$response" in
-            [nN])
-                SUFFIX_STRING=""
-                print_warning "Suffixe de sortie désactivé"
-                ;;
-            *)
-                # Ne pas afficher le suffixe complet car la résolution (1080p/720p) 
-                # dépend de chaque fichier source et peut prêter à confusion
-                print_success "Suffixe de sortie activé"
-                ;;
-        esac
-    fi
+            # Affichage succinct : garder seulement "<bitrate>_<height>" (ex: 2070k_1080p)
+            local hint_1080 hint_720
+            hint_1080="$suffix_example_1080"
+            hint_720="$suffix_example_720"
+            if [[ "$hint_1080" == _x265_* ]]; then
+                local _rest _br _res
+                _rest="${hint_1080#_x265_}"
+                IFS='_' read -r _br _res _ <<< "$_rest"
+                if [[ -n "$_br" && -n "$_res" ]]; then
+                    hint_1080="${_br}_${_res}"
+                fi
+            fi
+            if [[ "$hint_720" == _x265_* ]]; then
+                local _rest2 _br2 _res2
+                _rest2="${hint_720#_x265_}"
+                IFS='_' read -r _br2 _res2 _ <<< "$_rest2"
+                if [[ -n "$_br2" && -n "$_res2" ]]; then
+                    hint_720="${_br2}_${_res2}"
+                fi
+            fi
+
+            if [[ -n "$suffix_example_720" ]] && [[ "$suffix_example_720" != "$suffix_example_1080" ]]; then
+                ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080 / $hint_720"
+            else
+                ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080"
+            fi
+            read -r response
+            
+            case "$response" in
+                [nN])
+                    SUFFIX_STRING=""
+                    print_warning "Suffixe de sortie désactivé"
+                    ;;
+                *)
+                    # Ne pas afficher le suffixe complet car la résolution (1080p/720p) 
+                    # dépend de chaque fichier source et peut prêter à confusion
+                    print_success "Suffixe de sortie activé"
+                    ;;
+            esac
+            ;;
+    esac
 
     # 4. Vérifications de sécurité (Écrasement / Coexistence)
     if [[ -z "$SUFFIX_STRING" ]] && [[ "$is_same_dir" == true ]]; then

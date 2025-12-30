@@ -97,9 +97,9 @@ teardown() {
     [[ "$final_output" =~ "-dryrun-sample.mkv" ]]
 }
 
-@test "_prepare_file_paths: utilise CUSTOM_SUFFIX_STRING si défini" {
+@test "_prepare_file_paths: utilise SUFFIX_MODE=custom si défini" {
     SOURCE="/videos"
-    CUSTOM_SUFFIX_STRING="_mon_suffixe_perso"
+    SUFFIX_MODE="custom:_mon_suffixe_perso"
     SUFFIX_STRING="_x265_ignored"
     
     local result
