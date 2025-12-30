@@ -35,9 +35,9 @@ validate_queue_file() {
     
     local test_read=$(head -c 100 "$queue_file" | tr '\0' '\n' | head -1)
     if [[ -z "$test_read" ]] && [[ $file_count -gt 0 ]]; then
-        echo -e "${YELLOW}⚠️  Le fichier queue semble valide ($file_count fichiers détectés).${NOCOLOR}"
+        echo -e "  ${YELLOW}⚠️  Le fichier queue semble valide ($file_count fichiers détectés).${NOCOLOR}"
     else
-        echo -e "${GREEN}✅ Fichier queue validé ($file_count fichiers détectés).${NOCOLOR}"
+        echo -e "  ${GREEN}✅ Fichier queue validé ($file_count fichiers détectés).${NOCOLOR}"
     fi
     
     return 0
@@ -78,7 +78,7 @@ _validate_index_source() {
     # Si pas de fichier de métadonnées, on ne peut pas valider → régénérer
     if [[ ! -f "$INDEX_META" ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}⚠️  Pas de métadonnées pour l'index existant, régénération...${NOCOLOR}"
+            echo -e "  ${YELLOW}⚠️  Pas de métadonnées pour l'index existant, régénération...${NOCOLOR}"
         fi
         rm -f "$INDEX" "$INDEX_READABLE"
         return 1
@@ -90,7 +90,7 @@ _validate_index_source() {
     
     if [[ -z "$stored_source" ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}⚠️  Source non trouvée dans les métadonnées, régénération...${NOCOLOR}"
+            echo -e "  ${YELLOW}⚠️  Source non trouvée dans les métadonnées, régénération...${NOCOLOR}"
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
@@ -102,10 +102,10 @@ _validate_index_source() {
     
     if [[ "$current_source_normalized" != "$stored_source_normalized" ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}⚠️  La source a changé :${NOCOLOR}"
-            echo -e "${YELLOW}    Index créé pour : $stored_source${NOCOLOR}"
-            echo -e "${YELLOW}    Source actuelle : $SOURCE${NOCOLOR}"
-            echo -e "${YELLOW}    Régénération automatique de l'index...${NOCOLOR}"
+            echo -e "  ${YELLOW}⚠️  La source a changé :${NOCOLOR}"
+            echo -e "  ${YELLOW}    Index créé pour : $stored_source${NOCOLOR}"
+            echo -e "  ${YELLOW}    Source actuelle : $SOURCE${NOCOLOR}"
+            echo -e "  ${YELLOW}    Régénération automatique de l'index...${NOCOLOR}"
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
@@ -164,7 +164,7 @@ _handle_existing_index() {
     # Vérifier que l'index n'est pas vide
     if ! [[ -s "$INDEX" ]]; then 
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW} Index vide, régénération nécessaire...${NOCOLOR}"
+            echo -e "  ${YELLOW}⚠️  Index vide, régénération nécessaire...${NOCOLOR}"
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
