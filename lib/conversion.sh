@@ -37,15 +37,8 @@ _determine_conversion_mode() {
     local target_codec="${VIDEO_CODEC:-hevc}"
     local is_better_or_equal_codec=false
     
-    if declare -f is_codec_better_or_equal &>/dev/null; then
-        if is_codec_better_or_equal "$codec" "$target_codec"; then
-            is_better_or_equal_codec=true
-        fi
-    else
-        case "$codec" in
-            av1) is_better_or_equal_codec=true ;;
-            hevc|h265) [[ "$target_codec" == "hevc" ]] && is_better_or_equal_codec=true ;;
-        esac
+    if is_codec_better_or_equal "$codec" "$target_codec"; then
+        is_better_or_equal_codec=true
     fi
     
     # Vidéo conforme (bon codec + bitrate optimisé) ?
@@ -116,14 +109,7 @@ should_skip_conversion() {
             # Détecter si le fichier est dans un codec meilleur/égal mais avec bitrate trop élevé
             local target_codec="${VIDEO_CODEC:-hevc}"
             local is_better_or_equal=false
-            if declare -f is_codec_better_or_equal &>/dev/null; then
-                is_codec_better_or_equal "$codec" "$target_codec" && is_better_or_equal=true
-            else
-                case "$codec" in
-                    av1) is_better_or_equal=true ;;
-                    hevc|h265) [[ "$target_codec" == "hevc" ]] && is_better_or_equal=true ;;
-                esac
-            fi
+            is_codec_better_or_equal "$codec" "$target_codec" && is_better_or_equal=true
             
             if [[ "$is_better_or_equal" == true && -n "$LOG_PROGRESS" ]]; then
                 local codec_display="${codec^^}"

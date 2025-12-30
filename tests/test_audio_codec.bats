@@ -16,6 +16,7 @@ setup() {
         source "$LIB_DIR/config.sh"
         source "$LIB_DIR/codec_profiles.sh"
         source "$LIB_DIR/utils.sh"
+        source "$LIB_DIR/media_probe.sh"
         source "$LIB_DIR/audio_params.sh"
         source "$LIB_DIR/video_params.sh"
         source "$LIB_DIR/stream_mapping.sh"

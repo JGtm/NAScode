@@ -225,10 +225,8 @@ set_conversion_mode_parameters() {
     # Appliquer le facteur d'efficacité du codec cible
     # Les bitrates de référence sont pour HEVC (efficacité=70)
     # Formule : bitrate_codec = bitrate_hevc * (efficacité_codec / 70)
-    local codec_efficiency=70  # HEVC par défaut
-    if declare -f get_codec_efficiency &>/dev/null; then
-        codec_efficiency=$(get_codec_efficiency "${VIDEO_CODEC:-hevc}")
-    fi
+    local codec_efficiency
+    codec_efficiency=$(get_codec_efficiency "${VIDEO_CODEC:-hevc}")
     
     # Calculer les bitrates ajustés
     # Exemples : HEVC → *70/70=*1, AV1 → *50/70≈*0.71, VVC → *35/70=*0.5
@@ -243,23 +241,14 @@ set_conversion_mode_parameters() {
     X265_VBV_PARAMS="vbv-maxrate=${MAXRATE_KBPS}:vbv-bufsize=${BUFSIZE_KBPS}"
     
     # Initialiser l'encodeur selon le codec (si pas déjà spécifié)
-    if [[ -z "$VIDEO_ENCODER" ]] && declare -f get_codec_encoder &>/dev/null; then
+    if [[ -z "$VIDEO_ENCODER" ]]; then
         VIDEO_ENCODER=$(get_codec_encoder "$VIDEO_CODEC")
-    elif [[ -z "$VIDEO_ENCODER" ]]; then
-        # Fallback si codec_profiles.sh pas encore chargé
-        case "$VIDEO_CODEC" in
-            hevc) VIDEO_ENCODER="libx265" ;;
-            av1)  VIDEO_ENCODER="libsvtav1" ;;
-            *)    VIDEO_ENCODER="libx265" ;;
-        esac
     fi
     
     # Valider que le codec/encodeur est disponible dans FFmpeg
-    if declare -f validate_codec_config &>/dev/null; then
-        if ! validate_codec_config; then
-            print_error "Configuration codec invalide. Vérifiez que FFmpeg supporte l'encodeur $VIDEO_ENCODER."
-            exit 1
-        fi
+    if ! validate_codec_config; then
+        print_error "Configuration codec invalide. Vérifiez que FFmpeg supporte l'encodeur $VIDEO_ENCODER."
+        exit 1
     fi
     
     # Construire le suffixe dynamique basé sur les paramètres
@@ -286,12 +275,8 @@ build_dynamic_suffix() {
     fi
     
     # Suffixe basé sur le codec (x265, av1, etc.)
-    local codec_suffix="x265"
-    if declare -f get_codec_suffix &>/dev/null; then
-        codec_suffix=$(get_codec_suffix "$VIDEO_CODEC")
-    elif [[ "$VIDEO_CODEC" == "av1" ]]; then
-        codec_suffix="av1"
-    fi
+    local codec_suffix
+    codec_suffix=$(get_codec_suffix "$VIDEO_CODEC")
     
     local suffix="_${codec_suffix}"
     

@@ -44,6 +44,9 @@ load_base_modules() {
     # Charger les utilitaires
     source "$LIB_DIR/utils.sh"
     
+    # Charger les fonctions de probe média (doit être avant audio_params)
+    source "$LIB_DIR/media_probe.sh"
+    
     # Charger les paramètres audio
     source "$LIB_DIR/audio_params.sh"
 

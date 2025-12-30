@@ -163,6 +163,46 @@ get_video_metadata() {
 }
 
 ###########################################################
+# ANALYSE DES PROPRIÉTÉS AUDIO
+###########################################################
+
+# Récupère les infos audio du premier flux audio d'un fichier.
+# Centralise les appels ffprobe audio pour éviter les duplications.
+# Usage: _probe_audio_info <file>
+# Retour: codec|bitrate_kbps (bitrate en kbps, 0 si non disponible)
+_probe_audio_info() {
+    local file="$1"
+    
+    local audio_info
+    audio_info=$(ffprobe -v error \
+        -select_streams a:0 \
+        -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
+        -of default=noprint_wrappers=1 \
+        "$file" 2>/dev/null || true)
+    
+    local codec bitrate bitrate_tag bitrate_kbps
+    codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
+    bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
+    bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
+    
+    # Utiliser le tag BPS si bitrate direct non disponible
+    if [[ -z "$bitrate" || "$bitrate" == "N/A" ]]; then
+        bitrate="$bitrate_tag"
+    fi
+    
+    # Convertir en kbps
+    if declare -f clean_number &>/dev/null; then
+        bitrate=$(clean_number "$bitrate")
+    fi
+    bitrate_kbps=0
+    if [[ -n "$bitrate" && "$bitrate" =~ ^[0-9]+$ ]]; then
+        bitrate_kbps=$((bitrate / 1000))
+    fi
+    
+    echo "${codec}|${bitrate_kbps}"
+}
+
+###########################################################
 # ANALYSE DES PROPRIÉTÉS VIDÉO (RÉSOLUTION / PIX_FMT)
 ###########################################################
 
