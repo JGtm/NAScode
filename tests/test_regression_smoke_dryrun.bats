@@ -42,16 +42,21 @@ teardown() {
 
     # Logs et queue (dans WORKDIR pour ne pas polluer le repo)
     [ -d "$WORKDIR/logs" ]
-    [ -f "$WORKDIR/logs/Queue" ]
+    # Queue est supprimé au cleanup, on vérifie Queue.full qui persiste
+    [ -f "$WORKDIR/logs/Queue.full" ]
 
     # Le log de dry-run doit exister
     compgen -G "$WORKDIR/logs/DryRun_Comparison_*.log" >/dev/null
 
     # La queue ne doit pas contenir les exclusions évidentes
-    tr '\0' '\n' < "$WORKDIR/logs/Queue" > "$TEST_TEMP_DIR/queue.txt"
-    ! grep -q "Converted/ignored.mkv" "$TEST_TEMP_DIR/queue.txt"
-    ! grep -q "logs/ignored2.mkv" "$TEST_TEMP_DIR/queue.txt"
-    ! grep -q "c.part" "$TEST_TEMP_DIR/queue.txt"
+    # Queue est supprimé, on utilise Queue_readable qui contient la queue finale (limitée)
+    local queue_readable
+    queue_readable=$(ls "$WORKDIR/logs/Queue_readable_"*.txt | head -1)
+    [ -f "$queue_readable" ]
+    
+    ! grep -q "Converted/ignored.mkv" "$queue_readable"
+    ! grep -q "logs/ignored2.mkv" "$queue_readable"
+    ! grep -q "c.part" "$queue_readable"
 
     # La limite doit se refléter dans le nombre de fichiers touchés en sortie
     # (en dry-run, convert_file touche les fichiers de sortie)

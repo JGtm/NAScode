@@ -184,6 +184,8 @@ _finalize_log_and_verify() {
             ) 200>"${TOTAL_SIZE_AFTER_FILE}.lock" 2>/dev/null || true
         fi
     fi
+    
+    return 0
 }
 
 ###########################################################

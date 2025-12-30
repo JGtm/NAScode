@@ -172,8 +172,27 @@ count_subtitle_streams() {
 _build_stream_mapping() {
     local input_file="$1"
 
-    # Toujours mapper vidéo et audio
-    local mapping="-map 0:v -map 0:a?"
+    local mapping=""
+
+    # 1. Video mapping: exclude attached_pic (cover art)
+    local video_streams
+    video_streams=$(ffprobe -v error -select_streams v \
+        -show_entries stream=index:stream_disposition=attached_pic \
+        -of csv=p=0 "$input_file" 2>/dev/null)
+
+    if [[ -n "$video_streams" ]]; then
+        while IFS=',' read -r idx attached; do
+            if [[ "$attached" != "1" ]]; then
+                mapping="$mapping -map 0:$idx"
+            fi
+        done <<< "$video_streams"
+    else
+        # Fallback: map all video streams if probe fails
+        mapping="-map 0:v"
+    fi
+
+    # 2. Audio mapping (keep all)
+    mapping="$mapping -map 0:a?"
 
     # Récupérer les index des sous-titres français
     local fr_subs

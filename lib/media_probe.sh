@@ -16,7 +16,7 @@ get_full_media_metadata() {
     output=$(ffprobe -v error \
         -show_entries format=duration,bit_rate \
         -show_entries stream=index,codec_type,codec_name,bit_rate,width,height,pix_fmt:stream_tags=BPS \
-        -of default=noprint_wrappers=1 \
+        -of default=noprint_wrappers=0 \
         "$file" 2>/dev/null || true)
     
     # Parsing avec awk pour extraire les infos vidéo (premier flux vidéo) et audio (premier flux audio)
@@ -56,11 +56,25 @@ get_full_media_metadata() {
         }
     }
 
-    /^index=/ {
+    /^\[STREAM\]/ {
         commit_stream();
-        curr_idx = $2;
+        curr_idx = -2; # Mark as inside stream but index not yet found
         # Reset current stream vars
         curr_type=""; curr_codec=""; curr_bitrate=0; curr_width=0; curr_height=0; curr_pix_fmt=""; curr_bps=0;
+    }
+
+    /^\[\/STREAM\]/ {
+        commit_stream();
+        curr_idx = -1;
+    }
+
+    /^\[FORMAT\]/ {
+        commit_stream(); # Safety
+        curr_idx = -1;
+    }
+
+    /^index=/ {
+        curr_idx = $2;
     }
 
     /^codec_type=/ { curr_type = $2 }

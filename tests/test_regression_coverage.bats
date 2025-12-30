@@ -78,8 +78,8 @@ teardown() {
     local result
     result=$(_build_stream_mapping "$fake_file")
     
-    # Doit contenir au minimum -map 0:v:0 et -map 0:a?
-    [[ "$result" =~ "-map 0:v:0" ]]
+    # Doit contenir au minimum -map 0:v (fallback) et -map 0:a?
+    [[ "$result" =~ "-map 0:v" ]]
     [[ "$result" =~ "-map 0:a" ]]
 }
 
@@ -108,8 +108,10 @@ STUB
     local result
     result=$(_build_stream_mapping "/fake/file.mkv")
 
-    [[ "$result" =~ "-map 0:v:1" ]]
-    [[ ! "$result" =~ "-map 0:v:0" ]]
+    # Expect absolute index 1 (main video)
+    [[ "$result" =~ "-map 0:1" ]]
+    # Should not contain index 0 (cover art)
+    [[ ! "$result" =~ "-map 0:0" ]]
 }
 
 @test "SUBTITLES: fichier avec sous-titres FR uniquement conserve FR" {

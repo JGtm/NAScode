@@ -18,6 +18,7 @@ setup() {
     export LOG_SUCCESS="$TEST_TEMP_DIR/success.log"
     export LOG_SKIPPED="$TEST_TEMP_DIR/skipped.log"
     export LOG_ERROR="$TEST_TEMP_DIR/error.log"
+    export LOG_SESSION="$LOG_ERROR"
     export SUMMARY_FILE="$TEST_TEMP_DIR/summary.log"
     : > "$LOG_SUCCESS"
     : > "$LOG_SKIPPED"

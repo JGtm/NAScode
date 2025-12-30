@@ -3,27 +3,19 @@
 ## Dernière session (30/12/2025)
 
 ### Tâches accomplies
-- Consolidation des logs `Success/Error/Skipped` en un unique log de session `Session_*.log`.
-- Nettoyage automatique des anciens logs (> 30 jours) en conservant `Index`, `Index.meta` et `Index_readable*`.
-- Nettoyage de fin d'exécution (y compris interruption) des fichiers temporaires `Queue`, `Progress_*`, `.vmaf_queue_*`, compteurs, etc.
-- Correctif Windows/Git Bash : validation explicite de `--source` et messages d'erreur plus clairs.
-- Ajustement UI : alignement de la bordure sur la ligne "Indexation".
-- Mise à jour des tests Bats E2E pour le log consolidé `Session_*.log`.
-- Correction suffixe : ne plus ajouter `_x265` quand la vidéo est conservée dans un codec supérieur (ex: AV1).
-- Renommage du titre dans `run_tests.sh` : "Tests Unitaires - NAScode Script".
+- Correction de 4 fichiers de tests échoués (`test_e2e_full_workflow.bats`, `test_finalize_transfer_errors.bats`, `test_regression_coverage.bats`, `test_regression_smoke_dryrun.bats`).
+- **Fix `lib/media_probe.sh`** : Réécriture du parsing `ffprobe` pour gérer correctement les sections `[STREAM]` et `[FORMAT]`, corrigeant la détection HEVC.
+- **Fix `lib/stream_mapping.sh`** : Exclusion explicite des flux `attached_pic` (cover art) pour éviter qu'ils soient traités comme des flux vidéo.
+- **Fix `lib/finalize.sh`** : Retourne succès (0) même si le transfert échoue (mais est loggué), pour ne pas bloquer le script.
+- **Fix `tests/test_regression_smoke_dryrun.bats`** : Vérification de `Queue.full` ou `Queue_readable` au lieu du fichier temporaire `Queue`.
 
 ### Contexte
-- Objectif : réduire le bruit dans `logs/` et simplifier le suivi (un log par session).
-- L'utilisateur lance les tests manuellement et partage les logs.
-- Contexte Windows/Git Bash : attention aux chemins/Unicode.
+- Objectif : Rendre la suite de tests 100% verte.
+- Branche de travail : `fix/test-failures`.
 
 ### Derniers prompts
-- "Consolider success/error/skipped dans session + nettoyer progress/queue en fin de run"
-- "Fix Windows: cd ../Données échoue"
-- "Corriger tests qui cherchent Success_*.log"
-- "Suffixe incorrect quand codec supérieur conservé"
-- "Renommer 'Tests Unitaires - Conversion Script'"
+- "Des tests ont échoué" (Correction des régressions).
 
 ### Prochaines étapes
-- Merger la branche de travail vers `main`.
-- Relancer `bash run_tests.sh` pour valider sur `main`.
+- Merger la branche `fix/test-failures` vers `main`.
+- Relancer `bash run_tests.sh` complet pour validation finale.
