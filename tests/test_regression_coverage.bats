@@ -78,9 +78,38 @@ teardown() {
     local result
     result=$(_build_stream_mapping "$fake_file")
     
-    # Doit contenir au minimum -map 0:v et -map 0:a?
-    [[ "$result" =~ "-map 0:v" ]]
+    # Doit contenir au minimum -map 0:v:0 et -map 0:a?
+    [[ "$result" =~ "-map 0:v:0" ]]
     [[ "$result" =~ "-map 0:a" ]]
+}
+
+@test "VIDEO: _build_stream_mapping exclut attached_pic (cover art)" {
+    # Créer un stub ffprobe qui simule 2 flux vidéo :
+    # - v:0 = attached_pic (cover)
+    # - v:1 = vidéo principale
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+if [[ "$*" =~ "-select_streams v" ]]; then
+    echo "0,1"
+    echo "1,0"
+fi
+if [[ "$*" =~ "-select_streams s" ]]; then
+    echo "2,fre"
+fi
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+
+    PATH="$stub_dir:$PATH"
+
+    local result
+    result=$(_build_stream_mapping "/fake/file.mkv")
+
+    [[ "$result" =~ "-map 0:v:1" ]]
+    [[ ! "$result" =~ "-map 0:v:0" ]]
 }
 
 @test "SUBTITLES: fichier avec sous-titres FR uniquement conserve FR" {
@@ -91,6 +120,10 @@ teardown() {
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
 # Simuler un fichier avec sous-titres FR (index 2) et EN (index 3)
+if [[ "$*" =~ "-select_streams v" ]]; then
+    # Vidéo principale uniquement (pas d'attached_pic)
+    echo "0,0"
+fi
 if [[ "$*" =~ "-select_streams s" ]]; then
     echo "2,fre"
     echo "3,eng"
@@ -118,6 +151,10 @@ STUB
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
 # Simuler un fichier avec sous-titres EN (index 2) et ES (index 3) - pas de FR
+if [[ "$*" =~ "-select_streams v" ]]; then
+    # Vidéo principale uniquement (pas d'attached_pic)
+    echo "0,0"
+fi
 if [[ "$*" =~ "-select_streams s" ]]; then
     echo "2,eng"
     echo "3,spa"
