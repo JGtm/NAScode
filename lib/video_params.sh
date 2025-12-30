@@ -259,28 +259,6 @@ build_downscale_filter() {
 }
 
 ###########################################################
-# CALCUL HAUTEUR DE SORTIE
-###########################################################
-
-# Estime la hauteur de sortie après application éventuelle du downscale 1080p.
-# Usage: compute_output_height <src_width> <src_height>
-# Retourne: hauteur estimée (vide si entrées invalides)
-compute_output_height() {
-    _compute_output_height_for_bitrate "$@"
-}
-
-###########################################################
-# ADAPTATION BITRATE PAR RÉSOLUTION
-###########################################################
-
-# Calcule un bitrate effectif (kbps) selon la hauteur de sortie estimée.
-# Usage: compute_effective_bitrate <base_kbps> <output_height>
-# Retourne: bitrate adapté en kbps
-compute_effective_bitrate() {
-    _compute_effective_bitrate_kbps_for_height "$@"
-}
-
-###########################################################
 # CALCUL COMPLET DES PARAMÈTRES VIDÉO
 ###########################################################
 

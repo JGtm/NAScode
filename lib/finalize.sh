@@ -345,6 +345,26 @@ _finalize_conversion_error() {
 # AFFICHAGE DU RÉSUMÉ FINAL
 ###########################################################
 
+# Compte les occurrences d'un pattern dans le log de session
+# Usage: _count_log_pattern <pattern> [flags]
+# Retourne 0 si pas de log ou pattern non trouvé
+_count_log_pattern() {
+    local pattern="$1"
+    local flags="${2:-}"
+    local count=0
+    
+    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
+        if [[ -n "$flags" ]]; then
+            count=$(grep -c"$flags" "$pattern" "$LOG_SESSION" 2>/dev/null || true)
+        else
+            count=$(grep -c "$pattern" "$LOG_SESSION" 2>/dev/null || true)
+        fi
+        count=$(echo "${count:-0}" | tr -d '[:space:]')
+    fi
+    [[ -z "$count" ]] && count=0
+    echo "$count"
+}
+
 # Formate une taille en octets en format lisible (Ko, Mo, Go)
 # Usage: _format_size_bytes <bytes>
 _format_size_bytes() {
@@ -380,6 +400,55 @@ _format_size_bytes_compact() {
     fi
 }
 
+# Calcule les économies d'espace à partir des fichiers de taille totale
+# Retourne: show|line1|line2 où show=true/false
+_calculate_space_savings() {
+    # Note: N'est pas calculé en mode sample ou dry-run (pas représentatif)
+    if [[ "${SAMPLE_MODE:-false}" == true ]] || [[ "${DRYRUN:-false}" == true ]]; then
+        echo "false||"
+        return
+    fi
+    
+    if [[ ! -f "${TOTAL_SIZE_BEFORE_FILE:-}" ]] || [[ ! -f "${TOTAL_SIZE_AFTER_FILE:-}" ]]; then
+        echo "false||"
+        return
+    fi
+    
+    local total_before total_after
+    total_before=$(cat "$TOTAL_SIZE_BEFORE_FILE" 2>/dev/null || echo 0)
+    total_after=$(cat "$TOTAL_SIZE_AFTER_FILE" 2>/dev/null || echo 0)
+    total_before=$(echo "$total_before" | tr -d '[:space:]')
+    total_after=$(echo "$total_after" | tr -d '[:space:]')
+    [[ -z "$total_before" ]] && total_before=0
+    [[ -z "$total_after" ]] && total_after=0
+    
+    if [[ "$total_before" -le 0 ]] || [[ "$total_after" -le 0 ]]; then
+        echo "false||"
+        return
+    fi
+    
+    local space_saved=$((total_before - total_after))
+    local before_fmt=$(_format_size_bytes "$total_before")
+    local after_fmt=$(_format_size_bytes "$total_after")
+    local line1="${before_fmt} → ${after_fmt}"
+    local line2=""
+    
+    if [[ "$space_saved" -ge 0 ]]; then
+        local saved_fmt=$(_format_size_bytes "$space_saved")
+        local savings_percent=""
+        if [[ "$total_before" -gt 0 ]]; then
+            savings_percent=$(awk "BEGIN {printf \"%.1f\", ($space_saved / $total_before) * 100}")
+        fi
+        line2="(−${saved_fmt}, ${savings_percent}%)"
+    else
+        # Cas rare : fichiers plus gros après conversion
+        local increase_fmt=$(_format_size_bytes "$((-space_saved))")
+        line2="(+${increase_fmt})"
+    fi
+    
+    echo "true|${line1}|${line2}"
+}
+
 show_summary() {
     # Traiter toutes les analyses VMAF en attente
     process_vmaf_queue
@@ -396,96 +465,26 @@ show_summary() {
         total_elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
     fi
     
-    local succ=0
-    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
-        succ=$(grep -c ' | SUCCESS' "$LOG_SESSION" 2>/dev/null || true)
-        succ=$(echo "${succ:-0}" | tr -d '[:space:]')
-        [[ -z "$succ" ]] && succ=0
-    fi
-
-    local skip=0
-    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
-        skip=$(grep -c ' | SKIPPED' "$LOG_SESSION" 2>/dev/null || true)
-        skip=$(echo "${skip:-0}" | tr -d '[:space:]')
-        [[ -z "$skip" ]] && skip=0
-    fi
-
-    local err=0
-    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
-        err=$(grep -c ' | ERROR ' "$LOG_SESSION" 2>/dev/null || true)
-        err=$(echo "${err:-0}" | tr -d '[:space:]')
-        [[ -z "$err" ]] && err=0
-    fi
-
-    # Anomalies : fichiers plus lourds après conversion
-    local size_anomalies=0
-    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
-        size_anomalies=$(grep -c 'WARNING: FICHIER PLUS LOURD' "$LOG_SESSION" 2>/dev/null | tr -d '\r\n') || size_anomalies=0
-    fi
-
-    # Anomalies : erreurs de vérification checksum/taille lors du transfert
-    local checksum_anomalies=0
-    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
-        checksum_anomalies=$(grep -cE ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' "$LOG_SESSION" 2>/dev/null | tr -d '\r\n') || checksum_anomalies=0
-    fi
-
-    # Anomalies VMAF : fichiers avec qualité dégradée (score < 70)
-    local vmaf_anomalies=0
-    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
-        vmaf_anomalies=$(grep -c ' | VMAF | .* | quality:DEGRADE' "$LOG_SESSION" 2>/dev/null | tr -d '\r\n') || vmaf_anomalies=0
-    fi
+    # Comptage des statistiques depuis le log de session
+    local succ=$(_count_log_pattern ' | SUCCESS')
+    local skip=$(_count_log_pattern ' | SKIPPED')
+    local err=$(_count_log_pattern ' | ERROR ')
+    local size_anomalies=$(_count_log_pattern 'WARNING: FICHIER PLUS LOURD')
+    local checksum_anomalies=$(_count_log_pattern ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' 'E')
+    local vmaf_anomalies=$(_count_log_pattern ' | VMAF | .* | quality:DEGRADE')
     
     # Calcul du gain de place total
-    # Note: N'est pas affiché en mode sample ou dry-run (pas représentatif)
-    local total_before=0 total_after=0 space_saved=0 
-    local space_saved_line1="" space_saved_line2=""
-    local show_space_savings=false
-    
-    if [[ "${SAMPLE_MODE:-false}" != true ]] && [[ "${DRYRUN:-false}" != true ]]; then
-        if [[ -f "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && [[ -f "${TOTAL_SIZE_AFTER_FILE:-}" ]]; then
-            total_before=$(cat "$TOTAL_SIZE_BEFORE_FILE" 2>/dev/null || echo 0)
-            total_after=$(cat "$TOTAL_SIZE_AFTER_FILE" 2>/dev/null || echo 0)
-            total_before=$(echo "$total_before" | tr -d '[:space:]')
-            total_after=$(echo "$total_after" | tr -d '[:space:]')
-            [[ -z "$total_before" ]] && total_before=0
-            [[ -z "$total_after" ]] && total_after=0
-            
-            if [[ "$total_before" -gt 0 ]] && [[ "$total_after" -gt 0 ]]; then
-                space_saved=$((total_before - total_after))
-                local before_fmt=$(_format_size_bytes "$total_before")
-                local after_fmt=$(_format_size_bytes "$total_after")
-                local saved_fmt=$(_format_size_bytes "$space_saved")
-                # Calculer le pourcentage d'économie
-                local savings_percent=""
-                if [[ "$total_before" -gt 0 ]]; then
-                    savings_percent=$(awk "BEGIN {printf \"%.1f\", ($space_saved / $total_before) * 100}")
-                fi
-                if [[ "$space_saved" -ge 0 ]]; then
-                    # Ligne 1: tailles avant → après
-                    space_saved_line1="${before_fmt} → ${after_fmt}"
-                    # Ligne 2: économie (alignée à droite)
-                    space_saved_line2="(−${saved_fmt}, ${savings_percent}%)"
-                else
-                    # Cas rare : fichiers plus gros après conversion
-                    local increase_fmt=$(_format_size_bytes "$((-space_saved))")
-                    space_saved_line1="${before_fmt} → ${after_fmt}"
-                    space_saved_line2="(+${increase_fmt})"
-                fi
-                show_space_savings=true
-            fi
-        fi
-    fi
+    local savings_data line1 line2 show_space_savings
+    savings_data=$(_calculate_space_savings)
+    IFS='|' read -r show_space_savings line1 line2 <<< "$savings_data"
     
     # Afficher message si aucun fichier traité (queue vide ou tout skippé)
-    # Spécification: si tout est skippé, on dit aussi "Aucun fichier à traiter".
     local total_processed=$((succ + err))
     if [[ "$total_processed" -eq 0 ]]; then
         print_empty_state "Aucun fichier à traiter"
     fi
     
     # Déterminer si on doit afficher la section anomalies
-    # - Anomalies VMAF : seulement si VMAF est activé ET il y a des anomalies
-    # - Autres anomalies : seulement si > 0
     local has_any_anomaly=false
     local show_vmaf_anomaly=false
     
@@ -519,8 +518,8 @@ show_summary() {
         # Afficher le gain de place si disponible (sur deux lignes)
         if [[ "$show_space_savings" == true ]]; then
             print_summary_separator
-            print_summary_item "Espace économisé" "$space_saved_line1" "$GREEN"
-            print_summary_value_only "$space_saved_line2" "$GREEN"
+            print_summary_item "Espace économisé" "$line1" "$GREEN"
+            print_summary_value_only "$line2" "$GREEN"
         fi
         print_summary_footer
     } | tee "$SUMMARY_FILE"
