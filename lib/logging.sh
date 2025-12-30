@@ -42,6 +42,18 @@ log_success() {
     echo -e "${GREEN:-}✅ ${message}${NOCOLOR:-}"
 }
 
+# Nettoie les logs de plus de X jours (défaut 30)
+cleanup_old_logs() {
+    local days="${1:-30}"
+    if [[ -d "$LOG_DIR" ]]; then
+        # Nettoyage silencieux des fichiers de plus de X jours
+        # On exclut l'Index et Index.meta qui sont persistants
+        find "$LOG_DIR" -type f -mtime +"$days" \
+            ! -name "Index" ! -name "Index.meta" \
+            -exec rm -f {} + 2>/dev/null || true
+    fi
+}
+
 ###########################################################
 # CHEMINS DES LOGS
 ###########################################################
@@ -71,6 +83,9 @@ initialize_directories() {
     mkdir -p "$LOG_DIR" "$TMP_DIR" "$OUTPUT_DIR"
     
     rm -f "$STOP_FLAG"
+    
+    # Nettoyage automatique des vieux logs (30 jours)
+    cleanup_old_logs 30
     
     # Créer les fichiers de log
     for log_file in "$LOG_SUCCESS" "$LOG_SKIPPED" "$LOG_ERROR" "$SUMMARY_FILE" "$LOG_PROGRESS"; do

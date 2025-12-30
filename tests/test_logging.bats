@@ -103,6 +103,27 @@ teardown() {
     [ -d "$test_out_dir" ]
 }
 
+@test "cleanup_old_logs: supprime les vieux fichiers" {
+    cd "$TEST_TEMP_DIR"
+    mkdir -p logs
+    
+    # Créer un fichier vieux (35 jours)
+    touch -d "35 days ago" logs/old_file.log
+    # Créer un fichier récent
+    touch logs/recent_file.log
+    # Créer un fichier Index (ne doit pas être supprimé)
+    touch -d "35 days ago" logs/Index
+    
+    # Charger logging.sh (LOG_DIR sera ./logs dans TEST_TEMP_DIR)
+    source "$LIB_DIR/logging.sh"
+    
+    cleanup_old_logs 30
+    
+    [ ! -f "logs/old_file.log" ]
+    [ -f "logs/recent_file.log" ]
+    [ -f "logs/Index" ]
+}
+
 @test "initialize_directories: crée les fichiers de log vides" {
     local test_log_dir="$TEST_TEMP_DIR/test_logs"
     mkdir -p "$test_log_dir"
