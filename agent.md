@@ -6,6 +6,27 @@ Ce document décrit les attentes lorsque tu fais évoluer le code (humain ou age
 
 ---
 
+## Principes Fondamentaux
+
+1. **Work doggedly**: Ton but est d'être autonome. Si tu connais l'objectif global, continue tant que tu peux progresser. Si tu t'arrêtes, justifie pourquoi.
+2. **Work smart**: En cas de bug, prends du recul. Ajoute des logs pour vérifier tes hypothèses.
+3. **Check your work**: Si tu écris du code, essaie de vérifier qu'il fait ce qui est attendu (ex: simulation, logs).
+4. **handoff.md**: À la fin de chaque session, crée/mets à jour `handoff.md` à la racine avec un résumé de ce qui a été fait et des derniers prompts.
+
+## Conduite de l'Agent
+
+- Vérifie tes hypothèses avant d'exécuter des commandes ; signale les incertitudes.
+- Demande des clarifications si la demande est ambiguë ou risquée.
+- Résume l'intention avant des correctifs multi-étapes.
+- Cite les sources (documentation) avec précision.
+- Découpe le travail en étapes incrémentales.
+
+## Workflow Loop
+
+**EXPLORE** → **PLAN** → **ACT** → **OBSERVE** → **REFLECT** → **COMMIT**
+
+---
+
 ## ⛔ RÈGLE OBLIGATOIRE : Ne JAMAIS travailler sur `main`
 
 > **STOP ! Avant TOUTE modification de fichier, vérifie la branche courante.**
@@ -64,10 +85,11 @@ Ces opérations ne modifient pas directement le code mais gèrent l'historique G
 - Priorité n°2 : **maintenabilité** (modularité, lisibilité, tests).
 - Priorité n°3 : performance (uniquement quand c’est mesuré/justifié).
 
-## Principes de conception
+## Principes de conception & Style
 
-- Respecter l’architecture modulaire existante (`nascode` charge `lib/*.sh`).
-- Éviter les “gros” scripts monolithiques : préférer des helpers dédiés (ex: `_compute_*`, `_build_*`).
+- **Blend in, don’t reinvent**: Respecte le style existant, le nommage et l'architecture modulaire (`nascode` charge `lib/*.sh`).
+- **Re-use before you write**: Préfère les helpers existants (`_compute_*`, `_build_*`).
+- **Propose, then alter**: Les refactors majeurs nécessitent une validation préalable.
 - Garder les fonctions **petites** et **testables** (entrées/sorties claires).
 - Ne pas casser les interfaces existantes sans raison (noms de variables exportées, signatures de fonctions, logs).
 - Ne pas ajouter de dépendances externes sans justification (objectif : GNU/Linux + macOS + Git Bash).
@@ -160,10 +182,12 @@ Avant toute modification non-triviale (multi-fichiers, changement de comportemen
 Pour les petits changements (typo, ajustement local, test manquant évident) : plan léger ou exécution directe si c’est clairement sans risque.
 
 ## Politique de tests et documentation
-- **Toute nouvelle fonction doit être couverte par des tests unitaires** dans `tests/`.
-- Si la fonction impacte le workflow complet (CLI, conversion, résumé), ajouter aussi un **test e2e** si applicable.- Si une fonction change (signature/comportement/side effects), mettre à jour ou ajouter les tests Bats correspondants dans `tests/`.
-- Si une option CLI, un mode, un suffixe, ou une convention de log change : mettre à jour `README.md`.
-- Ne pas “corriger” les tests en les affaiblissant : préférer rendre le code plus déterministe/robuste.
+
+> **Note importante** : L'agent ne lance pas les tests automatiquement sauf demande explicite. C'est l'utilisateur qui lance `run_tests.sh` et partage les logs.
+
+- **Création de tests** : Toute nouvelle fonction ou correction de bug doit être accompagnée d'un test unitaire ou e2e dans `tests/`.
+- **Documentation** : Si une option CLI, un mode, un suffixe, ou une convention de log change : mettre à jour `README.md`.
+- **Robustesse** : Ne pas “corriger” les tests en les affaiblissant : préférer rendre le code plus déterministe/robuste.
 
 ## Règle après merge avec `main`
 
