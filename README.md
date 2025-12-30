@@ -115,7 +115,7 @@ bash nascode [options]
 | `-f, --file FILE` | Convertir un fichier unique (bypass index/queue) |
 | `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
 | `-c, --codec CODEC` | Codec vidéo : `hevc` (défaut) ou `av1` |
-| `-a, --audio CODEC` | Codec audio : `copy` (défaut), `aac`, `ac3`, `eac3`, `opus` |
+| `-a, --audio CODEC` | Codec audio : `aac` (défaut), `copy`, `ac3`, `eac3`, `opus` |
 | `-d, --dry-run` | Simulation sans encodage |
 | `-t, --sample` | Mode sample : encode ~30s pour test rapide |
 | `-v, --vmaf` | Activer l'évaluation VMAF |
