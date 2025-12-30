@@ -126,7 +126,7 @@ bash nascode [options]
 | `-R, --regenerate-index` | Forcer la régénération de l'index |
 | `-n, --no-progress` | Désactiver les barres de progression |
 | `-x, --no-suffix` | Pas de suffixe sur les fichiers de sortie |
-| `--suffix STRING` | Utiliser un suffixe personnalisé (remplace le suffixe dynamique) |
+| `--suffix [STRING]` | Utiliser un suffixe personnalisé (ou forcer le dynamique si vide) |
 | `-e, --exclude PATTERN` | Exclure des fichiers (glob) |
 | `-q, --queue FILE` | Utiliser une file d'attente personnalisée |
 | `-p, --off-peak [HH:MM-HH:MM]` | Mode heures creuses (défaut : `22:00-06:00`) |

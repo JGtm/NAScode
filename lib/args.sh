@@ -69,12 +69,14 @@ parse_arguments() {
                 shift
                 ;;
             --suffix)
-                if [[ -n "${2:-}" ]]; then
+                # Si un argument suit et ne commence pas par tiret, c'est le suffixe perso
+                if [[ -n "${2:-}" ]] && [[ "${2:0:1}" != "-" ]]; then
                     CUSTOM_SUFFIX_STRING="$2"
                     shift 2
                 else
-                    print_error "--suffix doit être suivi d'une chaîne de caractères"
-                    exit 1
+                    # Sinon, on active simplement le suffixe dynamique (annule un éventuel -x)
+                    FORCE_NO_SUFFIX=false
+                    shift
                 fi
                 ;;
             -v|--vmaf)

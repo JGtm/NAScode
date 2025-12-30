@@ -174,11 +174,25 @@ _reset_cli_state() {
     [ "$CUSTOM_SUFFIX_STRING" = "_custom" ]
 }
 
-@test "parse_arguments: --suffix échoue sans argument" {
+@test "parse_arguments: --suffix sans argument active le suffixe dynamique" {
     _reset_cli_state
+    FORCE_NO_SUFFIX=true # On simule qu'il était désactivé
 
-    run parse_arguments --suffix
-    [ "$status" -eq 1 ]
+    parse_arguments --suffix
+
+    [ "$FORCE_NO_SUFFIX" = "false" ]
+    [ -z "$CUSTOM_SUFFIX_STRING" ]
+}
+
+@test "parse_arguments: --suffix suivi d'une option active le suffixe dynamique" {
+    _reset_cli_state
+    FORCE_NO_SUFFIX=true
+
+    parse_arguments --suffix -v
+
+    [ "$FORCE_NO_SUFFIX" = "false" ]
+    [ -z "$CUSTOM_SUFFIX_STRING" ]
+    [ "$VMAF_ENABLED" = "true" ]
 }
 @test "parse_arguments: -n active NO_PROGRESS" {
     _reset_cli_state
