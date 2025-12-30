@@ -341,6 +341,24 @@ print_summary_separator() {
     echo -e "${GREEN}  ╟───────────────────────────────────────────╢${NOCOLOR}"
 }
 
+# Affiche un titre de section dans le résumé (ex: ANOMALIE(S))
+# Usage: print_summary_section_title "⚠  ANOMALIE(S)  ⚠"
+print_summary_section_title() {
+    local title="$1"
+    local title_cols
+    title_cols=$(printf '%s' "$title" | wc -m)
+    
+    # Centrer le titre dans 43 caractères
+    local total_padding=$((43 - title_cols))
+    local left_pad=$((total_padding / 2))
+    local right_pad=$((total_padding - left_pad))
+    
+    local left_spaces=$(printf '%*s' "$left_pad" '')
+    local right_spaces=$(printf '%*s' "$right_pad" '')
+    
+    echo -e "${GREEN}  ║${NOCOLOR}${YELLOW}${left_spaces}${title}${right_spaces}${NOCOLOR}${GREEN}║${NOCOLOR}"
+}
+
 # Ferme l'encadré du résumé
 # Usage: print_summary_footer
 print_summary_footer() {

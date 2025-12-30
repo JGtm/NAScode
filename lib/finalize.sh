@@ -184,6 +184,8 @@ _finalize_log_and_verify() {
             ) 200>"${TOTAL_SIZE_AFTER_FILE}.lock" 2>/dev/null || true
         fi
     fi
+    
+    return 0
 }
 
 ###########################################################
@@ -505,12 +507,14 @@ show_summary() {
         print_summary_item "Succès" "$succ" "$GREEN"
         print_summary_item "Ignorés" "$skip" "$YELLOW"
         print_summary_item "Erreurs" "$err" "$RED"
-        # Section anomalies : affichée uniquement si au moins une anomalie
+        # Section anomalies : intégrée avec titre centré
         if [[ "$has_any_anomaly" == true ]]; then
             print_summary_separator
-            [[ "$size_anomalies" -gt 0 ]] && print_summary_item "Anomalies taille" "$size_anomalies" "$YELLOW"
-            [[ "$checksum_anomalies" -gt 0 ]] && print_summary_item "Anomalies intégrité" "$checksum_anomalies" "$RED"
-            [[ "$show_vmaf_anomaly" == true ]] && print_summary_item "Anomalies VMAF" "$vmaf_anomalies" "$YELLOW"
+            print_summary_section_title "⚠  ANOMALIE(S)  ⚠"
+            print_summary_separator
+            [[ "$size_anomalies" -gt 0 ]] && print_summary_item "Taille" "$size_anomalies" "$YELLOW"
+            [[ "$checksum_anomalies" -gt 0 ]] && print_summary_item "Intégrité" "$checksum_anomalies" "$RED"
+            [[ "$show_vmaf_anomaly" == true ]] && print_summary_item "VMAF" "$vmaf_anomalies" "$YELLOW"
         fi
         # Afficher le gain de place si disponible (sur deux lignes)
         if [[ "$show_space_savings" == true ]]; then
