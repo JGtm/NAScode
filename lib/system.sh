@@ -154,25 +154,22 @@ check_output_suffix() {
             fi
 
             # Affichage succinct : garder seulement "<bitrate>_<height>" (ex: 2070k_1080p)
+            # Helper pour extraire bitrate_resolution depuis le suffixe complet
+            _extract_suffix_hint() {
+                local suffix="$1"
+                if [[ "$suffix" == _x265_* || "$suffix" == _av1_* ]]; then
+                    local rest br res
+                    rest="${suffix#_*_}"  # Enlève _x265_ ou _av1_
+                    IFS='_' read -r br res _ <<< "$rest"
+                    [[ -n "$br" && -n "$res" ]] && echo "${br}_${res}" || echo "$suffix"
+                else
+                    echo "$suffix"
+                fi
+            }
+            
             local hint_1080 hint_720
-            hint_1080="$suffix_example_1080"
-            hint_720="$suffix_example_720"
-            if [[ "$hint_1080" == _x265_* ]]; then
-                local _rest _br _res
-                _rest="${hint_1080#_x265_}"
-                IFS='_' read -r _br _res _ <<< "$_rest"
-                if [[ -n "$_br" && -n "$_res" ]]; then
-                    hint_1080="${_br}_${_res}"
-                fi
-            fi
-            if [[ "$hint_720" == _x265_* ]]; then
-                local _rest2 _br2 _res2
-                _rest2="${hint_720#_x265_}"
-                IFS='_' read -r _br2 _res2 _ <<< "$_rest2"
-                if [[ -n "$_br2" && -n "$_res2" ]]; then
-                    hint_720="${_br2}_${_res2}"
-                fi
-            fi
+            hint_1080=$(_extract_suffix_hint "$suffix_example_1080")
+            hint_720=$(_extract_suffix_hint "$suffix_example_720")
 
             if [[ -n "$suffix_example_720" ]] && [[ "$suffix_example_720" != "$suffix_example_1080" ]]; then
                 ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080 / $hint_720"
@@ -195,7 +192,7 @@ check_output_suffix() {
             ;;
     esac
 
-    # 4. Vérifications de sécurité (Écrasement / Coexistence)
+    # Vérifications de sécurité (Écrasement / Coexistence)
     if [[ -z "$SUFFIX_STRING" ]] && [[ "$is_same_dir" == true ]]; then
         # ALERTE : Pas de suffixe ET même répertoire = RISQUE D'ÉCRASMENT
         print_critical_alert "RISQUE D'ÉCRASEMENT" \
@@ -219,7 +216,7 @@ check_output_suffix() {
                 ;;
         esac
         
-    # 3. Vérification de sécurité douce
+    # Vérification de sécurité douce
     elif [[ -n "$SUFFIX_STRING" ]] && [[ "$is_same_dir" == true ]]; then
         # ATTENTION : Suffixe utilisé, mais toujours dans le même répertoire
         print_warning_box "Coexistence de fichiers" \

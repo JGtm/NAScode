@@ -384,7 +384,6 @@ print_phase_start() {
         echo -e "${color}  ┃  ${DIM}${subtitle}${NOCOLOR}"
     fi
     echo -e "${color}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
-    echo ""
 }
 
 # Affiche un groupe d'options actives dans un encadré
@@ -545,7 +544,7 @@ print_conversion_start() {
     local nb_files="$1"
     local limitation="${2:-}"
     
-    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$BLUE"
+    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$WHITE"
     
     if [[ -n "$limitation" ]]; then
         print_limitation "$limitation"

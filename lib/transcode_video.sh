@@ -119,18 +119,8 @@ _setup_video_encoding_params() {
 # ENCODAGE UNIFIÉ
 ###########################################################
 
-# Retourne le flag des paramètres encodeur (-x265-params, -svtav1-params, etc.)
-# Usage: _get_encoder_params_flag_internal "libx265" -> "-x265-params"
-_get_encoder_params_flag_internal() {
-    local encoder="${1:-libx265}"
-    
-    case "$encoder" in
-        libx265)    echo "-x265-params" ;;
-        libsvtav1)  echo "-svtav1-params" ;;
-        libaom-av1) echo "" ;;  # libaom utilise des options FFmpeg directes
-        *)          echo "" ;;
-    esac
-}
+# Note: get_encoder_params_flag() est définie dans codec_profiles.sh et exportée.
+# Ne pas dupliquer ici.
 
 # Construit les paramètres internes de l'encodeur
 # Usage: _build_encoder_params_internal "libx265" "pass1" "vbv-maxrate=2520:vbv-bufsize=3780"
@@ -443,7 +433,7 @@ _run_ffmpeg_encode() {
     
     # Construire les paramètres encodeur spécifiques
     local encoder_params_flag encoder_full_params
-    encoder_params_flag=$(_get_encoder_params_flag_internal "$encoder")
+    encoder_params_flag=$(get_encoder_params_flag "$encoder")
     encoder_full_params=$(_build_encoder_params_internal "$encoder" "$mode" "$encoder_base_params")
 
     # Exécution FFmpeg avec construction dynamique selon l'encodeur
