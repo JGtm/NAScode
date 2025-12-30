@@ -150,6 +150,18 @@ teardown() {
     grep -q "OUTPUT_DIR=$OUTPUT_DIR" "$INDEX_META"
 }
 
+@test "_validate_index_source: supprime l'index si REGENERATE_INDEX=true" {
+    touch "$INDEX" "$INDEX_READABLE" "$INDEX_META"
+    REGENERATE_INDEX=true
+    
+    run _validate_index_source
+    
+    [ "$status" -eq 1 ]
+    [ ! -f "$INDEX" ]
+    [ ! -f "$INDEX_READABLE" ]
+    [ ! -f "$INDEX_META" ]
+}
+
 ###########################################################
 # Tests de _build_queue_from_index()
 ###########################################################

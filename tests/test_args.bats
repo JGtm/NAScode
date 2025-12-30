@@ -150,7 +150,36 @@ _reset_cli_state() {
 
     [ "$KEEP_INDEX" = "true" ]
 }
+@test "parse_arguments: -R active REGENERATE_INDEX" {
+    _reset_cli_state
 
+    parse_arguments -R
+
+    [ "$REGENERATE_INDEX" = "true" ]
+}
+
+@test "parse_arguments: --regenerate-index active REGENERATE_INDEX" {
+    _reset_cli_state
+
+    parse_arguments --regenerate-index
+
+    [ "$REGENERATE_INDEX" = "true" ]
+}
+
+@test "parse_arguments: --suffix définit CUSTOM_SUFFIX_STRING" {
+    _reset_cli_state
+
+    parse_arguments --suffix "_custom"
+
+    [ "$CUSTOM_SUFFIX_STRING" = "_custom" ]
+}
+
+@test "parse_arguments: --suffix échoue sans argument" {
+    _reset_cli_state
+
+    run parse_arguments --suffix
+    [ "$status" -eq 1 ]
+}
 @test "parse_arguments: -n active NO_PROGRESS" {
     _reset_cli_state
 

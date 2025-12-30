@@ -64,6 +64,19 @@ parse_arguments() {
                 KEEP_INDEX=true
                 shift
                 ;;
+            -R|--regenerate-index)
+                REGENERATE_INDEX=true
+                shift
+                ;;
+            --suffix)
+                if [[ -n "${2:-}" ]]; then
+                    CUSTOM_SUFFIX_STRING="$2"
+                    shift 2
+                else
+                    print_error "--suffix doit être suivi d'une chaîne de caractères"
+                    exit 1
+                fi
+                ;;
             -v|--vmaf)
                 VMAF_ENABLED=true
                 shift

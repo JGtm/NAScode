@@ -171,7 +171,11 @@ _prepare_file_paths() {
     # Suffixe effectif (par fichier) : inclut bitrate adapté + résolution + codec audio effectif.
     # Fallback : si les fonctions ne sont pas chargées (tests/unitaires), on garde SUFFIX_STRING.
     local effective_suffix="$SUFFIX_STRING"
-    if [[ -n "$SUFFIX_STRING" ]] && declare -f _build_effective_suffix_for_dims &>/dev/null; then
+    
+    # Si un suffixe personnalisé est forcé, on l'utilise tel quel (sauf si vide)
+    if [[ -n "${CUSTOM_SUFFIX_STRING:-}" ]]; then
+        effective_suffix="$CUSTOM_SUFFIX_STRING"
+    elif [[ -n "$SUFFIX_STRING" ]] && declare -f _build_effective_suffix_for_dims &>/dev/null; then
         local input_width="$opt_width"
         local input_height="$opt_height"
         

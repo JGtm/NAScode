@@ -66,6 +66,15 @@ _normalize_source_path() {
 # Vérifie si l'index existant correspond à la source actuelle
 # Retourne 0 si valide, 1 si régénération nécessaire
 _validate_index_source() {
+    # Si régénération forcée demandée
+    if [[ "${REGENERATE_INDEX:-false}" == true ]]; then
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${YELLOW}⚠️  Régénération forcée de l'index demandée.${NOCOLOR}"
+        fi
+        rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
+        return 1
+    fi
+
     # Si pas de fichier de métadonnées, on ne peut pas valider → régénérer
     if [[ ! -f "$INDEX_META" ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then

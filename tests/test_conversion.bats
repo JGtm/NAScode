@@ -97,6 +97,20 @@ teardown() {
     [[ "$final_output" =~ "-dryrun-sample.mkv" ]]
 }
 
+@test "_prepare_file_paths: utilise CUSTOM_SUFFIX_STRING si défini" {
+    SOURCE="/videos"
+    CUSTOM_SUFFIX_STRING="_mon_suffixe_perso"
+    SUFFIX_STRING="_x265_ignored"
+    
+    local result
+    result=$(_prepare_file_paths "/videos/test.mkv" "/output")
+    
+    local effective_suffix
+    effective_suffix=$(echo "$result" | cut -d'|' -f4)
+    
+    [ "$effective_suffix" = "_mon_suffixe_perso" ]
+}
+
 ###########################################################
 # Tests de should_skip_conversion()
 ###########################################################
