@@ -544,7 +544,7 @@ print_conversion_start() {
     local nb_files="$1"
     local limitation="${2:-}"
     
-    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$WHITE"
+    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$BLUE"
     
     if [[ -n "$limitation" ]]; then
         print_limitation "$limitation"

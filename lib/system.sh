@@ -141,7 +141,7 @@ check_output_suffix() {
         on)
             # -S sans argument : activer le suffixe dynamique sans question
             # SUFFIX_STRING garde sa valeur par défaut (suffixe dynamique)
-            print_success "Suffixe de sortie activé (option -S)"
+            print_success "Suffixe de sortie activé"
             ;;
         ask|*)
             # Mode interactif par défaut
