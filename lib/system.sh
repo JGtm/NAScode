@@ -129,12 +129,16 @@ check_output_suffix() {
         SUFFIX_STRING=""
         print_info "Option --no-suffix activée. Le suffixe est désactivé par commande."
     
-    # 2. Si un suffixe personnalisé a été fourni via -S ou --suffix
+    # 2. Si un suffixe personnalisé a été fourni via -S "valeur"
     elif [[ -n "${CUSTOM_SUFFIX_STRING:-}" ]]; then
         # On utilise la valeur fournie par l'option courte/longue
         SUFFIX_STRING="$CUSTOM_SUFFIX_STRING"
-
         echo -e "  ${YELLOW}⚠️  Utilisation forcée du suffixe de sortie : ${SUFFIX_STRING}${NOCOLOR}"
+    
+    # 3. Si -S sans argument : activer le suffixe dynamique sans question
+    elif [[ "${SUFFIX_ENABLED:-false}" == true ]]; then
+        # SUFFIX_STRING garde sa valeur par défaut (suffixe dynamique)
+        print_success "Suffixe de sortie activé (option -S)"
     
     else
         # 3. Logique interactive par défaut (si pas de -x et pas de -S)

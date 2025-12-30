@@ -18,6 +18,7 @@ CUSTOM_QUEUE=""
 SOURCE="../"
 OUTPUT_DIR="$SCRIPT_DIR/Converted"
 FORCE_NO_SUFFIX=false
+SUFFIX_ENABLED=false      # -S sans argument : activer le suffixe sans question
 CUSTOM_SUFFIX_STRING=""   # Suffixe personnalisé via -S/--suffix
 REGENERATE_INDEX=false    # Régénérer l'index via -R/--regenerate-index
 PARALLEL_JOBS=1

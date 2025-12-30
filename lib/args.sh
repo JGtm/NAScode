@@ -74,7 +74,8 @@ parse_arguments() {
                     CUSTOM_SUFFIX_STRING="$2"
                     shift 2
                 else
-                    # Sinon, on active simplement le suffixe dynamique (annule un éventuel -x)
+                    # Sinon, on active le suffixe dynamique (bypass la question interactive)
+                    SUFFIX_ENABLED=true
                     FORCE_NO_SUFFIX=false
                     shift
                 fi
