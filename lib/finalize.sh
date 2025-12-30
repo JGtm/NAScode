@@ -91,23 +91,23 @@ _finalize_log_and_verify() {
     local size_comparison="${size_before_mb}MB → ${size_after_mb}MB"
 
     if [[ "$size_after_mb" -ge "$size_before_mb" ]]; then
-        if [[ -n "$LOG_SKIPPED" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: FICHIER PLUS LOURD ($size_comparison). | $file_original" >> "$LOG_SKIPPED" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: FICHIER PLUS LOURD ($size_comparison). | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
     fi
 
     # Si le transfert ne s'est pas fait vers la destination prévue, le signaler comme erreur.
     # move_status: 0=OK vers destination, 1=fallback, 2=échec (temporaire)
     if [[ "$move_status" != "0" ]]; then
-        if [[ -n "$LOG_ERROR" ]]; then
+        if [[ -n "$LOG_SESSION" ]]; then
             local intended_msg="${final_intended:-$final_actual}"
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR TRANSFER_FALLBACK | $file_original -> $intended_msg | actual:$final_actual | move_status:$move_status" >> "$LOG_ERROR" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR TRANSFER_FALLBACK | $file_original -> $intended_msg | actual:$final_actual | move_status:$move_status" >> "$LOG_SESSION" 2>/dev/null || true
         fi
     fi
 
     # Log success (conversion OK) — même si le transfert a dû passer par un fallback, on garde la trace.
-    if [[ -n "$LOG_SUCCESS" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SUCCESS" 2>/dev/null || true
+    if [[ -n "$LOG_SESSION" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SESSION" 2>/dev/null || true
     fi
 
     # Vérification d'intégrité : d'abord comparer la taille exacte (rapide), puis checksum si nécessaire
@@ -137,8 +137,8 @@ _finalize_log_and_verify() {
     fi
 
     # Écrire uniquement dans les logs : VERIFY
-    if [[ -n "$LOG_SUCCESS" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SUCCESS" 2>/dev/null || true
+    if [[ -n "$LOG_SESSION" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SESSION" 2>/dev/null || true
     fi
 
     # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)
@@ -148,8 +148,8 @@ _finalize_log_and_verify() {
 
     # En cas de problème, journaliser dans le log d'erreur
     if [[ "$verify_status" != "OK" && "$verify_status" != "SKIPPED" ]]; then
-        if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_ERROR" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_SESSION" 2>/dev/null || true
         fi
     fi
 
@@ -210,8 +210,8 @@ _finalize_conversion_success() {
         if [[ -f "$tmp_output" ]]; then
             echo -e "  ${YELLOW}⚠️  Conversion interrompue, fichier temporaire conservé: $tmp_output${NOCOLOR}" >&2
             # Log pour récupération manuelle si besoin
-            if [[ -n "$LOG_ERROR" ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | INTERRUPTED | $file_original -> $tmp_output (fichier temp conservé)" >> "$LOG_ERROR" 2>/dev/null || true
+            if [[ -n "$LOG_SESSION" ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | INTERRUPTED | $file_original -> $tmp_output (fichier temp conservé)" >> "$LOG_SESSION" 2>/dev/null || true
             fi
         fi
         return 1
@@ -275,8 +275,8 @@ _finalize_conversion_success() {
     # Vérifier que le fichier de sortie temporaire existe
     if [[ ! -f "$tmp_output" ]]; then
         echo -e "  ${RED}❌ ERREUR: Fichier temporaire introuvable après encodage: $tmp_output${NOCOLOR}" >&2
-        if [[ -n "$LOG_ERROR" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output (fichier temp absent)" >> "$LOG_ERROR" 2>/dev/null || true
+        if [[ -n "$LOG_SESSION" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output (fichier temp absent)" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
         return 1
@@ -326,15 +326,15 @@ _finalize_conversion_error() {
             echo -e "  ${RED}❌ Échec de la conversion : $filename${NOCOLOR}"
         fi
     fi
-    if [[ -n "$LOG_ERROR" ]]; then
-        echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_ERROR" 2>/dev/null || true
-        echo "--- Erreur détaillée FFMPEG ---" >> "$LOG_ERROR" 2>/dev/null || true
+    if [[ -n "$LOG_SESSION" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+        echo "--- Erreur détaillée FFMPEG ---" >> "$LOG_SESSION" 2>/dev/null || true
         if [[ -n "$ffmpeg_log_temp" ]] && [[ -f "$ffmpeg_log_temp" ]] && [[ -s "$ffmpeg_log_temp" ]]; then
-            cat "$ffmpeg_log_temp" >> "$LOG_ERROR" 2>/dev/null || true
+            cat "$ffmpeg_log_temp" >> "$LOG_SESSION" 2>/dev/null || true
         else
-            echo "(Log d'erreur : ffmpeg_log_temp='$ffmpeg_log_temp' exists=$([ -f "$ffmpeg_log_temp" ] && echo 'OUI' || echo 'NON'))" >> "$LOG_ERROR" 2>/dev/null || true
+            echo "(Log d'erreur : ffmpeg_log_temp='$ffmpeg_log_temp' exists=$([ -f "$ffmpeg_log_temp" ] && echo 'OUI' || echo 'NON'))" >> "$LOG_SESSION" 2>/dev/null || true
         fi
-        echo "-------------------------------" >> "$LOG_ERROR" 2>/dev/null || true
+        echo "-------------------------------" >> "$LOG_SESSION" 2>/dev/null || true
     fi
     rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null
 }
@@ -395,42 +395,42 @@ show_summary() {
     fi
     
     local succ=0
-    if [[ -f "$LOG_SUCCESS" && -s "$LOG_SUCCESS" ]]; then
-        succ=$(grep -c ' | SUCCESS' "$LOG_SUCCESS" 2>/dev/null || true)
+    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
+        succ=$(grep -c ' | SUCCESS' "$LOG_SESSION" 2>/dev/null || true)
         succ=$(echo "${succ:-0}" | tr -d '[:space:]')
         [[ -z "$succ" ]] && succ=0
     fi
 
     local skip=0
-    if [[ -f "$LOG_SKIPPED" && -s "$LOG_SKIPPED" ]]; then
-        skip=$(grep -c ' | SKIPPED' "$LOG_SKIPPED" 2>/dev/null || true)
+    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
+        skip=$(grep -c ' | SKIPPED' "$LOG_SESSION" 2>/dev/null || true)
         skip=$(echo "${skip:-0}" | tr -d '[:space:]')
         [[ -z "$skip" ]] && skip=0
     fi
 
     local err=0
-    if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
-        err=$(grep -c ' | ERROR ' "$LOG_ERROR" 2>/dev/null || true)
+    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
+        err=$(grep -c ' | ERROR ' "$LOG_SESSION" 2>/dev/null || true)
         err=$(echo "${err:-0}" | tr -d '[:space:]')
         [[ -z "$err" ]] && err=0
     fi
 
     # Anomalies : fichiers plus lourds après conversion
     local size_anomalies=0
-    if [[ -f "$LOG_SKIPPED" && -s "$LOG_SKIPPED" ]]; then
-        size_anomalies=$(grep -c 'WARNING: FICHIER PLUS LOURD' "$LOG_SKIPPED" 2>/dev/null | tr -d '\r\n') || size_anomalies=0
+    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
+        size_anomalies=$(grep -c 'WARNING: FICHIER PLUS LOURD' "$LOG_SESSION" 2>/dev/null | tr -d '\r\n') || size_anomalies=0
     fi
 
     # Anomalies : erreurs de vérification checksum/taille lors du transfert
     local checksum_anomalies=0
-    if [[ -f "$LOG_ERROR" && -s "$LOG_ERROR" ]]; then
-        checksum_anomalies=$(grep -cE ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' "$LOG_ERROR" 2>/dev/null | tr -d '\r\n') || checksum_anomalies=0
+    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
+        checksum_anomalies=$(grep -cE ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' "$LOG_SESSION" 2>/dev/null | tr -d '\r\n') || checksum_anomalies=0
     fi
 
     # Anomalies VMAF : fichiers avec qualité dégradée (score < 70)
     local vmaf_anomalies=0
-    if [[ -f "$LOG_SUCCESS" && -s "$LOG_SUCCESS" ]]; then
-        vmaf_anomalies=$(grep -c ' | VMAF | .* | quality:DEGRADE' "$LOG_SUCCESS" 2>/dev/null | tr -d '\r\n') || vmaf_anomalies=0
+    if [[ -f "$LOG_SESSION" && -s "$LOG_SESSION" ]]; then
+        vmaf_anomalies=$(grep -c ' | VMAF | .* | quality:DEGRADE' "$LOG_SESSION" 2>/dev/null | tr -d '\r\n') || vmaf_anomalies=0
     fi
     
     # Calcul du gain de place total

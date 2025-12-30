@@ -137,17 +137,39 @@ _compute_effective_bitrate_kbps_for_height() {
 # Inclut : bitrate effectif ou CRF + hauteur de sortie estimée (ex: 720p) + preset.
 # Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_<audio_codec>][_sample]
 # Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_<audio_codec>][_sample]
-# Usage: _build_effective_suffix_for_dims <width> <height> [input_file] [opt_audio_codec] [opt_audio_bitrate]
+# Usage: _build_effective_suffix_for_dims <width> <height> [input_file] [opt_audio_codec] [opt_audio_bitrate] [source_video_codec]
 _build_effective_suffix_for_dims() {
     local src_width="$1"
     local src_height="$2"
     local input_file="${3:-}"
     local opt_audio_codec="${4:-}"
     local opt_audio_bitrate="${5:-}"
+    local source_video_codec="${6:-}"
 
-    # Suffixe basé sur le codec vidéo (x265, av1, etc.)
+    # Suffixe basé sur le codec vidéo
+    # Si source_video_codec est fourni et est supérieur ou égal au codec cible,
+    # on utilise le codec source (cas video_passthrough)
     local codec_suffix="x265"
-    if declare -f get_codec_suffix &>/dev/null; then
+    local use_source_codec=false
+    
+    if [[ -n "$source_video_codec" ]] && declare -f is_codec_better_or_equal &>/dev/null; then
+        if is_codec_better_or_equal "$source_video_codec" "${VIDEO_CODEC:-hevc}"; then
+            use_source_codec=true
+        fi
+    fi
+    
+    if [[ "$use_source_codec" == true ]]; then
+        # Utiliser le codec source pour le suffixe
+        if declare -f get_codec_suffix &>/dev/null; then
+            codec_suffix=$(get_codec_suffix "$source_video_codec")
+        else
+            case "$source_video_codec" in
+                av1) codec_suffix="av1" ;;
+                hevc|h265) codec_suffix="x265" ;;
+                *) codec_suffix="$source_video_codec" ;;
+            esac
+        fi
+    elif declare -f get_codec_suffix &>/dev/null; then
         codec_suffix=$(get_codec_suffix "${VIDEO_CODEC:-hevc}")
     elif [[ "${VIDEO_CODEC:-hevc}" == "av1" ]]; then
         codec_suffix="av1"

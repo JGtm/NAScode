@@ -64,6 +64,21 @@ parse_arguments() {
                 KEEP_INDEX=true
                 shift
                 ;;
+            -R|--regenerate-index)
+                REGENERATE_INDEX=true
+                shift
+                ;;
+            --suffix)
+                # Si un argument suit et ne commence pas par tiret, c'est le suffixe personnalisé
+                if [[ -n "${2:-}" ]] && [[ "${2:0:1}" != "-" ]]; then
+                    CUSTOM_SUFFIX_STRING="$2"
+                    shift 2
+                else
+                    # Sinon, on active simplement le suffixe dynamique (annule un éventuel -x)
+                    FORCE_NO_SUFFIX=false
+                    shift
+                fi
+                ;;
             -v|--vmaf)
                 VMAF_ENABLED=true
                 shift

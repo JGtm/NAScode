@@ -86,6 +86,17 @@ cleanup() {
     # Nettoyage des fichiers temporaires x265 two-pass (logs d'encodage)
     # Ces fichiers sont créés dans le répertoire courant par FFmpeg/x265
     _cleanup_x265_logs
+
+    # Nettoyage des logs temporaires (Queue, Progress) - même en cas d'interruption
+    # On garde Index_readable comme demandé
+    if [[ -d "${LOG_DIR:-./logs}" ]]; then
+        rm -f "${LOG_DIR:-./logs}/Queue" "${LOG_DIR:-./logs}/Progress_"* 2>/dev/null || true
+        # Supprimer aussi les fichiers temporaires .vmaf_queue, compteurs de taille, etc.
+        rm -f "${LOG_DIR:-./logs}/.vmaf_queue_"* 2>/dev/null || true
+        rm -f "${LOG_DIR:-./logs}/.total_size_"* 2>/dev/null || true
+        rm -f "${LOG_DIR:-./logs}/next_queue_pos_"* 2>/dev/null || true
+        rm -f "${LOG_DIR:-./logs}/fifo_writer"* 2>/dev/null || true
+    fi
 }
 
 # Variable pour détecter une vraie interruption (Ctrl+C ou kill)

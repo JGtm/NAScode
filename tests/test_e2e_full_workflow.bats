@@ -100,14 +100,14 @@ teardown() {
     
     [ "$status" -eq 0 ]
     
-    # Le log de succès doit exister (avec timestamp) et contenir une entrée
-    local success_file
-    success_file=$(find "$WORKDIR/logs" -name "Success_*.log" -type f | head -1)
-    [ -n "$success_file" ]
-    [ -f "$success_file" ]
+    # Le log de session doit exister (avec timestamp) et contenir une entrée SUCCESS
+    local session_file
+    session_file=$(find "$WORKDIR/logs" -name "Session_*.log" -type f | head -1)
+    [ -n "$session_file" ]
+    [ -f "$session_file" ]
     
     local success_count
-    success_count=$(wc -l < "$success_file")
+    success_count=$(grep -c ' | SUCCESS' "$session_file" || echo 0)
     [ "$success_count" -ge 1 ]
 }
 
@@ -383,11 +383,11 @@ teardown() {
     
     [ "$status" -eq 0 ]
     
-    # Le fichier doit être dans le log des skipped (avec timestamp)
-    local skipped_file
-    skipped_file=$(find "$WORKDIR/logs" -name "Skipped_*.log" -type f | head -1)
-    [ -n "$skipped_file" ]
-    grep -q "test_video_hevc_2s.mkv" "$skipped_file"
+    # Le fichier doit être dans le log de session avec SKIPPED (avec timestamp)
+    local session_file
+    session_file=$(find "$WORKDIR/logs" -name "Session_*.log" -type f | head -1)
+    [ -n "$session_file" ]
+    grep -q "SKIPPED.*test_video_hevc_2s.mkv" "$session_file"
 }
 
 ###########################################################
@@ -464,14 +464,10 @@ teardown() {
     # Le fichier doit être mentionné dans les logs (erreur OU skipped)
     # Un fichier sans flux vidéo valide est SKIPPED, pas ERROR
     local found=false
-    local error_file skipped_file
-    error_file=$(find "$WORKDIR/logs" -name "Error_*.log" -type f 2>/dev/null | head -1)
-    skipped_file=$(find "$WORKDIR/logs" -name "Skipped_*.log" -type f 2>/dev/null | head -1)
+    local session_file
+    session_file=$(find "$WORKDIR/logs" -name "Session_*.log" -type f 2>/dev/null | head -1)
     
-    if [[ -n "$error_file" ]] && grep -q "corrupted.mkv" "$error_file" 2>/dev/null; then
-        found=true
-    fi
-    if [[ -n "$skipped_file" ]] && grep -q "corrupted.mkv" "$skipped_file" 2>/dev/null; then
+    if [[ -n "$session_file" ]] && grep -qE "(ERROR|SKIPPED).*corrupted.mkv" "$session_file" 2>/dev/null; then
         found=true
     fi
     # Vérifier aussi dans la sortie standard

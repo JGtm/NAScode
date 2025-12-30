@@ -68,18 +68,11 @@ teardown() {
     # Le script doit avoir géré l'erreur (soit terminé normalement, soit créé un log)
     local found_in_logs=false
     
-    # Chercher dans Error.log ou Skipped.log
-    local error_log=$(find "$WORKDIR/logs" -name "Error_*.log" -type f 2>/dev/null | head -1)
-    local skipped_log=$(find "$WORKDIR/logs" -name "Skipped_*.log" -type f 2>/dev/null | head -1)
+    # Chercher dans Session.log (log consolidé)
+    local session_log=$(find "$WORKDIR/logs" -name "Session_*.log" -type f 2>/dev/null | head -1)
     
-    if [[ -n "$error_log" && -f "$error_log" ]]; then
-        if grep -q "corrupted_video" "$error_log" 2>/dev/null; then
-            found_in_logs=true
-        fi
-    fi
-    
-    if [[ -n "$skipped_log" && -f "$skipped_log" ]]; then
-        if grep -q "corrupted_video" "$skipped_log" 2>/dev/null; then
+    if [[ -n "$session_log" && -f "$session_log" ]]; then
+        if grep -qE "(ERROR|SKIPPED).*corrupted_video" "$session_log" 2>/dev/null; then
             found_in_logs=true
         fi
     fi

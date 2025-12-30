@@ -42,14 +42,24 @@ log_success() {
     echo -e "${GREEN:-}✅ ${message}${NOCOLOR:-}"
 }
 
+# Nettoie les logs de plus de X jours (défaut 30)
+cleanup_old_logs() {
+    local days="${1:-30}"
+    if [[ -d "$LOG_DIR" ]]; then
+        # Nettoyage silencieux des fichiers de plus de X jours
+        # On exclut l'Index et Index.meta qui sont persistants
+        find "$LOG_DIR" -type f -mtime +"$days" \
+            ! -name "Index" ! -name "Index.meta" ! -name "Index_readable*" \
+            -exec rm -f {} + 2>/dev/null || true
+    fi
+}
+
 ###########################################################
 # CHEMINS DES LOGS
 ###########################################################
 
 readonly LOG_DIR="./logs"
-readonly LOG_SUCCESS="$LOG_DIR/Success_${EXECUTION_TIMESTAMP}.log"
-readonly LOG_SKIPPED="$LOG_DIR/Skipped_${EXECUTION_TIMESTAMP}.log"
-readonly LOG_ERROR="$LOG_DIR/Error_${EXECUTION_TIMESTAMP}.log"
+readonly LOG_SESSION="$LOG_DIR/Session_${EXECUTION_TIMESTAMP}.log"
 readonly SUMMARY_FILE="$LOG_DIR/Summary_${EXECUTION_TIMESTAMP}.log"
 readonly LOG_PROGRESS="$LOG_DIR/Progress_${EXECUTION_TIMESTAMP}.log"
 readonly INDEX="$LOG_DIR/Index"
@@ -72,8 +82,11 @@ initialize_directories() {
     
     rm -f "$STOP_FLAG"
     
+    # Nettoyage automatique des vieux logs (30 jours)
+    cleanup_old_logs 30
+    
     # Créer les fichiers de log
-    for log_file in "$LOG_SUCCESS" "$LOG_SKIPPED" "$LOG_ERROR" "$SUMMARY_FILE" "$LOG_PROGRESS"; do
+    for log_file in "$LOG_SESSION" "$SUMMARY_FILE" "$LOG_PROGRESS"; do
         touch "$log_file"
     done
     # Le log de comparaison dry-run n'est créé que si on est en mode dry-run
