@@ -320,13 +320,14 @@ Conversion/
 
 ## 📊 Logs
 
-- `Success_*.log` : fichiers convertis avec succès
-- `Error_*.log` : erreurs de conversion
+- `Session_*.log` : journal unifié de la session (succès, erreurs, skipped, vérifications)
+- `Summary_*.log` : résumé de fin de conversion
 - `Progress_*.log` : progression détaillée
-- `Skipped_*.log` : fichiers ignorés (déjà optimisés)
-- `Index` : index des fichiers à traiter
+- `Index` : index des fichiers à traiter (format null-separated)
 - `Index_readable_*.txt` : index lisible (liste des fichiers)
-- `Queue` : file d'attente (format null-separated)
+- `Queue` : file d'attente (format null-separated, supprimée à la fin)
+- `Queue.full` : copie complète de la queue avant limitation
+- `DryRun_Comparison_*.log` : comparaison des noms (mode dry-run)
 
 ## 🔍 Évaluation VMAF
 
