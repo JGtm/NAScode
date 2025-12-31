@@ -47,7 +47,7 @@ _setup_video_encoding_params() {
     # Affichage 10-bit si applicable
     if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]]; then
         if [[ "$OUTPUT_PIX_FMT" == "yuv420p10le" ]]; then
-            echo -e "${CYAN}  🎨 Sortie 10-bit activée (source: $input_pix_fmt)${NOCOLOR}"
+            echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
         fi
     fi
 
