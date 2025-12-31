@@ -1,5 +1,22 @@
 # Handoff
 
+## Dernière session (31/12/2025)
+
+### Tâches accomplies
+
+#### 1. Nettoyage des codes couleurs ANSI dans le fichier Summary
+- **lib/finalize.sh** : ajout de `_strip_ansi_stream()` et écriture de `SUMMARY_FILE` via `tee >(_strip_ansi_stream > "$SUMMARY_FILE")`
+- Objectif : garder les couleurs à l'écran, mais produire un fichier `Summary_*.log` lisible (sans séquences `\x1b[...]`).
+
+#### 2. Test de non-régression
+- **tests/test_finalize_transfer_errors.bats** : ajout d'une assertion garantissant l'absence de caractère ESC (`\x1b`) dans `SUMMARY_FILE`.
+
+### Derniers prompts
+- "C'est possible de nettoyer les codes couleurs quand on fait le tee \"$SUMMARY_FILE\" ?"
+
+### Branches en cours
+- `fix/strip-ansi-summary`
+
 ## Dernière session (30/12/2025)
 
 ### Tâches accomplies
