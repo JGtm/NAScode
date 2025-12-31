@@ -9,6 +9,20 @@
 # - "full"             : conversion complète (vidéo + audio)
 CONVERSION_ACTION=""
 
+# Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
+CURRENT_FILE_NUMBER=0
+
+# Génère le préfixe [X/Y] pour les messages si le compteur est disponible
+# Usage: _get_counter_prefix
+# Retourne une chaîne vide si pas de compteur actif
+_get_counter_prefix() {
+    local current_num="${CURRENT_FILE_NUMBER:-0}"
+    local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
+    if [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
+        echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
+    fi
+}
+
 # Détermine le mode de conversion à appliquer pour un fichier.
 # Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original> [opt_audio_codec] [opt_audio_bitrate]
 # Définit CONVERSION_ACTION et retourne 0 si une action est nécessaire, 1 si skip total
@@ -81,17 +95,18 @@ should_skip_conversion() {
     local result=$?
     
     # Affichage et logging selon le mode
+    local counter_prefix=$(_get_counter_prefix)
     case "$CONVERSION_ACTION" in
         "skip")
             if [[ -z "$codec" ]]; then
-                echo -e "${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
+                echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
             else
                 local codec_display="${codec^^}"
                 [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
-                echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
+                echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
@@ -198,7 +213,8 @@ _check_output_exists() {
     local final_output="$3"
     
     if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
-        echo -e "${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
+        local counter_prefix=$(_get_counter_prefix)
+        echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
@@ -240,15 +256,7 @@ _setup_temp_files_and_logs() {
     mkdir -p "$final_dir" 2>/dev/null || true
     if [[ "$NO_PROGRESS" != true ]]; then
         echo ""
-        # Afficher le compteur X/Y si disponible
-        local counter_str=""
-        if declare -f increment_starting_counter &>/dev/null; then
-            local current_num=$(increment_starting_counter)
-            local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
-            if [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
-                counter_str="${DIM}[${current_num}/${total_num}]${NOCOLOR} "
-            fi
-        fi
+        local counter_str=$(_get_counter_prefix)
         echo -e "▶️  ${counter_str}Démarrage du fichier : $filename"
     fi
     if [[ -n "$LOG_PROGRESS" ]]; then
@@ -332,6 +340,13 @@ convert_file() {
 
     local file_original="$1"
     local output_dir="$2"
+    
+    # Incrémenter le compteur de fichiers au tout début (pour affichage [X/Y])
+    # Cette variable sera utilisée par tous les messages (skips inclus)
+    CURRENT_FILE_NUMBER=0
+    if declare -f increment_starting_counter &>/dev/null; then
+        CURRENT_FILE_NUMBER=$(increment_starting_counter)
+    fi
     
     # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel
     # Format: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate

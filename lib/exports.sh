@@ -35,6 +35,7 @@ export_variables() {
     # ========================================================
     # FONCTIONS DE PRÉPARATION ET FINALISATION
     # ========================================================
+    export -f _get_counter_prefix
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
     export -f _setup_temp_files_and_logs _check_disk_space _get_temp_filename
     export -f _analyze_video _copy_to_temp_storage
