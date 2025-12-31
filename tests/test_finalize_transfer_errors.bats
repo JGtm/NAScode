@@ -90,6 +90,10 @@ teardown() {
     # Le format du résumé utilise maintenant print_summary_item avec alignement
     run grep -E "Erreurs.*1" "$SUMMARY_FILE"
     [ "$status" -eq 0 ]
+
+    # Le fichier résumé ne doit pas contenir de codes couleurs ANSI
+    run grep -q $'\x1b' "$SUMMARY_FILE"
+    [ "$status" -ne 0 ]
 }
 
 ###########################################################

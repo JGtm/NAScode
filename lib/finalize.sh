@@ -400,6 +400,14 @@ _format_size_bytes_compact() {
     fi
 }
 
+# Supprime les séquences ANSI (couleurs / contrôles) d'un flux texte.
+# Usage: some_cmd | _strip_ansi_stream
+_strip_ansi_stream() {
+    # Regex ANSI assez large (CSI) : ESC [ ... @-~
+    # Compatible awk GNU/macOS (mawk/gawk).
+    awk '{ gsub(/\033\[[0-9;?]*[ -\/]*[@-~]/, ""); print }'
+}
+
 # Calcule les économies d'espace à partir des fichiers de taille totale
 # Retourne: show|line1|line2 où show=true/false
 _calculate_space_savings() {
@@ -522,7 +530,7 @@ show_summary() {
             print_summary_value_only "$line2" "$GREEN"
         fi
         print_summary_footer
-    } | tee "$SUMMARY_FILE"
+    } | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
     
     # Afficher le résumé des heures creuses si activé
     if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
