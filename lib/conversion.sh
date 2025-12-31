@@ -90,8 +90,15 @@ should_skip_conversion() {
                 fi
             else
                 local codec_display="${codec^^}"
-                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="x265"
-                echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
+                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
+                [[ "$codec" == "av1" ]] && codec_display="AV1"
+                # Indiquer si le codec source est meilleur que la cible
+                local target_codec="${VIDEO_CODEC:-hevc}"
+                local codec_better_msg=""
+                if is_codec_better_or_equal "$codec" "$target_codec" && [[ "$codec" != "$target_codec" ]]; then
+                    codec_better_msg=" (meilleur que ${target_codec^^})"
+                fi
+                echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display}${codec_better_msg} & bitrate optimisé) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
@@ -99,7 +106,13 @@ should_skip_conversion() {
             return 0
             ;;
         "video_passthrough")
-            # Log discret - comportement transparent pour l'utilisateur
+            # Message visible + log pour indiquer la conversion audio seule
+            local codec_display="${codec^^}"
+            [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
+            [[ "$codec" == "av1" ]] && codec_display="AV1"
+            if [[ "$NO_PROGRESS" != true ]]; then
+                echo -e "${CYAN}  📋 Vidéo conservée (${codec_display} optimisé) → conversion audio seule${NOCOLOR}"
+            fi
             if [[ -n "$LOG_PROGRESS" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | VIDEO_PASSTHROUGH | Audio à optimiser | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
             fi
@@ -240,7 +253,16 @@ _setup_temp_files_and_logs() {
     mkdir -p "$final_dir" 2>/dev/null || true
     if [[ "$NO_PROGRESS" != true ]]; then
         echo ""
-        echo -e "▶️  Démarrage du fichier : $filename"
+        # Afficher le compteur X/Y si disponible
+        local counter_str=""
+        if declare -f increment_starting_counter &>/dev/null; then
+            local current_num=$(increment_starting_counter)
+            local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
+            if [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
+                counter_str="${DIM}[${current_num}/${total_num}]${NOCOLOR} "
+            fi
+        fi
+        echo -e "▶️  ${counter_str}Démarrage du fichier : $filename"
     fi
     if [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
@@ -287,7 +309,8 @@ _copy_to_temp_storage() {
     local ffmpeg_log_temp="$4"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_transfer_item "$filename"
+        # Ne pas passer le nom : il est déjà sur la ligne "Démarrage du fichier"
+        print_transfer_item
     else
         echo -e "${CYAN}→ $filename${NOCOLOR}"
     fi

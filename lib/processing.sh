@@ -15,6 +15,14 @@ _process_queue_simple() {
         nb_files=$(count_null_separated "$QUEUE")
     fi
     
+    # Initialiser le compteur de fichiers pour l'affichage "X/Y"
+    STARTING_FILE_COUNTER_FILE="$LOG_DIR/starting_file_counter_${EXECUTION_TIMESTAMP}"
+    echo "0" > "$STARTING_FILE_COUNTER_FILE"
+    export STARTING_FILE_COUNTER_FILE
+    
+    TOTAL_FILES_TO_PROCESS="$nb_files"
+    export TOTAL_FILES_TO_PROCESS
+    
     if [[ "$NO_PROGRESS" != true ]]; then
         print_conversion_start "$nb_files"
         # Réserver espace affichage pour les workers parallèles
@@ -75,6 +83,11 @@ _process_queue_with_fifo() {
     echo "0" > "$PROCESSED_COUNT_FILE"
     export PROCESSED_COUNT_FILE
     
+    # Compteur pour l'affichage "X/Y" (incrémenté au début du traitement)
+    STARTING_FILE_COUNTER_FILE="$LOG_DIR/starting_file_counter_${EXECUTION_TIMESTAMP}"
+    echo "0" > "$STARTING_FILE_COUNTER_FILE"
+    export STARTING_FILE_COUNTER_FILE
+    
     # Queue complète et position pour alimentation dynamique
     QUEUE_FULL="$QUEUE.full"
     NEXT_QUEUE_POS_FILE="$LOG_DIR/next_queue_pos_${EXECUTION_TIMESTAMP}"
@@ -94,6 +107,10 @@ _process_queue_with_fifo() {
     fi
     # Position initiale = nombre de fichiers déjà dans la queue limitée
     echo "$target_count" > "$NEXT_QUEUE_POS_FILE"
+    
+    # Total de fichiers pour l'affichage "X/Y"
+    TOTAL_FILES_TO_PROCESS="$target_count"
+    export TOTAL_FILES_TO_PROCESS
     
     # Fichier cible pour le writer
     TARGET_COUNT_FILE="$LOG_DIR/target_count_${EXECUTION_TIMESTAMP}"

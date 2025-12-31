@@ -165,10 +165,10 @@ BEGIN {
     if (NOPROG != "true" && (now - last_update >= refresh_interval || percent >= 99)) {
         if (is_parallel && slot > 0) {
             lines_up = max_slots - slot + 2;
-            printf "\033[%dA\r\033[K  %s [%d] %-30.30s %s %5.1f%% | %s | ETA: %s | x%.2f\033[%dB\r",
+            printf "\033[%dA\r\033[K  %s [%d] %-45.45s %s %5.1f%% | %s | ETA: %s | x%.2f\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-30.30s %s %5.1f%% | %s | ETA: %s | x%.2f",
+            printf "\r\033[K  %s %-45.45s %s %5.1f%% | %s | ETA: %s | x%.2f",
                    EMOJI, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed > "/dev/stderr";
         }
         fflush("/dev/stderr");
@@ -183,10 +183,10 @@ BEGIN {
         end_time_str = format_time(end_now);
         if (is_parallel && slot > 0) {
             lines_up = max_slots - slot + 2;
-            printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s | %s | %s\033[%dB\r",
+            printf "\033[%dA\r\033[K  %s [%d] %-40.40s %s 100.0%% | %s | %s | %s\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-30.30s %s 100.0%% | %s | %s | %s\n",
+            printf "\r\033[K  %s %-45.45s %s 100.0%% | %s | %s | %s\n",
                    EMOJI, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str > "/dev/stderr";
         }
         fflush("/dev/stderr");

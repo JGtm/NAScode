@@ -62,7 +62,7 @@ export_variables() {
     # FONCTIONS DE TRAITEMENT PARALLÈLE
     # ========================================================
     export -f prepare_dynamic_queue _process_queue_simple _process_queue_with_fifo
-    export -f increment_processed_count update_queue
+    export -f increment_processed_count increment_starting_counter update_queue
     
     # ========================================================
     # FONCTIONS UTILITAIRES

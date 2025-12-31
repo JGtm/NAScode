@@ -4,6 +4,41 @@
 
 ### Tâches accomplies
 
+#### 1. Améliorations UI - Messages et affichage
+- **lib/conversion.sh** :
+  - Ajout message visible `📋 Vidéo conservée (X265 optimisé) → conversion audio seule` pour mode video_passthrough
+  - Amélioration message SKIPPED : indique si le codec est meilleur que la cible (ex: "AV1 (meilleur que HEVC)")
+  - Ajout compteur `[X/Y]` sur la ligne "Démarrage du fichier"
+  - Suppression redondance : ne plus afficher le nom de fichier dans le bloc de transfert (déjà sur la ligne de démarrage)
+
+#### 2. Compteur de fichiers X/Y
+- **lib/processing.sh** : 
+  - Ajout variables `STARTING_FILE_COUNTER_FILE` et `TOTAL_FILES_TO_PROCESS`
+  - Export pour utilisation dans les workers parallèles
+- **lib/queue.sh** :
+  - Nouvelle fonction `increment_starting_counter()` avec mutex pour comptage atomique
+- **lib/exports.sh** : Export de `increment_starting_counter`
+
+#### 3. Troncature noms de fichiers augmentée à 45 caractères
+- **lib/utils.sh** : Script AWK - passage de `%-30.30s` à `%-45.45s`
+- **lib/finalize.sh** : Ligne "Terminé en" - passage de 30 à 45 caractères
+- **lib/vmaf.sh** : Tous les affichages VMAF - passage de 30 à 45 caractères
+
+#### 4. Simplification bloc de transfert
+- **lib/ui.sh** : `print_transfer_item()` affiche maintenant "📥 Copie vers temp..." au lieu du nom de fichier (évite la répétition)
+
+### Derniers prompts
+- Améliorations UI : messages audio-only, compteur X/Y, réduction répétition nom fichier, troncature 45 caractères
+
+### Branches en cours
+- `feature/ui-improvements` (actuelle)
+
+---
+
+## Session précédente (31/12/2025)
+
+### Tâches accomplies
+
 #### 1. Nettoyage des codes couleurs ANSI dans le fichier Summary
 - **lib/finalize.sh** : ajout de `_strip_ansi_stream()` et écriture de `SUMMARY_FILE` via `tee >(_strip_ansi_stream > "$SUMMARY_FILE")`
 - Objectif : garder les couleurs à l'écran, mais produire un fichier `Summary_*.log` lisible (sans séquences `\x1b[...]`).

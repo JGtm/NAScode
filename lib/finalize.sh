@@ -243,10 +243,10 @@ _finalize_conversion_success() {
         local display_name
         display_name="$(basename "${final_output:-$filename}")"
 
-        # Tronquer comme ailleurs (ex: VMAF) : 30 caractères max.
+        # Tronquer à 45 caractères max pour l'affichage
         local display_name_trunc="$display_name"
-        if [[ ${#display_name_trunc} -gt 30 ]]; then
-            display_name_trunc="${display_name_trunc:0:27}..."
+        if [[ ${#display_name_trunc} -gt 45 ]]; then
+            display_name_trunc="${display_name_trunc:0:42}..."
         fi
 
         local size_part=""
