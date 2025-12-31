@@ -12,25 +12,23 @@ CONVERSION_ACTION=""
 # Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
 CURRENT_FILE_NUMBER=0
 
-# Génère le préfixe [X/Y] ou [X] pour les messages si le compteur est disponible
+# Génère le préfixe [X/Y] pour les messages si le compteur est disponible
 # Usage: _get_counter_prefix
-# - Avec limite dynamique (LIMIT_FILES > 0) : affiche [X] car le total est inconnu
+# - Avec limite (-l) : pas de compteur (queue dynamique, total inconnu)
 # - Sans limite : affiche [X/Y] avec le total réel
-# Retourne une chaîne vide si pas de compteur actif
+# Retourne une chaîne vide si pas de compteur actif ou mode limite
 _get_counter_prefix() {
     local current_num="${CURRENT_FILE_NUMBER:-0}"
     local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
     local limit="${LIMIT_FILES:-0}"
     
-    if [[ "$current_num" -gt 0 ]]; then
-        if [[ "$limit" -gt 0 ]]; then
-            # Avec limite dynamique : on ne connaît pas le total réel
-            # Afficher juste le numéro courant
-            echo "${DIM}[${current_num}]${NOCOLOR} "
-        elif [[ "$total_num" -gt 0 ]]; then
-            # Sans limite : on connaît le total exact
-            echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
-        fi
+    # Pas de compteur en mode limite (queue dynamique)
+    if [[ "$limit" -gt 0 ]]; then
+        return
+    fi
+    
+    if [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
+        echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
     fi
 }
 
