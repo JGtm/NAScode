@@ -91,14 +91,7 @@ should_skip_conversion() {
             else
                 local codec_display="${codec^^}"
                 [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
-                [[ "$codec" == "av1" ]] && codec_display="AV1"
-                # Indiquer si le codec source est meilleur que la cible
-                local target_codec="${VIDEO_CODEC:-hevc}"
-                local codec_better_msg=""
-                if is_codec_better_or_equal "$codec" "$target_codec" && [[ "$codec" != "$target_codec" ]]; then
-                    codec_better_msg=" (meilleur que ${target_codec^^})"
-                fi
-                echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display}${codec_better_msg} & bitrate optimisé) : $filename${NOCOLOR}" >&2
+                echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
@@ -106,13 +99,7 @@ should_skip_conversion() {
             return 0
             ;;
         "video_passthrough")
-            # Message visible + log pour indiquer la conversion audio seule
-            local codec_display="${codec^^}"
-            [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
-            [[ "$codec" == "av1" ]] && codec_display="AV1"
-            if [[ "$NO_PROGRESS" != true ]]; then
-                echo -e "${CYAN}  📋 Vidéo conservée (${codec_display} optimisé) → conversion audio seule${NOCOLOR}"
-            fi
+            # Log discret - le message visible sera affiché après le transfert
             if [[ -n "$LOG_PROGRESS" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | VIDEO_PASSTHROUGH | Audio à optimiser | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
             fi
@@ -309,8 +296,7 @@ _copy_to_temp_storage() {
     local ffmpeg_log_temp="$4"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        # Ne pas passer le nom : il est déjà sur la ligne "Démarrage du fichier"
-        print_transfer_item
+        print_transfer_item "$filename"
     else
         echo -e "${CYAN}→ $filename${NOCOLOR}"
     fi
@@ -409,6 +395,27 @@ convert_file() {
     local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
     
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
+    
+    # Afficher les messages informatifs après le transfert, avant la conversion
+    if [[ "$NO_PROGRESS" != true ]]; then
+        local codec_display="${v_codec^^}"
+        [[ "$v_codec" == "hevc" || "$v_codec" == "h265" ]] && codec_display="X265"
+        [[ "$v_codec" == "av1" ]] && codec_display="AV1"
+        
+        if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
+            # Mode passthrough : vidéo conservée, seul l'audio sera converti
+            echo -e "${CYAN}  📋 Vidéo conservée (${codec_display} optimisé) → conversion audio seule${NOCOLOR}"
+        else
+            # Mode full : vérifier si le codec source est meilleur/égal à la cible
+            local target_codec="${VIDEO_CODEC:-hevc}"
+            if is_codec_better_or_equal "$v_codec" "$target_codec"; then
+                # Le codec source est efficace mais le bitrate est trop élevé
+                local target_display="${target_codec^^}"
+                [[ "$target_codec" == "hevc" || "$target_codec" == "h265" ]] && target_display="X265"
+                echo -e "${CYAN}  🎯 Codec ${codec_display} conservé → ré-encodage pour optimiser le bitrate${NOCOLOR}"
+            fi
+        fi
+    fi
     
     # Choix du mode de conversion selon CONVERSION_ACTION (défini par should_skip_conversion)
     local conversion_success=false

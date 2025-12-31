@@ -192,14 +192,10 @@ print_success_box() {
 }
 
 # Affiche un en-tête de transfert/téléchargement
-# Usage: print_transfer_item ["Nom du fichier"] (optionnel, sinon juste la bordure)
+# Usage: print_transfer_item "Nom du fichier"
 print_transfer_item() {
-    local filename="${1:-}"
-    if [[ -n "$filename" ]]; then
-        echo -e "${CYAN}  ┌─ 📥 ${WHITE}${filename}${NOCOLOR}"
-    else
-        echo -e "${CYAN}  ┌─ 📥 Copie vers temp...${NOCOLOR}"
-    fi
+    local filename="$1"
+    echo -e "${CYAN}  ┌─ 📥 ${WHITE}${filename}${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
 }
 
