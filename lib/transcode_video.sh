@@ -6,7 +6,7 @@
 # Texte affiché dans la barre de progression FFmpeg
 # Pour afficher le nom du fichier : PROGRESS_DISPLAY_TEXT="$base_name"
 # Pour afficher un texte fixe : PROGRESS_DISPLAY_TEXT="Traitement en cours"
-PROGRESS_DISPLAY_TEXT_USE_FILENAME=true  # true = nom du fichier, false = texte fixe
+PROGRESS_DISPLAY_TEXT_USE_FILENAME=false  # true = nom du fichier, false = texte fixe
 PROGRESS_DISPLAY_TEXT_FIXED="Traitement en cours"
 
 ###########################################################
