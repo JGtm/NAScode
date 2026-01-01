@@ -3,6 +3,12 @@
 # ENCODAGE VIDÉO
 ###########################################################
 
+# Texte affiché dans la barre de progression FFmpeg
+# Pour afficher le nom du fichier : PROGRESS_DISPLAY_TEXT="$base_name"
+# Pour afficher un texte fixe : PROGRESS_DISPLAY_TEXT="Traitement en cours"
+PROGRESS_DISPLAY_TEXT_USE_FILENAME=true  # true = nom du fichier, false = texte fixe
+PROGRESS_DISPLAY_TEXT_FIXED="Traitement en cours"
+
 ###########################################################
 # SOUS-FONCTIONS ENCODAGE (FORMAT / SCALE)
 ###########################################################
@@ -425,6 +431,14 @@ _run_ffmpeg_encode() {
     # Paramètres GOP selon le mode (film: 240, série: 600)
     local keyint_value="${FILM_KEYINT:-600}"
     
+    # Texte à afficher dans la barre de progression
+    local progress_display_text
+    if [[ "$PROGRESS_DISPLAY_TEXT_USE_FILENAME" == true ]]; then
+        progress_display_text="$base_name"
+    else
+        progress_display_text="$PROGRESS_DISPLAY_TEXT_FIXED"
+    fi
+    
     # Options spécifiques à l'encodeur
     local tune_opt preset_opt bitrate_opt
     tune_opt=$(_get_tune_option "$encoder")
@@ -451,7 +465,7 @@ _run_ffmpeg_encode() {
             $stream_opt \
             $output_dest \
             -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
-        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
             -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
             -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
             "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
@@ -469,7 +483,7 @@ _run_ffmpeg_encode() {
             $stream_opt \
             $output_dest \
             -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
-        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
             -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
             -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
             "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
@@ -644,6 +658,14 @@ _execute_ffmpeg_pipeline() {
 
     # ===== EXÉCUTION SELON LE MODE =====
     
+    # Texte à afficher dans la barre de progression
+    local progress_display_text
+    if [[ "$PROGRESS_DISPLAY_TEXT_USE_FILENAME" == true ]]; then
+        progress_display_text="$base_name"
+    else
+        progress_display_text="$PROGRESS_DISPLAY_TEXT_FIXED"
+    fi
+    
     case "$mode" in
         "passthrough")
             # Mode passthrough : vidéo copiée, audio traité
@@ -654,7 +676,7 @@ _execute_ffmpeg_pipeline() {
                 $stream_mapping -f matroska \
                 "$tmp_output" \
                 -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-            awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$base_name" -v NOPROG="$NO_PROGRESS" \
+            awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                 -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
                 -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
                 "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
@@ -663,7 +685,7 @@ _execute_ffmpeg_pipeline() {
             local awk_rc=${PIPESTATUS[1]:-0}
 
             if [[ "$ffmpeg_rc" -ne 0 || "$awk_rc" -ne 0 ]]; then
-                _pipeline_show_error "Erreur lors du remuxage (video passthrough)" "$ffmpeg_log_temp"
+                _pipeline_show_error "Erreur lors du remuxage" "$ffmpeg_log_temp"
                 _pipeline_cleanup_and_fail
                 return 1
             fi

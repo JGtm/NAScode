@@ -271,7 +271,7 @@ _finalize_conversion_success() {
             size_part=" | ${before_fmt} → ${after_fmt}"
         fi
 
-        echo -e "  ${GREEN}✅ ${display_name_trunc} | Terminé en ${elapsed_display}${size_part}${NOCOLOR}"
+        echo -e "  ${GREEN}✅ Conversion terminée en ${elapsed_display}${size_part}${NOCOLOR}"
     fi
 
     # Vérifier que le fichier de sortie temporaire existe

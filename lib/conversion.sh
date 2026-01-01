@@ -428,7 +428,7 @@ convert_file() {
         
         if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
             # Mode passthrough : vidéo conservée, seul l'audio sera converti
-            echo -e "${CYAN}  📋 Vidéo conservée (${codec_display} optimisé) → conversion audio seule${NOCOLOR}"
+            echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → conversion audio seule${NOCOLOR}"
         else
             # Mode full : vérifier si le codec source est meilleur/égal à la cible
             local target_codec="${VIDEO_CODEC:-hevc}"
@@ -436,7 +436,7 @@ convert_file() {
                 # Le codec source est efficace mais le bitrate est trop élevé
                 local target_display="${target_codec^^}"
                 [[ "$target_codec" == "hevc" || "$target_codec" == "h265" ]] && target_display="X265"
-                echo -e "${CYAN}  🎯 Codec ${codec_display} conservé → ré-encodage pour optimiser le bitrate${NOCOLOR}"
+                echo -e "${CYAN}  🎯 Codec ${codec_display} optimal → limitation du bitrate${NOCOLOR}"
             fi
         fi
     fi

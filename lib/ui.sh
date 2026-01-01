@@ -195,7 +195,7 @@ print_success_box() {
 # Usage: print_transfer_item "Nom du fichier"
 print_transfer_item() {
     local filename="$1"
-    echo -e "${CYAN}  ┌─ 📥 ${WHITE}${filename}${NOCOLOR}"
+    echo -e "${CYAN}  ┌─ 📥 ${WHITE}Téléchargement vers dossier temporaire${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
 }
 
