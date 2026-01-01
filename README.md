@@ -179,14 +179,13 @@ bash nascode -l 10 -k
 
 | Paramètre | Mode `serie` | Mode `film` | Mode `film-adaptive` |
 |-----------|--------------|-------------|----------------------|
-| Bitrate cible | 2070 kbps | 2035 kbps | **Adaptatif** (BPP×C) |
+| Encodage | **CRF 21** (single-pass) | Two-pass 2035 kbps | CRF 21 contraint |
 | Maxrate | 2520 kbps | 3200 kbps | Target × 1.4 |
 | Preset | medium | medium | medium |
 | Keyint (GOP) | 600 (~25s) | 240 (~10s) | 240 (~10s) |
 | Tune fastdecode | Oui | Non | Non |
 | Optimisations x265 | Oui | Non (qualité max) | Non |
-| Pass 1 rapide | Oui | Non | - |
-| Mode par défaut | Single-pass CRF | Two-pass forcé | CRF 21 contraint |
+| Pass 1 rapide | - | Non | - |
 
 ### Codecs audio
 
