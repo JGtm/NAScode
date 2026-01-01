@@ -221,23 +221,28 @@ Le script utilise une logique **smart codec** optimisée pour la taille des fich
 - 🥉 Vorbis — *efficace, conservé*
 - ❌ E-AC3 (384k), AC3 (640k), DTS — *inefficaces, convertis*
 
-#### Vidéo (cible : HEVC x265)
+#### Vidéo (cible par défaut : HEVC x265)
 
-| Codec source | Bitrate | Action | Résultat |
-|--------------|---------|--------|----------|
-| **AV1** | * | `passthrough` | Conservé (codec supérieur) |
-| **HEVC** | ≤ seuil* | `passthrough` | Vidéo copiée, audio traité |
-| **HEVC** | > seuil* | `encode` | Réencodage HEVC |
-| **H.264/AVC** | * | `encode` | Conversion → HEVC |
-| **MPEG4/autres** | * | `encode` | Conversion → HEVC |
-| **4K (2160p)** | * | `encode + scale` | Downscale → 1080p |
+Le script compare le codec source avec le codec cible et applique une **hiérarchie d'efficacité** :
 
-> \* Seuil = `MAXRATE × (1 + tolérance)` : série 2772 kbps, film 3520 kbps (tolérance 10%)
+**Hiérarchie des codecs vidéo** : AV1 > HEVC > VP9 > H.264 > MPEG4
 
-**Hiérarchie des codecs vidéo** (qualité/efficacité) :
-- 🥇 **AV1** — *meilleur codec, toujours conservé*
-- 🥈 **HEVC/H.265** — *codec cible par défaut*
-- ❌ H.264, MPEG4, VP9 — *convertis vers HEVC*
+| Codec source | vs Cible | Bitrate | Action | Résultat |
+|--------------|----------|---------|--------|----------|
+| **AV1** | > HEVC | ≤ seuil AV1* | `skip` | Conservé (meilleur codec, bitrate OK) |
+| **AV1** | > HEVC | > seuil AV1* | `encode` | Réencodage → HEVC (bitrate trop élevé) |
+| **HEVC** | = HEVC | ≤ seuil HEVC* | `skip` | Conservé (même codec, bitrate OK) |
+| **HEVC** | = HEVC | > seuil HEVC* | `encode` | Réencodage HEVC (bitrate trop élevé) |
+| **VP9** | < HEVC | * | `encode` | Conversion → HEVC |
+| **H.264/AVC** | < HEVC | * | `encode` | Conversion → HEVC |
+| **MPEG4/autres** | < HEVC | * | `encode` | Conversion → HEVC |
+| **4K (2160p)** | * | * | `encode + scale` | Downscale → 1080p + HEVC |
+
+> \* **Seuils par codec** (mode série, tolérance 10%) :
+> - HEVC : 2772 kbps (2520 × 1.1)
+> - AV1 : 1980 kbps (1800 × 1.1) — seuil plus bas car codec plus efficace
+
+**Règle générale** : Un codec **meilleur ou égal** au codec cible est conservé **uniquement si** son bitrate est sous le seuil adapté à ce codec.
 
 #### Options `--force`
 
