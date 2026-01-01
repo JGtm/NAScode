@@ -7,9 +7,10 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 ### Encodage
 - **Multi-codec** : support HEVC (x265) et AV1 (libsvtav1, libaom-av1)
 - **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
-- **Deux modes de conversion** :
+- **Trois modes de conversion** :
   - `serie` : optimisé vitesse (~1 Go/h), preset medium, CRF ou 2070 kbps
   - `film` : optimisé qualité, preset medium, two-pass 2035 kbps
+  - `film-adaptive` : bitrate adaptatif selon la complexité visuelle (BPP×C)
 - **Paramètres x265 optimisés** pour le mode série :
   - `sao=0` : désactive Sample Adaptive Offset (gain ~5%)
   - `strong-intra-smoothing=0` : préserve les détails fins
@@ -176,16 +177,16 @@ bash nascode -l 10 -k
 
 ### Modes de conversion
 
-| Paramètre | Mode `serie` | Mode `film` |
-|-----------|--------------|-------------|
-| Bitrate cible | 2070 kbps | 2035 kbps |
-| Maxrate | 2520 kbps | 3200 kbps |
-| Preset | medium | medium |
-| Keyint (GOP) | 600 (~25s) | 240 (~10s) |
-| Tune fastdecode | Oui | Non |
-| Optimisations x265 | Oui | Non (qualité max) |
-| Pass 1 rapide | Oui | Non |
-| Mode par défaut | Single-pass CRF | Two-pass forcé |
+| Paramètre | Mode `serie` | Mode `film` | Mode `film-adaptive` |
+|-----------|--------------|-------------|----------------------|
+| Bitrate cible | 2070 kbps | 2035 kbps | **Adaptatif** (BPP×C) |
+| Maxrate | 2520 kbps | 3200 kbps | Target × 1.4 |
+| Preset | medium | medium | medium |
+| Keyint (GOP) | 600 (~25s) | 240 (~10s) | 240 (~10s) |
+| Tune fastdecode | Oui | Non | Non |
+| Optimisations x265 | Oui | Non (qualité max) | Non |
+| Pass 1 rapide | Oui | Non | - |
+| Mode par défaut | Single-pass CRF | Two-pass forcé | CRF 21 contraint |
 
 ### Codecs audio
 
@@ -225,6 +226,7 @@ Le script utilise une logique **smart codec** optimisée pour la taille des fich
 
 | Codec source | Bitrate | Action | Résultat |
 |--------------|---------|--------|----------|
+| **AV1** | * | `passthrough` | Conservé (codec supérieur) |
 | **HEVC** | ≤ seuil* | `passthrough` | Vidéo copiée, audio traité |
 | **HEVC** | > seuil* | `encode` | Réencodage HEVC |
 | **H.264/AVC** | * | `encode` | Conversion → HEVC |
@@ -232,6 +234,11 @@ Le script utilise une logique **smart codec** optimisée pour la taille des fich
 | **4K (2160p)** | * | `encode + scale` | Downscale → 1080p |
 
 > \* Seuil = `MAXRATE × (1 + tolérance)` : série 2772 kbps, film 3520 kbps (tolérance 10%)
+
+**Hiérarchie des codecs vidéo** (qualité/efficacité) :
+- 🥇 **AV1** — *meilleur codec, toujours conservé*
+- 🥈 **HEVC/H.265** — *codec cible par défaut*
+- ❌ H.264, MPEG4, VP9 — *convertis vers HEVC*
 
 #### Options `--force`
 
