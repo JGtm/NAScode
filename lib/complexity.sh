@@ -7,31 +7,33 @@
 ###########################################################
 
 # ----- Constantes du mode film-adaptive -----
+# Note: pas de readonly pour éviter les erreurs quand le fichier est sourcé plusieurs fois (tests)
+
 # BPP (Bits Per Pixel) de référence pour HEVC
 # Calibré pour produire ~2000-3500 kbps en 1080p@24fps
-readonly ADAPTIVE_BPP_BASE=0.045
+ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE:-0.045}"
 
 # Coefficient de complexité : bornes min/max
-readonly ADAPTIVE_C_MIN=0.75
-readonly ADAPTIVE_C_MAX=1.35
+ADAPTIVE_C_MIN="${ADAPTIVE_C_MIN:-0.75}"
+ADAPTIVE_C_MAX="${ADAPTIVE_C_MAX:-1.35}"
 
 # Seuils de mapping std-dev → coefficient C
 # Basés sur l'écart-type normalisé des tailles de frames
 # Ces valeurs sont à affiner avec un corpus de test réel
-readonly ADAPTIVE_STDDEV_LOW=0.15    # En dessous : contenu statique
-readonly ADAPTIVE_STDDEV_HIGH=0.35   # Au dessus : contenu complexe
+ADAPTIVE_STDDEV_LOW="${ADAPTIVE_STDDEV_LOW:-0.15}"    # En dessous : contenu statique
+ADAPTIVE_STDDEV_HIGH="${ADAPTIVE_STDDEV_HIGH:-0.35}"  # Au dessus : contenu complexe
 
 # Durée d'échantillon par point (secondes)
-readonly ADAPTIVE_SAMPLE_DURATION=10
+ADAPTIVE_SAMPLE_DURATION="${ADAPTIVE_SAMPLE_DURATION:-10}"
 
 # Plancher qualité (kbps minimum)
-readonly ADAPTIVE_MIN_BITRATE_KBPS=800
+ADAPTIVE_MIN_BITRATE_KBPS="${ADAPTIVE_MIN_BITRATE_KBPS:-800}"
 
 # Facteur multiplicateur pour maxrate (ratio vs target)
-readonly ADAPTIVE_MAXRATE_FACTOR=1.4
+ADAPTIVE_MAXRATE_FACTOR="${ADAPTIVE_MAXRATE_FACTOR:-1.4}"
 
 # Facteur multiplicateur pour bufsize (ratio vs target)
-readonly ADAPTIVE_BUFSIZE_FACTOR=2.5
+ADAPTIVE_BUFSIZE_FACTOR="${ADAPTIVE_BUFSIZE_FACTOR:-2.5}"
 
 ###########################################################
 # ANALYSE DES FRAMES

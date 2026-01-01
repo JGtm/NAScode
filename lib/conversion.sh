@@ -110,12 +110,12 @@ should_skip_conversion() {
     
     # Déterminer le mode de conversion (sans seuil adaptatif)
     _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate" ""
-    local result=$?
     
     # Affichage et logging selon le mode
     _display_skip_decision "$codec" "$filename" "$file_original"
     
-    return $result
+    # Retourner 0 si skip, 1 sinon (sémantique shell : 0=succès=skip)
+    [[ "$CONVERSION_ACTION" == "skip" ]] && return 0 || return 1
 }
 
 # Version avec support du seuil adaptatif pour le mode film-adaptive
@@ -131,12 +131,12 @@ should_skip_conversion_adaptive() {
     
     # Déterminer le mode de conversion avec le seuil adaptatif si fourni
     _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate" "$adaptive_maxrate_kbps"
-    local result=$?
     
     # Affichage et logging selon le mode
     _display_skip_decision "$codec" "$filename" "$file_original"
     
-    return $result
+    # Retourner 0 si skip, 1 sinon (sémantique shell : 0=succès=skip)
+    [[ "$CONVERSION_ACTION" == "skip" ]] && return 0 || return 1
 }
 
 # Affichage et logging de la décision de skip (factorisation)

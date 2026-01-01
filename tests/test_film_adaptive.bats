@@ -11,6 +11,8 @@ load test_helper
 setup() {
     setup_test_env
     load_base_modules
+    # Charger complexity.sh (déjà chargé par load_base_modules via test_helper)
+    # Les constantes utilisent ${VAR:-default} donc pas de problème de re-source
 }
 
 teardown() {
@@ -22,9 +24,6 @@ teardown() {
 ###########################################################
 
 @test "_map_stddev_to_complexity: stddev très bas → C_MIN (0.75)" {
-    # Charger les constantes
-    source "$LIB_DIR/complexity.sh"
-    
     local result
     result=$(_map_stddev_to_complexity "0.10")
     
@@ -33,8 +32,6 @@ teardown() {
 }
 
 @test "_map_stddev_to_complexity: stddev très haut → C_MAX (1.35)" {
-    source "$LIB_DIR/complexity.sh"
-    
     local result
     result=$(_map_stddev_to_complexity "0.50")
     
@@ -43,8 +40,6 @@ teardown() {
 }
 
 @test "_map_stddev_to_complexity: stddev moyen → interpolation linéaire" {
-    source "$LIB_DIR/complexity.sh"
-    
     # Avec stddev au milieu de la plage (0.25 = milieu entre 0.15 et 0.35)
     local result
     result=$(_map_stddev_to_complexity "0.25")
@@ -57,8 +52,6 @@ teardown() {
 }
 
 @test "_describe_complexity: C faible → statique" {
-    source "$LIB_DIR/complexity.sh"
-    
     local result
     result=$(_describe_complexity "0.80")
     
@@ -66,8 +59,6 @@ teardown() {
 }
 
 @test "_describe_complexity: C moyen → standard" {
-    source "$LIB_DIR/complexity.sh"
-    
     local result
     result=$(_describe_complexity "1.05")
     
@@ -75,7 +66,7 @@ teardown() {
 }
 
 @test "_describe_complexity: C élevé → complexe" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     local result
     result=$(_describe_complexity "1.30")
@@ -88,7 +79,7 @@ teardown() {
 ###########################################################
 
 @test "compute_adaptive_target_bitrate: calcul BPP×C pour 1080p@24fps" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # 1920×1080×24×0.045/1000 × 1.0 = ~2239 kbps
     local result
@@ -99,7 +90,7 @@ teardown() {
 }
 
 @test "compute_adaptive_target_bitrate: coefficient faible → bitrate réduit" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # Avec C=0.75, le bitrate devrait être ~75% de celui à C=1.0
     local result
@@ -110,7 +101,7 @@ teardown() {
 }
 
 @test "compute_adaptive_target_bitrate: coefficient élevé → bitrate augmenté" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # Avec C=1.35, le bitrate devrait être ~135% de celui à C=1.0
     local result
@@ -121,7 +112,7 @@ teardown() {
 }
 
 @test "compute_adaptive_target_bitrate: garde-fou bitrate original" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # Si le bitrate source est 2000 kbps (2000000 bps), le target ne devrait
     # pas dépasser 75% = 1500 kbps, même si le calcul BPP donnerait plus
@@ -133,7 +124,7 @@ teardown() {
 }
 
 @test "compute_adaptive_target_bitrate: plancher qualité respecté" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # Pour une vidéo très petite, le bitrate minimum devrait être ADAPTIVE_MIN_BITRATE_KBPS
     # 640×360×24×0.045/1000 × 0.75 = ~186 kbps (en dessous du plancher)
@@ -145,7 +136,7 @@ teardown() {
 }
 
 @test "compute_adaptive_maxrate: applique le facteur 1.4" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     local result
     result=$(compute_adaptive_maxrate 2000)
@@ -155,7 +146,7 @@ teardown() {
 }
 
 @test "compute_adaptive_bufsize: applique le facteur 2.5" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     local result
     result=$(compute_adaptive_bufsize 2000)
@@ -169,7 +160,7 @@ teardown() {
 ###########################################################
 
 @test "_compute_normalized_stddev: calcul correct sur données simples" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # Données avec écart-type connu
     # Exemple: 100, 100, 100 → stddev=0, cv=0
@@ -182,7 +173,7 @@ teardown() {
 }
 
 @test "_compute_normalized_stddev: données variées → CV non nul" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # Données avec variance
     local result
@@ -197,7 +188,7 @@ teardown() {
 }
 
 @test "_compute_normalized_stddev: données insuffisantes → 0" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     # Une seule valeur ne permet pas de calculer un écart-type
     local result
@@ -211,7 +202,7 @@ teardown() {
 ###########################################################
 
 @test "set_conversion_mode_parameters: film-adaptive définit ADAPTIVE_COMPLEXITY_MODE" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     CONVERSION_MODE="film-adaptive"
     set_conversion_mode_parameters
@@ -220,7 +211,7 @@ teardown() {
 }
 
 @test "set_conversion_mode_parameters: film-adaptive active CRF 21" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     CONVERSION_MODE="film-adaptive"
     set_conversion_mode_parameters
@@ -229,7 +220,7 @@ teardown() {
 }
 
 @test "set_conversion_mode_parameters: film-adaptive est en single-pass" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     CONVERSION_MODE="film-adaptive"
     set_conversion_mode_parameters
@@ -238,7 +229,7 @@ teardown() {
 }
 
 @test "set_conversion_mode_parameters: film n'active pas ADAPTIVE_COMPLEXITY_MODE" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     
     CONVERSION_MODE="film"
     ADAPTIVE_COMPLEXITY_MODE=false  # Reset avant test
@@ -252,11 +243,12 @@ teardown() {
 ###########################################################
 
 @test "should_skip_conversion_adaptive: skip si bitrate sous seuil adaptatif" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     source "$LIB_DIR/conversion.sh"
     
     ADAPTIVE_COMPLEXITY_MODE=true
     VIDEO_CODEC="hevc"
+    AUDIO_CODEC="copy"  # Audio en copy = pas de conversion audio → skip complet
     
     # Seuil adaptatif = 2800 kbps, bitrate source = 2500 kbps (2500000 bps)
     # Avec tolérance 10% : seuil effectif = 3080 kbps → skip
@@ -266,7 +258,7 @@ teardown() {
 }
 
 @test "should_skip_conversion_adaptive: no-skip si bitrate au-dessus du seuil" {
-    source "$LIB_DIR/complexity.sh"
+    # complexity.sh already loaded by load_base_modules
     source "$LIB_DIR/conversion.sh"
     
     ADAPTIVE_COMPLEXITY_MODE=true

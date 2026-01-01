@@ -30,6 +30,7 @@ setup() {
     source "$LIB_DIR/audio_params.sh"
     source "$LIB_DIR/video_params.sh"
     source "$LIB_DIR/stream_mapping.sh"
+    source "$LIB_DIR/complexity.sh"
     source "$LIB_DIR/transcode_video.sh"
     source "$LIB_DIR/conversion.sh"
     source "$LIB_DIR/processing.sh"
