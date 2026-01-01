@@ -35,6 +35,7 @@ export_variables() {
     # ========================================================
     # FONCTIONS DE PRÉPARATION ET FINALISATION
     # ========================================================
+    export -f _get_counter_prefix
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
     export -f _setup_temp_files_and_logs _check_disk_space _get_temp_filename
     export -f _analyze_video _copy_to_temp_storage
@@ -62,7 +63,7 @@ export_variables() {
     # FONCTIONS DE TRAITEMENT PARALLÈLE
     # ========================================================
     export -f prepare_dynamic_queue _process_queue_simple _process_queue_with_fifo
-    export -f increment_processed_count update_queue
+    export -f increment_processed_count increment_starting_counter update_queue
     
     # ========================================================
     # FONCTIONS UTILITAIRES

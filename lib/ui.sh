@@ -195,7 +195,7 @@ print_success_box() {
 # Usage: print_transfer_item "Nom du fichier"
 print_transfer_item() {
     local filename="$1"
-    echo -e "${CYAN}  ┌─ 📥 ${WHITE}${filename}${NOCOLOR}"
+    echo -e "${CYAN}  ┌─ 📥 ${WHITE}Téléchargement vers dossier temporaire${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
 }
 
@@ -485,6 +485,13 @@ format_option_source() {
 format_option_dest() {
     local path="$1"
     echo -e "📁  Destination : ${CYAN}${path}${NOCOLOR}"
+}
+
+# Formate le nombre de fichiers à traiter pour print_active_options
+# Usage: format_option_file_count "19"
+format_option_file_count() {
+    local count="$1"
+    echo -e "📊  Fichiers à traiter : ${WHITE}${count}${NOCOLOR}"
 }
 
 # Affiche une limitation active (fonction legacy, utilisée si pas de regroupement)

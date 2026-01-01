@@ -9,6 +9,29 @@
 # - "full"             : conversion complète (vidéo + audio)
 CONVERSION_ACTION=""
 
+# Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
+CURRENT_FILE_NUMBER=0
+
+# Génère le préfixe [X/Y] pour les messages si le compteur est disponible
+# Usage: _get_counter_prefix
+# - Avec limite (-l) : pas de compteur (queue dynamique, total inconnu)
+# - Sans limite : affiche [X/Y] avec le total réel
+# Retourne une chaîne vide si pas de compteur actif ou mode limite
+_get_counter_prefix() {
+    local current_num="${CURRENT_FILE_NUMBER:-0}"
+    local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
+    local limit="${LIMIT_FILES:-0}"
+    
+    # Pas de compteur en mode limite (queue dynamique)
+    if [[ "$limit" -gt 0 ]]; then
+        return
+    fi
+    
+    if [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
+        echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
+    fi
+}
+
 # Détermine le mode de conversion à appliquer pour un fichier.
 # Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original> [opt_audio_codec] [opt_audio_bitrate]
 # Définit CONVERSION_ACTION et retourne 0 si une action est nécessaire, 1 si skip total
@@ -81,17 +104,18 @@ should_skip_conversion() {
     local result=$?
     
     # Affichage et logging selon le mode
+    local counter_prefix=$(_get_counter_prefix)
     case "$CONVERSION_ACTION" in
         "skip")
             if [[ -z "$codec" ]]; then
-                echo -e "${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
+                echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
             else
                 local codec_display="${codec^^}"
-                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="x265"
-                echo -e "${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
+                [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
+                echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
@@ -99,7 +123,7 @@ should_skip_conversion() {
             return 0
             ;;
         "video_passthrough")
-            # Log discret - comportement transparent pour l'utilisateur
+            # Log discret - le message visible sera affiché après le transfert
             if [[ -n "$LOG_PROGRESS" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | VIDEO_PASSTHROUGH | Audio à optimiser | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
             fi
@@ -198,7 +222,8 @@ _check_output_exists() {
     local final_output="$3"
     
     if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
-        echo -e "${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
+        local counter_prefix=$(_get_counter_prefix)
+        echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
@@ -240,7 +265,8 @@ _setup_temp_files_and_logs() {
     mkdir -p "$final_dir" 2>/dev/null || true
     if [[ "$NO_PROGRESS" != true ]]; then
         echo ""
-        echo -e "▶️  Démarrage du fichier : $filename"
+        local counter_str=$(_get_counter_prefix)
+        echo -e "▶️  ${counter_str}Démarrage du fichier : $filename"
     fi
     if [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
@@ -324,6 +350,13 @@ convert_file() {
     local file_original="$1"
     local output_dir="$2"
     
+    # Incrémenter le compteur de fichiers au tout début (pour affichage [X/Y])
+    # Cette variable sera utilisée par tous les messages (skips inclus)
+    CURRENT_FILE_NUMBER=0
+    if declare -f increment_starting_counter &>/dev/null; then
+        CURRENT_FILE_NUMBER=$(increment_starting_counter)
+    fi
+    
     # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel
     # Format: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
     local full_metadata
@@ -386,6 +419,27 @@ convert_file() {
     local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
     
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
+    
+    # Afficher les messages informatifs après le transfert, avant la conversion
+    if [[ "$NO_PROGRESS" != true ]]; then
+        local codec_display="${v_codec^^}"
+        [[ "$v_codec" == "hevc" || "$v_codec" == "h265" ]] && codec_display="X265"
+        [[ "$v_codec" == "av1" ]] && codec_display="AV1"
+        
+        if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
+            # Mode passthrough : vidéo conservée, seul l'audio sera converti
+            echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → conversion audio seule${NOCOLOR}"
+        else
+            # Mode full : vérifier si le codec source est meilleur/égal à la cible
+            local target_codec="${VIDEO_CODEC:-hevc}"
+            if is_codec_better_or_equal "$v_codec" "$target_codec"; then
+                # Le codec source est efficace mais le bitrate est trop élevé
+                local target_display="${target_codec^^}"
+                [[ "$target_codec" == "hevc" || "$target_codec" == "h265" ]] && target_display="X265"
+                echo -e "${CYAN}  🎯 Codec ${codec_display} optimal → limitation du bitrate${NOCOLOR}"
+            fi
+        fi
+    fi
     
     # Choix du mode de conversion selon CONVERSION_ACTION (défini par should_skip_conversion)
     local conversion_success=false

@@ -403,6 +403,36 @@ increment_processed_count() {
     rmdir "$lockdir" 2>/dev/null || true
 }
 
+# Incrémente le compteur de fichier au DÉBUT du traitement et retourne la nouvelle valeur
+# Utilisé pour l'affichage "Fichier X/Y"
+increment_starting_counter() {
+    # Ne rien faire si pas de fichier compteur
+    if [[ -z "${STARTING_FILE_COUNTER_FILE:-}" ]] || [[ ! -f "${STARTING_FILE_COUNTER_FILE:-}" ]]; then
+        echo "0"
+        return 0
+    fi
+    
+    local lockdir="$LOG_DIR/starting_counter.lock"
+    # Mutex simple via mkdir
+    local attempts=0
+    while ! mkdir "$lockdir" 2>/dev/null; do
+        sleep 0.05
+        attempts=$((attempts + 1))
+        if [[ $attempts -gt 100 ]]; then break; fi  # timeout 5s
+    done
+    
+    local current=0
+    if [[ -f "$STARTING_FILE_COUNTER_FILE" ]]; then
+        current=$(cat "$STARTING_FILE_COUNTER_FILE" 2>/dev/null || echo 0)
+    fi
+    local new_value=$((current + 1))
+    echo "$new_value" > "$STARTING_FILE_COUNTER_FILE"
+    
+    rmdir "$lockdir" 2>/dev/null || true
+    
+    echo "$new_value"
+}
+
 # Quand un fichier est skip, ajouter le prochain candidat de la queue complète
 # pour maintenir le nombre de fichiers demandés par --limit
 update_queue() {
@@ -463,6 +493,14 @@ _show_active_options() {
     # Chemins source et destination (toujours affichés)
     options+=("$(format_option_source "$SOURCE")")
     options+=("$(format_option_dest "$OUTPUT_DIR")")
+    
+    # Nombre de fichiers à traiter (seulement sans limite, car compteur actif)
+    if [[ "${LIMIT_FILES:-0}" -eq 0 ]] && [[ -f "$QUEUE" ]]; then
+        local file_count=$(count_null_separated "$QUEUE")
+        if [[ "$file_count" -gt 0 ]]; then
+            options+=("$(format_option_file_count "$file_count")")
+        fi
+    fi
     
     # Option Dry-run (en premier car très important)
     if [[ "$DRYRUN" == true ]]; then
