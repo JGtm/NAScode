@@ -1,10 +1,36 @@
 # Handoff
 
-## Dernière session (01/01/2026)
+## Dernière session (02/01/2026)
 
 ### Tâches accomplies
 
-#### 1. Nouveau mode `film-adaptive` - Encodage prédictif par complexité
+#### 1. Correction des tests film-adaptive
+
+**Problèmes corrigés** :
+
+1. **test_film_adaptive.bats** : Le test de skip (`should_skip_conversion_adaptive`) échouait car `AUDIO_CODEC` n'était pas défini. Sans `AUDIO_CODEC="copy"`, la fonction `_should_convert_audio` retournait true et le `CONVERSION_ACTION` devenait `video_passthrough` au lieu de `skip`.
+
+2. **test_regression_exports_contract.bats** : Le test échouait car `complexity.sh` n'était pas sourcé. Les fonctions `analyze_video_complexity`, `_map_stddev_to_complexity`, etc. n'existaient pas quand `exports.sh` tentait de les exporter.
+
+3. **lib/complexity.sh** : Utilisation de `readonly` pour les constantes causait des erreurs lors du re-sourcing dans les tests. Changé en pattern `VAR="${VAR:-default}"`.
+
+4. **lib/conversion.sh** : La sémantique des return values dans `should_skip_conversion` et `should_skip_conversion_adaptive` avait été perdue lors du refactoring. Corrigé pour retourner 0=skip, 1=pas de skip.
+
+**Résultat** : 564 tests passent (100%), 2 tests ignorés intentionnellement (skips).
+
+### Branche en cours
+- `feature/film-adaptive-mode`
+
+### Commits récents
+- `fix(tests): corrige les échecs de tests film-adaptive`
+
+### À faire
+- [ ] Merger la branche `feature/film-adaptive-mode` dans `main` quand prêt
+- [ ] Tester le mode film-adaptive sur des fichiers réels
+
+---
+
+## Session précédente (01/01/2026)
 
 **Concept** : Adapter le bitrate vidéo fichier par fichier selon la complexité visuelle analysée.
 
