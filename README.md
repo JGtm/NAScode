@@ -7,9 +7,10 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 ### Encodage
 - **Multi-codec** : support HEVC (x265) et AV1 (libsvtav1, libaom-av1)
 - **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
-- **Deux modes de conversion** :
+- **Trois modes de conversion** :
   - `serie` : optimisé vitesse (~1 Go/h), preset medium, CRF ou 2070 kbps
   - `film` : optimisé qualité, preset medium, two-pass 2035 kbps
+  - `film-adaptive` : bitrate adaptatif selon la complexité visuelle (BPP×C)
 - **Paramètres x265 optimisés** pour le mode série :
   - `sao=0` : désactive Sample Adaptive Offset (gain ~5%)
   - `strong-intra-smoothing=0` : préserve les détails fins
