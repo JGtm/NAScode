@@ -33,8 +33,9 @@ _get_counter_prefix() {
 }
 
 # Détermine le mode de conversion à appliquer pour un fichier.
-# Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original> [opt_audio_codec] [opt_audio_bitrate]
+# Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original> [opt_audio_codec] [opt_audio_bitrate] [adaptive_maxrate_kbps]
 # Définit CONVERSION_ACTION et retourne 0 si une action est nécessaire, 1 si skip total
+# Note: adaptive_maxrate_kbps est utilisé en mode film-adaptive pour le seuil de skip
 _determine_conversion_mode() {
     local codec="$1"
     local bitrate="$2"
@@ -42,6 +43,7 @@ _determine_conversion_mode() {
     local file_original="$4"
     local opt_audio_codec="${5:-}"
     local opt_audio_bitrate="${6:-}"
+    local adaptive_maxrate_kbps="${7:-}"
     
     CONVERSION_ACTION=""
     
@@ -51,9 +53,16 @@ _determine_conversion_mode() {
         return 1
     fi
     
-    # Calcul dynamique du seuil : MAXRATE_KBPS * (1 + tolérance)
-    local base_threshold_bits=$((MAXRATE_KBPS * 1000))
-    local tolerance_bits=$((MAXRATE_KBPS * SKIP_TOLERANCE_PERCENT * 10))
+    # Calcul dynamique du seuil de skip
+    # En mode film-adaptive, on utilise le maxrate adaptatif calculé pour ce fichier
+    # Sinon on utilise le MAXRATE_KBPS global
+    local effective_maxrate_kbps="${MAXRATE_KBPS}"
+    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]] && [[ -n "$adaptive_maxrate_kbps" ]] && [[ "$adaptive_maxrate_kbps" =~ ^[0-9]+$ ]]; then
+        effective_maxrate_kbps="$adaptive_maxrate_kbps"
+    fi
+    
+    local base_threshold_bits=$((effective_maxrate_kbps * 1000))
+    local tolerance_bits=$((effective_maxrate_kbps * SKIP_TOLERANCE_PERCENT * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
     
     # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible
@@ -99,11 +108,43 @@ should_skip_conversion() {
     local opt_audio_codec="${5:-}"
     local opt_audio_bitrate="${6:-}"
     
-    # Déterminer le mode de conversion
-    _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate"
+    # Déterminer le mode de conversion (sans seuil adaptatif)
+    _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate" ""
     local result=$?
     
     # Affichage et logging selon le mode
+    _display_skip_decision "$codec" "$filename" "$file_original"
+    
+    return $result
+}
+
+# Version avec support du seuil adaptatif pour le mode film-adaptive
+# Usage: should_skip_conversion_adaptive <codec> <bitrate> <filename> <file_original> [audio_codec] [audio_bitrate] [adaptive_maxrate_kbps]
+should_skip_conversion_adaptive() {
+    local codec="$1"
+    local bitrate="$2"
+    local filename="$3"
+    local file_original="$4"
+    local opt_audio_codec="${5:-}"
+    local opt_audio_bitrate="${6:-}"
+    local adaptive_maxrate_kbps="${7:-}"
+    
+    # Déterminer le mode de conversion avec le seuil adaptatif si fourni
+    _determine_conversion_mode "$codec" "$bitrate" "$filename" "$file_original" "$opt_audio_codec" "$opt_audio_bitrate" "$adaptive_maxrate_kbps"
+    local result=$?
+    
+    # Affichage et logging selon le mode
+    _display_skip_decision "$codec" "$filename" "$file_original"
+    
+    return $result
+}
+
+# Affichage et logging de la décision de skip (factorisation)
+_display_skip_decision() {
+    local codec="$1"
+    local filename="$2"
+    local file_original="$3"
+    
     local counter_prefix=$(_get_counter_prefix)
     case "$CONVERSION_ACTION" in
         "skip")
@@ -115,19 +156,22 @@ should_skip_conversion() {
             else
                 local codec_display="${codec^^}"
                 [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
-                echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Déjà ${codec_display} & bitrate optimisé) : $filename${NOCOLOR}" >&2
+                local skip_msg="Déjà ${codec_display} & bitrate optimisé"
+                # En mode adaptatif, préciser que c'est par rapport au seuil adaptatif
+                if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
+                    skip_msg="Déjà ${codec_display} & bitrate ≤ seuil adaptatif"
+                fi
+                echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (${skip_msg}) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
-                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Déjà ${codec_display} et bitrate optimisé) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (${skip_msg}) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
             fi
-            return 0
             ;;
         "video_passthrough")
             # Log discret - le message visible sera affiché après le transfert
             if [[ -n "$LOG_PROGRESS" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | VIDEO_PASSTHROUGH | Audio à optimiser | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
             fi
-            return 1  # Ne pas skip - traiter le fichier
             ;;
         "full")
             # Détecter si le fichier est dans un codec meilleur/égal mais avec bitrate trop élevé
@@ -140,11 +184,8 @@ should_skip_conversion() {
                 [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Ré-encodage ${codec_display}) | Bitrate trop élevé | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
             fi
-            return 1
             ;;
     esac
-    
-    return 1
 }
 
 ###########################################################
@@ -405,9 +446,38 @@ convert_file() {
     
     _check_disk_space "$file_original" || return 1
     
-    # 4. Analyse et décision de conversion (avec métadonnées déjà acquises)
-    # On appelle should_skip_conversion directement avec les métadonnées
-    if should_skip_conversion "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate"; then
+    # 4. Analyse adaptative (mode film-adaptive uniquement)
+    # Variables pour stocker les paramètres adaptatifs calculés
+    local adaptive_target_kbps="" adaptive_maxrate_kbps="" adaptive_bufsize_kbps=""
+    local complexity_c="" complexity_desc="" stddev_val=""
+    
+    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
+        # Calculer les paramètres adaptatifs pour ce fichier
+        local adaptive_params
+        adaptive_params=$(compute_video_params_adaptive "$file_original")
+        
+        # Format: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
+        local _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf
+        IFS='|' read -r _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf complexity_c complexity_desc stddev_val adaptive_target_kbps <<< "$adaptive_params"
+        
+        # Extraire le maxrate adaptatif (enlever le 'k' si présent)
+        adaptive_maxrate_kbps="${_mr%k}"
+        adaptive_bufsize_kbps="${_bs%k}"
+        
+        # Afficher l'analyse de complexité (avant la décision de skip)
+        if [[ "$NO_PROGRESS" != true ]]; then
+            display_complexity_analysis "$file_original" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
+        fi
+        
+        # Stocker les paramètres adaptatifs dans des variables d'environnement
+        # pour qu'ils soient utilisés par _execute_conversion
+        export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
+        export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
+        export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
+    fi
+    
+    # 5. Décision de conversion (avec métadonnées et seuil adaptatif si applicable)
+    if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
         # Alimenter la queue avec le prochain candidat si limite active
         if [[ "$LIMIT_FILES" -gt 0 ]]; then
             update_queue || true

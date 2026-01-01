@@ -1,6 +1,85 @@
 # Handoff
 
-## Dernière session (31/12/2025)
+## Dernière session (01/01/2026)
+
+### Tâches accomplies
+
+#### 1. Nouveau mode `film-adaptive` - Encodage prédictif par complexité
+
+**Concept** : Adapter le bitrate vidéo fichier par fichier selon la complexité visuelle analysée.
+
+**Fichiers créés/modifiés** :
+
+- **lib/complexity.sh** (NOUVEAU) :
+  - Analyse multi-échantillons (25%, 50%, 75% de la durée)
+  - Calcul du coefficient de variation (écart-type normalisé des tailles de frames)
+  - Mapping vers coefficient de complexité C (0.75 → 1.35)
+  - Formule BPP : `R_target = (W × H × FPS × 0.045 / 1000) × C`
+  - Garde-fous : max 75% bitrate source, min 800 kbps
+
+- **lib/config.sh** :
+  - Ajout du case `film-adaptive` dans `set_conversion_mode_parameters()`
+  - Variable `ADAPTIVE_COMPLEXITY_MODE=true`
+  - CRF 21 (meilleure qualité), single-pass avec VBV contraint
+
+- **lib/conversion.sh** :
+  - Nouvelle fonction `should_skip_conversion_adaptive()` avec seuil adaptatif
+  - Fonction `_display_skip_decision()` factorisée
+  - Intégration de l'analyse de complexité dans `convert_file()`
+
+- **lib/video_params.sh** :
+  - Nouvelle fonction `compute_video_params_adaptive()` qui utilise complexity.sh
+
+- **lib/transcode_video.sh** :
+  - `_setup_video_encoding_params()` utilise les variables `ADAPTIVE_*` si mode actif
+
+- **lib/args.sh** : Accepte `-m film-adaptive`
+
+- **lib/exports.sh** : Export des nouvelles fonctions et variables
+
+- **nascode** : Chargement de `lib/complexity.sh`
+
+- **tests/test_film_adaptive.bats** (NOUVEAU) : Tests unitaires pour le nouveau mode
+
+- **tests/test_helper.bash** : Chargement de complexity.sh
+
+- **README.md** : Documentation complète du mode film-adaptive
+
+### Formule de bitrate adaptatif
+
+```
+R_target = (W × H × FPS × BPP_base / 1000) × C
+
+Où :
+- BPP_base = 0.045 (bits par pixel pour HEVC moderne)
+- C = coefficient de complexité [0.75, 1.35]
+- Garde-fou : R_final = min(R_target, R_orig × 0.75)
+- Plancher : R_final = max(R_final, 800 kbps)
+```
+
+### Exemple pour 1080p@24fps
+
+| Complexité | Coefficient C | Bitrate cible |
+|------------|---------------|---------------|
+| Statique   | 0.75          | ~1680 kbps    |
+| Standard   | 1.0           | ~2240 kbps    |
+| Action     | 1.35          | ~3020 kbps    |
+
+### Derniers prompts
+- "Analyse et challenger le plan d'encodage prédictif par lot (BPP × complexité)"
+- "Ok pour créer le mode film-adaptive opt-in avec les suggestions"
+
+### Branche en cours
+- `feature/film-adaptive-mode` (actuelle)
+
+### À faire (suggestions)
+- [ ] Lancer les tests : `bash run_tests.sh`
+- [ ] Tester sur quelques films réels pour calibrer les seuils
+- [ ] Éventuellement affiner `ADAPTIVE_STDDEV_LOW` et `ADAPTIVE_STDDEV_HIGH`
+
+---
+
+## Session précédente (31/12/2025)
 
 ### Tâches accomplies
 

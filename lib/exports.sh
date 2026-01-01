@@ -11,7 +11,8 @@ export_variables() {
     # FONCTIONS DE CONVERSION PRINCIPALES
     # ========================================================
     export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel
-    export -f should_skip_conversion _determine_conversion_mode clean_number custom_pv
+    export -f should_skip_conversion should_skip_conversion_adaptive
+    export -f _determine_conversion_mode _display_skip_decision clean_number custom_pv
     
     # --- Fonctions codec_profiles.sh (gestion des codecs vidéo) ---
     export -f get_codec_encoder get_codec_suffix get_codec_ffmpeg_names
@@ -22,7 +23,12 @@ export_variables() {
     # --- Fonctions de paramètres vidéo (video_params.sh) ---
     export -f _select_output_pix_fmt _build_downscale_filter_if_needed
     export -f _compute_output_height_for_bitrate _compute_effective_bitrate_kbps_for_height
-    export -f _build_effective_suffix_for_dims
+    export -f _build_effective_suffix_for_dims compute_video_params_adaptive
+    
+    # --- Fonctions d'analyse de complexité (complexity.sh) ---
+    export -f analyze_video_complexity _map_stddev_to_complexity _describe_complexity
+    export -f compute_adaptive_target_bitrate compute_adaptive_maxrate compute_adaptive_bufsize
+    export -f get_adaptive_encoding_params display_complexity_analysis
     
     # --- Fonctions d'encodage (transcode_video.sh) ---
     export -f _setup_video_encoding_params _setup_sample_mode_params
@@ -88,6 +94,14 @@ export_variables() {
     export DOWNSCALE_MAX_WIDTH DOWNSCALE_MAX_HEIGHT
     export ADAPTIVE_BITRATE_BY_RESOLUTION ADAPTIVE_720P_MAX_HEIGHT ADAPTIVE_720P_SCALE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
+    
+    # --- Variables mode film-adaptive (complexity.sh) ---
+    export ADAPTIVE_COMPLEXITY_MODE
+    export ADAPTIVE_BPP_BASE ADAPTIVE_C_MIN ADAPTIVE_C_MAX
+    export ADAPTIVE_STDDEV_LOW ADAPTIVE_STDDEV_HIGH
+    export ADAPTIVE_SAMPLE_DURATION ADAPTIVE_MIN_BITRATE_KBPS
+    export ADAPTIVE_MAXRATE_FACTOR ADAPTIVE_BUFSIZE_FACTOR
+    export ADAPTIVE_TARGET_KBPS ADAPTIVE_MAXRATE_KBPS ADAPTIVE_BUFSIZE_KBPS
     
     # --- Variables audio ---
     export AUDIO_CODEC AUDIO_BITRATE_KBPS

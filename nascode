@@ -64,6 +64,7 @@ source "$LIB_DIR/args.sh"        # Arguments (dépend de colors, config, off_pea
 source "$LIB_DIR/queue.sh"       # Queue (dépend de colors, config, utils, logging)
 source "$LIB_DIR/vmaf.sh"        # VMAF (dépend de colors, config, utils, logging)
 source "$LIB_DIR/media_probe.sh" # Propriétés média (dépend de utils)
+source "$LIB_DIR/complexity.sh"  # Analyse complexité pour film-adaptive (dépend de media_probe)
 source "$LIB_DIR/audio_params.sh" # Paramètres audio (dépend de config, utils)
 source "$LIB_DIR/video_params.sh" # Paramètres vidéo (pix_fmt/downscale/bitrate/suffix)
 source "$LIB_DIR/stream_mapping.sh" # Mapping streams (sous-titres)

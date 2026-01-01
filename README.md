@@ -176,16 +176,55 @@ bash nascode -l 10 -k
 
 ### Modes de conversion
 
-| Paramètre | Mode `serie` | Mode `film` |
-|-----------|--------------|-------------|
-| Bitrate cible | 2070 kbps | 2035 kbps |
-| Maxrate | 2520 kbps | 3200 kbps |
-| Preset | medium | medium |
-| Keyint (GOP) | 600 (~25s) | 240 (~10s) |
-| Tune fastdecode | Oui | Non |
-| Optimisations x265 | Oui | Non (qualité max) |
-| Pass 1 rapide | Oui | Non |
-| Mode par défaut | Single-pass CRF | Two-pass forcé |
+| Paramètre | Mode `serie` | Mode `film` | Mode `film-adaptive` |
+|-----------|--------------|-------------|----------------------|
+| Bitrate cible | 2070 kbps | 2035 kbps | **Adaptatif** (BPP×C) |
+| Maxrate | 2520 kbps | 3200 kbps | Target × 1.4 |
+| Preset | medium | medium | medium |
+| Keyint (GOP) | 600 (~25s) | 240 (~10s) | 240 (~10s) |
+| Tune fastdecode | Oui | Non | Non |
+| Optimisations x265 | Oui | Non (qualité max) | Non |
+| Pass 1 rapide | Oui | Non | - |
+| Mode par défaut | Single-pass CRF | Two-pass forcé | CRF 21 contraint |
+
+### Mode `film-adaptive` (nouveau)
+
+Ce mode analyse la **complexité visuelle** de chaque fichier pour adapter le bitrate automatiquement.
+
+**Fonctionnement :**
+
+1. **Analyse multi-échantillons** : 3 points à 25%, 50% et 75% de la durée
+2. **Calcul du coefficient de variation** (CV) des tailles de frames
+3. **Mapping vers un coefficient de complexité C** :
+   - CV ≤ 0.15 → C = 0.75 (contenu statique : interviews, dialogues)
+   - CV ≈ 0.25 → C ≈ 1.0 (film typique)
+   - CV ≥ 0.35 → C = 1.35 (action, pluie, grain)
+
+4. **Formule du bitrate adaptatif** :
+   ```
+   R_target = (W × H × FPS × 0.045 / 1000) × C
+   ```
+
+5. **Garde-fous** :
+   - Maximum : 75% du bitrate source (évite l'inflation)
+   - Minimum : 800 kbps (plancher qualité)
+
+**Exemple pour 1080p@24fps :**
+
+| Type de contenu | Coefficient C | Bitrate cible |
+|-----------------|---------------|---------------|
+| Interview/Statique | 0.75 | ~1680 kbps |
+| Film standard | 1.0 | ~2240 kbps |
+| Action/Grain | 1.35 | ~3020 kbps |
+
+**Utilisation :**
+```bash
+# Mode adaptatif pour un dossier de films
+bash nascode -m film-adaptive -s "/chemin/films"
+
+# Avec simulation (dry-run)
+bash nascode -m film-adaptive -d -s "/chemin/films"
+```
 
 ### Codecs audio
 
