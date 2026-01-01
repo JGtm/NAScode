@@ -494,6 +494,14 @@ _show_active_options() {
     options+=("$(format_option_source "$SOURCE")")
     options+=("$(format_option_dest "$OUTPUT_DIR")")
     
+    # Nombre de fichiers à traiter (seulement sans limite, car compteur actif)
+    if [[ "${LIMIT_FILES:-0}" -eq 0 ]] && [[ -f "$QUEUE" ]]; then
+        local file_count=$(count_null_separated "$QUEUE")
+        if [[ "$file_count" -gt 0 ]]; then
+            options+=("$(format_option_file_count "$file_count")")
+        fi
+    fi
+    
     # Option Dry-run (en premier car très important)
     if [[ "$DRYRUN" == true ]]; then
         options+=("$(format_option_dryrun)")

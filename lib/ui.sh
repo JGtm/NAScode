@@ -487,6 +487,13 @@ format_option_dest() {
     echo -e "📁  Destination : ${CYAN}${path}${NOCOLOR}"
 }
 
+# Formate le nombre de fichiers à traiter pour print_active_options
+# Usage: format_option_file_count "19"
+format_option_file_count() {
+    local count="$1"
+    echo -e "📊  Fichiers à traiter : ${WHITE}${count}${NOCOLOR}"
+}
+
 # Affiche une limitation active (fonction legacy, utilisée si pas de regroupement)
 # Usage: print_limitation "Traitement de 5 fichiers maximum" [mode]
 print_limitation() {
