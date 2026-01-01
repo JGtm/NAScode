@@ -491,7 +491,7 @@ format_option_dest() {
 # Usage: format_option_file_count "19"
 format_option_file_count() {
     local count="$1"
-    echo -e "📊  Fichiers à traiter : ${WHITE}${count}${NOCOLOR}"
+    echo -e "📊  Compteur de fichiers à traiter"
 }
 
 # Affiche une limitation active (fonction legacy, utilisée si pas de regroupement)
