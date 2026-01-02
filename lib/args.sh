@@ -210,7 +210,7 @@ parse_arguments() {
             *)
                 # Argument positionnel non reconnu (ni option ni flag)
                 print_error "Argument inattendu : $1"
-                echo -e "  ${DIM}Conseil : vérifiez que toutes les options sont précédées d'un tiret (ex: -l 3)${NOCOLOR}" >&2
+                echo -e "  ${DIM}Vérifiez que toutes les options sont précédées d'un tiret (ex: -l 3)${NOCOLOR}" >&2
                 exit 1
                 ;;
         esac
