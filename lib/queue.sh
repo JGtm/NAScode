@@ -256,14 +256,6 @@ _index_video_files() {
         if is_excluded "$f"; then continue; fi
         if [[ "$f" =~ \.(sh|txt)$ ]]; then continue; fi
         
-        local count=$(($(cat "$count_file") + 1))
-        echo "$count" > "$count_file"
-        
-        # Affichage de progression
-        if [[ "$NO_PROGRESS" != true ]]; then
-            print_indexing_progress "$count" "$total_files"
-        fi
-        
         # Stockage de la taille et du chemin (séparé par tab)
         local size
         size=$(get_file_size_bytes "$f")
@@ -271,6 +263,15 @@ _index_video_files() {
         # Filtre taille (index/queue) : ne garder que les fichiers >= seuil
         if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]] && [[ "$size" -lt "$MIN_SIZE_BYTES" ]]; then
             continue
+        fi
+
+        # Incrémenter le compteur APRÈS le filtre (sinon progression incorrecte)
+        local count=$(($(cat "$count_file") + 1))
+        echo "$count" > "$count_file"
+        
+        # Affichage de progression
+        if [[ "$NO_PROGRESS" != true ]]; then
+            print_indexing_progress "$count" "$total_files"
         fi
 
         echo -e "${size}\t$f"

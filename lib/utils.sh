@@ -119,6 +119,7 @@ get_file_size_bytes() {
 # Formats acceptés :
 #   - bytes : 123456
 #   - suffixes binaires : 700K, 700M, 1G, 2T (suffixe optionnel 'B')
+#   - décimaux : 1.5G, 2.5M
 # Insensible à la casse. Retourne la valeur en octets sur stdout.
 parse_human_size_to_bytes() {
     local raw="${1:-}"
@@ -137,25 +138,26 @@ parse_human_size_to_bytes() {
         s="${s%B}"
     fi
 
-    # Bytes (nombre pur)
+    # Bytes (nombre pur entier)
     if [[ "$s" =~ ^[0-9]+$ ]]; then
         echo "$s"
         return 0
     fi
 
-    # Nombre + unité (K/M/G/T)
-    if [[ "$s" =~ ^([0-9]+)([KMGT])$ ]]; then
+    # Nombre (entier ou décimal) + unité (K/M/G/T)
+    if [[ "$s" =~ ^([0-9]+\.?[0-9]*)([KMGT])$ ]]; then
         number="${BASH_REMATCH[1]}"
         unit="${BASH_REMATCH[2]}"
     else
         return 1
     fi
 
+    # Utiliser awk pour gérer les décimaux et tronquer vers un entier
     case "$unit" in
-        K) echo $(( number * 1024 )) ;;
-        M) echo $(( number * 1024 * 1024 )) ;;
-        G) echo $(( number * 1024 * 1024 * 1024 )) ;;
-        T) echo $(( number * 1024 * 1024 * 1024 * 1024 )) ;;
+        K) awk -v n="$number" 'BEGIN { printf "%.0f", n * 1024 }' ;;
+        M) awk -v n="$number" 'BEGIN { printf "%.0f", n * 1024 * 1024 }' ;;
+        G) awk -v n="$number" 'BEGIN { printf "%.0f", n * 1024 * 1024 * 1024 }' ;;
+        T) awk -v n="$number" 'BEGIN { printf "%.0f", n * 1024 * 1024 * 1024 * 1024 }' ;;
         *) return 1 ;;
     esac
     return 0
