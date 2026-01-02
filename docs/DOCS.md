@@ -1,6 +1,6 @@
 # Documentation NAScode
 
-Cette section contient la documentation détaillée. Le [README principal](../README.md) reste volontairement court (TL;DR + liens).
+Cette section contient la documentation détaillée. Le [README principal](../README.md) reste volontairement court.
 
 ## Guides
 

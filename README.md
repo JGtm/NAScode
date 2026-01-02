@@ -52,7 +52,7 @@ Pour la logique complète et les détails, voir [docs/SMART_CODEC.md](docs/SMART
 Rappels :
 - `--audio copy` : copie l'audio sans modification.
 - `--force-audio` : force la conversion vers le codec cible (bypass smart).
-- Marge anti “micro-conversions” : downscale si bitrate $>$ 110% de la cible (cas même codec).
+	- $\text{seuil} = \text{MAXRATE\_KBPS} \times \left(1 + \text{tolérance}\right)$
 
 | Codec source | Statut | Bitrate source | Action | Résultat (défaut) |
 |-------------|--------|----------------|--------|-------------------|
@@ -98,7 +98,7 @@ bash nascode --help
 ```
 
 Guides détaillés :
-- [docs/README.md](docs/README.md)
+- [docs/DOCS.md](docs/DOCS.md)
 - [docs/USAGE.md](docs/USAGE.md)
 - [docs/CONFIG.md](docs/CONFIG.md)
 
