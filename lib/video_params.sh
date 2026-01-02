@@ -306,6 +306,88 @@ compute_video_params() {
 }
 
 ###########################################################
+# CALCUL ADAPTATIF (MODE FILM-ADAPTIVE)
+###########################################################
+
+# Calcule les paramètres vidéo avec analyse de complexité.
+# Usage: compute_video_params_adaptive <input_file>
+# Retourne: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc
+#
+# Cette fonction étend compute_video_params pour le mode film-adaptive :
+# - Analyse la complexité du fichier (multi-échantillonnage)
+# - Calcule un bitrate adapté au contenu
+# - Applique les garde-fous (min/max, % du bitrate original)
+compute_video_params_adaptive() {
+    local input_file="$1"
+    
+    # Récupérer les métadonnées complètes
+    local metadata
+    metadata=$(get_full_media_metadata "$input_file")
+    
+    local video_bitrate_bps video_codec duration input_width input_height input_pix_fmt audio_codec audio_bitrate
+    IFS='|' read -r video_bitrate_bps video_codec duration input_width input_height input_pix_fmt audio_codec audio_bitrate <<< "$metadata"
+    
+    # Pixel format de sortie
+    local output_pix_fmt
+    output_pix_fmt=$(_select_output_pix_fmt "$input_pix_fmt")
+
+    # Filtre de downscale si nécessaire
+    local downscale_filter filter_opts=""
+    downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
+    if [[ -n "$downscale_filter" ]]; then
+        filter_opts="-vf $downscale_filter"
+    fi
+
+    # Calcul de la hauteur de sortie (après downscale éventuel)
+    local output_height
+    output_height=$(_compute_output_height_for_bitrate "$input_width" "$input_height")
+    
+    # Largeur de sortie estimée (pour le calcul BPP)
+    local output_width="$input_width"
+    if [[ -n "$downscale_filter" ]] && [[ -n "$output_height" ]]; then
+        # Estimer la largeur proportionnellement
+        if [[ "$input_height" -gt 0 ]]; then
+            output_width=$(( input_width * output_height / input_height ))
+            # Arrondir au multiple de 2
+            output_width=$(( (output_width / 2) * 2 ))
+        fi
+    fi
+
+    # Récupérer le FPS
+    local fps
+    fps=$(ffprobe -v error -select_streams v:0 \
+        -show_entries stream=r_frame_rate \
+        -of default=noprint_wrappers=1:nokey=1 \
+        "$input_file" 2>/dev/null | head -1)
+    
+    # Convertir le FPS (format "24000/1001" ou "24")
+    if [[ "$fps" == *"/"* ]]; then
+        fps=$(awk -F/ '{if($2>0) printf "%.3f", $1/$2; else print $1}' <<< "$fps")
+    fi
+    [[ -z "$fps" ]] && fps="24"
+
+    # Analyser la complexité (multi-échantillonnage)
+    local stddev complexity_c complexity_desc
+    stddev=$(analyze_video_complexity "$input_file" "$duration")
+    complexity_c=$(_map_stddev_to_complexity "$stddev")
+    complexity_desc=$(_describe_complexity "$complexity_c")
+
+    # Calculer le bitrate adaptatif avec la formule BPP × C
+    local effective_target effective_maxrate effective_bufsize
+    effective_target=$(compute_adaptive_target_bitrate "$output_width" "$output_height" "$fps" "$complexity_c" "$video_bitrate_bps")
+    effective_maxrate=$(compute_adaptive_maxrate "$effective_target")
+    effective_bufsize=$(compute_adaptive_bufsize "$effective_target")
+
+    local video_bitrate="${effective_target}k"
+    local video_maxrate="${effective_maxrate}k"
+    local video_bufsize="${effective_bufsize}k"
+    local vbv_string="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
+
+    # Retourner toutes les valeurs séparées par | (format étendu)
+    echo "${output_pix_fmt}|${filter_opts}|${video_bitrate}|${video_maxrate}|${video_bufsize}|${vbv_string}|${output_height}|${input_width}|${input_height}|${input_pix_fmt}|${complexity_c}|${complexity_desc}|${stddev}|${effective_target}"
+}
+
+###########################################################
 # AFFICHAGE DES PARAMÈTRES (effet de bord volontaire)
 ###########################################################
 

@@ -58,6 +58,10 @@ SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour V
 SINGLE_PASS_MODE=true
 CRF_VALUE=21  # Valeur CRF par défaut (0=lossless, 18=excellent, 23=défaut x265)
 
+# Mode film-adaptive : calcul de bitrate adaptatif par fichier selon complexité
+# Activé automatiquement quand CONVERSION_MODE="film-adaptive"
+ADAPTIVE_COMPLEXITY_MODE=false
+
 # Mode de tri pour la construction de la file d'attente (optionnel)
 # Options disponibles pour `SORT_MODE` :
 #   - size_desc  : Trier par taille décroissante (par défaut, privilégie gros fichiers)
@@ -194,6 +198,27 @@ set_conversion_mode_parameters() {
             # Pas de tune fastdecode pour qualité max
             FILM_TUNE_FASTDECODE=false
             ;;
+        film-adaptive)
+            # Films adaptatifs : bitrate calculé par fichier selon complexité
+            # Utilise Constrained CRF avec maxrate adaptatif
+            # Les bitrates réels sont calculés dans lib/complexity.sh
+            # Valeurs de référence (seront surchargées par fichier)
+            base_target_kbps=2500  # Estimation moyenne 1080p@24fps
+            base_maxrate_kbps=3500
+            base_bufsize_kbps=6250
+            ENCODER_PRESET="medium"
+            # Films : pas de paramètres x265 spéciaux
+            X265_EXTRA_PARAMS=""
+            X265_PASS1_FAST=false
+            # Mode CRF contraint (single-pass avec limites VBV)
+            SINGLE_PASS_MODE=true
+            CRF_VALUE=21  # Meilleure qualité que le défaut x265 (23)
+            # GOP court pour meilleur seeking
+            FILM_KEYINT=240
+            FILM_TUNE_FASTDECODE=false
+            # Flag pour activer le calcul adaptatif dans video_params
+            ADAPTIVE_COMPLEXITY_MODE=true
+            ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 21 (single-pass)
             # Bitrates de référence (HEVC)
@@ -222,7 +247,7 @@ set_conversion_mode_parameters() {
             ;;
         *)
             print_error "Mode de conversion inconnu : $CONVERSION_MODE"
-            echo "  Modes disponibles : film, serie"
+            echo "  Modes disponibles : film, film-adaptive, serie"
             exit 1
             ;;
     esac

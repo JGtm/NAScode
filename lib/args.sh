@@ -255,7 +255,7 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-s, --source${NOCOLOR} DIR             Dossier source (ARG) [défaut : dossier parent]
     ${GREEN}-o, --output-dir${NOCOLOR} DIR         Dossier de destination (ARG) [défaut : \`Converted\` au même niveau que le script]
     ${GREEN}-e, --exclude${NOCOLOR} PATTERN        Ajouter un pattern d'exclusion (ARG)
-    ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, serie (ARG) [défaut : serie]
+    ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, film-adaptive, serie (ARG) [défaut : serie]
     ${GREEN}--min-size${NOCOLOR} SIZE              Filtrer l'index/queue : ne garder que les fichiers >= SIZE (ex: 700M, 1G)
     ${GREEN}-d, --dry-run${NOCOLOR}                Mode simulation sans conversion (FLAG)
     ${GREEN}-S  --suffix${NOCOLOR} [STRING]             Activer un suffixe dynamique ou définir un suffixe personnalisé (ARG optionnel)
@@ -295,7 +295,8 @@ ${CYAN}Logique Smart Codec (audio) :${NOCOLOR}
   Utilisez --force-audio pour toujours convertir vers le codec cible.${NOCOLOR}
 
 ${CYAN}Modes de conversion :${NOCOLOR}
-  ${YELLOW}film${NOCOLOR}          : Qualité maximale
+  ${YELLOW}film${NOCOLOR}          : Qualité maximale (two-pass ABR, bitrate fixe)
+  ${YELLOW}film-adaptive${NOCOLOR} : Bitrate adaptatif par fichier selon complexité (CRF contraint)
   ${YELLOW}serie${NOCOLOR}         : Bon compromis taille/qualité [défaut]
 
 ${CYAN}Mode heures creuses :${NOCOLOR}

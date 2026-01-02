@@ -26,6 +26,8 @@ PROGRESS_DISPLAY_TEXT_FIXED="Traitement en cours"
 # Prépare les paramètres vidéo adaptés au fichier source (bitrate, filtres, etc.)
 # Retourne via variables globales : VIDEO_BITRATE, VIDEO_MAXRATE, VIDEO_BUFSIZE,
 #                                   X265_VBV_STRING, VIDEO_FILTER_OPTS, OUTPUT_PIX_FMT
+# En mode film-adaptive, utilise les variables ADAPTIVE_TARGET_KBPS, ADAPTIVE_MAXRATE_KBPS,
+# ADAPTIVE_BUFSIZE_KBPS si elles sont définies.
 _setup_video_encoding_params() {
     local input_file="$1"
     
@@ -57,14 +59,28 @@ _setup_video_encoding_params() {
         fi
     fi
 
-    # Calcul du bitrate adapté à la résolution de sortie
-    local output_height
-    output_height=$(_compute_output_height_for_bitrate "$input_width" "$input_height")
-
+    # Calcul du bitrate selon le mode
     local effective_target effective_maxrate effective_bufsize
-    effective_target=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
-    effective_maxrate=$(_compute_effective_bitrate_kbps_for_height "${MAXRATE_KBPS}" "$output_height")
-    effective_bufsize=$(_compute_effective_bitrate_kbps_for_height "${BUFSIZE_KBPS}" "$output_height")
+    
+    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]] && \
+       [[ -n "${ADAPTIVE_TARGET_KBPS:-}" ]] && [[ "${ADAPTIVE_TARGET_KBPS}" =~ ^[0-9]+$ ]]; then
+        # Mode film-adaptive : utiliser les paramètres calculés par analyse de complexité
+        effective_target="${ADAPTIVE_TARGET_KBPS}"
+        effective_maxrate="${ADAPTIVE_MAXRATE_KBPS}"
+        effective_bufsize="${ADAPTIVE_BUFSIZE_KBPS}"
+        
+        if [[ "$NO_PROGRESS" != true ]]; then
+            echo -e "${CYAN}  🎯 Bitrate adaptatif : ${effective_target}k (maxrate: ${effective_maxrate}k)${NOCOLOR}"
+        fi
+    else
+        # Mode standard : calcul basé sur la résolution de sortie
+        local output_height
+        output_height=$(_compute_output_height_for_bitrate "$input_width" "$input_height")
+
+        effective_target=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
+        effective_maxrate=$(_compute_effective_bitrate_kbps_for_height "${MAXRATE_KBPS}" "$output_height")
+        effective_bufsize=$(_compute_effective_bitrate_kbps_for_height "${BUFSIZE_KBPS}" "$output_height")
+    fi
 
     VIDEO_BITRATE="${effective_target}k"
     VIDEO_MAXRATE="${effective_maxrate}k"
