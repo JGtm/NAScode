@@ -1,5 +1,30 @@
 # Handoff
 
+## Dernière session (02/01/2026)
+
+### Tâches accomplies
+
+#### 1. Ajout du pipeline multimodal (process)
+- **agent.md** : ajout d'une section "Pipeline de développement multimodal (LLM)".
+- **.github/copilot-instructions.md** : ajout d'une section "Pipeline de Développement Multimodal".
+
+#### 2. Refonte de la documentation (README + docs/)
+- **README.md** : simplification en page d'entrée (TL;DR, commandes clés, liens vers docs).
+- **docs/** : création de guides séparés : `README.md`, `USAGE.md`, `CONFIG.md`, `SMART_CODEC.md`, `TROUBLESHOOTING.md`, `CHANGELOG.md`.
+- Correction de cohérence doc : le codec audio par défaut est `aac` (conforme à `lib/config.sh`).
+
+#### 3. Mémoire projet
+- **DEVBOOK.md** : création puis mise à jour avec les changements de process et doc.
+
+### Derniers prompts
+- Mise en place du pipeline de développement multimodal.
+- Audit/refonte du README (TL;DR, organisation, réduction répétitions) + proposition de docs séparées.
+
+### Branche en cours
+- `docs/multimodal-pipeline`
+
+---
+
 ## Dernière session (31/12/2025)
 
 ### Tâches accomplies
