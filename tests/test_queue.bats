@@ -351,6 +351,57 @@ teardown() {
 }
 
 ###########################################################
+# Tests de increment_converted_count() et get_converted_count()
+###########################################################
+
+@test "increment_converted_count: incrémente et retourne la nouvelle valeur" {
+    CONVERTED_COUNT_FILE="$TEST_QUEUE_DIR/converted_count"
+    echo "3" > "$CONVERTED_COUNT_FILE"
+    
+    local result
+    result=$(increment_converted_count)
+    
+    [ "$result" -eq 4 ]
+    [ "$(cat "$CONVERTED_COUNT_FILE")" -eq 4 ]
+}
+
+@test "increment_converted_count: démarre à 1 si fichier à 0" {
+    CONVERTED_COUNT_FILE="$TEST_QUEUE_DIR/converted_count"
+    echo "0" > "$CONVERTED_COUNT_FILE"
+    
+    local result
+    result=$(increment_converted_count)
+    
+    [ "$result" -eq 1 ]
+}
+
+@test "increment_converted_count: ne fait rien si pas de fichier compteur" {
+    CONVERTED_COUNT_FILE=""
+    
+    run increment_converted_count
+    [ "$status" -eq 0 ]
+}
+
+@test "get_converted_count: lit la valeur du compteur" {
+    CONVERTED_COUNT_FILE="$TEST_QUEUE_DIR/converted_count"
+    echo "7" > "$CONVERTED_COUNT_FILE"
+    
+    local result
+    result=$(get_converted_count)
+    
+    [ "$result" -eq 7 ]
+}
+
+@test "get_converted_count: retourne 0 si pas de fichier" {
+    CONVERTED_COUNT_FILE=""
+    
+    local result
+    result=$(get_converted_count)
+    
+    [ "$result" -eq 0 ]
+}
+
+###########################################################
 # Tests avec espaces dans les chemins
 ###########################################################
 

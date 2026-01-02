@@ -92,6 +92,15 @@ _process_queue_with_fifo() {
     CONVERTED_COUNT_FILE="$LOG_DIR/converted_count_${EXECUTION_TIMESTAMP}"
     echo "0" > "$CONVERTED_COUNT_FILE"
     export CONVERTED_COUNT_FILE
+
+    # Queue complète et position pour alimentation dynamique
+    QUEUE_FULL="$QUEUE.full"
+    NEXT_QUEUE_POS_FILE="$LOG_DIR/next_queue_pos_${EXECUTION_TIMESTAMP}"
+    TOTAL_QUEUE_FILE="$LOG_DIR/total_queue_${EXECUTION_TIMESTAMP}"
+
+    # Calculer le total de la queue complète
+    local total_full=0
+    if [[ -f "$QUEUE_FULL" ]]; then
         total_full=$(count_null_separated "$QUEUE_FULL")
     fi
     echo "$total_full" > "$TOTAL_QUEUE_FILE"

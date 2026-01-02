@@ -1,5 +1,31 @@
 # Handoff
 
+## Dernière session (02/01/2026 - après-midi)
+
+### Tâches accomplies
+
+#### 1. UX Compteur mode limite
+- **Problème** : En mode limite (`-l N`), pas de compteur visible et frustration si la limite n'est pas atteinte.
+- **Solution** :
+  - Nouveau compteur `CONVERTED_COUNT_FILE` qui ne compte que les fichiers réellement convertis (pas les skips)
+  - Affichage `[X/N]` en mode limite (commence à `[0/N]`)
+  - Bloc jaune en fin de run : "Tous les fichiers restants sont déjà optimisés. (X/N)" si limite non atteinte
+- **Fichiers modifiés** :
+  - `lib/queue.sh` : +`increment_converted_count()`, +`get_converted_count()`
+  - `lib/processing.sh` : init compteur + message fin
+  - `lib/conversion.sh` : `_get_counter_prefix()` modifié + incrément après décision skip
+- **Tests** : 5 tests ajoutés dans `test_queue.bats`
+
+### Derniers prompts
+- Réflexion sur compteur fichiers à traiter pour mode limite
+- Validation approche modulaire (option A)
+- Implémentation + tests + doc
+
+### Branche en cours
+- `fix/limit-counter-ux`
+
+---
+
 ## Dernière session (02/01/2026)
 
 ### Tâches accomplies

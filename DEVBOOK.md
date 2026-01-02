@@ -15,6 +15,18 @@ Objectifs :
 
 ### 2026-01-02
 
+#### UX : Compteur fichiers convertis pour mode limite
+- **Quoi** : En mode limite (`-l N`), afficher un compteur `[X/N]` qui n'incrémente que sur les fichiers réellement convertis (pas les skips). Afficher un message jaune si la limite n'est pas atteinte car tous les fichiers restants sont déjà optimisés.
+- **Où** :
+  - `lib/queue.sh` : ajout `increment_converted_count()` et `get_converted_count()` (helpers avec mutex)
+  - `lib/processing.sh` : init `CONVERTED_COUNT_FILE`, affichage bloc jaune en fin de run si `converted < limit`
+  - `lib/conversion.sh` : modification `_get_counter_prefix()` pour afficher `[X/LIMIT]` en mode limite, incrément après décision "pas skip"
+- **Pourquoi** : UX améliorée — l'utilisateur voit clairement combien de fichiers ont été effectivement convertis, et un message explicatif évite la frustration si la limite demandée n'est pas atteinte.
+- **Impact** :
+  - Mode normal inchangé (compteur `[X/Y]` existant)
+  - Tests Bats ajoutés : `test_queue.bats` (5 tests pour les nouveaux helpers)
+  - Documentation : `DEVBOOK.md`, `handoff.md`
+
 #### Documentation & Pipeline multimodal
 - Ajout du processus "Pipeline de Développement Multimodal" dans `agent.md` et `.github/copilot-instructions.md`.
 - Création de `DEVBOOK.md` pour tracer les changements clés et maintenir la mémoire du projet.
