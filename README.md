@@ -1,82 +1,83 @@
-# 🎬 Conversion Video x265 / AV1
+# 🎬 NAScode — Conversion vidéo HEVC (x265) / AV1
 
-Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou **AV1** en batch, optimisé pour les séries et films.
+Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou **AV1** en batch (séries/films), avec une logique “smart” (skip/passthrough) et une file d’attente persistante.
 
-## ✨ Fonctionnalités
+## TL;DR (30 secondes)
 
-### Encodage
-- **Multi-codec** : support HEVC (x265) et AV1 (libsvtav1, libaom-av1)
-- **Encodage** : single-pass (CRF) ou two-pass (bitrate cible) selon le mode/options
-- **Trois modes de conversion** :
-  - `serie` : optimisé vitesse (~1 Go/h), preset medium, CRF ou 2070 kbps
-  - `film` : optimisé qualité, preset medium, two-pass 2035 kbps
-  - `film-adaptive` : bitrate adaptatif selon la complexité visuelle (BPP×C)
-- **Paramètres x265 optimisés** pour le mode série :
-  - `sao=0` : désactive Sample Adaptive Offset (gain ~5%)
-  - `strong-intra-smoothing=0` : préserve les détails fins
-  - `limit-refs=3` : limite les références motion
-  - `subme=2` : précision sub-pixel réduite
-  - `no-slow-firstpass=1` : pass 1 rapide (gain ~15%)
-  - `-tune fastdecode` : décodage fluide sur appareils variés
-- **Mode film** (qualité maximale) :
-  - Two-pass forcé pour qualité optimale
-  - GOP court (keyint=240, ~10s) pour meilleur seeking
-  - Pas de tune fastdecode (qualité prioritaire)
-- **Format 10-bit** (`yuv420p10le`) pour une meilleure qualité
-- **Accélération matérielle** : CUDA (Windows/Linux) ou VideoToolbox (macOS)
-- **Adaptation intelligente du bitrate** : réduit automatiquement le bitrate cible si la résolution de sortie est inférieure à 1080p (ex: 720p), évitant le gaspillage d'espace.
+Prérequis rapides :
+- **bash 4+** (Git Bash/WSL sur Windows OK)
+- **ffmpeg** avec `libx265` (AV1 via `libsvtav1` optionnel, VMAF via `libvmaf` optionnel)
 
-### Gestion des fichiers
-- **File d'attente intelligente** avec index persistant
-- **Modes de tri** : par taille (asc/desc) ou par nom (asc/desc)
-- **Skip automatique** : fichiers déjà en x265/AV1 avec bitrate optimisé
-- **Video passthrough** : si la vidéo est conforme mais l'audio peut être optimisé, seul l'audio est réencodé (vidéo copiée)
-- **Suffixe dynamique** reflétant les paramètres : `_x265_crf23_1080p_medium`
-- **Transfert vérifié** avec checksum SHA256
-
-### Évaluation qualité
-- **Score VMAF** (optionnel) : évaluation perceptuelle de la qualité vidéo
-- **Mode sample** (`-t`) : encode un segment de 30s pour test rapide
-- Analyse VMAF en batch à la fin des conversions
-
-### Audio
-- **Multi-codec** : choix du codec audio via `-a/--audio`
-  - `copy` (défaut) : copie l'audio source sans modification
-  - `aac` : AAC 160 kbps (polyvalent)
-  - `ac3` : Dolby Digital 640 kbps (rétro-compatibilité)
-  - `eac3` : E-AC3/DD+ 384 kbps (séries HD/Atmos)
-  - `opus` : Opus 128 kbps (le plus efficace)
-- **Smart Codec** : si la source a un codec plus efficace que la cible, il est conservé
-  - Hiérarchie : Opus > AAC > E-AC3 > AC3 > FLAC (lossless)
-  - Le bitrate est limité selon le codec effectif (pas d'upscaling)
-  - Utiliser `--force-audio` pour forcer la conversion vers le codec cible
-- **Anti-upscaling intelligent** : ne convertit que si le gain est réel (>10%)
-- Suffixe audio dans le nom de fichier (`_aac`, `_opus`, `_eac3`, etc.)
-
-## 📋 Prérequis
-
-- **Système** : GNU/Linux, macOS, Windows (Git Bash/WSL)
-- **FFmpeg** avec `libx265` (HEVC) et optionnellement `libsvtav1` (AV1), `libvmaf`
-- **Outils** : `bash 4+`, `awk`, `stat`, `md5sum`/`md5`
-
-Vérifier FFmpeg :
+Installation :
 ```bash
-ffmpeg -hide_banner -encoders | grep libx265
-ffmpeg -hide_banner -encoders | grep libsvtav1  # optionnel, pour AV1
-ffmpeg -hide_banner -filters | grep libvmaf
-```
-
-## 🚀 Installation
-
-```bash
-git clone <repo_url> Conversion
-cd Conversion
+git clone <repo_url> NAScode
+cd NAScode
 chmod +x nascode
 ```
 
-## 🧪 Tests
+Usage minimal :
+```bash
+# Convertir un dossier (mode série par défaut)
+bash nascode -s "/chemin/vers/series"
 
-Le repo utilise **Bats**.
+# Mode film (plus orienté qualité)
+bash nascode -m film -s "/chemin/vers/films"
+
+# Dry-run (simulation)
+bash nascode -d -s "/chemin/source"
+
+# Heures creuses (plage par défaut 22:00-06:00)
+bash nascode -p -s "/chemin/vers/series"
+```
+
+Defaults importants (issus de la config) :
+- Mode : `serie`
+- Codec vidéo : `hevc`
+- Codec audio : `aac`
+- Sortie : `Converted/`
+
+## Ce que fait le script
+
+- Convertit en **HEVC (x265)** ou **AV1** selon `--codec`.
+- Gère une **file d’attente** (index persistant) et peut **skip** les fichiers déjà “bons”.
+- Supporte un mode **video passthrough** (vidéo copiée, audio optimisé si pertinent).
+- Ajoute un **suffixe** (dynamique ou personnalisé) pour refléter les paramètres.
+- Optionnel : **VMAF** et **sample** pour tester rapidement.
+
+## Utilisation
+
+Commande :
+```bash
+bash nascode [options]
+```
+
+Pour la liste complète des options :
+```bash
+bash nascode --help
+```
+
+Guides détaillés :
+- [docs/README.md](docs/README.md)
+- [docs/USAGE.md](docs/USAGE.md)
+- [docs/CONFIG.md](docs/CONFIG.md)
+
+## Logs & sortie
+
+- Sortie par défaut : `Converted/`
+- Logs : `logs/` (session, erreurs, skipped, index/queue)
+
+Détails : [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+
+## Documentation
+
+- Index docs : [docs/README.md](docs/README.md)
+- Ajouter un nouveau codec : [docs/ADDING_NEW_CODEC.md](docs/ADDING_NEW_CODEC.md)
+- Instructions macOS : [docs/Instructions-Mac.txt](docs/Instructions-Mac.txt)
+- Critères de conversion (CSV) : [docs/📋%20Tableau%20récapitulatif%20-%20Critères%20de%20conversion.csv](docs/%F0%9F%93%8B%20Tableau%20r%C3%A9capitulatif%20-%20Crit%C3%A8res%20de%20conversion.csv)
+
+## Tests
+
+Le repo utilise **Bats** :
 
 ```bash
 bash run_tests.sh
@@ -90,353 +91,15 @@ bash run_tests.sh -f "queue"  # exemple
 
 Sur Git Bash / Windows, [run_tests.sh](run_tests.sh) tente aussi `${HOME}/.local/bin/bats` si `bats` n’est pas sur le PATH.
 
-## 🤝 Contribution
+## Contribution
 
-- Règles de travail : lire [agent.md](agent.md) (modularité, plan avant gros changements, tests/doc, post-merge `main`).
-- Template de commit :
+- Règles de travail : [agent.md](agent.md)
+- Copilot (repo-level) : [.github/copilot-instructions.md](.github/copilot-instructions.md)
 
-```bash
-git config commit.template .gitmessage.txt
-```
+## Changelog
 
-- Copilot (repo-level) : voir [.github/copilot-instructions.md](.github/copilot-instructions.md).
+Voir : [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
-## 📖 Usage
-
-```bash
-bash nascode [options]
-```
-
-### Options principales
-
-| Option | Description |
-|--------|-------------|
-| `-s, --source DIR` | Dossier source (défaut: `../`) |
-| `-o, --output-dir DIR` | Dossier de sortie (défaut: `Converted/`) |
-| `-f, --file FILE` | Convertir un fichier unique (bypass index/queue) |
-| `-m, --mode MODE` | Mode de conversion : `serie` (défaut) ou `film` |
-| `-c, --codec CODEC` | Codec vidéo : `hevc` (défaut) ou `av1` |
-| `-a, --audio CODEC` | Codec audio : `aac` (défaut), `copy`, `ac3`, `eac3`, `opus` |
-| `-d, --dry-run` | Simulation sans encodage |
-| `-t, --sample` | Mode sample : encode ~30s pour test rapide |
-| `-v, --vmaf` | Activer l'évaluation VMAF |
-| `-2, --two-pass` | Forcer le mode two-pass (défaut : single-pass CRF pour séries) |
-| `-l, --limit N` | Limiter à N fichiers |
-| `-r, --random` | Sélection aléatoire des fichiers |
-| `-k, --keep-index` | Réutiliser l'index existant |
-| `-R, --regenerate-index` | Forcer la régénération de l'index |
-| `-n, --no-progress` | Désactiver les barres de progression |
-| `-x, --no-suffix` | Pas de suffixe sur les fichiers de sortie |
-| `--suffix [STRING]` | Utiliser un suffixe personnalisé (ou forcer le dynamique si vide) |
-| `-e, --exclude PATTERN` | Exclure des fichiers (glob) |
-| `-q, --queue FILE` | Utiliser une file d'attente personnalisée |
-| `-p, --off-peak [HH:MM-HH:MM]` | Mode heures creuses (défaut : `22:00-06:00`) |
-| `--force-audio` | Forcer la conversion audio vers le codec cible (bypass smart codec) |
-| `--force-video` | Forcer le réencodage vidéo (bypass smart codec) |
-| `--force` | Raccourci pour `--force-audio` et `--force-video` |
-| `-h, --help` | Afficher l'aide colorée |
-
-### Exemples
-
-```bash
-# Conversion standard d'un dossier de séries
-bash nascode -s "/chemin/vers/series"
-
-# Convertir un fichier spécifique
-bash nascode -f "/chemin/vers/video.mkv"
-
-# Mode film avec évaluation VMAF
-bash nascode -m film -v -s "/chemin/vers/films"
-
-# Test rapide sur 5 fichiers aléatoires (30s chacun)
-bash nascode -t -v -r -l 5
-
-# Heures creuses (plage par défaut 22:00-06:00)
-bash nascode -p -s "/chemin/vers/series"
-
-# Heures creuses avec plage personnalisée
-bash nascode --off-peak=23:00-07:00 -s "/chemin/vers/series"
-
-# Conversion AV1 (codec moderne, meilleur ratio qualité/taille)
-bash nascode -c av1 -s "/chemin/vers/videos"
-
-# Mode film en AV1 avec VMAF
-bash nascode -m film -c av1 -v -s "/chemin/vers/films"
-
-# Conversion audio vers AAC (réduit la taille si source E-AC3/DTS)
-bash nascode -a aac -s "/chemin/vers/series"
-
-# Simulation pour vérifier la configuration
-bash nascode -d -s "/chemin/source"
-
-# Conversion avec limite et index conservé
-bash nascode -l 10 -k
-```
-
-## ⚙️ Configuration
-
-### Modes de conversion
-
-| Paramètre | Mode `serie` | Mode `film` | Mode `film-adaptive` |
-|-----------|--------------|-------------|----------------------|
-| Encodage | **CRF 21** (single-pass) | Two-pass 2035 kbps | CRF 21 contraint |
-| Maxrate | 2520 kbps | 3200 kbps | Target × 1.4 |
-| Preset | medium | medium | medium |
-| Keyint (GOP) | 600 (~25s) | 240 (~10s) | 240 (~10s) |
-| Tune fastdecode | Oui | Non | Non |
-| Optimisations x265 | Oui | Non (qualité max) | Non |
-| Pass 1 rapide | - | Non | - |
-
-### Codecs audio
-
-| Codec | Bitrate | Usage recommandé | Rang efficacité |
-|-------|---------|------------------|-----------------|
-| `opus` | 128 kbps | Maximum d'efficacité | 🥇 1er |
-| `aac` | 160 kbps | Polyvalent, compatible | 🥈 2e |
-| `eac3` | 384 kbps | Séries HD, Atmos | 🥉 3e |
-| `ac3` | 640 kbps | Rétro-compatibilité | 4e |
-| `copy` | - | Conserve l'original | - |
-
-### 🎯 Matrices de décision
-
-#### Audio (cible par défaut : AAC 160 kbps)
-
-Le script utilise une logique **smart codec** optimisée pour la taille des fichiers :
-
-| Codec source | Statut | Bitrate source | Action | Résultat |
-|--------------|--------|----------------|--------|----------|
-| **FLAC/TrueHD** | Lossless | - | `copy` | Conservé (qualité max) |
-| **Opus** | Efficace | ≤ 128k | `copy` | Conservé tel quel |
-| **Opus** | Efficace | > 128k | `downscale` | Opus → 128k |
-| **AAC** | Efficace | ≤ 160k | `copy` | Conservé tel quel |
-| **AAC** | Efficace | > 176k* | `downscale` | AAC → 160k |
-| **E-AC3** | Inefficace | * | `convert` | → AAC 160k |
-| **AC3/DTS** | Inefficace | * | `convert` | → AAC 160k |
-| **MP3/autres** | Inefficace | * | `convert` | → AAC 160k |
-
-> \* Marge de 10% appliquée pour éviter les micro-conversions (176k = 160k × 1.1)
-
-**Hiérarchie d'efficacité** (qualité/taille) :
-- 🥇 **Opus** (128k) ≈ **AAC** (160k) — *très efficaces, conservés*
-- 🥉 Vorbis — *efficace, conservé*
-- ❌ E-AC3 (384k), AC3 (640k), DTS — *inefficaces, convertis*
-
-#### Vidéo (cible par défaut : HEVC x265)
-
-Le script compare le codec source avec le codec cible et applique une **hiérarchie d'efficacité** :
-
-**Hiérarchie des codecs vidéo** : AV1 > HEVC > VP9 > H.264 > MPEG4
-
-| Codec source | vs Cible | Bitrate | Action | Résultat |
-|--------------|----------|---------|--------|----------|
-| **AV1** | > HEVC | ≤ seuil AV1* | `skip` | Conservé (meilleur codec, bitrate OK) |
-| **AV1** | > HEVC | > seuil AV1* | `encode` | Réencodage → HEVC (bitrate trop élevé) |
-| **HEVC** | = HEVC | ≤ seuil HEVC* | `skip` | Conservé (même codec, bitrate OK) |
-| **HEVC** | = HEVC | > seuil HEVC* | `encode` | Réencodage HEVC (bitrate trop élevé) |
-| **VP9** | < HEVC | * | `encode` | Conversion → HEVC |
-| **H.264/AVC** | < HEVC | * | `encode` | Conversion → HEVC |
-| **MPEG4/autres** | < HEVC | * | `encode` | Conversion → HEVC |
-| **4K (2160p)** | * | * | `encode + scale` | Downscale → 1080p + HEVC |
-
-> \* **Seuils par codec** (mode série, tolérance 10%) :
-> - HEVC : 2772 kbps (2520 × 1.1)
-> - AV1 : 1980 kbps (1800 × 1.1) — seuil plus bas car codec plus efficace
-
-**Règle générale** : Un codec **meilleur ou égal** au codec cible est conservé **uniquement si** son bitrate est sous le seuil adapté à ce codec.
-
-#### Options `--force`
-
-| Option | Effet |
-|--------|-------|
-| `--force-audio` | Ignore la logique smart, force conversion vers AAC |
-| `--force-video` | Ignore le passthrough, force réencodage HEVC |
-| `--force` | Active les deux options ci-dessus |
-
-### Variables modifiables (`lib/config.sh`)
-
-```bash
-CONVERSION_MODE="serie"           # Mode par défaut
-VIDEO_CODEC="hevc"                # Codec vidéo (hevc, av1)
-AUDIO_CODEC="aac"                 # Codec audio (aac, ac3, eac3, opus, copy)
-SORT_MODE="name_asc"              # Tri de la file d'attente
-SAMPLE_DURATION=30                # Durée du segment test (secondes)
-SKIP_TOLERANCE_PERCENT=10         # Tolérance pour skip (% au-dessus du maxrate)
-FORCE_AUDIO_CODEC=false           # Forcer la conversion audio (bypass smart codec)
-FORCE_VIDEO_CODEC=false           # Forcer le réencodage vidéo (bypass smart codec)
-```
-
-> **Seuil de skip dynamique** : le seuil est calculé automatiquement selon `MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)`. Il s'adapte au mode (série/film) et au codec (HEVC/AV1).
-
-### Codecs supportés
-
-| Codec | Encodeur | Efficacité | Bitrate série | Bitrate film |
-|-------|----------|------------|---------------|--------------|
-| `hevc` | libx265 | 70% | 2070 kbps | 2035 kbps |
-| `av1` | libsvtav1 | 50% | 1478 kbps | 1453 kbps |
-
-> **Bitrates adaptatifs** : les bitrates sont automatiquement ajustés selon l'efficacité du codec. Un codec plus moderne (AV1) obtient un bitrate plus bas pour une qualité équivalente.
-
-**Note** : Pour changer l'encodeur d'un codec (ex: `libaom-av1` au lieu de `libsvtav1`), modifier `VIDEO_ENCODER` dans `lib/config.sh`.
-
-### Paramètres x265 (mode série)
-
-```
-amp=0:rect=0:sao=0:strong-intra-smoothing=0:limit-refs=3:subme=2
-```
-
-### Mode heures creuses (off-peak)
-
-Quand `-p/--off-peak` est activé :
-
-- Le script ne démarre de nouvelles conversions **que** pendant la plage définie.
-- Si un fichier est en cours quand les heures pleines reviennent, il **termine**, puis le script attend le retour des heures creuses.
-- La plage par défaut est `22:00-06:00` (modifiable via `--off-peak=HH:MM-HH:MM`).
-
-## 📁 Structure
-
-```
-Conversion/
-├── nascode            # Script principal
-├── lib/
-│   ├── args.sh              # Parsing des arguments
-│   ├── audio_params.sh      # Paramètres audio
-│   ├── codec_profiles.sh    # Profils codecs (HEVC, AV1)
-│   ├── ui.sh                # Codes couleur terminal
-│   ├── config.sh            # Configuration globale
-│   ├── conversion.sh        # Orchestration FFmpeg
-│   ├── detect.sh            # Détection outils/système
-│   ├── exports.sh           # Exports pour sous-shells
-│   ├── finalize.sh          # Finalisation et résumé
-│   ├── lock.sh              # Verrou + traps
-│   ├── logging.sh           # Gestion des logs
-│   ├── media_probe.sh       # Propriétés média (ffprobe)
-│   ├── off_peak.sh          # Heures creuses
-│   ├── processing.sh        # Traitement (queue, FIFO)
-│   ├── progress.sh          # Progression
-│   ├── queue.sh             # Index + file d'attente
-│   ├── stream_mapping.sh    # Mapping des flux
-│   ├── system.sh            # Vérifications système
-│   ├── transcode_video.sh   # Logique vidéo (x265, downscale)
-│   ├── transfer.sh          # Transferts asynchrones
-│   ├── utils.sh             # Utilitaires
-│   ├── video_params.sh      # Paramètres vidéo
-│   └── vmaf.sh              # Évaluation VMAF
-├── logs/               # Logs d'exécution
-│   ├── Success_*.log
-│   ├── Error_*.log
-│   ├── Progress_*.log
-│   └── Index
-└── Converted/          # Fichiers convertis
-```
-
-## 📊 Logs
-
-- `Session_*.log` : journal unifié de la session (succès, erreurs, skipped, vérifications)
-- `Summary_*.log` : résumé de fin de conversion
-- `Progress_*.log` : progression détaillée
-- `Index` : index des fichiers à traiter (format null-separated)
-- `Index_readable_*.txt` : index lisible (liste des fichiers)
-- `Queue` : file d'attente (format null-separated, supprimée à la fin)
-- `Queue.full` : copie complète de la queue avant limitation
-- `DryRun_Comparison_*.log` : comparaison des noms (mode dry-run)
-
-## 🔍 Évaluation VMAF
-
-Le score VMAF (Video Multi-Method Assessment Fusion) évalue la qualité perceptuelle :
-
-| Score | Qualité |
-|-------|---------|
-| ≥ 90 | EXCELLENT |
-| 80-89 | TRÈS BON |
-| 70-79 | BON |
-| < 70 | DÉGRADÉ |
-
-```bash
-# Activer VMAF avec mode test
-bash nascode -v -t
-```
-
-## 🛠️ Dépannage
-
-### FFmpeg sans libx265
-```bash
-# Ubuntu/Debian
-sudo apt install ffmpeg
-
-# macOS
-brew install ffmpeg
-```
-
-### Windows (Git Bash) : FFmpeg avec SVT-AV1
-
-La version "essentials" de FFmpeg (gyan.dev) ne contient pas `libsvtav1` pour l'encodage AV1.
-Si tu utilises Git Bash avec MSYS2, tu peux installer une version complète de FFmpeg :
-
-```bash
-# 1. Installer FFmpeg et SVT-AV1 via pacman (MSYS2)
-pacman -S mingw-w64-ucrt-x86_64-ffmpeg mingw-w64-ucrt-x86_64-svt-av1
-
-# 2. Ajouter MSYS2 au PATH (dans ~/.bashrc)
-echo 'export PATH="/c/msys64/ucrt64/bin:$PATH"' >> ~/.bashrc
-source ~/.bashrc
-
-# 3. Vérifier que libsvtav1 est disponible
-ffmpeg -encoders 2>/dev/null | grep libsvtav1
-```
-
-> **Note** : Si tu n'as pas MSYS2, tu peux aussi télécharger FFmpeg "full" depuis [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) qui inclut SVT-AV1.
-
-> **VMAF** : Si ton FFmpeg principal n'a pas `libvmaf` (comme celui de MSYS2), le script cherche automatiquement un FFmpeg alternatif pour les analyses VMAF (ex: celui de gyan.dev). Tu verras le message "VMAF via FFmpeg alternatif" dans ce cas.
-
-### Fichiers sautés
-Consultez `logs/Skipped_*.log` - le fichier est probablement déjà en x265 avec un bitrate optimisé.
-
-### Erreurs d'encodage
-1. Vérifiez `logs/Error_*.log`
-2. Vérifiez l'espace disque dans `/tmp`
-3. Testez avec un seul fichier : `bash nascode -l 1`
-
-### Caractères spéciaux dans les noms
-Le script gère les espaces et caractères spéciaux, mais évitez les caractères de contrôle.
-
-## 📝 Changelog récent
-
-### v2.4 (Décembre 2025)
-- ✅ **Audio multi-codec** : option `-a/--audio` pour choisir AAC, AC3, Opus ou copy
-- ✅ **Logique anti-upscaling** : ne convertit l'audio que si gain réel (>20%)
-- ✅ Bitrates optimisés : AAC 160k, AC3 384k, Opus 128k
-- ✅ Suffixe audio dans le nom de fichier (`_aac`, `_opus`, etc.)
-- ✅ Refactoring audio : nouveau module `audio_params.sh` dédié
-- ✅ Aide colorée avec options mises en évidence
-- ✅ Affichage codec vidéo dans les paramètres actifs
-
-### v2.3 (Décembre 2025)
-- ✅ **Support multi-codec vidéo** : option `-c/--codec` pour choisir HEVC ou AV1
-- ✅ Nouveau module `codec_profiles.sh` pour configuration modulaire des encodeurs
-- ✅ Support libsvtav1 et libaom-av1 pour AV1
-- ✅ Suffixe dynamique par codec (`_x265_`, `_av1_`)
-- ✅ Skip automatique adapté au codec cible
-- ✅ Validation encodeur FFmpeg avant conversion
-
-### v2.2 (Décembre 2025)
-- ✅ Option `-f/--file` pour convertir un fichier unique (bypass index/queue)
-- ✅ Affichage du gain de place total dans le résumé final (avant → après, économie en %)
-- ✅ Amélioration fiabilité pipefail et nettoyage fichiers temporaires
-
-### v2.1 (Décembre 2025)
-- ✅ Mode film optimisé qualité (two-pass 2035 kbps, keyint=240)
-- ✅ GOP différencié : 240 frames (film) vs 600 frames (série)
-- ✅ Tune fastdecode optionnel (activé série, désactivé film)
-- ✅ Tests refactorisés : comportement vs valeurs en dur
-- ✅ Affichage tests condensé avec progression temps réel
-
-### v2.0 (Décembre 2025)
-- ✅ Nouveaux paramètres x265 optimisés pour le mode série
-- ✅ Pass 1 rapide (`no-slow-firstpass`) pour gain de temps
-- ✅ Préparation conversion audio Opus 128k (désactivé temporairement)
-- ✅ Amélioration gestion VMAF (détection fichiers vides)
-- ✅ Suffixe dynamique avec indicateur `_tuned`
-
-## 📄 Licence
+## Licence
 
 MIT License - Libre d'utilisation et de modification.
