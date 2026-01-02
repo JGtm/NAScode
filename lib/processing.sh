@@ -87,15 +87,11 @@ _process_queue_with_fifo() {
     STARTING_FILE_COUNTER_FILE="$LOG_DIR/starting_file_counter_${EXECUTION_TIMESTAMP}"
     echo "0" > "$STARTING_FILE_COUNTER_FILE"
     export STARTING_FILE_COUNTER_FILE
-    
-    # Queue complète et position pour alimentation dynamique
-    QUEUE_FULL="$QUEUE.full"
-    NEXT_QUEUE_POS_FILE="$LOG_DIR/next_queue_pos_${EXECUTION_TIMESTAMP}"
-    TOTAL_QUEUE_FILE="$LOG_DIR/total_queue_${EXECUTION_TIMESTAMP}"
-    
-    # Calculer le total de la queue complète
-    local total_full=0
-    if [[ -f "$QUEUE_FULL" ]]; then
+
+    # Compteur de fichiers réellement convertis (pas les skips) pour UX mode limite
+    CONVERTED_COUNT_FILE="$LOG_DIR/converted_count_${EXECUTION_TIMESTAMP}"
+    echo "0" > "$CONVERTED_COUNT_FILE"
+    export CONVERTED_COUNT_FILE
         total_full=$(count_null_separated "$QUEUE_FULL")
     fi
     echo "$total_full" > "$TOTAL_QUEUE_FILE"
@@ -214,9 +210,20 @@ _process_queue_with_fifo() {
         fi
     fi
 
+    # Message UX si la limite n'a pas été atteinte (tous les fichiers restants étaient déjà optimisés)
+    if [[ "$NO_PROGRESS" != true ]] && [[ ! -f "$STOP_FLAG" ]]; then
+        local converted_count=0
+        if [[ -f "$CONVERTED_COUNT_FILE" ]]; then
+            converted_count=$(cat "$CONVERTED_COUNT_FILE" 2>/dev/null || echo 0)
+        fi
+        if [[ "$converted_count" -lt "$LIMIT_FILES" ]]; then
+            print_warning_box "Fin des tâches" "Tous les fichiers restants sont déjà optimisés. (${converted_count}/${LIMIT_FILES})"
+        fi
+    fi
+
     # Nettoyer les artefacts FIFO
     rm -f "$WORKFIFO" "$FIFO_WRITER_PID" "$FIFO_WRITER_READY" "$fifo_done" 2>/dev/null || true
-    rm -f "$PROCESSED_COUNT_FILE" "$TARGET_COUNT_FILE" 2>/dev/null || true
+    rm -f "$PROCESSED_COUNT_FILE" "$TARGET_COUNT_FILE" "$CONVERTED_COUNT_FILE" 2>/dev/null || true
     rm -f "$NEXT_QUEUE_POS_FILE" "$TOTAL_QUEUE_FILE" 2>/dev/null || true
     
     # Tentative de terminaison des processus enfants éventuels restants

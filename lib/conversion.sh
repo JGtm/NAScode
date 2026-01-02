@@ -14,19 +14,25 @@ CURRENT_FILE_NUMBER=0
 
 # Génère le préfixe [X/Y] pour les messages si le compteur est disponible
 # Usage: _get_counter_prefix
-# - Avec limite (-l) : pas de compteur (queue dynamique, total inconnu)
+# - Avec limite (-l) : affiche [converted/LIMIT] (commence à 0)
 # - Sans limite : affiche [X/Y] avec le total réel
-# Retourne une chaîne vide si pas de compteur actif ou mode limite
+# Retourne une chaîne vide si pas de compteur actif
 _get_counter_prefix() {
     local current_num="${CURRENT_FILE_NUMBER:-0}"
     local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
     local limit="${LIMIT_FILES:-0}"
     
-    # Pas de compteur en mode limite (queue dynamique)
+    # Mode limite : afficher [converted/LIMIT]
     if [[ "$limit" -gt 0 ]]; then
+        local converted=0
+        if declare -f get_converted_count &>/dev/null; then
+            converted=$(get_converted_count)
+        fi
+        echo "${DIM}[${converted}/${limit}]${NOCOLOR} "
         return
     fi
     
+    # Mode normal : afficher [current/total]
     if [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
         echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
     fi
@@ -487,6 +493,12 @@ convert_file() {
     fi
     
     local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
+    
+    # Incrémenter le compteur de fichiers réellement convertis (UX mode limite)
+    # Ce compteur n'est incrémenté que si on va vraiment convertir (pas sur skip)
+    if declare -f increment_converted_count &>/dev/null; then
+        increment_converted_count >/dev/null
+    fi
     
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
     
