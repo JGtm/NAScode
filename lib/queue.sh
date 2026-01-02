@@ -141,9 +141,15 @@ _handle_custom_queue() {
         fi
         
         # Convertir la CUSTOM_QUEUE (null-separated) en INDEX (taille\tchemin)
-        # Calculer la taille pour chaque fichier
+        # Calculer la taille pour chaque fichier, et appliquer le filtre --min-size si actif.
         tr '\0' '\n' < "$CUSTOM_QUEUE" | while read -r f; do
-            echo -e "$(stat -c%s "$f")\t$f"
+            [[ -z "$f" ]] && continue
+            local size
+            size=$(get_file_size_bytes "$f")
+            if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]] && [[ "$size" -lt "$MIN_SIZE_BYTES" ]]; then
+                continue
+            fi
+            echo -e "${size}\t$f"
         done > "$INDEX"
         
         # Créer INDEX_READABLE et sauvegarder les métadonnées
@@ -217,6 +223,15 @@ _count_total_video_files() {
         # Appliquer les mêmes exclusions que _index_video_files
         if is_excluded "$f"; then continue; fi
         if [[ "$f" =~ \.(sh|txt)$ ]]; then continue; fi
+
+        # Si filtre taille activé, ne compter que les fichiers >= seuil
+        if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]]; then
+            local size
+            size=$(get_file_size_bytes "$f")
+            if [[ "$size" -lt "$MIN_SIZE_BYTES" ]]; then
+                continue
+            fi
+        fi
         ((count++))
     done < <(find "$SOURCE" \
         -wholename "$exclude_dir_name" -prune \
@@ -250,7 +265,15 @@ _index_video_files() {
         fi
         
         # Stockage de la taille et du chemin (séparé par tab)
-        echo -e "$(stat -c%s "$f")\t$f"
+        local size
+        size=$(get_file_size_bytes "$f")
+
+        # Filtre taille (index/queue) : ne garder que les fichiers >= seuil
+        if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]] && [[ "$size" -lt "$MIN_SIZE_BYTES" ]]; then
+            continue
+        fi
+
+        echo -e "${size}\t$f"
     done > "$queue_tmp"
 }
 
@@ -293,26 +316,37 @@ _generate_index() {
 _build_queue_from_index() {
     # Construction de la QUEUE à partir de l'INDEX (fichier permanent)
     # Appliquer le mode de tri configuré via SORT_MODE
+
+    # Appliquer un filtre taille (si demandé) AVANT le tri.
+    # Cela s'applique aussi quand un index existant est conservé.
+    _emit_index_lines() {
+        if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]]; then
+            awk -F'\t' -v min="$MIN_SIZE_BYTES" '$1+0 >= min {print}' "$INDEX"
+        else
+            cat "$INDEX"
+        fi
+    }
+
     case "$SORT_MODE" in
         size_desc)
             # Trier par taille décroissante (par défaut)
-            sort -nrk1,1 "$INDEX" | cut -f2- | tr '\n' '\0' > "$QUEUE"
+            _emit_index_lines | sort -nrk1,1 | cut -f2- | tr '\n' '\0' > "$QUEUE"
             ;;
         size_asc)
             # Trier par taille croissante
-            sort -nk1,1 "$INDEX" | cut -f2- | tr '\n' '\0' > "$QUEUE"
+            _emit_index_lines | sort -nk1,1 | cut -f2- | tr '\n' '\0' > "$QUEUE"
             ;;
         name_asc)
             # Trier par nom de fichier ascendant (utilise la 2ème colonne : chemin)
-            sort -t$'\t' -k2,2 "$INDEX" | cut -f2- | tr '\n' '\0' > "$QUEUE"
+            _emit_index_lines | sort -t$'\t' -k2,2 | cut -f2- | tr '\n' '\0' > "$QUEUE"
             ;;
         name_desc)
             # Trier par nom de fichier descendant
-            sort -t$'\t' -k2,2 -r "$INDEX" | cut -f2- | tr '\n' '\0' > "$QUEUE"
+            _emit_index_lines | sort -t$'\t' -k2,2 -r | cut -f2- | tr '\n' '\0' > "$QUEUE"
             ;;
         *)
             # Mode inconnu -> repli sur size_desc
-            sort -nrk1,1 "$INDEX" | cut -f2- | tr '\n' '\0' > "$QUEUE"
+            _emit_index_lines | sort -nrk1,1 | cut -f2- | tr '\n' '\0' > "$QUEUE"
             ;;
     esac
 }

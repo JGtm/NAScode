@@ -104,6 +104,64 @@ clean_number() {
 }
 
 ###########################################################
+# TAILLES DE FICHIERS / PARSING
+###########################################################
+
+# Retourne la taille d'un fichier en octets.
+# Compatible Linux (stat -c%s) et macOS (stat -f%z). Sur MSYS/Git Bash,
+# `stat -c%s` est généralement disponible.
+get_file_size_bytes() {
+    local path="$1"
+    stat -c%s -- "$path" 2>/dev/null || stat -f%z -- "$path" 2>/dev/null || echo 0
+}
+
+# Convertit une taille "humaine" en octets.
+# Formats acceptés :
+#   - bytes : 123456
+#   - suffixes binaires : 700K, 700M, 1G, 2T (suffixe optionnel 'B')
+# Insensible à la casse. Retourne la valeur en octets sur stdout.
+parse_human_size_to_bytes() {
+    local raw="${1:-}"
+    local s unit number
+
+    if [[ -z "$raw" ]]; then
+        return 1
+    fi
+
+    # Trim espaces
+    s="${raw//[[:space:]]/}"
+    s="${s^^}"
+
+    # Autoriser un trailing 'B' (ex: 700MB)
+    if [[ "$s" == *B ]]; then
+        s="${s%B}"
+    fi
+
+    # Bytes (nombre pur)
+    if [[ "$s" =~ ^[0-9]+$ ]]; then
+        echo "$s"
+        return 0
+    fi
+
+    # Nombre + unité (K/M/G/T)
+    if [[ "$s" =~ ^([0-9]+)([KMGT])$ ]]; then
+        number="${BASH_REMATCH[1]}"
+        unit="${BASH_REMATCH[2]}"
+    else
+        return 1
+    fi
+
+    case "$unit" in
+        K) echo $(( number * 1024 )) ;;
+        M) echo $(( number * 1024 * 1024 )) ;;
+        G) echo $(( number * 1024 * 1024 * 1024 )) ;;
+        T) echo $(( number * 1024 * 1024 * 1024 * 1024 )) ;;
+        *) return 1 ;;
+    esac
+    return 0
+}
+
+###########################################################
 # SCRIPT AWK UNIFIÉ POUR PROGRESSION FFMPEG
 ###########################################################
 
