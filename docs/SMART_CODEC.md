@@ -49,7 +49,7 @@ AV1 > HEVC > VP9 > H.264 > MPEG4
 
 La décision “skip car déjà optimisé” utilise une tolérance :
 
-$$\text{seuil} = \text{MAXRATE\_KBPS} \times \left(1 + \frac{\text{SKIP\_TOLERANCE\_PERCENT}}{100}\right)$$
+$$\text{seuil} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times \left(1 + \frac{\text{SKIP\\_TOLERANCE\\_PERCENT}}{100}\right)$$
 
 `MAXRATE_KBPS` dépend :
 - du mode (`serie` / `film`),
