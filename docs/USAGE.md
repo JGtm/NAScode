@@ -55,6 +55,7 @@ Le script évolue : la table ci-dessous est un rappel, l’autorité reste `bash
 - `-m, --mode MODE` : `serie` (défaut) ou `film`
 - `-c, --codec CODEC` : `hevc` (défaut) ou `av1`
 - `-a, --audio CODEC` : `aac` (défaut), `copy`, `ac3`, `eac3`, `opus`
+- `--min-size SIZE` : filtrer l’index/queue (ne garder que les fichiers >= SIZE, ex: `700M`, `1G`)
 - `-v, --vmaf` : activer VMAF
 - `-t, --sample` : encoder un segment de test
 - `-p, --off-peak [HH:MM-HH:MM]` : n’exécuter que pendant les heures creuses

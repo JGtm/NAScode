@@ -43,6 +43,17 @@ parse_arguments() {
                     exit 1
                 fi
                 ;;
+            --min-size)
+                if [[ -z "${2:-}" ]]; then
+                    print_error "--min-size doit être suivi d'une taille (ex: 700M, 1G)"
+                    exit 1
+                fi
+                if ! MIN_SIZE_BYTES=$(parse_human_size_to_bytes "$2"); then
+                    print_error "Taille invalide pour --min-size : '$2' (ex: 700M, 1G, 500000000)"
+                    exit 1
+                fi
+                shift 2
+                ;;
             -q|--queue)
                 if [[ -f "$2" ]]; then
                     CUSTOM_QUEUE="$2"
@@ -245,6 +256,7 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-o, --output-dir${NOCOLOR} DIR         Dossier de destination (ARG) [défaut : \`Converted\` au même niveau que le script]
     ${GREEN}-e, --exclude${NOCOLOR} PATTERN        Ajouter un pattern d'exclusion (ARG)
     ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, serie (ARG) [défaut : serie]
+    ${GREEN}--min-size${NOCOLOR} SIZE              Filtrer l'index/queue : ne garder que les fichiers >= SIZE (ex: 700M, 1G)
     ${GREEN}-d, --dry-run${NOCOLOR}                Mode simulation sans conversion (FLAG)
     ${GREEN}-S  --suffix${NOCOLOR} [STRING]             Activer un suffixe dynamique ou définir un suffixe personnalisé (ARG optionnel)
     ${GREEN}-x, --no-suffix${NOCOLOR}              Désactiver le suffixe _x265 (FLAG)

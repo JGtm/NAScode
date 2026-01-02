@@ -26,6 +26,10 @@ CONVERSION_MODE="serie"
 VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
 SINGLE_FILE=""       # Chemin vers un fichier unique à convertir (bypass index/queue)
 
+# Filtre de taille (construction de l'index/queue uniquement)
+# 0 = pas de filtre
+MIN_SIZE_BYTES=0
+
 # ----- Codec audio -----
 # Options : aac (défaut), copy, ac3, opus
 # - aac  : AAC 160k, très compatible, bon compromis qualité/taille (défaut)

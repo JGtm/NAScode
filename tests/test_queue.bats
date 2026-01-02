@@ -50,6 +50,7 @@ setup() {
     RANDOM_MODE=false
     KEEP_INDEX=false
     NO_PROGRESS=true
+    MIN_SIZE_BYTES=0
     
     mkdir -p "$OUTPUT_DIR" "$LOG_DIR"
 }
@@ -193,6 +194,23 @@ teardown() {
     local first
     first=$(tr '\0' '\n' < "$QUEUE" | head -1)
     [[ "$first" =~ "large.mkv" ]]
+}
+
+@test "_build_queue_from_index: applique MIN_SIZE_BYTES (filtre taille)" {
+    echo -e "100\t$TEST_VIDEO_DIR/small.mkv" > "$INDEX"
+    echo -e "300\t$TEST_VIDEO_DIR/large.mkv" >> "$INDEX"
+    echo -e "200\t$TEST_VIDEO_DIR/medium.mkv" >> "$INDEX"
+
+    MIN_SIZE_BYTES=200
+    SORT_MODE="size_desc"
+    _build_queue_from_index
+
+    # La queue ne doit pas contenir small.mkv
+    run bash -lc "tr '\\0' '\\n' < '$QUEUE'"
+    [ "$status" -eq 0 ]
+    [[ ! "$output" =~ "small.mkv" ]]
+    [[ "$output" =~ "large.mkv" ]]
+    [[ "$output" =~ "medium.mkv" ]]
 }
 
 @test "_build_queue_from_index: trie par taille croissante" {

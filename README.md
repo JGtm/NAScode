@@ -26,6 +26,9 @@ bash nascode -d -s "/chemin/source"
 
 # Heures creuses (plage par défaut 22:00-06:00)
 bash nascode -p -s "/chemin/vers/series"
+
+# Filtrer l'index/queue : ignorer les petits fichiers (utile pour films)
+bash nascode -m film --min-size 700M -s "/chemin/vers/films"
 ```
 
 Defaults importants (issus de la config) :
