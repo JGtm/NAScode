@@ -25,3 +25,12 @@ Cette règle est **non négociable**. Ne jamais modifier directement `main`.
 - Si CLI/logs/suffixes/comportement utilisateur change : mettre à jour le README.
 - Après merge/rebase depuis `main` : relire/mettre à jour le README + relancer `bash run_tests.sh`.
 - Commits : explicites, un sujet par commit, corps « un point par ligne ».
+
+## Pipeline de Développement Multimodal
+
+Quand l'utilisateur demande explicitement ce pipeline, appliquer l'ordre suivant :
+
+1. **Conception (GPT-5.2)** : analyser la demande, produire un plan d'implémentation atomique et expliciter les dépendances/risques. Objectif : cohérence d'architecture.
+2. **Exécution (Claude 4.5 Opus)** : implémenter selon le plan, en respectant strictement le style local et la robustesse.
+3. **Documentation & audit (GPT-5.2)** : relire, documenter (README/docs) et traquer les régressions.
+4. **Mise à jour du contexte (Agent)** : consigner les changements clés dans `DEVBOOK.md`.

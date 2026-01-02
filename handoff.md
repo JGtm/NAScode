@@ -4,108 +4,28 @@
 
 ### Tâches accomplies
 
-#### 1. Correction des tests film-adaptive
+#### 1. Ajout du pipeline multimodal (process)
+- **agent.md** : ajout d'une section "Pipeline de développement multimodal (LLM)".
+- **.github/copilot-instructions.md** : ajout d'une section "Pipeline de Développement Multimodal".
 
-**Problèmes corrigés** :
+#### 2. Refonte de la documentation (README + docs/)
+- **README.md** : simplification en page d'entrée (TL;DR, commandes clés, liens vers docs).
+- **docs/** : création de guides séparés : `README.md`, `USAGE.md`, `CONFIG.md`, `SMART_CODEC.md`, `TROUBLESHOOTING.md`, `CHANGELOG.md`.
+- Correction de cohérence doc : le codec audio par défaut est `aac` (conforme à `lib/config.sh`).
 
-1. **test_film_adaptive.bats** : Le test de skip (`should_skip_conversion_adaptive`) échouait car `AUDIO_CODEC` n'était pas défini. Sans `AUDIO_CODEC="copy"`, la fonction `_should_convert_audio` retournait true et le `CONVERSION_ACTION` devenait `video_passthrough` au lieu de `skip`.
-
-2. **test_regression_exports_contract.bats** : Le test échouait car `complexity.sh` n'était pas sourcé. Les fonctions `analyze_video_complexity`, `_map_stddev_to_complexity`, etc. n'existaient pas quand `exports.sh` tentait de les exporter.
-
-3. **lib/complexity.sh** : Utilisation de `readonly` pour les constantes causait des erreurs lors du re-sourcing dans les tests. Changé en pattern `VAR="${VAR:-default}"`.
-
-4. **lib/conversion.sh** : La sémantique des return values dans `should_skip_conversion` et `should_skip_conversion_adaptive` avait été perdue lors du refactoring. Corrigé pour retourner 0=skip, 1=pas de skip.
-
-**Résultat** : 564 tests passent (100%), 2 tests ignorés intentionnellement (skips).
-
-### Branche en cours
-- `feature/film-adaptive-mode`
-
-### Commits récents
-- `fix(tests): corrige les échecs de tests film-adaptive`
-
-### À faire
-- [ ] Merger la branche `feature/film-adaptive-mode` dans `main` quand prêt
-- [ ] Tester le mode film-adaptive sur des fichiers réels
-
----
-
-## Session précédente (01/01/2026)
-
-**Concept** : Adapter le bitrate vidéo fichier par fichier selon la complexité visuelle analysée.
-
-**Fichiers créés/modifiés** :
-
-- **lib/complexity.sh** (NOUVEAU) :
-  - Analyse multi-échantillons (25%, 50%, 75% de la durée)
-  - Calcul du coefficient de variation (écart-type normalisé des tailles de frames)
-  - Mapping vers coefficient de complexité C (0.75 → 1.35)
-  - Formule BPP : `R_target = (W × H × FPS × 0.045 / 1000) × C`
-  - Garde-fous : max 75% bitrate source, min 800 kbps
-
-- **lib/config.sh** :
-  - Ajout du case `film-adaptive` dans `set_conversion_mode_parameters()`
-  - Variable `ADAPTIVE_COMPLEXITY_MODE=true`
-  - CRF 21 (meilleure qualité), single-pass avec VBV contraint
-
-- **lib/conversion.sh** :
-  - Nouvelle fonction `should_skip_conversion_adaptive()` avec seuil adaptatif
-  - Fonction `_display_skip_decision()` factorisée
-  - Intégration de l'analyse de complexité dans `convert_file()`
-
-- **lib/video_params.sh** :
-  - Nouvelle fonction `compute_video_params_adaptive()` qui utilise complexity.sh
-
-- **lib/transcode_video.sh** :
-  - `_setup_video_encoding_params()` utilise les variables `ADAPTIVE_*` si mode actif
-
-- **lib/args.sh** : Accepte `-m film-adaptive`
-
-- **lib/exports.sh** : Export des nouvelles fonctions et variables
-
-- **nascode** : Chargement de `lib/complexity.sh`
-
-- **tests/test_film_adaptive.bats** (NOUVEAU) : Tests unitaires pour le nouveau mode
-
-- **tests/test_helper.bash** : Chargement de complexity.sh
-
-- **README.md** : Documentation complète du mode film-adaptive
-
-### Formule de bitrate adaptatif
-
-```
-R_target = (W × H × FPS × BPP_base / 1000) × C
-
-Où :
-- BPP_base = 0.045 (bits par pixel pour HEVC moderne)
-- C = coefficient de complexité [0.75, 1.35]
-- Garde-fou : R_final = min(R_target, R_orig × 0.75)
-- Plancher : R_final = max(R_final, 800 kbps)
-```
-
-### Exemple pour 1080p@24fps
-
-| Complexité | Coefficient C | Bitrate cible |
-|------------|---------------|---------------|
-| Statique   | 0.75          | ~1680 kbps    |
-| Standard   | 1.0           | ~2240 kbps    |
-| Action     | 1.35          | ~3020 kbps    |
+#### 3. Mémoire projet
+- **DEVBOOK.md** : création puis mise à jour avec les changements de process et doc.
 
 ### Derniers prompts
-- "Analyse et challenger le plan d'encodage prédictif par lot (BPP × complexité)"
-- "Ok pour créer le mode film-adaptive opt-in avec les suggestions"
+- Mise en place du pipeline de développement multimodal.
+- Audit/refonte du README (TL;DR, organisation, réduction répétitions) + proposition de docs séparées.
 
 ### Branche en cours
-- `feature/film-adaptive-mode` (actuelle)
-
-### À faire (suggestions)
-- [ ] Lancer les tests : `bash run_tests.sh`
-- [ ] Tester sur quelques films réels pour calibrer les seuils
-- [ ] Éventuellement affiner `ADAPTIVE_STDDEV_LOW` et `ADAPTIVE_STDDEV_HIGH`
+- `docs/multimodal-pipeline`
 
 ---
 
-## Session précédente (31/12/2025)
+## Dernière session (31/12/2025)
 
 ### Tâches accomplies
 

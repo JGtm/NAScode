@@ -9,6 +9,7 @@ load 'test_helper'
 setup() {
     setup_test_env
     load_minimal
+    source "$LIB_DIR/utils.sh"     # nécessaire pour parse_human_size_to_bytes
     source "$LIB_DIR/off_peak.sh"  # Nécessaire pour parse_off_peak_range
     source "$LIB_DIR/args.sh"
 }
@@ -41,6 +42,24 @@ _reset_cli_state() {
     OFF_PEAK_END="06:00"
     # Fichier unique
     SINGLE_FILE=""
+    # Filtre taille (index/queue)
+    MIN_SIZE_BYTES=0
+}
+
+@test "parse_arguments: --min-size affecte MIN_SIZE_BYTES" {
+    _reset_cli_state
+
+    parse_arguments --min-size 700M
+
+    [ "$MIN_SIZE_BYTES" -eq 734003200 ]
+}
+
+@test "parse_arguments: --min-size invalide échoue" {
+    _reset_cli_state
+
+    run parse_arguments --min-size 10Z
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "min-size" ]] || [[ "$output" =~ "Taille" ]]
 }
 
 @test "parse_arguments: dry-run reste false si option absente" {
