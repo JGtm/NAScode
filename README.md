@@ -52,7 +52,7 @@ Pour la logique complète et les détails, voir [docs/SMART_CODEC.md](docs/SMART
 Rappels :
 - `--audio copy` : copie l'audio sans modification.
 - `--force-audio` : force la conversion vers le codec cible (bypass smart).
-	- $\text{seuil} = \text{MAXRATE\_KBPS} \times \left(1 + \text{tolérance}\right)$
+
 
 | Codec source | Statut | Bitrate source | Action | Résultat (défaut) |
 |-------------|--------|----------------|--------|-------------------|
@@ -70,7 +70,7 @@ Rappels :
 Rappels :
 - Hiérarchie (efficacité) : AV1 > HEVC > VP9 > H.264 > MPEG4
 - Le “skip” dépend d’un seuil dérivé de `MAXRATE_KBPS` et d’une tolérance :
-	- $\text{seuil} = \text{MAXRATE\_KBPS} \times (1 + \text{tolérance})$
+	- $\text{seuil} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times (1 + \text{tolérance})$
 	- Par défaut : tolérance 10%
 	- Exemples (mode `serie`) : HEVC maxrate 2520k → seuil 2772k ; AV1 maxrate 1800k → seuil 1980k
 - `--force-video` : force le ré-encodage vidéo (bypass smart).
