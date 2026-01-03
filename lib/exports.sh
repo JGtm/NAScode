@@ -27,6 +27,7 @@ export_variables() {
     
     # --- Fonctions d'analyse de complexité (complexity.sh) ---
     export -f analyze_video_complexity _map_stddev_to_complexity _describe_complexity
+    export -f _show_analysis_progress _get_frame_sizes _compute_normalized_stddev
     export -f compute_adaptive_target_bitrate compute_adaptive_maxrate compute_adaptive_bufsize
     export -f get_adaptive_encoding_params display_complexity_analysis
     

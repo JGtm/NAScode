@@ -137,7 +137,7 @@ Sur Git Bash / Windows, [run_tests.sh](run_tests.sh) tente aussi `${HOME}/.local
 
 ## Contribution
 
-- Règles de travail : [agent.md](agent.md)
+- Règles de travail : [agent.md](.ai/agent.md)
 - Copilot (repo-level) : [.github/copilot-instructions.md](.github/copilot-instructions.md)
 
 ## Changelog

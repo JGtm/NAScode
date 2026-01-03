@@ -238,6 +238,7 @@ process_vmaf_queue() {
     
     if [[ "$NO_PROGRESS" != true ]]; then
         print_vmaf_start "$vmaf_count"
+        echo ""  # Saut de ligne après l'en-tête pour aérer l'affichage
     fi
     
     local current=0

@@ -1,6 +1,6 @@
 # Instructions Copilot (repo)
 
-Lis et applique en priorité les règles dans [agent.md](../agent.md).
+Lis et applique en priorité les règles dans [agent.md](../.ai/agent.md).
 ## ⛔ PREMIÈRE ACTION OBLIGATOIRE
 
 **Avant TOUTE modification de fichier, exécute :**

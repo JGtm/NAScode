@@ -65,13 +65,10 @@ _setup_video_encoding_params() {
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]] && \
        [[ -n "${ADAPTIVE_TARGET_KBPS:-}" ]] && [[ "${ADAPTIVE_TARGET_KBPS}" =~ ^[0-9]+$ ]]; then
         # Mode film-adaptive : utiliser les paramètres calculés par analyse de complexité
+        # (Bitrate déjà affiché par display_complexity_analysis)
         effective_target="${ADAPTIVE_TARGET_KBPS}"
         effective_maxrate="${ADAPTIVE_MAXRATE_KBPS}"
         effective_bufsize="${ADAPTIVE_BUFSIZE_KBPS}"
-        
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${CYAN}  🎯 Bitrate adaptatif : ${effective_target}k (maxrate: ${effective_maxrate}k)${NOCOLOR}"
-        fi
     else
         # Mode standard : calcul basé sur la résolution de sortie
         local output_height

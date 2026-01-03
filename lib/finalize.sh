@@ -532,11 +532,8 @@ show_summary() {
         print_summary_footer
     } | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
     
-    # Afficher le résumé des heures creuses si activé
-    if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
-        echo ""
-        show_off_peak_status
-    fi
+    # Note: Le statut heures creuses est déjà affiché au démarrage (show_off_peak_startup_info)
+    # Pas besoin de le réafficher après le résumé final
 }
 
 ###########################################################

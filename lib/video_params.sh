@@ -366,9 +366,9 @@ compute_video_params_adaptive() {
     fi
     [[ -z "$fps" ]] && fps="24"
 
-    # Analyser la complexité (multi-échantillonnage)
+    # Analyser la complexité (multi-échantillonnage avec progression)
     local stddev complexity_c complexity_desc
-    stddev=$(analyze_video_complexity "$input_file" "$duration")
+    stddev=$(analyze_video_complexity "$input_file" "$duration" true)
     complexity_c=$(_map_stddev_to_complexity "$stddev")
     complexity_desc=$(_describe_complexity "$complexity_c")
 

@@ -11,7 +11,7 @@ Ce document décrit les attentes lorsque tu fais évoluer le code (humain ou age
 1. **Work doggedly**: Ton but est d'être autonome. Si tu connais l'objectif global, continue tant que tu peux progresser. Si tu t'arrêtes, justifie pourquoi.
 2. **Work smart**: En cas de bug, prends du recul. Ajoute des logs pour vérifier tes hypothèses.
 3. **Check your work**: Si tu écris du code, essaie de vérifier qu'il fait ce qui est attendu (ex: simulation, logs).
-4. **handoff.md**: À la fin de chaque session, crée/mets à jour `handoff.md` à la racine avec un résumé de ce qui a été fait et des derniers prompts.
+4. **handoff.md**: À la fin de chaque session, crée/mets à jour `.ai/handoff.md` avec un résumé de ce qui a été fait et des derniers prompts.
 
 ## Conduite de l'Agent
 
@@ -32,7 +32,7 @@ Quand l'utilisateur le demande explicitement, appliquer ce pipeline en 4 phases 
 1. **Phase de conception (GPT-5.2)** : analyser la requête, produire un plan d'implémentation atomique, identifier les dépendances et les risques. Cette phase est garante de la cohérence de l'architecture.
 2. **Phase d'exécution (Claude 4.5 Opus)** : implémenter le code à partir du plan. Priorité à l'adhérence au style local et à la robustesse logique.
 3. **Phase de documentation & audit (GPT-5.2)** : relire le travail, compléter/mettre à jour la documentation (README, docs, commentaires/docstrings si applicables) et détecter les régressions potentielles.
-4. **Mise à jour du contexte (Agent)** : inscrire les changements clés dans `DEVBOOK.md` pour conserver une mémoire durable du projet.
+4. **Mise à jour du contexte (Agent)** : inscrire les changements clés dans `.ai/DEVBOOK.md` pour conserver une mémoire durable du projet.
 
 Note : ce pipeline complète la section "Règle de planification" plus bas (plan + analyse + options avant exécution pour tout changement non-trivial).
 

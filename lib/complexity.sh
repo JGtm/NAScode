@@ -82,12 +82,13 @@ _compute_normalized_stddev() {
 }
 
 # Analyse la complexité d'un fichier vidéo via multi-échantillonnage.
-# Prend 3 échantillons à 25%, 50% et 75% de la durée.
-# Usage: analyze_video_complexity <file> <duration_seconds>
+# Prend 6 échantillons répartis sur la durée pour une meilleure représentativité.
+# Usage: analyze_video_complexity <file> <duration_seconds> [show_progress]
 # Retourne: coefficient de variation moyen (écart-type normalisé)
 analyze_video_complexity() {
     local file="$1"
     local duration="$2"
+    local show_progress="${3:-false}"
     
     # Validation des entrées
     if [[ -z "$file" ]] || [[ ! -f "$file" ]]; then
@@ -107,38 +108,83 @@ analyze_video_complexity() {
     # Minimum requis : 60 secondes pour une analyse fiable
     if [[ "$duration_int" -lt 60 ]]; then
         # Fichier trop court : analyser tout le fichier
+        if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
+            _show_analysis_progress 1 1
+        fi
         local all_frames
         all_frames=$(_get_frame_sizes "$file" 0 "$duration_int")
         _compute_normalized_stddev "$all_frames"
         return 0
     fi
     
-    # Points d'échantillonnage : 25%, 50%, 75%
+    # Points d'échantillonnage : 6 positions réparties (10%, 25%, 40%, 55%, 70%, 85%)
+    # Évite les génériques de début/fin et couvre bien le contenu
     local sample_duration="${ADAPTIVE_SAMPLE_DURATION}"
     local margin=30  # Marge pour éviter les génériques
     
-    local pos_25=$(( (duration_int * 25 / 100) ))
-    local pos_50=$(( (duration_int * 50 / 100) ))
-    local pos_75=$(( (duration_int * 75 / 100) ))
+    local positions=(
+        $(( (duration_int * 10 / 100) ))   # Début (après intro)
+        $(( (duration_int * 25 / 100) ))   # Premier quart
+        $(( (duration_int * 40 / 100) ))   # Avant milieu
+        $(( (duration_int * 55 / 100) ))   # Après milieu
+        $(( (duration_int * 70 / 100) ))   # Troisième quart
+        $(( (duration_int * 85 / 100) ))   # Fin (avant générique)
+    )
     
-    # S'assurer qu'on ne dépasse pas la fin
+    # S'assurer qu'on ne dépasse pas la fin et qu'on respecte les marges
     local max_start=$(( duration_int - sample_duration - margin ))
-    [[ "$pos_25" -gt "$max_start" ]] && pos_25="$max_start"
-    [[ "$pos_50" -gt "$max_start" ]] && pos_50="$max_start"
-    [[ "$pos_75" -gt "$max_start" ]] && pos_75="$max_start"
-    [[ "$pos_25" -lt "$margin" ]] && pos_25="$margin"
+    local all_frames=""
+    local total_samples=${#positions[@]}
+    local current_sample=0
     
-    # Collecter les frames des 3 échantillons
-    local frames_25 frames_50 frames_75
-    frames_25=$(_get_frame_sizes "$file" "$pos_25" "$sample_duration")
-    frames_50=$(_get_frame_sizes "$file" "$pos_50" "$sample_duration")
-    frames_75=$(_get_frame_sizes "$file" "$pos_75" "$sample_duration")
+    for pos in "${positions[@]}"; do
+        ((current_sample++))
+        
+        # Ajuster la position si nécessaire
+        [[ "$pos" -gt "$max_start" ]] && pos="$max_start"
+        [[ "$pos" -lt "$margin" ]] && pos="$margin"
+        
+        # Afficher la progression si demandé
+        if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
+            _show_analysis_progress "$current_sample" "$total_samples"
+        fi
+        
+        # Collecter les frames de cet échantillon
+        local frames
+        frames=$(_get_frame_sizes "$file" "$pos" "$sample_duration")
+        
+        if [[ -n "$all_frames" ]]; then
+            all_frames=$(printf "%s\n%s" "$all_frames" "$frames")
+        else
+            all_frames="$frames"
+        fi
+    done
     
-    # Combiner et calculer l'écart-type global
-    local all_frames
-    all_frames=$(printf "%s\n%s\n%s" "$frames_25" "$frames_50" "$frames_75")
+    # Effacer la ligne de progression si affichée
+    if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
+        printf "\r\033[K" >&2
+    fi
     
     _compute_normalized_stddev "$all_frames"
+}
+
+# Affiche une barre de progression pour l'analyse de complexité
+# Usage: _show_analysis_progress <current> <total>
+_show_analysis_progress() {
+    local current="$1"
+    local total="$2"
+    local percent=$((current * 100 / total))
+    
+    # Construire la barre de progression (20 caractères)
+    local bar_width=20
+    local filled=$((percent * bar_width / 100))
+    local bar="╢"
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=filled; i<bar_width; i++)); do bar+="░"; done
+    bar+="╟"
+    
+    # Afficher sur stderr pour ne pas polluer la sortie
+    printf "\r\033[K  📊 Analyse complexité %s %3d%% [%d/%d]" "$bar" "$percent" "$current" "$total" >&2
 }
 
 # Mappe le coefficient de variation vers le coefficient de complexité C.
@@ -285,9 +331,9 @@ get_adaptive_encoding_params() {
     fi
     [[ -z "$fps" ]] && fps="24"
     
-    # Analyser la complexité
+    # Analyser la complexité (avec progression)
     local stddev complexity_c complexity_desc
-    stddev=$(analyze_video_complexity "$file" "$duration")
+    stddev=$(analyze_video_complexity "$file" "$duration" true)
     complexity_c=$(_map_stddev_to_complexity "$stddev")
     complexity_desc=$(_describe_complexity "$complexity_c")
     
