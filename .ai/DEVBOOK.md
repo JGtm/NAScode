@@ -82,3 +82,22 @@ Objectifs :
   - Compatible avec le skip intelligent et le passthrough
   - Log enrichi avec coefficient C et description du contenu
   - Tests Bats : 22 tests dans `test_film_adaptive.bats`
+
+### 2026-01-03
+
+#### Refactorisation Quick Wins et Structurelle
+- **Quoi** : Factorisation de code dupliqué et suppression de code mort.
+- **Où** :
+  - `lib/utils.sh` : ajout `format_duration_seconds()` et `format_duration_compact()`
+  - `lib/finalize.sh` : remplacement de 5 calculs de durée inline + 5 appels stat par les helpers
+  - `lib/vmaf.sh` : remplacement de 1 appel stat par `get_file_size_bytes()`
+  - `lib/transcode_video.sh` : suppression de `_build_encoder_ffmpeg_args()` (85 lignes de code mort, jamais appelé), fusion des deux branches if/else dans `_run_ffmpeg_encode()` (-14 lignes)
+  - `tests/test_utils.bats` : 13 tests unitaires pour les nouvelles fonctions format_duration_*
+- **Pourquoi** : 
+  - Réduire la duplication améliore la maintenabilité
+  - Le code mort crée de la confusion et du bruit
+  - Les helpers testables sont plus fiables
+- **Impact** :
+  - ~100 lignes supprimées/factorisées
+  - Aucun changement de comportement
+  - Tests ajoutés pour les nouvelles fonctions

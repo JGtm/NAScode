@@ -1,5 +1,37 @@
 # Handoff
 
+## Dernière session (03/01/2026)
+
+### Tâches accomplies
+
+#### 1. Refactorisation Quick Wins
+- **format_duration_seconds()** et **format_duration_compact()** ajoutées à `lib/utils.sh`
+- Remplacement de 5 calculs de durée inline dans `lib/finalize.sh`
+- Remplacement de tous les `stat -c%s || stat -f%z` par `get_file_size_bytes()` (finalize.sh, vmaf.sh)
+- Suppression de **85 lignes de code mort** (`_build_encoder_ffmpeg_args()`)
+- 13 tests unitaires ajoutés dans `tests/test_utils.bats`
+
+#### 2. Refactorisation Structurelle
+- **_run_ffmpeg_encode()** : fusion des deux branches if/else dupliquées en une seule commande FFmpeg
+- Réduction de 40 à 30 lignes (-14 lignes net)
+- `convert_file()` analysée : déjà bien structurée, pas de refacto nécessaire
+
+### Commits
+- `4cb2fed` : refactor: quick wins - factorisation et nettoyage de code
+- `953e2cf` : refactor(transcode): déduplique l'appel FFmpeg dans _run_ffmpeg_encode()
+
+### Derniers prompts
+- "occupe toi des quicks wins et de la refactorisation structurelle que tu as jugé nécessaire et n'oublies pas de mettre à jour les tests"
+
+### Branche en cours
+- `fix/ui-vmaf-improvements`
+
+### À faire (non commencé)
+- Tests à lancer par l'utilisateur : `bash run_tests.sh`
+- Push si tests OK
+
+---
+
 ## Dernière session (02/01/2026 - après-midi)
 
 ### Tâches accomplies
