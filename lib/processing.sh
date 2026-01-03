@@ -226,7 +226,7 @@ _process_queue_with_fifo() {
             converted_count=$(cat "$CONVERTED_COUNT_FILE" 2>/dev/null || echo 0)
         fi
         if [[ "$converted_count" -lt "$LIMIT_FILES" ]]; then
-            print_warning_box "Fin des tâches" "Tous les fichiers restants sont déjà optimisés. (${converted_count}/${LIMIT_FILES})"
+            print_warning_box "Fin des tâches" "Tous les fichiers restants sont déjà optimisés."
         fi
     fi
 
