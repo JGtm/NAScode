@@ -185,14 +185,6 @@ _show_analysis_progress() {
     # Note: en fin d'analyse, on efface cette ligne
     printf "\r\033[K  📊 Analyse complexité %s %3d%% [%d/%d]" "$bar" "$percent" "$current" "$total" >&2
 }
-    local bar="╢"
-    for ((i=0; i<filled; i++)); do bar+="█"; done
-    for ((i=filled; i<bar_width; i++)); do bar+="░"; done
-    bar+="╟"
-    
-    # Afficher sur stderr pour ne pas polluer la sortie
-    printf "\r\033[K  📊 Analyse complexité %s %3d%% [%d/%d]" "$bar" "$percent" "$current" "$total" >&2
-}
 
 # Mappe le coefficient de variation vers le coefficient de complexité C.
 # Usage: _map_stddev_to_complexity <normalized_stddev>
