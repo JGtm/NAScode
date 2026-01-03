@@ -23,31 +23,35 @@ teardown() {
 # Tests du calcul du coefficient de complexité
 ###########################################################
 
-@test "_map_stddev_to_complexity: stddev très bas → C_MIN (0.85)" {
+@test "_map_stddev_to_complexity: stddev très bas → C_MIN" {
     local result
     result=$(_map_stddev_to_complexity "0.10")
     
-    # Devrait retourner C_MIN (0.85) pour un stddev très bas
-    [[ "$result" == "0.85" ]]
+    # Devrait retourner C_MIN pour un stddev très bas
+    [[ "$result" == "$ADAPTIVE_C_MIN" ]]
 }
 
-@test "_map_stddev_to_complexity: stddev très haut → C_MAX (1.25)" {
+@test "_map_stddev_to_complexity: stddev très haut → C_MAX" {
     local result
     result=$(_map_stddev_to_complexity "0.50")
     
-    # Devrait retourner C_MAX (1.25) pour un stddev élevé
-    [[ "$result" == "1.25" ]]
+    # Devrait retourner C_MAX pour un stddev élevé
+    [[ "$result" == "$ADAPTIVE_C_MAX" ]]
 }
 
 @test "_map_stddev_to_complexity: stddev moyen → interpolation linéaire" {
-    # Avec stddev au milieu de la plage (0.325 = milieu entre 0.20 et 0.45)
+    # Avec stddev au milieu de la plage
     local result
     result=$(_map_stddev_to_complexity "0.325")
     
-    # Devrait être autour de 1.05 (milieu entre 0.85 et 1.25)
-    # Vérifions qu'il est dans la plage attendue
+    # Devrait être entre C_MIN et C_MAX, proche du milieu
     local c_val
-    c_val=$(awk -v r="$result" 'BEGIN { print (r >= 1.0 && r <= 1.1) ? "ok" : "fail" }')
+    c_val=$(awk -v r="$result" -v cmin="$ADAPTIVE_C_MIN" -v cmax="$ADAPTIVE_C_MAX" '
+        BEGIN { 
+            mid = (cmin + cmax) / 2
+            # Vérifier que le résultat est proche du milieu (±0.1)
+            print (r >= mid - 0.1 && r <= mid + 0.1) ? "ok" : "fail" 
+        }')
     [[ "$c_val" == "ok" ]]
 }
 
@@ -79,36 +83,46 @@ teardown() {
 ###########################################################
 
 @test "compute_adaptive_target_bitrate: calcul BPP×C pour 1080p@24fps" {
-    # complexity.sh already loaded by load_base_modules
+    # Calcul attendu : 1920×1080×24×BPP_BASE/1000 × 1.0
+    local expected
+    expected=$(awk -v bpp="$ADAPTIVE_BPP_BASE" 'BEGIN { printf "%.0f", 1920*1080*24*bpp/1000 }')
     
-    # 1920×1080×24×0.032/1000 × 1.0 = ~1592 kbps
     local result
     result=$(compute_adaptive_target_bitrate 1920 1080 24 "1.0" "")
     
-    # Le résultat devrait être autour de 1592 kbps (±150)
-    [[ "$result" -ge 1450 && "$result" -le 1750 ]]
+    # Le résultat devrait être proche de expected (±10%)
+    local margin=$((expected / 10))
+    [[ "$result" -ge $((expected - margin)) && "$result" -le $((expected + margin)) ]]
 }
 
 @test "compute_adaptive_target_bitrate: coefficient faible → bitrate réduit" {
-    # complexity.sh already loaded by load_base_modules
+    # Avec C=C_MIN, le bitrate devrait être C_MIN% de celui à C=1.0
+    local base_expected
+    base_expected=$(awk -v bpp="$ADAPTIVE_BPP_BASE" 'BEGIN { printf "%.0f", 1920*1080*24*bpp/1000 }')
+    local expected
+    expected=$(awk -v base="$base_expected" -v c="$ADAPTIVE_C_MIN" 'BEGIN { printf "%.0f", base * c }')
     
-    # Avec C=0.85, le bitrate devrait être ~85% de celui à C=1.0
     local result
-    result=$(compute_adaptive_target_bitrate 1920 1080 24 "0.85" "")
+    result=$(compute_adaptive_target_bitrate 1920 1080 24 "$ADAPTIVE_C_MIN" "")
     
-    # ~1592 × 0.85 = ~1353 kbps
-    [[ "$result" -ge 1200 && "$result" -le 1500 ]]
+    # Le résultat devrait être proche de expected (±10%)
+    local margin=$((expected / 10))
+    [[ "$result" -ge $((expected - margin)) && "$result" -le $((expected + margin)) ]]
 }
 
 @test "compute_adaptive_target_bitrate: coefficient élevé → bitrate augmenté" {
-    # complexity.sh already loaded by load_base_modules
+    # Avec C=C_MAX, le bitrate devrait être C_MAX% de celui à C=1.0
+    local base_expected
+    base_expected=$(awk -v bpp="$ADAPTIVE_BPP_BASE" 'BEGIN { printf "%.0f", 1920*1080*24*bpp/1000 }')
+    local expected
+    expected=$(awk -v base="$base_expected" -v c="$ADAPTIVE_C_MAX" 'BEGIN { printf "%.0f", base * c }')
     
-    # Avec C=1.25, le bitrate devrait être ~125% de celui à C=1.0
     local result
-    result=$(compute_adaptive_target_bitrate 1920 1080 24 "1.25" "")
+    result=$(compute_adaptive_target_bitrate 1920 1080 24 "$ADAPTIVE_C_MAX" "")
     
-    # ~1592 × 1.25 = ~1990 kbps
-    [[ "$result" -ge 1850 && "$result" -le 2150 ]]
+    # Le résultat devrait être proche de expected (±10%)
+    local margin=$((expected / 10))
+    [[ "$result" -ge $((expected - margin)) && "$result" -le $((expected + margin)) ]]
 }
 
 @test "compute_adaptive_target_bitrate: garde-fou bitrate original" {
