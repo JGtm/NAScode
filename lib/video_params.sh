@@ -369,6 +369,8 @@ compute_video_params_adaptive() {
     # Analyser la complexité (multi-échantillonnage avec progression)
     local stddev complexity_c complexity_desc
     stddev=$(analyze_video_complexity "$input_file" "$duration" true)
+    # Effacer la barre de progression (le printf dans le sous-shell ne peut pas le faire)
+    [[ "${NO_PROGRESS:-false}" != true ]] && printf "\r\033[K" >&2
     complexity_c=$(_map_stddev_to_complexity "$stddev")
     complexity_desc=$(_describe_complexity "$complexity_c")
 

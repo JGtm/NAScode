@@ -160,10 +160,8 @@ analyze_video_complexity() {
         fi
     done
     
-    # Effacer la ligne de progression si affichée
-    if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
-        printf "\r\033[K" >&2
-    fi
+    # Note: L'effacement de la barre de progression est fait par l'appelant
+    # car printf dans un sous-shell ($()) ne peut pas effacer correctement
     
     _compute_normalized_stddev "$all_frames"
 }
@@ -178,6 +176,15 @@ _show_analysis_progress() {
     # Construire la barre de progression (20 caractères)
     local bar_width=20
     local filled=$((percent * bar_width / 100))
+    local bar="╢"
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=filled; i<bar_width; i++)); do bar+="░"; done
+    bar+="╟"
+    
+    # Afficher sur stderr pour ne pas polluer la sortie
+    # Note: en fin d'analyse, on efface cette ligne
+    printf "\r\033[K  📊 Analyse complexité %s %3d%% [%d/%d]" "$bar" "$percent" "$current" "$total" >&2
+}
     local bar="╢"
     for ((i=0; i<filled; i++)); do bar+="█"; done
     for ((i=filled; i<bar_width; i++)); do bar+="░"; done
@@ -334,6 +341,8 @@ get_adaptive_encoding_params() {
     # Analyser la complexité (avec progression)
     local stddev complexity_c complexity_desc
     stddev=$(analyze_video_complexity "$file" "$duration" true)
+    # Effacer la barre de progression (le printf dans le sous-shell ne peut pas le faire)
+    [[ "${NO_PROGRESS:-false}" != true ]] && printf "\r\033[K" >&2
     complexity_c=$(_map_stddev_to_complexity "$stddev")
     complexity_desc=$(_describe_complexity "$complexity_c")
     
