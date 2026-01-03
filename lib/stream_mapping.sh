@@ -173,8 +173,7 @@ count_subtitle_streams() {
 # - Fallback: si aucun sous-titre FR trouvé, garde tous les sous-titres
 # Retourne une chaîne de paramètres -map pour ffmpeg.
 _build_stream_mapping() {
-    local input_file
-    input_file=$("$1")
+    local input_file="$1"
 
     local mapping=""
 
