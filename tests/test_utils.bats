@@ -283,3 +283,47 @@ teardown() {
     result=$(get_file_size_bytes "$test_file")
     [ "$result" -eq 4 ]
 }
+
+###########################################################
+# Tests de normalize_path_for_ffprobe()
+###########################################################
+
+@test "normalize_path_for_ffprobe: convertit /c/ en C:/" {
+    result=$(normalize_path_for_ffprobe "/c/Users/test/video.mkv")
+    [ "$result" = "C:/Users/test/video.mkv" ]
+}
+
+@test "normalize_path_for_ffprobe: convertit /d/ en D:/" {
+    result=$(normalize_path_for_ffprobe "/d/Videos/film.mkv")
+    [ "$result" = "D:/Videos/film.mkv" ]
+}
+
+@test "normalize_path_for_ffprobe: conserve chemin Unix normal" {
+    result=$(normalize_path_for_ffprobe "/home/user/video.mkv")
+    [ "$result" = "/home/user/video.mkv" ]
+}
+
+@test "normalize_path_for_ffprobe: conserve chemin Windows natif" {
+    result=$(normalize_path_for_ffprobe "C:/Users/test/video.mkv")
+    [ "$result" = "C:/Users/test/video.mkv" ]
+}
+
+@test "normalize_path_for_ffprobe: gère les accents dans le chemin" {
+    result=$(normalize_path_for_ffprobe "/c/Vidéos/Séries/épisode.mkv")
+    [ "$result" = "C:/Vidéos/Séries/épisode.mkv" ]
+}
+
+@test "normalize_path_for_ffprobe: gère les apostrophes dans le chemin" {
+    result=$(normalize_path_for_ffprobe "/c/Films/L'Odyssée/film.mkv")
+    [ "$result" = "C:/Films/L'Odyssée/film.mkv" ]
+}
+
+@test "normalize_path_for_ffprobe: gère les espaces dans le chemin" {
+    result=$(normalize_path_for_ffprobe "/c/Ma Vidéo/Mon Film/test.mkv")
+    [ "$result" = "C:/Ma Vidéo/Mon Film/test.mkv" ]
+}
+
+@test "normalize_path_for_ffprobe: gère chemin vide" {
+    result=$(normalize_path_for_ffprobe "")
+    [ "$result" = "" ]
+}

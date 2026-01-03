@@ -332,3 +332,51 @@ STUB
     
     [[ "$final_dir" =~ "season one" ]]
 }
+
+###########################################################
+# Tests de chemins avec caractères spéciaux (accents, apostrophes)
+###########################################################
+
+@test "_prepare_file_paths: gère les accents dans le nom de fichier" {
+    SOURCE="/videos"
+    SUFFIX_STRING="_x265"
+    DRYRUN=false
+    
+    local result
+    result=$(_prepare_file_paths "/videos/épisode_spécial.mkv" "/output")
+    
+    local filename
+    filename=$(echo "$result" | cut -d'|' -f1)
+    
+    [ "$filename" = "épisode_spécial.mkv" ]
+}
+
+@test "_prepare_file_paths: gère les apostrophes dans le chemin" {
+    SOURCE="/videos"
+    SUFFIX_STRING="_x265"
+    DRYRUN=false
+    
+    local result
+    result=$(_prepare_file_paths "/videos/L'Odyssée/film.mkv" "/output")
+    
+    local final_dir
+    final_dir=$(echo "$result" | cut -d'|' -f2)
+    
+    [[ "$final_dir" =~ "L'Odyssée" ]]
+}
+
+@test "_prepare_file_paths: gère les caractères mixtes (espaces + accents + apostrophes)" {
+    SOURCE="/videos"
+    SUFFIX_STRING="_x265"
+    DRYRUN=false
+    
+    local result
+    result=$(_prepare_file_paths "/videos/Ma Série/S01E01 - L'épisode préféré.mkv" "/output")
+    
+    local filename final_dir
+    filename=$(echo "$result" | cut -d'|' -f1)
+    final_dir=$(echo "$result" | cut -d'|' -f2)
+    
+    [ "$filename" = "S01E01 - L'épisode préféré.mkv" ]
+    [[ "$final_dir" =~ "Ma Série" ]]
+}

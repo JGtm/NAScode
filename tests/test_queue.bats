@@ -417,3 +417,42 @@ teardown() {
     # Vérifier que le fichier est dans la queue
     tr '\0' '\n' < "$QUEUE" | grep -q "episode 01.mkv"
 }
+
+@test "edge case: gère les chemins avec accents" {
+    # Créer un fichier avec des accents dans le chemin
+    mkdir -p "$TEST_VIDEO_DIR/Séries/L'épisode"
+    echo "video" > "$TEST_VIDEO_DIR/Séries/L'épisode/épisode_01.mkv"
+    
+    # Nettoyer et reconstruire
+    rm -f "$INDEX" "$INDEX_META" "$QUEUE"
+    build_queue
+    
+    # Vérifier que le fichier est dans la queue
+    tr '\0' '\n' < "$QUEUE" | grep -q "épisode_01.mkv"
+}
+
+@test "edge case: gère les chemins avec apostrophes" {
+    # Créer un fichier avec apostrophe
+    mkdir -p "$TEST_VIDEO_DIR/Film"
+    echo "video" > "$TEST_VIDEO_DIR/Film/L'Odyssée.mkv"
+    
+    # Nettoyer et reconstruire
+    rm -f "$INDEX" "$INDEX_META" "$QUEUE"
+    build_queue
+    
+    # Vérifier que le fichier est dans la queue
+    tr '\0' '\n' < "$QUEUE" | grep -q "L'Odyssée.mkv"
+}
+
+@test "edge case: gère les chemins avec caractères spéciaux mixtes" {
+    # Créer un fichier avec espaces, accents et apostrophe
+    mkdir -p "$TEST_VIDEO_DIR/Ma Série Préférée"
+    echo "video" > "$TEST_VIDEO_DIR/Ma Série Préférée/S01E01 - L'épisode spécial.mkv"
+    
+    # Nettoyer et reconstruire
+    rm -f "$INDEX" "$INDEX_META" "$QUEUE"
+    build_queue
+    
+    # Vérifier que le fichier est dans la queue
+    tr '\0' '\n' < "$QUEUE" | grep -q "L'épisode spécial.mkv"
+}
