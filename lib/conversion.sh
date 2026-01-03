@@ -395,6 +395,10 @@ convert_file() {
     set -o pipefail
 
     local file_original="$1"
+    # Windows/Git Bash : un chemin lu depuis un fichier peut contenir un '\r' (CRLF)
+    # Ce '\r' rend ffprobe/ffmpeg incapables d'ouvrir le fichier => faux "Pas de flux vidéo".
+    # On normalise dès l'entrée.
+    file_original="${file_original//$'\r'/}"
     local output_dir="$2"
     
     # Incrémenter le compteur de fichiers au tout début (pour affichage [X/Y])
