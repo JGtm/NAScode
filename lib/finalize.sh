@@ -84,8 +84,7 @@ _finalize_log_and_verify() {
     local size_after_mb=0 size_after_bytes=0
     if [[ -e "$final_actual" ]]; then
         size_after_mb=$(du -m "$final_actual" 2>/dev/null | awk '{print $1}') || size_after_mb=0
-        # Taille exacte en octets (stat -c%s sur Linux, stat -f%z sur macOS)
-        size_after_bytes=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo 0)
+        size_after_bytes=$(get_file_size_bytes "$final_actual")
     fi
 
     local size_comparison="${size_before_mb}MB → ${size_after_mb}MB"
@@ -159,7 +158,7 @@ _finalize_log_and_verify() {
         # Taille originale en octets (convertir depuis MB ou recalculer si le fichier existe encore)
         local original_size_bytes=0
         if [[ -e "$file_original" ]]; then
-            original_size_bytes=$(stat -c%s "$file_original" 2>/dev/null || stat -f%z "$file_original" 2>/dev/null || echo 0)
+            original_size_bytes=$(get_file_size_bytes "$file_original")
         else
             # Fichier original supprimé, estimer depuis size_before_mb
             original_size_bytes=$((size_before_mb * 1024 * 1024))
@@ -228,16 +227,8 @@ _finalize_conversion_success() {
             local end_ts
             end_ts=$(date +%s)
             local elapsed=$((end_ts - start_for_file))
-            local eh=$((elapsed / 3600))
-            local em=$(((elapsed % 3600) / 60))
-            local es=$((elapsed % 60))
-            elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
-
-            if [[ "$eh" -gt 0 ]]; then
-                elapsed_display="${eh}h${em}m${es}s"
-            else
-                elapsed_display="${em}m${es}s"
-            fi
+            elapsed_str=$(format_duration_seconds "$elapsed")
+            elapsed_display=$(format_duration_compact "$elapsed")
         fi
 
         local display_name
@@ -256,13 +247,13 @@ _finalize_conversion_success() {
             after_bytes=0
 
             if [[ -e "$file_original" ]]; then
-                before_bytes=$(stat -c%s "$file_original" 2>/dev/null || stat -f%z "$file_original" 2>/dev/null || echo 0)
+                before_bytes=$(get_file_size_bytes "$file_original")
             elif [[ -n "${size_before_mb:-}" ]] && [[ "${size_before_mb}" =~ ^[0-9]+$ ]]; then
                 before_bytes=$((size_before_mb * 1024 * 1024))
             fi
 
             if [[ -e "$tmp_output" ]]; then
-                after_bytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
+                after_bytes=$(get_file_size_bytes "$tmp_output")
             fi
 
             local before_fmt after_fmt
@@ -287,7 +278,7 @@ _finalize_conversion_success() {
     # checksum et taille exacte avant déplacement (pour vérification intégrité)
     local checksum_before size_before_bytes
     checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
-    size_before_bytes=$(stat -c%s "$tmp_output" 2>/dev/null || stat -f%z "$tmp_output" 2>/dev/null || echo 0)
+    size_before_bytes=$(get_file_size_bytes "$tmp_output")
 
     # Vérifier si le système de transfert asynchrone est initialisé
     if [[ -n "${TRANSFER_PIDS_FILE:-}" ]] && declare -f start_async_transfer &>/dev/null; then
@@ -467,10 +458,7 @@ show_summary() {
         local end_ts
         end_ts=$(date +%s)
         local elapsed=$((end_ts - START_TS_TOTAL))
-        local eh=$((elapsed / 3600))
-        local em=$(((elapsed % 3600) / 60))
-        local es=$((elapsed % 60))
-        total_elapsed_str=$(printf "%02d:%02d:%02d" "$eh" "$em" "$es")
+        total_elapsed_str=$(format_duration_seconds "$elapsed")
     fi
     
     # Comptage des statistiques depuis le log de session

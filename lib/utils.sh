@@ -1,5 +1,37 @@
 #!/bin/bash
 ###########################################################
+# FORMATAGE DURÉE
+###########################################################
+
+# Formate une durée en secondes vers HH:MM:SS
+# Usage: format_duration_seconds <seconds>
+# Retourne: "01:23:45" ou "00:05:30"
+format_duration_seconds() {
+    local seconds="${1:-0}"
+    [[ ! "$seconds" =~ ^[0-9]+$ ]] && seconds=0
+    local h=$((seconds / 3600))
+    local m=$(((seconds % 3600) / 60))
+    local s=$((seconds % 60))
+    printf "%02d:%02d:%02d" "$h" "$m" "$s"
+}
+
+# Formate une durée en secondes de façon compacte (1h23m45s ou 5m30s)
+# Usage: format_duration_compact <seconds>
+# Retourne: "1h23m45s" ou "5m30s"
+format_duration_compact() {
+    local seconds="${1:-0}"
+    [[ ! "$seconds" =~ ^[0-9]+$ ]] && seconds=0
+    local h=$((seconds / 3600))
+    local m=$(((seconds % 3600) / 60))
+    local s=$((seconds % 60))
+    if [[ "$h" -gt 0 ]]; then
+        echo "${h}h${m}m${s}s"
+    else
+        echo "${m}m${s}s"
+    fi
+}
+
+###########################################################
 # CALCUL MD5 PORTABLE
 ###########################################################
 

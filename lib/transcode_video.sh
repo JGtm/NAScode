@@ -202,91 +202,6 @@ _build_encoder_params_internal() {
 }
 
 # Construit les paramètres spécifiques à l'encodeur pour FFmpeg
-# Usage: _build_encoder_ffmpeg_args <encoder> <mode> <base_params>
-# Retourne: les arguments FFmpeg pour l'encodeur
-_build_encoder_ffmpeg_args() {
-    local encoder="${1:-libx265}"
-    local mode="$2"           # pass1, pass2, crf
-    local base_params="$3"    # VBV params et extras
-    
-    local encoder_args=""
-    local params_flag=""
-    local full_params=""
-    
-    # Obtenir le flag des paramètres encodeur (-x265-params, -svtav1-params, etc.)
-    params_flag=$(get_encoder_params_flag "$encoder")
-    
-    # Construire les paramètres selon l'encodeur et le mode
-    case "$encoder" in
-        libx265)
-            # x265 : paramètres classiques avec pass=N pour two-pass
-            case "$mode" in
-                "pass1")
-                    full_params="pass=1:${base_params}"
-                    if [[ "${X265_PASS1_FAST:-false}" == true ]]; then
-                        full_params="${full_params}:no-slow-firstpass=1"
-                    fi
-                    ;;
-                "pass2")
-                    full_params="pass=2:${base_params}"
-                    ;;
-                "crf")
-                    full_params="${base_params}"
-                    ;;
-            esac
-            encoder_args="-c:v libx265 ${params_flag} \"${full_params}\""
-            ;;
-            
-        libsvtav1)
-            # SVT-AV1 : paramètres via -svtav1-params
-            # Note: SVT-AV1 utilise -b:v pour le bitrate cible, pas de pass explicite
-            # Le two-pass SVT-AV1 se fait via --pass 1/2 dans les params
-            case "$mode" in
-                "pass1")
-                    full_params="pass=1:${base_params}"
-                    ;;
-                "pass2")
-                    full_params="pass=2:${base_params}"
-                    ;;
-                "crf")
-                    full_params="${base_params}"
-                    ;;
-            esac
-            if [[ -n "$full_params" ]]; then
-                encoder_args="-c:v libsvtav1 ${params_flag} \"${full_params}\""
-            else
-                encoder_args="-c:v libsvtav1"
-            fi
-            ;;
-            
-        libaom-av1)
-            # libaom-av1 : options directes (pas de -params flag standard)
-            # Two-pass utilise -pass 1/2 comme option FFmpeg directe
-            case "$mode" in
-                "pass1")
-                    encoder_args="-c:v libaom-av1 -pass 1"
-                    ;;
-                "pass2")
-                    encoder_args="-c:v libaom-av1 -pass 2"
-                    ;;
-                "crf")
-                    encoder_args="-c:v libaom-av1"
-                    ;;
-            esac
-            # libaom utilise cpu-used au lieu de preset
-            local aom_cpu_used
-            aom_cpu_used=$(convert_preset "$ENCODER_PRESET" "libaom-av1")
-            encoder_args="${encoder_args} -cpu-used ${aom_cpu_used}"
-            ;;
-            
-        *)
-            # Fallback générique
-            encoder_args="-c:v $encoder"
-            ;;
-    esac
-    
-    echo "$encoder_args"
-}
 
 # Retourne l'option -tune appropriée pour l'encodeur
 # Usage: _get_tune_option <encoder>
@@ -327,7 +242,7 @@ _get_preset_option() {
             echo "-preset $svt_preset"
             ;;
         libaom-av1)
-            # libaom utilise -cpu-used (géré dans _build_encoder_ffmpeg_args)
+            # libaom utilise -cpu-used au lieu de -preset (géré séparément)
             echo ""
             ;;
         *)

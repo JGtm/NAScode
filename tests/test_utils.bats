@@ -174,3 +174,79 @@ teardown() {
     result=$(awk "BEGIN {print ($ts2 >= $ts1) ? 1 : 0}")
     [ "$result" -eq 1 ]
 }
+
+###########################################################
+# Tests de format_duration_seconds()
+###########################################################
+
+@test "format_duration_seconds: formate 0 secondes" {
+    result=$(format_duration_seconds 0)
+    [ "$result" = "00:00:00" ]
+}
+
+@test "format_duration_seconds: formate moins d'une minute" {
+    result=$(format_duration_seconds 45)
+    [ "$result" = "00:00:45" ]
+}
+
+@test "format_duration_seconds: formate une minute exacte" {
+    result=$(format_duration_seconds 60)
+    [ "$result" = "00:01:00" ]
+}
+
+@test "format_duration_seconds: formate une heure exacte" {
+    result=$(format_duration_seconds 3600)
+    [ "$result" = "01:00:00" ]
+}
+
+@test "format_duration_seconds: formate une durée mixte" {
+    # 2h 15m 33s = 7200 + 900 + 33 = 8133
+    result=$(format_duration_seconds 8133)
+    [ "$result" = "02:15:33" ]
+}
+
+@test "format_duration_seconds: gère les grandes durées" {
+    # 25h = 90000 secondes
+    result=$(format_duration_seconds 90000)
+    [ "$result" = "25:00:00" ]
+}
+
+@test "format_duration_seconds: gère une entrée vide" {
+    result=$(format_duration_seconds "")
+    [ "$result" = "00:00:00" ]
+}
+
+###########################################################
+# Tests de format_duration_compact()
+###########################################################
+
+@test "format_duration_compact: formate 0 secondes" {
+    result=$(format_duration_compact 0)
+    [ "$result" = "0s" ]
+}
+
+@test "format_duration_compact: formate moins d'une minute" {
+    result=$(format_duration_compact 45)
+    [ "$result" = "45s" ]
+}
+
+@test "format_duration_compact: formate minutes et secondes" {
+    result=$(format_duration_compact 125)  # 2m 5s
+    [ "$result" = "2m 5s" ]
+}
+
+@test "format_duration_compact: formate heures, minutes et secondes" {
+    # 2h 15m 33s = 7200 + 900 + 33 = 8133
+    result=$(format_duration_compact 8133)
+    [ "$result" = "2h 15m 33s" ]
+}
+
+@test "format_duration_compact: formate une heure exacte" {
+    result=$(format_duration_compact 3600)
+    [ "$result" = "1h 0m 0s" ]
+}
+
+@test "format_duration_compact: gère une entrée vide" {
+    result=$(format_duration_compact "")
+    [ "$result" = "0s" ]
+}

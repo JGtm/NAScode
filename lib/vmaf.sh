@@ -31,7 +31,7 @@ compute_vmaf_score() {
     
     # Vérifier que le fichier converti n'est pas vide (dryrun crée des fichiers de 0 octets)
     local converted_size
-    converted_size=$(stat -c%s "$converted" 2>/dev/null || stat -f%z "$converted" 2>/dev/null || echo "0")
+    converted_size=$(get_file_size_bytes "$converted")
     if [[ "$converted_size" -eq 0 ]]; then
         echo "NA"
         return 0
