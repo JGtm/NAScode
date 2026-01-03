@@ -87,6 +87,21 @@ normalize_path_for_ffprobe() {
     fi
 }
 
+# Wrapper ffprobe qui normalise automatiquement les chemins Windows/Git Bash.
+# Usage identique à ffprobe : ffprobe_safe [options] <file>
+# Le dernier argument est considéré comme le fichier à normaliser.
+ffprobe_safe() {
+    local args=("$@")
+    local last_idx=$((${#args[@]} - 1))
+    
+    # Normaliser le dernier argument (le fichier)
+    if [[ $last_idx -ge 0 ]]; then
+        args[$last_idx]=$(normalize_path_for_ffprobe "${args[$last_idx]}")
+    fi
+    
+    ffprobe "${args[@]}"
+}
+
 ###########################################################
 # FONCTIONS DE COMPTAGE ET EXCLUSION
 ###########################################################

@@ -10,7 +10,7 @@ export_variables() {
     # ========================================================
     # FONCTIONS UTILITAIRES DE BASE
     # ========================================================
-    export -f normalize_path_for_ffprobe
+    export -f normalize_path_for_ffprobe ffprobe_safe
     
     # ========================================================
     # FONCTIONS DE CONVERSION PRINCIPALES

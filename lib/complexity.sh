@@ -48,12 +48,7 @@ _get_frame_sizes() {
     local start_sec="$2"
     local duration_sec="$3"
     
-    # Windows/Git Bash : normaliser le chemin pour ffprobe
-    if declare -f normalize_path_for_ffprobe &>/dev/null; then
-        file=$(normalize_path_for_ffprobe "$file")
-    fi
-    
-    ffprobe -v error \
+    ffprobe_safe -v error \
         -select_streams v:0 \
         -read_intervals "${start_sec}%+${duration_sec}" \
         -show_entries frame=pkt_size \
@@ -335,15 +330,10 @@ get_adaptive_encoding_params() {
     
     # Récupérer le FPS
     local fps
-    local _file_for_fps="$file"
-    # Windows/Git Bash : normaliser le chemin pour ffprobe
-    if declare -f normalize_path_for_ffprobe &>/dev/null; then
-        _file_for_fps=$(normalize_path_for_ffprobe "$file")
-    fi
-    fps=$(ffprobe -v error -select_streams v:0 \
+    fps=$(ffprobe_safe -v error -select_streams v:0 \
         -show_entries stream=r_frame_rate \
         -of default=noprint_wrappers=1:nokey=1 \
-        "$_file_for_fps" 2>/dev/null | head -1)
+        "$file" 2>/dev/null | head -1)
     
     # Convertir le FPS (format "24000/1001" ou "24")
     if [[ "$fps" == *"/"* ]]; then

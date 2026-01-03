@@ -7,20 +7,6 @@
 ###########################################################
 
 ###########################################################
-# HELPER INTERNE
-###########################################################
-
-# Normalise un chemin pour ffprobe sous Windows/Git Bash
-_normalize_for_ffprobe() {
-    local file="$1"
-    if declare -f normalize_path_for_ffprobe &>/dev/null; then
-        normalize_path_for_ffprobe "$file"
-    else
-        echo "$file"
-    fi
-}
-
-###########################################################
 # SÉLECTION SOUS-TITRES FR
 ###########################################################
 
@@ -28,12 +14,11 @@ _normalize_for_ffprobe() {
 # Usage: find_french_subtitle_stream <input_file>
 # Retourne: index du flux (ex: "0:s:0") ou chaîne vide si non trouvé
 find_french_subtitle_stream() {
-    local input_file
-    input_file=$(_normalize_for_ffprobe "$1")
+    local input_file="$1"
     
     # Liste tous les flux de sous-titres avec leurs tags language
     local streams_info
-    streams_info=$(ffprobe -v error \
+    streams_info=$(ffprobe_safe -v error \
         -select_streams s \
         -show_entries stream=index:stream_tags=language \
         -of csv=p=0 \
@@ -60,11 +45,11 @@ find_french_subtitle_stream() {
 # Retourne: index du flux (ex: "0:s:0") ou chaîne vide si non trouvé
 find_english_subtitle_stream() {
     local input_file
-    input_file=$(_normalize_for_ffprobe "$1")
+    input_file=$("$1")
     
     # Liste tous les flux de sous-titres avec leurs tags language
     local streams_info
-    streams_info=$(ffprobe -v error \
+    streams_info=$(ffprobe_safe -v error \
         -select_streams s \
         -show_entries stream=index:stream_tags=language \
         -of csv=p=0 \
@@ -149,9 +134,9 @@ build_subtitle_mapping() {
 # Retourne: liste au format "index|language|codec|title" par ligne
 list_subtitle_streams() {
     local input_file
-    input_file=$(_normalize_for_ffprobe "$1")
+    input_file=$("$1")
     
-    ffprobe -v error \
+    ffprobe_safe -v error \
         -select_streams s \
         -show_entries stream=index,codec_name:stream_tags=language,title \
         -of csv=p=0 \
@@ -166,10 +151,10 @@ list_subtitle_streams() {
 # Retourne: nombre de flux
 count_subtitle_streams() {
     local input_file
-    input_file=$(_normalize_for_ffprobe "$1")
+    input_file=$("$1")
     
     local count
-    count=$(ffprobe -v error \
+    count=$(ffprobe_safe -v error \
         -select_streams s \
         -show_entries stream=index \
         -of csv=p=0 \
@@ -189,13 +174,13 @@ count_subtitle_streams() {
 # Retourne une chaîne de paramètres -map pour ffmpeg.
 _build_stream_mapping() {
     local input_file
-    input_file=$(_normalize_for_ffprobe "$1")
+    input_file=$("$1")
 
     local mapping=""
 
     # 1. Video mapping: exclude attached_pic (cover art)
     local video_streams
-    video_streams=$(ffprobe -v error -select_streams v \
+    video_streams=$(ffprobe_safe -v error -select_streams v \
         -show_entries stream=index:stream_disposition=attached_pic \
         -of csv=p=0 "$input_file" 2>/dev/null)
 
@@ -215,7 +200,7 @@ _build_stream_mapping() {
 
     # Récupérer les index des sous-titres français
     local fr_subs
-    fr_subs=$(ffprobe -v error -select_streams s \
+    fr_subs=$(ffprobe_safe -v error -select_streams s \
         -show_entries stream=index:stream_tags=language \
         -of csv=p=0 "$input_file" 2>/dev/null | \
         awk -F',' '$2 ~ /^(fre|fra|french)$/{print $1}' || true)

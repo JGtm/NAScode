@@ -10,15 +10,10 @@
 get_full_media_metadata() {
     local file="$1"
     
-    # Windows/Git Bash : normaliser le chemin pour ffprobe (accents, apostrophes)
-    if declare -f normalize_path_for_ffprobe &>/dev/null; then
-        file=$(normalize_path_for_ffprobe "$file")
-    fi
-    
     # Appel unique ffprobe pour format + streams
     # On récupère tout ce qui est potentiellement utile
     local output
-    output=$(ffprobe -v error \
+    output=$(ffprobe_safe -v error \
         -show_entries format=duration,bit_rate \
         -show_entries stream=index,codec_type,codec_name,bit_rate,width,height,pix_fmt:stream_tags=BPS \
         -of default=noprint_wrappers=0 \
@@ -114,17 +109,11 @@ get_full_media_metadata() {
 
 get_video_metadata() {
     local file="$1"
-    
-    # Windows/Git Bash : normaliser le chemin pour ffprobe
-    if declare -f normalize_path_for_ffprobe &>/dev/null; then
-        file=$(normalize_path_for_ffprobe "$file")
-    fi
-    
     local metadata_output
     local format_output
     
     # Récupération des métadonnées du stream vidéo
-    metadata_output=$(ffprobe -v error \
+    metadata_output=$(ffprobe_safe -v error \
         -select_streams v:0 \
         -show_entries stream=bit_rate,codec_name:stream_tags=BPS \
         -of default=noprint_wrappers=1 \
@@ -132,7 +121,7 @@ get_video_metadata() {
     
     # Récupération séparée des métadonnées du format (container)
     # Note: -select_streams empêche l'accès aux infos format, donc requête séparée
-    format_output=$(ffprobe -v error \
+    format_output=$(ffprobe_safe -v error \
         -show_entries format=bit_rate,duration \
         "$file" 2>/dev/null || true)
     
@@ -184,13 +173,8 @@ get_video_metadata() {
 _probe_audio_info() {
     local file="$1"
     
-    # Windows/Git Bash : normaliser le chemin pour ffprobe
-    if declare -f normalize_path_for_ffprobe &>/dev/null; then
-        file=$(normalize_path_for_ffprobe "$file")
-    fi
-    
     local audio_info
-    audio_info=$(ffprobe -v error \
+    audio_info=$(ffprobe_safe -v error \
         -select_streams a:0 \
         -show_entries stream=codec_name,bit_rate:stream_tags=BPS \
         -of default=noprint_wrappers=1 \
@@ -227,14 +211,8 @@ _probe_audio_info() {
 # Retour: width|height|pix_fmt (valeurs vides si non disponibles)
 get_video_stream_props() {
     local file="$1"
-    
-    # Windows/Git Bash : normaliser le chemin pour ffprobe
-    if declare -f normalize_path_for_ffprobe &>/dev/null; then
-        file=$(normalize_path_for_ffprobe "$file")
-    fi
-    
     local out
-    out=$(ffprobe -v error \
+    out=$(ffprobe_safe -v error \
         -select_streams v:0 \
         -show_entries stream=width,height,pix_fmt \
         -of default=noprint_wrappers=1 \
