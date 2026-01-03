@@ -23,28 +23,28 @@ teardown() {
 # Tests du calcul du coefficient de complexité
 ###########################################################
 
-@test "_map_stddev_to_complexity: stddev très bas → C_MIN (0.75)" {
+@test "_map_stddev_to_complexity: stddev très bas → C_MIN (0.85)" {
     local result
     result=$(_map_stddev_to_complexity "0.10")
     
-    # Devrait retourner C_MIN (0.75) pour un stddev très bas
-    [[ "$result" == "0.75" ]]
+    # Devrait retourner C_MIN (0.85) pour un stddev très bas
+    [[ "$result" == "0.85" ]]
 }
 
-@test "_map_stddev_to_complexity: stddev très haut → C_MAX (1.35)" {
+@test "_map_stddev_to_complexity: stddev très haut → C_MAX (1.25)" {
     local result
     result=$(_map_stddev_to_complexity "0.50")
     
-    # Devrait retourner C_MAX (1.35) pour un stddev élevé
-    [[ "$result" == "1.35" ]]
+    # Devrait retourner C_MAX (1.25) pour un stddev élevé
+    [[ "$result" == "1.25" ]]
 }
 
 @test "_map_stddev_to_complexity: stddev moyen → interpolation linéaire" {
-    # Avec stddev au milieu de la plage (0.25 = milieu entre 0.15 et 0.35)
+    # Avec stddev au milieu de la plage (0.325 = milieu entre 0.20 et 0.45)
     local result
-    result=$(_map_stddev_to_complexity "0.25")
+    result=$(_map_stddev_to_complexity "0.325")
     
-    # Devrait être autour de 1.05 (milieu entre 0.75 et 1.35)
+    # Devrait être autour de 1.05 (milieu entre 0.85 et 1.25)
     # Vérifions qu'il est dans la plage attendue
     local c_val
     c_val=$(awk -v r="$result" 'BEGIN { print (r >= 1.0 && r <= 1.1) ? "ok" : "fail" }')
@@ -81,34 +81,34 @@ teardown() {
 @test "compute_adaptive_target_bitrate: calcul BPP×C pour 1080p@24fps" {
     # complexity.sh already loaded by load_base_modules
     
-    # 1920×1080×24×0.045/1000 × 1.0 = ~2239 kbps
+    # 1920×1080×24×0.032/1000 × 1.0 = ~1592 kbps
     local result
     result=$(compute_adaptive_target_bitrate 1920 1080 24 "1.0" "")
     
-    # Le résultat devrait être autour de 2239 kbps (±100)
-    [[ "$result" -ge 2100 && "$result" -le 2400 ]]
+    # Le résultat devrait être autour de 1592 kbps (±150)
+    [[ "$result" -ge 1450 && "$result" -le 1750 ]]
 }
 
 @test "compute_adaptive_target_bitrate: coefficient faible → bitrate réduit" {
     # complexity.sh already loaded by load_base_modules
     
-    # Avec C=0.75, le bitrate devrait être ~75% de celui à C=1.0
+    # Avec C=0.85, le bitrate devrait être ~85% de celui à C=1.0
     local result
-    result=$(compute_adaptive_target_bitrate 1920 1080 24 "0.75" "")
+    result=$(compute_adaptive_target_bitrate 1920 1080 24 "0.85" "")
     
-    # ~2239 × 0.75 = ~1679 kbps
-    [[ "$result" -ge 1500 && "$result" -le 1800 ]]
+    # ~1592 × 0.85 = ~1353 kbps
+    [[ "$result" -ge 1200 && "$result" -le 1500 ]]
 }
 
 @test "compute_adaptive_target_bitrate: coefficient élevé → bitrate augmenté" {
     # complexity.sh already loaded by load_base_modules
     
-    # Avec C=1.35, le bitrate devrait être ~135% de celui à C=1.0
+    # Avec C=1.25, le bitrate devrait être ~125% de celui à C=1.0
     local result
-    result=$(compute_adaptive_target_bitrate 1920 1080 24 "1.35" "")
+    result=$(compute_adaptive_target_bitrate 1920 1080 24 "1.25" "")
     
-    # ~2239 × 1.35 = ~3023 kbps
-    [[ "$result" -ge 2800 && "$result" -le 3200 ]]
+    # ~1592 × 1.25 = ~1990 kbps
+    [[ "$result" -ge 1850 && "$result" -le 2150 ]]
 }
 
 @test "compute_adaptive_target_bitrate: garde-fou bitrate original" {
