@@ -383,6 +383,12 @@ _reset_cli_state() {
     [[ "$output" =~ "Option" ]]
 }
 
+@test "parse_arguments: argument positionnel sans tiret échoue (sous-shell)" {
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments -d l 3'
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "Argument inattendu" ]]
+}
+
 @test "config: DRYRUN d'environnement est écrasé à false" {
     run bash -lc 'export DRYRUN=true; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; echo "$DRYRUN"'
     [ "$status" -eq 0 ]

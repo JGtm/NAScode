@@ -207,6 +207,12 @@ parse_arguments() {
                 show_help
                 exit 1
                 ;;
+            *)
+                # Argument positionnel non reconnu (ni option ni flag)
+                print_error "Argument inattendu : $1"
+                echo -e "  ${DIM}Vérifiez que toutes les options sont précédées d'un tiret (ex: -l 3)${NOCOLOR}" >&2
+                exit 1
+                ;;
         esac
     done
 

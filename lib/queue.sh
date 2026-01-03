@@ -438,6 +438,44 @@ increment_processed_count() {
     rmdir "$lockdir" 2>/dev/null || true
 }
 
+# Incrémente le compteur de fichiers réellement convertis (pas les skips)
+# Utilisé pour l'affichage "X/LIMIT" en mode limite
+increment_converted_count() {
+    # Ne rien faire si pas en mode limite
+    if [[ -z "${CONVERTED_COUNT_FILE:-}" ]] || [[ ! -f "${CONVERTED_COUNT_FILE:-}" ]]; then
+        return 0
+    fi
+    
+    local lockdir="$LOG_DIR/converted_count.lock"
+    # Mutex simple via mkdir
+    local attempts=0
+    while ! mkdir "$lockdir" 2>/dev/null; do
+        sleep 0.05
+        attempts=$((attempts + 1))
+        if [[ $attempts -gt 100 ]]; then break; fi  # timeout 5s
+    done
+    
+    local current=0
+    if [[ -f "$CONVERTED_COUNT_FILE" ]]; then
+        current=$(cat "$CONVERTED_COUNT_FILE" 2>/dev/null || echo 0)
+    fi
+    local new_value=$((current + 1))
+    echo "$new_value" > "$CONVERTED_COUNT_FILE"
+    
+    rmdir "$lockdir" 2>/dev/null || true
+    
+    echo "$new_value"
+}
+
+# Lit le compteur de fichiers convertis (pour affichage final)
+get_converted_count() {
+    if [[ -z "${CONVERTED_COUNT_FILE:-}" ]] || [[ ! -f "${CONVERTED_COUNT_FILE:-}" ]]; then
+        echo "0"
+        return 0
+    fi
+    cat "$CONVERTED_COUNT_FILE" 2>/dev/null || echo "0"
+}
+
 # Incrémente le compteur de fichier au DÉBUT du traitement et retourne la nouvelle valeur
 # Utilisé pour l'affichage "Fichier X/Y"
 increment_starting_counter() {
