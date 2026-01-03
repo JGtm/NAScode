@@ -250,3 +250,36 @@ teardown() {
     result=$(format_duration_compact "")
     [ "$result" = "0s" ]
 }
+
+###########################################################
+# Tests de get_file_size_bytes()
+###########################################################
+
+@test "get_file_size_bytes: retourne la taille d'un fichier existant" {
+    local test_file="$TEST_TEMP_DIR/size_test.txt"
+    echo -n "12345" > "$test_file"  # 5 bytes exactement
+    
+    result=$(get_file_size_bytes "$test_file")
+    [ "$result" -eq 5 ]
+}
+
+@test "get_file_size_bytes: retourne 0 pour fichier vide" {
+    local test_file="$TEST_TEMP_DIR/empty.txt"
+    touch "$test_file"
+    
+    result=$(get_file_size_bytes "$test_file")
+    [ "$result" -eq 0 ]
+}
+
+@test "get_file_size_bytes: retourne 0 pour fichier inexistant" {
+    result=$(get_file_size_bytes "/nonexistent/file.txt")
+    [ "$result" -eq 0 ]
+}
+
+@test "get_file_size_bytes: gère les fichiers avec espaces dans le nom" {
+    local test_file="$TEST_TEMP_DIR/file with spaces.txt"
+    echo -n "test" > "$test_file"  # 4 bytes
+    
+    result=$(get_file_size_bytes "$test_file")
+    [ "$result" -eq 4 ]
+}
