@@ -378,44 +378,30 @@ _run_ffmpeg_encode() {
     encoder_params_flag=$(get_encoder_params_flag "$encoder")
     encoder_full_params=$(_build_encoder_params_internal "$encoder" "$mode" "$encoder_base_params")
 
-    # Exécution FFmpeg avec construction dynamique selon l'encodeur
+    # Construire les options encodeur spécifiques (vide si non applicable)
+    local encoder_specific_opts=""
     if [[ -n "$encoder_params_flag" && -n "$encoder_full_params" ]]; then
-        # Encodeur avec paramètres spécifiques (x265, svtav1)
-        $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-            $SAMPLE_SEEK_PARAMS \
-            $hwaccel_opts \
-            -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-            -g "$keyint_value" -keyint_min "$keyint_value" \
-            -c:v "$encoder" $preset_opt \
-            $tune_opt $bitrate_opt $encoder_params_flag "$encoder_full_params" \
-            -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
-            $audio_opt \
-            $stream_opt \
-            $output_dest \
-            -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
-        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
-            -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-            -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
-            "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
-    else
-        # Encodeur sans paramètres spécifiques (libaom, etc.)
-        $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-            $SAMPLE_SEEK_PARAMS \
-            $hwaccel_opts \
-            -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-            -g "$keyint_value" -keyint_min "$keyint_value" \
-            -c:v "$encoder" $preset_opt \
-            $tune_opt $bitrate_opt \
-            -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
-            $audio_opt \
-            $stream_opt \
-            $output_dest \
-            -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
-        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
-            -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-            -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
-            "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+        encoder_specific_opts="$encoder_params_flag $encoder_full_params"
     fi
+
+    # Exécution FFmpeg unifiée
+    # shellcheck disable=SC2086
+    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
+        $SAMPLE_SEEK_PARAMS \
+        $hwaccel_opts \
+        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
+        -g "$keyint_value" -keyint_min "$keyint_value" \
+        -c:v "$encoder" $preset_opt \
+        $tune_opt $bitrate_opt $encoder_specific_opts \
+        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
+        $audio_opt \
+        $stream_opt \
+        $output_dest \
+        -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
+    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
+        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
     # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
     local ffmpeg_rc=${PIPESTATUS[0]:-0}
