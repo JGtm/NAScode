@@ -557,9 +557,14 @@ _setup_sample_mode_params() {
 
     # Trouver le keyframe le plus proche
     local keyframe_pos
+    local _input_for_ffprobe="$input_file"
+    # Windows/Git Bash : normaliser le chemin pour ffprobe
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        _input_for_ffprobe=$(normalize_path_for_ffprobe "$input_file")
+    fi
     keyframe_pos=$(ffprobe -v error -select_streams v:0 -skip_frame nokey \
         -show_entries packet=pts_time -of csv=p=0 \
-        -read_intervals "${target_pos}%+30" "$input_file" 2>/dev/null | head -1 || true)
+        -read_intervals "${target_pos}%+30" "$_input_for_ffprobe" 2>/dev/null | head -1 || true)
 
     if [[ -z "$keyframe_pos" ]] || [[ ! "$keyframe_pos" =~ ^[0-9.]+$ ]]; then
         keyframe_pos="$target_pos"

@@ -10,6 +10,11 @@
 get_full_media_metadata() {
     local file="$1"
     
+    # Windows/Git Bash : normaliser le chemin pour ffprobe (accents, apostrophes)
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        file=$(normalize_path_for_ffprobe "$file")
+    fi
+    
     # Appel unique ffprobe pour format + streams
     # On récupère tout ce qui est potentiellement utile
     local output
@@ -109,6 +114,12 @@ get_full_media_metadata() {
 
 get_video_metadata() {
     local file="$1"
+    
+    # Windows/Git Bash : normaliser le chemin pour ffprobe
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        file=$(normalize_path_for_ffprobe "$file")
+    fi
+    
     local metadata_output
     local format_output
     
@@ -173,6 +184,11 @@ get_video_metadata() {
 _probe_audio_info() {
     local file="$1"
     
+    # Windows/Git Bash : normaliser le chemin pour ffprobe
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        file=$(normalize_path_for_ffprobe "$file")
+    fi
+    
     local audio_info
     audio_info=$(ffprobe -v error \
         -select_streams a:0 \
@@ -211,6 +227,12 @@ _probe_audio_info() {
 # Retour: width|height|pix_fmt (valeurs vides si non disponibles)
 get_video_stream_props() {
     local file="$1"
+    
+    # Windows/Git Bash : normaliser le chemin pour ffprobe
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        file=$(normalize_path_for_ffprobe "$file")
+    fi
+    
     local out
     out=$(ffprobe -v error \
         -select_streams v:0 \

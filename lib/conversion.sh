@@ -456,15 +456,39 @@ convert_file() {
     
     _check_disk_space "$file_original" || return 1
     
-    # 4. Analyse adaptative (mode film-adaptive uniquement)
-    # Variables pour stocker les paramètres adaptatifs calculés
+    # 4. Décision de conversion préliminaire (basée sur codec, pas sur bitrate adaptatif)
+    # En mode film-adaptive, on ne peut pas skip ici car on n'a pas encore le seuil adaptatif
+    # On vérifie juste si c'est déjà le bon codec avec un bitrate raisonnable
     local adaptive_target_kbps="" adaptive_maxrate_kbps="" adaptive_bufsize_kbps=""
     local complexity_c="" complexity_desc="" stddev_val=""
     
+    # En mode non-adaptatif, vérifier si on peut skip maintenant
+    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]]; then
+        if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" ""; then
+            if [[ "$LIMIT_FILES" -gt 0 ]]; then
+                update_queue || true
+            fi
+            increment_processed_count || true
+            return 0
+        fi
+    fi
+    
+    local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
+    
+    # Incrémenter le compteur de fichiers réellement convertis (UX mode limite)
+    if declare -f increment_converted_count &>/dev/null; then
+        increment_converted_count >/dev/null
+    fi
+    
+    # 5. Téléchargement AVANT l'analyse de complexité (plus efficace sur fichier local)
+    _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
+    
+    # 6. Analyse adaptative APRÈS téléchargement (mode film-adaptive uniquement)
+    # L'analyse sur fichier local (SSD) est beaucoup plus rapide que sur fichier réseau
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
-        # Calculer les paramètres adaptatifs pour ce fichier
+        # Calculer les paramètres adaptatifs sur le fichier LOCAL (tmp_input)
         local adaptive_params
-        adaptive_params=$(compute_video_params_adaptive "$file_original")
+        adaptive_params=$(compute_video_params_adaptive "$tmp_input")
         
         # Format: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
         local _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf
@@ -474,37 +498,27 @@ convert_file() {
         adaptive_maxrate_kbps="${_mr%k}"
         adaptive_bufsize_kbps="${_bs%k}"
         
-        # Afficher l'analyse de complexité (avant la décision de skip)
+        # Afficher l'analyse de complexité
         if [[ "$NO_PROGRESS" != true ]]; then
-            display_complexity_analysis "$file_original" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
+            display_complexity_analysis "$tmp_input" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
         fi
         
         # Stocker les paramètres adaptatifs dans des variables d'environnement
-        # pour qu'ils soient utilisés par _execute_conversion
         export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
         export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
         export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
-    fi
-    
-    # 5. Décision de conversion (avec métadonnées et seuil adaptatif si applicable)
-    if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
-        # Alimenter la queue avec le prochain candidat si limite active
-        if [[ "$LIMIT_FILES" -gt 0 ]]; then
-            update_queue || true
+        
+        # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
+        if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
+            # Nettoyer le fichier temporaire
+            rm -f "$tmp_input" 2>/dev/null || true
+            if [[ "$LIMIT_FILES" -gt 0 ]]; then
+                update_queue || true
+            fi
+            increment_processed_count || true
+            return 0
         fi
-        increment_processed_count || true
-        return 0
     fi
-    
-    local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
-    
-    # Incrémenter le compteur de fichiers réellement convertis (UX mode limite)
-    # Ce compteur n'est incrémenté que si on va vraiment convertir (pas sur skip)
-    if declare -f increment_converted_count &>/dev/null; then
-        increment_converted_count >/dev/null
-    fi
-    
-    _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
     
     # Afficher les messages informatifs après le transfert, avant la conversion
     if [[ "$NO_PROGRESS" != true ]]; then

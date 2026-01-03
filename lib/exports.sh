@@ -8,6 +8,11 @@
 
 export_variables() {
     # ========================================================
+    # FONCTIONS UTILITAIRES DE BASE
+    # ========================================================
+    export -f normalize_path_for_ffprobe
+    
+    # ========================================================
     # FONCTIONS DE CONVERSION PRINCIPALES
     # ========================================================
     export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel

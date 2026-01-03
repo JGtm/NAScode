@@ -7,6 +7,20 @@
 ###########################################################
 
 ###########################################################
+# HELPER INTERNE
+###########################################################
+
+# Normalise un chemin pour ffprobe sous Windows/Git Bash
+_normalize_for_ffprobe() {
+    local file="$1"
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        normalize_path_for_ffprobe "$file"
+    else
+        echo "$file"
+    fi
+}
+
+###########################################################
 # SÉLECTION SOUS-TITRES FR
 ###########################################################
 
@@ -14,7 +28,8 @@
 # Usage: find_french_subtitle_stream <input_file>
 # Retourne: index du flux (ex: "0:s:0") ou chaîne vide si non trouvé
 find_french_subtitle_stream() {
-    local input_file="$1"
+    local input_file
+    input_file=$(_normalize_for_ffprobe "$1")
     
     # Liste tous les flux de sous-titres avec leurs tags language
     local streams_info
@@ -44,7 +59,8 @@ find_french_subtitle_stream() {
 # Usage: find_english_subtitle_stream <input_file>
 # Retourne: index du flux (ex: "0:s:0") ou chaîne vide si non trouvé
 find_english_subtitle_stream() {
-    local input_file="$1"
+    local input_file
+    input_file=$(_normalize_for_ffprobe "$1")
     
     # Liste tous les flux de sous-titres avec leurs tags language
     local streams_info
@@ -132,7 +148,8 @@ build_subtitle_mapping() {
 # Usage: list_subtitle_streams <input_file>
 # Retourne: liste au format "index|language|codec|title" par ligne
 list_subtitle_streams() {
-    local input_file="$1"
+    local input_file
+    input_file=$(_normalize_for_ffprobe "$1")
     
     ffprobe -v error \
         -select_streams s \
@@ -148,7 +165,8 @@ list_subtitle_streams() {
 # Usage: count_subtitle_streams <input_file>
 # Retourne: nombre de flux
 count_subtitle_streams() {
-    local input_file="$1"
+    local input_file
+    input_file=$(_normalize_for_ffprobe "$1")
     
     local count
     count=$(ffprobe -v error \
@@ -170,7 +188,8 @@ count_subtitle_streams() {
 # - Fallback: si aucun sous-titre FR trouvé, garde tous les sous-titres
 # Retourne une chaîne de paramètres -map pour ffmpeg.
 _build_stream_mapping() {
-    local input_file="$1"
+    local input_file
+    input_file=$(_normalize_for_ffprobe "$1")
 
     local mapping=""
 

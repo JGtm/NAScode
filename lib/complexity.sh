@@ -10,18 +10,19 @@
 # Note: pas de readonly pour éviter les erreurs quand le fichier est sourcé plusieurs fois (tests)
 
 # BPP (Bits Per Pixel) de référence pour HEVC
-# Calibré pour produire ~2000-3500 kbps en 1080p@24fps
-ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE:-0.045}"
+# Calibré pour produire ~1500-2500 kbps en 1080p@24fps (plus agressif)
+ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE:-0.032}"
 
 # Coefficient de complexité : bornes min/max
-ADAPTIVE_C_MIN="${ADAPTIVE_C_MIN:-0.75}"
-ADAPTIVE_C_MAX="${ADAPTIVE_C_MAX:-1.35}"
+# Plage réduite pour des bitrates plus homogènes
+ADAPTIVE_C_MIN="${ADAPTIVE_C_MIN:-0.85}"
+ADAPTIVE_C_MAX="${ADAPTIVE_C_MAX:-1.25}"
 
 # Seuils de mapping std-dev → coefficient C
 # Basés sur l'écart-type normalisé des tailles de frames
-# Ces valeurs sont à affiner avec un corpus de test réel
-ADAPTIVE_STDDEV_LOW="${ADAPTIVE_STDDEV_LOW:-0.15}"    # En dessous : contenu statique
-ADAPTIVE_STDDEV_HIGH="${ADAPTIVE_STDDEV_HIGH:-0.35}"  # Au dessus : contenu complexe
+# Seuils resserrés : la plupart des films sont 'standard', seuls les vrais films d'action sont 'complexes'
+ADAPTIVE_STDDEV_LOW="${ADAPTIVE_STDDEV_LOW:-0.20}"    # En dessous : contenu statique (dialogues)
+ADAPTIVE_STDDEV_HIGH="${ADAPTIVE_STDDEV_HIGH:-0.45}"  # Au dessus : contenu très complexe (action intense)
 
 # Durée d'échantillon par point (secondes)
 ADAPTIVE_SAMPLE_DURATION="${ADAPTIVE_SAMPLE_DURATION:-10}"
@@ -46,6 +47,11 @@ _get_frame_sizes() {
     local file="$1"
     local start_sec="$2"
     local duration_sec="$3"
+    
+    # Windows/Git Bash : normaliser le chemin pour ffprobe
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        file=$(normalize_path_for_ffprobe "$file")
+    fi
     
     ffprobe -v error \
         -select_streams v:0 \
@@ -101,9 +107,9 @@ analyze_video_complexity() {
         return 1
     fi
     
-    # Convertir la durée en entier pour les calculs
+    # Convertir la durée en entier pour les calculs (LC_NUMERIC pour gérer les décimales)
     local duration_int
-    duration_int=$(printf "%.0f" "$duration")
+    duration_int=$(LC_NUMERIC=C printf "%.0f" "$duration")
     
     # Minimum requis : 60 secondes pour une analyse fiable
     if [[ "$duration_int" -lt 60 ]]; then
@@ -117,18 +123,24 @@ analyze_video_complexity() {
         return 0
     fi
     
-    # Points d'échantillonnage : 6 positions réparties (10%, 25%, 40%, 55%, 70%, 85%)
+    # Points d'échantillonnage : 12 positions réparties pour une analyse plus précise
     # Évite les génériques de début/fin et couvre bien le contenu
     local sample_duration="${ADAPTIVE_SAMPLE_DURATION}"
     local margin=30  # Marge pour éviter les génériques
     
     local positions=(
-        $(( (duration_int * 10 / 100) ))   # Début (après intro)
-        $(( (duration_int * 25 / 100) ))   # Premier quart
-        $(( (duration_int * 40 / 100) ))   # Avant milieu
-        $(( (duration_int * 55 / 100) ))   # Après milieu
-        $(( (duration_int * 70 / 100) ))   # Troisième quart
-        $(( (duration_int * 85 / 100) ))   # Fin (avant générique)
+        $(( (duration_int * 5 / 100) ))    # Après générique début
+        $(( (duration_int * 12 / 100) ))   # Début histoire
+        $(( (duration_int * 20 / 100) ))   # Premier quart
+        $(( (duration_int * 28 / 100) ))   # 
+        $(( (duration_int * 36 / 100) ))   # Avant milieu
+        $(( (duration_int * 44 / 100) ))   # Milieu -
+        $(( (duration_int * 52 / 100) ))   # Milieu +
+        $(( (duration_int * 60 / 100) ))   # Après milieu
+        $(( (duration_int * 68 / 100) ))   # Troisième quart
+        $(( (duration_int * 76 / 100) ))   # 
+        $(( (duration_int * 84 / 100) ))   # Fin
+        $(( (duration_int * 92 / 100) ))   # Avant générique fin
     )
     
     # S'assurer qu'on ne dépasse pas la fin et qu'on respecte les marges
@@ -182,8 +194,12 @@ _show_analysis_progress() {
     bar+="╟"
     
     # Afficher sur stderr pour ne pas polluer la sortie
-    # Note: en fin d'analyse, on efface cette ligne
-    printf "\r\033[K  📊 Analyse complexité %s %3d%% [%d/%d]" "$bar" "$percent" "$current" "$total" >&2
+    if [[ "$percent" -ge 100 ]]; then
+        # Terminé : afficher avec ✓ et nouvelle ligne pour garder visible
+        printf "\r\033[K  ✓ Analyse de la complexité %s 100%% [%d/%d]\n" "$bar" >&2
+    else
+        printf "\r\033[K  📊 Analyse de la complexité %s %3d%% [%d/%d]" "$bar" "$percent" >&2
+    fi
 }
 
 # Mappe le coefficient de variation vers le coefficient de complexité C.
@@ -319,10 +335,15 @@ get_adaptive_encoding_params() {
     
     # Récupérer le FPS
     local fps
+    local _file_for_fps="$file"
+    # Windows/Git Bash : normaliser le chemin pour ffprobe
+    if declare -f normalize_path_for_ffprobe &>/dev/null; then
+        _file_for_fps=$(normalize_path_for_ffprobe "$file")
+    fi
     fps=$(ffprobe -v error -select_streams v:0 \
         -show_entries stream=r_frame_rate \
         -of default=noprint_wrappers=1:nokey=1 \
-        "$file" 2>/dev/null | head -1)
+        "$_file_for_fps" 2>/dev/null | head -1)
     
     # Convertir le FPS (format "24000/1001" ou "24")
     if [[ "$fps" == *"/"* ]]; then
@@ -333,8 +354,6 @@ get_adaptive_encoding_params() {
     # Analyser la complexité (avec progression)
     local stddev complexity_c complexity_desc
     stddev=$(analyze_video_complexity "$file" "$duration" true)
-    # Effacer la barre de progression (le printf dans le sous-shell ne peut pas le faire)
-    [[ "${NO_PROGRESS:-false}" != true ]] && printf "\r\033[K" >&2
     complexity_c=$(_map_stddev_to_complexity "$stddev")
     complexity_desc=$(_describe_complexity "$complexity_c")
     

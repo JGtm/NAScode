@@ -71,6 +71,23 @@ PY
 }
 
 ###########################################################
+# NORMALISATION CHEMINS FFPROBE (WINDOWS/GIT BASH)
+###########################################################
+
+# Convertit un chemin Git Bash (/c/...) en chemin Windows (C:/...) pour ffprobe
+# ffprobe sur Windows/Git Bash ne gère pas bien /c/ avec des caractères spéciaux (accents, apostrophes)
+normalize_path_for_ffprobe() {
+    local path="$1"
+    # Si le chemin commence par /c/, /d/, etc. (lettre de lecteur Git Bash)
+    if [[ "$path" =~ ^/([a-zA-Z])/ ]]; then
+        # Convertir /c/... en C:/...
+        echo "${BASH_REMATCH[1]^}:${path:2}"
+    else
+        echo "$path"
+    fi
+}
+
+###########################################################
 # FONCTIONS DE COMPTAGE ET EXCLUSION
 ###########################################################
 
