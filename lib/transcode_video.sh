@@ -48,7 +48,7 @@ _setup_video_encoding_params() {
     if [[ -n "$downscale_filter" ]]; then
         VIDEO_FILTER_OPTS="-vf $downscale_filter"
         if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
         fi
     fi
     

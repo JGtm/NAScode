@@ -59,3 +59,47 @@ teardown() {
     [ -n "$codec" ]
     [[ "$duration" =~ ^[0-9]+(\.[0-9]+)?$ ]]
 }
+
+@test "_probe_audio_channels: retourne channels|channel_layout (stub)" {
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "channels=6"
+echo "channel_layout=6 channels"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+
+    local out channels layout
+    out=$(_probe_audio_channels "/fake/file.mkv")
+    IFS='|' read -r channels layout <<< "$out"
+
+    [ "$channels" -eq 6 ]
+    [ "$layout" = "6 channels" ]
+}
+
+@test "_probe_audio_full: retourne codec|bitrate_kbps|channels|layout (stub)" {
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=eac3"
+echo "bit_rate=384000"
+echo "channels=6"
+echo "channel_layout=6 channels"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+
+    local out codec bitrate_kbps channels layout
+    out=$(_probe_audio_full "/fake/file.mkv")
+    IFS='|' read -r codec bitrate_kbps channels layout <<< "$out"
+
+    [ "$codec" = "eac3" ]
+    [ "$bitrate_kbps" -eq 384 ]
+    [ "$channels" -eq 6 ]
+    [ "$layout" = "6 channels" ]
+}

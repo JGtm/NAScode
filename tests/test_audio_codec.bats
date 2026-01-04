@@ -393,6 +393,82 @@ STUB
     [ "$status" -eq 0 ]
 }
 
+@test "_build_audio_params: mode serie force stereo si source >= 6ch (stub)" {
+    # Stub ffprobe pour simuler audio multicanal avec layout non standard
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=eac3"
+echo "bit_rate=384000"
+echo "channels=6"
+echo "channel_layout=6 channels"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+
+    CONVERSION_MODE="serie"
+    AUDIO_CODEC="aac"
+    AUDIO_BITRATE_KBPS=0
+
+    local result
+    result=$(_build_audio_params "/fake/file.mkv")
+
+    [[ "$result" =~ "-c:a aac" ]]
+    [[ "$result" =~ "-af aformat=channel_layouts=stereo" ]]
+}
+
+@test "_build_audio_params: mode film preserve 5.1 si source >= 6ch (stub)" {
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=eac3"
+echo "bit_rate=384000"
+echo "channels=6"
+echo "channel_layout=6 channels"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+
+    CONVERSION_MODE="film"
+    AUDIO_CODEC="aac"
+    AUDIO_BITRATE_KBPS=0
+
+    local result
+    result=$(_build_audio_params "/fake/file.mkv")
+
+    [[ "$result" =~ "-c:a aac" ]]
+    [[ "$result" =~ "-af aformat=channel_layouts=5.1" ]]
+}
+
+@test "_build_audio_params: mode film force stereo si source < 6ch (stub)" {
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=eac3"
+echo "bit_rate=384000"
+echo "channels=2"
+echo "channel_layout=stereo"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+
+    CONVERSION_MODE="film"
+    AUDIO_CODEC="aac"
+    AUDIO_BITRATE_KBPS=0
+
+    local result
+    result=$(_build_audio_params "/fake/file.mkv")
+
+    [[ "$result" =~ "-c:a aac" ]]
+    [[ "$result" =~ "-af aformat=channel_layouts=stereo" ]]
+}
+
 ###########################################################
 # Tests d'intégration avec args.sh
 ###########################################################

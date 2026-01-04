@@ -374,6 +374,6 @@ display_complexity_analysis() {
     
     echo -e "${CYAN}  📊 Analyse de complexité :${NOCOLOR}"
     echo -e "${DIM}     └─ Coefficient de variation : ${stddev}${NOCOLOR}"
-    echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc}${NOCOLOR}"
+    echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
     echo -e "${DIM}     └─ Bitrate adaptatif : ${target_kbps} kbps${NOCOLOR}"
 }

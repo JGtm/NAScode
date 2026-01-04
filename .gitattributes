@@ -1,0 +1,7 @@
+# Normalise les fins de ligne pour éviter les soucis CRLF sur Git Bash/macOS/Linux.
+# Avec core.autocrlf=true, ces règles forcent un checkout en LF pour les scripts.
+
+*.sh        text eol=lf
+*.bats      text eol=lf
+nascode     text eol=lf
+run_tests.sh text eol=lf
