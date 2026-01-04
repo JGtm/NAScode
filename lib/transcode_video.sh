@@ -537,6 +537,10 @@ _execute_ffmpeg_pipeline() {
     fi
     EFFECTIVE_DURATION="$effective_duration"
 
+    # Préparer les paramètres du mode sample (seek + durée) - AVANT tout traitement
+    # Définit SAMPLE_SEEK_PARAMS, SAMPLE_DURATION_PARAMS, EFFECTIVE_DURATION, SAMPLE_KEYFRAME_POS
+    _setup_sample_mode_params "$tmp_input" "$duration_secs"
+
     # Préparer les paramètres audio
     local audio_params
     audio_params=$(_build_audio_params "$tmp_input")
@@ -583,8 +587,10 @@ _execute_ffmpeg_pipeline() {
     case "$mode" in
         "passthrough")
             # Mode passthrough : vidéo copiée, audio traité
+            # En mode sample, on applique seek+durée pour ne copier que le segment
             $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-                -i "$tmp_input" \
+                $SAMPLE_SEEK_PARAMS \
+                -i "$tmp_input" $SAMPLE_DURATION_PARAMS \
                 -c:v copy \
                 $audio_params \
                 $stream_mapping -f matroska \
@@ -608,7 +614,7 @@ _execute_ffmpeg_pipeline() {
         "crf"|"twopass")
             # Modes avec encodage vidéo : préparer les paramètres vidéo
             _setup_video_encoding_params "$tmp_input"
-            _setup_sample_mode_params "$tmp_input" "$duration_secs"
+            # Note: _setup_sample_mode_params est appelé en amont (PRÉPARATION COMMUNE)
 
             # Paramètres de base pour l'encodeur
             local encoder_base_params="${ENCODER_BASE_PARAMS:-}"

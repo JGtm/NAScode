@@ -67,6 +67,33 @@ load_minimal() {
     source "$LIB_DIR/codec_profiles.sh"
 }
 
+# Version rapide de load_minimal qui mocke detect.sh (pour tests sans I/O)
+# Utiliser pour les tests qui n'ont pas besoin de vraie détection système
+load_minimal_fast() {
+    export SCRIPT_DIR="$PROJECT_ROOT"
+    source "$LIB_DIR/ui.sh"
+    # Mock des variables de détection (évite les appels système lents)
+    export HAS_MD5SUM=1
+    export HAS_MD5=0
+    export HAS_PYTHON3=1
+    export HAS_DATE_NANO=1
+    export HAS_PERL_HIRES=0
+    export HAS_GAWK=1
+    export HAS_SHA256SUM=1
+    export HAS_SHASUM=0
+    export HAS_OPENSSL=1
+    export HAS_LIBVMAF=0
+    export FFMPEG_VMAF=""
+    export IS_MSYS=0
+    export IS_MACOS=0
+    export IS_LINUX=1
+    export HAS_LIBSVTAV1=1
+    export HAS_LIBX265=1
+    export HAS_LIBAOM=0
+    source "$LIB_DIR/config.sh"
+    source "$LIB_DIR/codec_profiles.sh"
+}
+
 # Helper pour créer un fichier null-separated
 create_null_separated_file() {
     local output_file="$1"

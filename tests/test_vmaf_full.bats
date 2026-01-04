@@ -373,3 +373,47 @@ teardown() {
     grep -q "VMAF" "$LOG_SUCCESS"
     grep -q "score:92.50" "$LOG_SUCCESS"
 }
+
+###########################################################
+# Tests d'intégration SAMPLE_MODE + VMAF
+###########################################################
+
+@test "regression: _execute_ffmpeg_pipeline définit SAMPLE_KEYFRAME_POS pour VMAF" {
+    # Ce test vérifie que _setup_sample_mode_params est appelée AVANT le case
+    # (y compris pour le mode passthrough), ce qui est nécessaire pour que
+    # SAMPLE_KEYFRAME_POS soit défini et transmis à la queue VMAF.
+    #
+    # Bug corrigé: avant le fix, _setup_sample_mode_params n'était appelée
+    # que dans le case crf|twopass, pas dans passthrough. Résultat: VMAF
+    # analysait tout le film au lieu des 30s du sample.
+    
+    # Vérifier que _setup_sample_mode_params est appelée dans la section PRÉPARATION COMMUNE
+    # (avant le case "$mode" in)
+    local transcode_file="$LIB_DIR/transcode_video.sh"
+    
+    # Récupérer le numéro de ligne de _setup_sample_mode_params
+    local setup_line
+    setup_line=$(grep -n "_setup_sample_mode_params.*tmp_input.*duration" "$transcode_file" | head -1 | cut -d: -f1)
+    
+    # Récupérer le numéro de ligne du case "$mode"
+    local case_line
+    case_line=$(grep -n 'case "\$mode" in' "$transcode_file" | head -1 | cut -d: -f1)
+    
+    # _setup_sample_mode_params doit être AVANT le case
+    [ -n "$setup_line" ]
+    [ -n "$case_line" ]
+    [ "$setup_line" -lt "$case_line" ]
+}
+
+@test "regression: mode passthrough utilise SAMPLE_SEEK_PARAMS" {
+    # Vérifier que la commande FFmpeg passthrough inclut les paramètres sample
+    local transcode_file="$LIB_DIR/transcode_video.sh"
+    
+    # Extraire le bloc passthrough et vérifier qu'il contient SAMPLE_SEEK_PARAMS
+    # On cherche entre "passthrough)" et le prochain ";;"
+    local passthrough_block
+    passthrough_block=$(sed -n '/\"passthrough\")/,/;;/p' "$transcode_file")
+    
+    echo "$passthrough_block" | grep -q 'SAMPLE_SEEK_PARAMS'
+    echo "$passthrough_block" | grep -q 'SAMPLE_DURATION_PARAMS'
+}
