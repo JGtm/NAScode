@@ -8,7 +8,7 @@ load 'test_helper'
 
 setup() {
     setup_test_env
-    load_minimal_fast
+    load_minimal  # Needs detect.sh for normalize_path
 }
 
 teardown() {

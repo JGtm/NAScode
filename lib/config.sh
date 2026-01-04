@@ -49,8 +49,8 @@ VIDEO_ENCODER=""     # Vide = auto-détection selon VIDEO_CODEC
 # Mode sample : encoder uniquement un segment de test (30s par défaut)
 SAMPLE_MODE=false
 SAMPLE_DURATION=30      # Durée du segment en secondes
-SAMPLE_MARGIN_START=180 # Marge début (éviter générique) en secondes
-SAMPLE_MARGIN_END=120   # Marge fin (éviter générique) en secondes
+SAMPLE_MARGIN_START=180 # Marge début (éviter intro/générique) en secondes
+SAMPLE_MARGIN_END=900   # Marge fin (éviter générique de fin) en secondes = 15 minutes
 SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour VMAF)
 
 # Mode single-pass CRF pour séries (plus rapide, taille variable)

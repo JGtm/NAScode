@@ -200,6 +200,9 @@ print_and_log ""
 # Exécution des tests
 ###########################################################
 
+# Capturer le temps de départ
+START_TIME=$(date +%s)
+
 cd "$TESTS_DIR"
 
 # Collecter les fichiers de test
@@ -394,11 +397,16 @@ else
 fi
 
 if [[ $TOTAL_SKIPPED -gt 0 ]]; then
-    print_and_log ""
     print_and_log "${YELLOW}ℹ ${TOTAL_SKIPPED} test(s) ignoré(s) (skip)${NC}"
 fi
 
+# Calculer et afficher le temps total d'exécution
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+ELAPSED_MIN=$((ELAPSED / 60))
+ELAPSED_SEC=$((ELAPSED % 60))
 print_and_log ""
+print_and_log "${DIM}⏱  Temps d'exécution : ${ELAPSED_MIN}m ${ELAPSED_SEC}s${NC}"
 print_and_log "${DIM}Log complet : $LOG_FILE${NC}"
 print_and_log "${CYAN}═══════════════════════════════════════════════════════${NC}"
 

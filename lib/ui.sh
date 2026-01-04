@@ -254,7 +254,6 @@ print_indexing_end() {
     # Format : "  │  ✅ 9999 fichiers indexés                       │"
     printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%4d${GREEN} fichiers indexés${NOCOLOR}                        ${MAGENTA}│${NOCOLOR}\n" "$count" >&2
     echo -e "${MAGENTA}  └──────────────────────────────────────────────────┘${NOCOLOR}" >&2
-    echo "" >&2
 }
 
 # Affiche un cadre quand l'index existant est conservé
@@ -272,7 +271,6 @@ print_index_kept() {
     echo -e "${MAGENTA}  ┌──────────────────────────────────────────────────┐${NOCOLOR}" >&2
     printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✔${NOCOLOR}  %-${width}s${MAGENTA}│${NOCOLOR}\n" "$message" >&2
     echo -e "${MAGENTA}  └──────────────────────────────────────────────────┘${NOCOLOR}" >&2
-    echo "" >&2
 }
 
 ###########################################################

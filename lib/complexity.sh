@@ -27,6 +27,13 @@ ADAPTIVE_STDDEV_HIGH="${ADAPTIVE_STDDEV_HIGH:-0.45}"  # Au dessus : contenu trè
 # Durée d'échantillon par point (secondes)
 ADAPTIVE_SAMPLE_DURATION="${ADAPTIVE_SAMPLE_DURATION:-10}"
 
+# Nombre de points d'échantillonnage pour l'analyse de complexité
+ADAPTIVE_SAMPLE_COUNT="${ADAPTIVE_SAMPLE_COUNT:-20}"
+
+# Marge début/fin pour éviter les génériques (% de la durée totale)
+ADAPTIVE_MARGIN_START_PCT="${ADAPTIVE_MARGIN_START_PCT:-5}"   # 5% = évite générique début
+ADAPTIVE_MARGIN_END_PCT="${ADAPTIVE_MARGIN_END_PCT:-8}"       # 8% = évite générique fin
+
 # Plancher qualité (kbps minimum)
 ADAPTIVE_MIN_BITRATE_KBPS="${ADAPTIVE_MIN_BITRATE_KBPS:-800}"
 
@@ -39,6 +46,40 @@ ADAPTIVE_BUFSIZE_FACTOR="${ADAPTIVE_BUFSIZE_FACTOR:-2.5}"
 ###########################################################
 # ANALYSE DES FRAMES
 ###########################################################
+
+# Génère N positions d'échantillonnage réparties uniformément.
+# Évite les génériques début/fin selon les marges configurées.
+# Usage: _generate_sample_positions <duration_seconds> <sample_count>
+# Retourne: positions séparées par des espaces
+_generate_sample_positions() {
+    local duration_int="$1"
+    local count="${2:-$ADAPTIVE_SAMPLE_COUNT}"
+    
+    # Marges en secondes (calculées à partir des pourcentages)
+    local margin_start=$(( duration_int * ADAPTIVE_MARGIN_START_PCT / 100 ))
+    local margin_end=$(( duration_int * ADAPTIVE_MARGIN_END_PCT / 100 ))
+    
+    # Plage utilisable
+    local usable_start="$margin_start"
+    local usable_end=$(( duration_int - margin_end ))
+    local usable_range=$(( usable_end - usable_start ))
+    
+    # Sécurité : si la plage est trop petite
+    if [[ "$usable_range" -lt "$count" ]]; then
+        echo "$margin_start"
+        return
+    fi
+    
+    # Générer les positions uniformément réparties
+    local positions=()
+    local step=$(( usable_range / (count + 1) ))
+    
+    for ((i=1; i<=count; i++)); do
+        positions+=( $(( usable_start + step * i )) )
+    done
+    
+    echo "${positions[*]}"
+}
 
 # Extrait les tailles de frames sur un segment donné.
 # Usage: _get_frame_sizes <file> <start_seconds> <duration_seconds>
@@ -118,28 +159,22 @@ analyze_video_complexity() {
         return 0
     fi
     
-    # Points d'échantillonnage : 12 positions réparties pour une analyse plus précise
-    # Évite les génériques de début/fin et couvre bien le contenu
+    # Points d'échantillonnage : N positions réparties uniformément
+    # Évite les génériques de début/fin selon les marges configurées
     local sample_duration="${ADAPTIVE_SAMPLE_DURATION}"
-    local margin=30  # Marge pour éviter les génériques
+    local sample_count="${ADAPTIVE_SAMPLE_COUNT}"
     
-    local positions=(
-        $(( (duration_int * 5 / 100) ))    # Après générique début
-        $(( (duration_int * 12 / 100) ))   # Début histoire
-        $(( (duration_int * 20 / 100) ))   # Premier quart
-        $(( (duration_int * 28 / 100) ))   # 
-        $(( (duration_int * 36 / 100) ))   # Avant milieu
-        $(( (duration_int * 44 / 100) ))   # Milieu -
-        $(( (duration_int * 52 / 100) ))   # Milieu +
-        $(( (duration_int * 60 / 100) ))   # Après milieu
-        $(( (duration_int * 68 / 100) ))   # Troisième quart
-        $(( (duration_int * 76 / 100) ))   # 
-        $(( (duration_int * 84 / 100) ))   # Fin
-        $(( (duration_int * 92 / 100) ))   # Avant générique fin
-    )
+    # Générer les positions dynamiquement
+    local positions_str
+    positions_str=$(_generate_sample_positions "$duration_int" "$sample_count")
+    read -ra positions <<< "$positions_str"
+    
+    # Marge de sécurité pour ne pas dépasser la fin
+    local margin_end=$(( duration_int * ADAPTIVE_MARGIN_END_PCT / 100 ))
+    local margin_start=$(( duration_int * ADAPTIVE_MARGIN_START_PCT / 100 ))
     
     # S'assurer qu'on ne dépasse pas la fin et qu'on respecte les marges
-    local max_start=$(( duration_int - sample_duration - margin ))
+    local max_start=$(( duration_int - sample_duration - margin_end ))
     local all_frames=""
     local total_samples=${#positions[@]}
     local current_sample=0
@@ -149,7 +184,7 @@ analyze_video_complexity() {
         
         # Ajuster la position si nécessaire
         [[ "$pos" -gt "$max_start" ]] && pos="$max_start"
-        [[ "$pos" -lt "$margin" ]] && pos="$margin"
+        [[ "$pos" -lt "$margin_start" ]] && pos="$margin_start"
         
         # Afficher la progression si demandé
         if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then

@@ -380,29 +380,27 @@ teardown() {
 
 @test "regression: _execute_ffmpeg_pipeline définit SAMPLE_KEYFRAME_POS pour VMAF" {
     # Ce test vérifie que _setup_sample_mode_params est appelée AVANT le case
-    # (y compris pour le mode passthrough), ce qui est nécessaire pour que
+    # dans _execute_ffmpeg_pipeline, ce qui est nécessaire pour que
     # SAMPLE_KEYFRAME_POS soit défini et transmis à la queue VMAF.
-    #
-    # Bug corrigé: avant le fix, _setup_sample_mode_params n'était appelée
-    # que dans le case crf|twopass, pas dans passthrough. Résultat: VMAF
-    # analysait tout le film au lieu des 30s du sample.
     
-    # Vérifier que _setup_sample_mode_params est appelée dans la section PRÉPARATION COMMUNE
-    # (avant le case "$mode" in)
     local transcode_file="$LIB_DIR/transcode_video.sh"
     
-    # Récupérer le numéro de ligne de _setup_sample_mode_params
-    local setup_line
-    setup_line=$(grep -n "_setup_sample_mode_params.*tmp_input.*duration" "$transcode_file" | head -1 | cut -d: -f1)
+    # Extraire uniquement la fonction _execute_ffmpeg_pipeline
+    # et vérifier que _setup_sample_mode_params est appelée avant le case
+    local func_content
+    func_content=$(sed -n '/^_execute_ffmpeg_pipeline()/,/^[^ ]/p' "$transcode_file" | head -n -1)
     
-    # Récupérer le numéro de ligne du case "$mode"
-    local case_line
-    case_line=$(grep -n 'case "\$mode" in' "$transcode_file" | head -1 | cut -d: -f1)
+    # Vérifier que _setup_sample_mode_params est présent
+    echo "$func_content" | grep -q "_setup_sample_mode_params"
     
-    # _setup_sample_mode_params doit être AVANT le case
-    [ -n "$setup_line" ]
-    [ -n "$case_line" ]
-    [ "$setup_line" -lt "$case_line" ]
+    # Vérifier l'ordre: setup_sample doit apparaître AVANT 'case "$mode"'
+    local setup_pos case_pos
+    setup_pos=$(echo "$func_content" | grep -n "_setup_sample_mode_params" | head -1 | cut -d: -f1)
+    case_pos=$(echo "$func_content" | grep -n 'case "\$mode"' | head -1 | cut -d: -f1)
+    
+    [ -n "$setup_pos" ]
+    [ -n "$case_pos" ]
+    [ "$setup_pos" -lt "$case_pos" ]
 }
 
 @test "regression: mode passthrough utilise SAMPLE_SEEK_PARAMS" {

@@ -313,7 +313,7 @@ _setup_temp_files_and_logs() {
     if [[ "$NO_PROGRESS" != true ]]; then
         echo ""
         local counter_str=$(_get_counter_prefix)
-        echo -e "▶️  ${counter_str}Démarrage du fichier : $filename"
+        echo -e "${counter_str}▶️ Démarrage du fichier : $filename"
     fi
     if [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
