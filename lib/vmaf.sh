@@ -84,7 +84,7 @@ compute_vmaf_score() {
         original_input_opts="-ss ${keyframe_pos} -t ${sample_duration}"
         # setpts remet les timestamps à 0 pour synchroniser les deux flux
         # On ajoute aussi un format commun et un scale éventuel pour garantir la compatibilité VMAF.
-        lavfi_filter="[0:v]setpts=PTS-STARTPTS,${dist_chain}[dist];[1:v]setpts=PTS-STARTPTS,${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
+        lavfi_filter="[0:v]setpts=PTS-STARTPTS,${dist_chain}[dist];[1:v]setpts=PTS-STARTPTS,${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=10:model=version=vmaf_v0.6.1neg"
     else
         # Mode normal : comparaison directe
         # On force un format commun et on scale l'original si besoin (downscale côté conversion).
@@ -271,10 +271,15 @@ process_vmaf_queue() {
             continue
         fi
         
-        # Calculer le score VMAF (avec barre de progression intégrée)
-        # Passer la position du keyframe si disponible (mode sample)
+        # Mesurer le temps d'analyse VMAF
+        local vmaf_start_time vmaf_end_time vmaf_duration vmaf_duration_str
+        vmaf_start_time=$(date +%s)
         local vmaf_score
         vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename" "$current" "$vmaf_count" "$keyframe_pos")
+        vmaf_end_time=$(date +%s)
+        vmaf_duration=$((vmaf_end_time - vmaf_start_time))
+        # Format hh:mm:ss
+        printf -v vmaf_duration_str '%02d:%02d:%02d' $((vmaf_duration/3600)) $((vmaf_duration%3600/60)) $((vmaf_duration%60))
         
         # Interpréter le score VMAF
         local vmaf_quality=""
@@ -308,8 +313,8 @@ process_vmaf_queue() {
             if [[ ${#display_name_final} -gt 45 ]]; then
                 display_name_final="${display_name_final:0:42}..."
             fi
-            # Compteur et nom de fichier en CYAN
-            printf "\r  %s ${CYAN}[%d/%d] %-45s${NOCOLOR} : %s (%s)%20s\n" "$status_icon" "$current" "$vmaf_count" "$display_name_final" "$vmaf_score" "${vmaf_quality:-NA}" "" >&2
+            # Compteur et nom de fichier en CYAN, ajout du temps d'analyse à la fin
+            printf "\r  %s ${CYAN}[%d/%d] %-45s${NOCOLOR} : %s (%s) | %s\n" "$status_icon" "$current" "$vmaf_count" "$display_name_final" "$vmaf_score" "${vmaf_quality:-NA}" "$vmaf_duration_str" >&2
         fi
         
     done < "$VMAF_QUEUE_FILE"
