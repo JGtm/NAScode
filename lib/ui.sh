@@ -418,7 +418,7 @@ format_option_limit() {
         icon="🎲"
     fi
     
-    echo -e "${icon}  ${MAGENTA}LIMITATION${NOCOLOR} : ${message}"
+    echo -e "${icon}  ${YELLOW}LIMITATION${NOCOLOR} : ${message}"
 }
 
 # Formate une option mode échantillon pour print_active_options
