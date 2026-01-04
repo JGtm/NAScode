@@ -191,9 +191,9 @@ _show_analysis_progress() {
     # Afficher sur stderr pour ne pas polluer la sortie
     if [[ "$percent" -ge 100 ]]; then
         # Terminé : afficher avec ✓ et nouvelle ligne pour garder visible
-        printf "\r\033[K  ✓ Analyse de complexité %s 100%% [%d/%d]\n" "$bar" >&2
+        printf "\r\033[K  ✓ Analyse de complexité %s 100%%\n" "$bar" >&2
     else
-        printf "\r\033[K  📊 Analyse de complexité %s %3d%% [%d/%d]" "$bar" "$percent" >&2
+        printf "\r\033[K  📊 Analyse de complexité %s %3d%%" "$bar" "$percent" >&2
     fi
 }
 
@@ -374,6 +374,6 @@ display_complexity_analysis() {
     
     echo -e "${CYAN}  📊 Analyse de complexité :${NOCOLOR}"
     echo -e "${DIM}     └─ Coefficient de variation : ${stddev}${NOCOLOR}"
-    echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc}${NOCOLOR}"
+    echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
     echo -e "${DIM}     └─ Bitrate adaptatif : ${target_kbps} kbps${NOCOLOR}"
 }

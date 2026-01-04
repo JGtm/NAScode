@@ -528,7 +528,7 @@ convert_file() {
         
         if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
             # Mode passthrough : vidéo conservée, seul l'audio sera converti
-            echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → conversion audio seule${NOCOLOR}"
+            echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → Conversion audio seule${NOCOLOR}"
         else
             # Mode full : vérifier si le codec source est meilleur/égal à la cible
             local target_codec="${VIDEO_CODEC:-hevc}"
@@ -536,7 +536,19 @@ convert_file() {
                 # Le codec source est efficace mais le bitrate est trop élevé
                 local target_display="${target_codec^^}"
                 [[ "$target_codec" == "hevc" || "$target_codec" == "h265" ]] && target_display="X265"
-                echo -e "${CYAN}  🎯 Codec ${codec_display} optimal → limitation du bitrate${NOCOLOR}"
+                echo -e "${CYAN}  🎯 Codec ${codec_display} optimal → Limitation du bitrate${NOCOLOR}"
+            fi
+        fi
+        
+        # Info sur le traitement audio multicanal (mode film/film-adaptive uniquement)
+        if [[ "${CONVERSION_MODE:-serie}" == "film" || "${CONVERSION_MODE:-serie}" == "film-adaptive" ]]; then
+            if declare -f _probe_audio_channels &>/dev/null && declare -f _is_audio_multichannel &>/dev/null; then
+                local channel_info channels
+                channel_info=$(_probe_audio_channels "$tmp_input")
+                channels=$(echo "$channel_info" | cut -d'|' -f1)
+                if _is_audio_multichannel "$channels"; then
+                    echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Préservation 5.1${NOCOLOR}"
+                fi
             fi
         fi
     fi

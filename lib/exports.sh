@@ -42,7 +42,8 @@ export_variables() {
     
     # --- Fonctions audio et sous-titres ---
     export -f _get_audio_target_bitrate _get_audio_conversion_info _build_audio_params _build_stream_mapping
-    export -f _should_convert_audio _probe_audio_info
+    export -f _should_convert_audio _probe_audio_info _probe_audio_channels _probe_audio_full
+    export -f _is_audio_multichannel _get_target_audio_layout _build_audio_layout_filter
     
     # ========================================================
     # FONCTIONS DE PRÉPARATION ET FINALISATION

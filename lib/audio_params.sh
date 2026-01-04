@@ -104,6 +104,65 @@ get_audio_ffmpeg_encoder() {
 }
 
 ###########################################################
+# GESTION DES LAYOUTS AUDIO (CANAUX)
+###########################################################
+
+# TODO [ÉVOLUTION FUTURE]: Implémenter une logique de downmix/réencodage multichannel
+# plus sophistiquée. Actuellement on normalise simplement vers stereo (serie) ou 5.1 (film).
+# Pistes futures :
+#   - Bitrate adaptatif selon le nombre de canaux (ex: AAC 5.1 à 256k au lieu de 160k)
+#   - Option --downmix pour forcer le downmix même en mode film
+#   - Préservation 7.1 pour certains cas (mode "premium" ?)
+#   - Détection des layouts non standards et normalisation automatique
+
+# Détermine si la source audio est multicanal (>= 6 canaux, soit 5.1 ou plus)
+# Usage: _is_audio_multichannel <channels>
+# Retourne: 0 (true) si >= 6 canaux, 1 (false) sinon
+_is_audio_multichannel() {
+    local channels="${1:-2}"
+    [[ "$channels" -ge 6 ]]
+}
+
+# Retourne le layout audio cible selon le mode de conversion et les canaux source.
+# Usage: _get_target_audio_layout <channels> [mode]
+# Retourne: "stereo" ou "5.1"
+# Règle :
+#   - Mode serie : toujours stéréo (downmix pour économiser l'espace)
+#   - Mode film/film-adaptive : 5.1 si source >= 6 canaux, sinon stéréo
+_get_target_audio_layout() {
+    local channels="${1:-2}"
+    local mode="${2:-${CONVERSION_MODE:-serie}}"
+    
+    case "$mode" in
+        film|film-adaptive)
+            # Mode film : conserver le multicanal si la source l'a
+            if _is_audio_multichannel "$channels"; then
+                echo "5.1"
+            else
+                echo "stereo"
+            fi
+            ;;
+        *)
+            # Mode serie (défaut) : toujours stéréo
+            echo "stereo"
+            ;;
+    esac
+}
+
+# Construit le filtre aformat pour normaliser le layout audio.
+# Usage: _build_audio_layout_filter <channels> [mode]
+# Retourne: "-af aformat=channel_layouts=..." ou "" si pas nécessaire
+_build_audio_layout_filter() {
+    local channels="${1:-2}"
+    local mode="${2:-${CONVERSION_MODE:-serie}}"
+    
+    local target_layout
+    target_layout=$(_get_target_audio_layout "$channels" "$mode")
+    
+    echo "-af aformat=channel_layouts=${target_layout}"
+}
+
+###########################################################
 # BITRATE CIBLE
 ###########################################################
 
@@ -311,32 +370,46 @@ _build_audio_params() {
     
     case "$action" in
         "copy")
+            # Mode copy : on garde l'audio tel quel (priorité au copy)
             echo "-c:a copy"
             ;;
         "convert"|"downscale")
             local encoder
             encoder=$(get_audio_ffmpeg_encoder "$effective_codec")
             
+            # Récupérer le nombre de canaux pour déterminer le layout cible
+            local channels="2"
+            if declare -f _probe_audio_channels &>/dev/null; then
+                local channel_info
+                channel_info=$(_probe_audio_channels "$input_file")
+                channels=$(echo "$channel_info" | cut -d'|' -f1)
+            fi
+            
+            # Déterminer le layout cible selon le mode (serie=stereo, film=5.1 si source>=6ch)
+            local layout_filter
+            layout_filter=$(_build_audio_layout_filter "$channels")
+            
             case "$effective_codec" in
                 opus|libopus)
-                    # Opus avec normalisation des layouts audio (évite les erreurs VLC)
-                    echo "-c:a libopus -b:a ${target_bitrate}k -af aformat=channel_layouts=7.1|5.1|stereo|mono"
+                    # Opus avec normalisation des layouts audio
+                    echo "-c:a libopus -b:a ${target_bitrate}k ${layout_filter}"
                     ;;
                 aac|aac_latm)
-                    # AAC standard
-                    echo "-c:a aac -b:a ${target_bitrate}k"
+                    # AAC avec normalisation des layouts audio
+                    echo "-c:a aac -b:a ${target_bitrate}k ${layout_filter}"
                     ;;
                 eac3|ec-3|dd+)
-                    # E-AC3 (Dolby Digital Plus)
-                    echo "-c:a eac3 -b:a ${target_bitrate}k"
+                    # E-AC3 (Dolby Digital Plus) avec normalisation
+                    echo "-c:a eac3 -b:a ${target_bitrate}k ${layout_filter}"
                     ;;
                 ac3|a52)
-                    # AC3 (Dolby Digital)
-                    echo "-c:a ac3 -b:a ${target_bitrate}k"
+                    # AC3 (Dolby Digital) avec normalisation
+                    echo "-c:a ac3 -b:a ${target_bitrate}k ${layout_filter}"
                     ;;
                 flac)
                     # FLAC lossless (pas de bitrate, compression level)
-                    echo "-c:a flac -compression_level 8"
+                    # On applique quand même le layout filter pour cohérence
+                    echo "-c:a flac -compression_level 8 ${layout_filter}"
                     ;;
                 *)
                     # Fallback vers le codec cible configuré
@@ -344,7 +417,7 @@ _build_audio_params() {
                     fallback_encoder=$(get_audio_ffmpeg_encoder "${AUDIO_CODEC:-aac}")
                     local fallback_bitrate
                     fallback_bitrate=$(_get_audio_target_bitrate "${AUDIO_CODEC:-aac}")
-                    echo "-c:a ${fallback_encoder} -b:a ${fallback_bitrate}k"
+                    echo "-c:a ${fallback_encoder} -b:a ${fallback_bitrate}k ${layout_filter}"
                     ;;
             esac
             ;;

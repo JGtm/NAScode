@@ -202,6 +202,71 @@ _probe_audio_info() {
     echo "${codec}|${bitrate_kbps}"
 }
 
+# Récupère le nombre de canaux et le layout audio du premier flux audio.
+# Usage: _probe_audio_channels <file>
+# Retour: channels|channel_layout (ex: "6|5.1" ou "2|stereo" ou "6|" si layout indéfini)
+_probe_audio_channels() {
+    local file="$1"
+    
+    local audio_info
+    audio_info=$(ffprobe_safe -v error \
+        -select_streams a:0 \
+        -show_entries stream=channels,channel_layout \
+        -of default=noprint_wrappers=1 \
+        "$file" 2>/dev/null || true)
+    
+    local channels channel_layout
+    channels=$(echo "$audio_info" | awk -F= '/^channels=/{print $2; exit}')
+    channel_layout=$(echo "$audio_info" | awk -F= '/^channel_layout=/{print $2; exit}')
+    
+    # Valeurs par défaut si non disponibles
+    [[ -z "$channels" || "$channels" == "N/A" ]] && channels="2"
+    [[ "$channel_layout" == "N/A" ]] && channel_layout=""
+    
+    echo "${channels}|${channel_layout}"
+}
+
+# Récupère les infos audio complètes (codec, bitrate, channels) en un seul appel.
+# Usage: _probe_audio_full <file>
+# Retour: codec|bitrate_kbps|channels|channel_layout
+_probe_audio_full() {
+    local file="$1"
+    
+    local audio_info
+    audio_info=$(ffprobe_safe -v error \
+        -select_streams a:0 \
+        -show_entries stream=codec_name,bit_rate,channels,channel_layout:stream_tags=BPS \
+        -of default=noprint_wrappers=1 \
+        "$file" 2>/dev/null || true)
+    
+    local codec bitrate bitrate_tag bitrate_kbps channels channel_layout
+    codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
+    bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
+    bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
+    channels=$(echo "$audio_info" | awk -F= '/^channels=/{print $2; exit}')
+    channel_layout=$(echo "$audio_info" | awk -F= '/^channel_layout=/{print $2; exit}')
+    
+    # Utiliser le tag BPS si bitrate direct non disponible
+    if [[ -z "$bitrate" || "$bitrate" == "N/A" ]]; then
+        bitrate="$bitrate_tag"
+    fi
+    
+    # Convertir en kbps
+    if declare -f clean_number &>/dev/null; then
+        bitrate=$(clean_number "$bitrate")
+    fi
+    bitrate_kbps=0
+    if [[ -n "$bitrate" && "$bitrate" =~ ^[0-9]+$ ]]; then
+        bitrate_kbps=$((bitrate / 1000))
+    fi
+    
+    # Valeurs par défaut
+    [[ -z "$channels" || "$channels" == "N/A" ]] && channels="2"
+    [[ "$channel_layout" == "N/A" ]] && channel_layout=""
+    
+    echo "${codec}|${bitrate_kbps}|${channels}|${channel_layout}"
+}
+
 ###########################################################
 # ANALYSE DES PROPRIÉTÉS VIDÉO (RÉSOLUTION / PIX_FMT)
 ###########################################################
