@@ -8,7 +8,7 @@ load 'test_helper'
 
 setup() {
     setup_test_env
-    load_minimal
+    load_minimal_fast
     source "$LIB_DIR/codec_profiles.sh"
 }
 

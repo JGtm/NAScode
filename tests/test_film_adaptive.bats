@@ -10,9 +10,7 @@ load test_helper
 
 setup() {
     setup_test_env
-    load_base_modules
-    # Charger complexity.sh (déjà chargé par load_base_modules via test_helper)
-    # Les constantes utilisent ${VAR:-default} donc pas de problème de re-source
+    load_base_modules_fast
 }
 
 teardown() {

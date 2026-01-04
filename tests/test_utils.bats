@@ -8,7 +8,7 @@ load 'test_helper'
 
 setup() {
     setup_test_env
-    load_base_modules
+    load_base_modules_fast
 }
 
 teardown() {

@@ -58,6 +58,26 @@ load_base_modules() {
     source "$LIB_DIR/stream_mapping.sh"
 }
 
+# Version rapide de load_base_modules qui mocke detect.sh (pour tests sans I/O réel)
+load_base_modules_fast() {
+    export SCRIPT_DIR="$PROJECT_ROOT"
+    source "$LIB_DIR/ui.sh"
+    # Mock des variables de détection (évite les appels système lents)
+    export HAS_MD5SUM=1 HAS_MD5=0 HAS_PYTHON3=1 HAS_DATE_NANO=1 HAS_PERL_HIRES=0
+    export HAS_GAWK=1 HAS_SHA256SUM=1 HAS_SHASUM=0 HAS_OPENSSL=1
+    export HAS_LIBVMAF=0 FFMPEG_VMAF=""
+    export IS_MSYS=0 IS_MACOS=0 IS_LINUX=1
+    export HAS_LIBSVTAV1=1 HAS_LIBX265=1 HAS_LIBAOM=0
+    source "$LIB_DIR/config.sh"
+    source "$LIB_DIR/codec_profiles.sh"
+    source "$LIB_DIR/utils.sh"
+    source "$LIB_DIR/media_probe.sh"
+    source "$LIB_DIR/audio_params.sh"
+    source "$LIB_DIR/complexity.sh"
+    source "$LIB_DIR/video_params.sh"
+    source "$LIB_DIR/stream_mapping.sh"
+}
+
 # Charger uniquement les couleurs et config (pour tests isolés)
 load_minimal() {
     export SCRIPT_DIR="$PROJECT_ROOT"

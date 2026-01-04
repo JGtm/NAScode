@@ -8,11 +8,15 @@ load 'test_helper'
 
 setup() {
     setup_test_env
-    # Charger les modules une seule fois
     if [[ -z "${_AUDIO_TEST_LOADED:-}" ]]; then
         export SCRIPT_DIR="$PROJECT_ROOT"
         source "$LIB_DIR/ui.sh"
-        source "$LIB_DIR/detect.sh"
+        # Mock detect.sh variables (faster)
+        export HAS_MD5SUM=1 HAS_MD5=0 HAS_PYTHON3=1 HAS_DATE_NANO=1 HAS_PERL_HIRES=0
+        export HAS_GAWK=1 HAS_SHA256SUM=1 HAS_SHASUM=0 HAS_OPENSSL=1
+        export HAS_LIBVMAF=0 FFMPEG_VMAF=""
+        export IS_MSYS=0 IS_MACOS=0 IS_LINUX=1
+        export HAS_LIBSVTAV1=1 HAS_LIBX265=1 HAS_LIBAOM=0
         source "$LIB_DIR/config.sh"
         source "$LIB_DIR/codec_profiles.sh"
         source "$LIB_DIR/utils.sh"
@@ -21,12 +25,10 @@ setup() {
         source "$LIB_DIR/video_params.sh"
         source "$LIB_DIR/stream_mapping.sh"
         source "$LIB_DIR/transcode_video.sh"
-        # Initialiser le mode conversion (définit TARGET_BITRATE_KBPS, etc.)
         set_conversion_mode_parameters "series"
         _AUDIO_TEST_LOADED=1
     fi
     
-    # Variables modifiables uniquement
     AUDIO_CODEC="copy"
     AUDIO_BITRATE_KBPS=0
 }
