@@ -384,6 +384,7 @@ print_phase_start() {
         echo -e "${color}  ┃  ${DIM}${subtitle}${NOCOLOR}"
     fi
     echo -e "${color}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
+    echo ""
 }
 
 # Affiche un groupe d'options actives dans un encadré
