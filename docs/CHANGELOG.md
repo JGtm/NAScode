@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.5 (Janvier 2026)
+
+- ✅ **Mode film-adaptive** : bitrate adaptatif basé sur une analyse de complexité
+- ✅ **Filtre de taille** : option `--min-size` pour filtrer l'index/queue (utile en mode film)
+- ✅ **Audio multicanal** : normalisation des layouts (stéréo / 5.1) + logique de préservation selon le mode
+- ✅ **Windows / Git Bash** : normalisation chemins/CRLF et meilleure robustesse avec caractères spéciaux
+- ✅ **VMAF & UX** : ajustements d'affichage + paramètre de subsampling, amélioration des messages et compteurs
+- ✅ **Tests** : refactor et optimisations pour exécution plus rapide et plus robuste
+
 ## v2.4 (Décembre 2025)
 
 - ✅ **Audio multi-codec** : option `-a/--audio` pour choisir AAC, AC3, Opus ou copy

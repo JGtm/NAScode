@@ -1,5 +1,12 @@
 # Handoff
 
+## Dernière session (04/01/2026)
+
+### Tâches accomplies
+
+- Ajout d'une entrée `v2.5 (Janvier 2026)` dans `docs/CHANGELOG.md`.
+- Préparation de la release `v2.5` (tag Git) pour refléter les changements récents.
+
 ## Dernière session (03/01/2026)
 
 ### Tâches accomplies
