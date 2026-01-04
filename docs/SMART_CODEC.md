@@ -22,6 +22,25 @@ Règles principales :
 
 Pour forcer la conversion (bypass smart) : `--force-audio`.
 
+### Gestion des canaux audio (multicanal)
+
+Le script gère automatiquement le nombre de canaux audio selon le mode :
+
+| Mode | Source | Résultat |
+|------|--------|----------|
+| `serie` | Stéréo (2ch) | Stéréo |
+| `serie` | 5.1 (6ch) | **Downmix → Stéréo** |
+| `serie` | 7.1 (8ch) | **Downmix → Stéréo** |
+| `film` / `film-adaptive` | Stéréo (2ch) | Stéréo |
+| `film` / `film-adaptive` | 5.1 (6ch) | **Préservé 5.1** |
+| `film` / `film-adaptive` | 7.1 (8ch) | **Réduit → 5.1** |
+
+**Pourquoi ?**
+- **Mode série** : priorité à l'économie d'espace. La stéréo suffit pour un visionnage sur PC/tablette/mobile.
+- **Mode film** : priorité à la qualité. Le 5.1 permet de profiter d'un système home cinema.
+
+Cette logique s'applique uniquement lors d'une **conversion** (`convert` ou `downscale`). Si l'audio est copié (`copy`), les canaux sont conservés tels quels.
+
 ### Hiérarchie (efficacité)
 
 La logique s’appuie sur un rang d’efficacité (voir `get_audio_codec_rank()` dans [lib/audio_params.sh](../lib/audio_params.sh)) :

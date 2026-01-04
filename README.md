@@ -56,6 +56,9 @@ Rappels :
 - `--audio copy` : copie l'audio sans modification.
 - `--force-audio` : force la conversion vers le codec cible (bypass smart).
 
+**Gestion des canaux (multicanal) :**
+- **Mode série** : l'audio multicanal (5.1, 7.1) est **mixé en stéréo** (économie d'espace).
+- **Mode film** : l'audio multicanal est **préservé en 5.1** (home cinema).
 
 | Codec source | Statut | Bitrate source | Action | Résultat (défaut) |
 |-------------|--------|----------------|--------|-------------------|
