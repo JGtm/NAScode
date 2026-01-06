@@ -1,6 +1,6 @@
 # Changelog
 
-## v2.5 (Janvier 2026)
+## v2.5
 
 - ✅ **Mode film-adaptive** : bitrate adaptatif basé sur une analyse de complexité
 - ✅ **Filtre de taille** : option `--min-size` pour filtrer l'index/queue (utile en mode film)
@@ -9,7 +9,7 @@
 - ✅ **VMAF & UX** : ajustements d'affichage + paramètre de subsampling, amélioration des messages et compteurs
 - ✅ **Tests** : refactor et optimisations pour exécution plus rapide et plus robuste
 
-## v2.4 (Décembre 2025)
+## v2.4
 
 - ✅ **Audio multi-codec** : option `-a/--audio` pour choisir AAC, AC3, Opus ou copy
 - ✅ **Logique anti-upscaling** : ne convertit l'audio que si gain réel (>20%)
@@ -19,7 +19,7 @@
 - ✅ Aide colorée avec options mises en évidence
 - ✅ Affichage codec vidéo dans les paramètres actifs
 
-## v2.3 (Décembre 2025)
+## v2.3
 
 - ✅ **Support multi-codec vidéo** : option `-c/--codec` pour choisir HEVC ou AV1
 - ✅ Nouveau module `codec_profiles.sh` pour configuration modulaire des encodeurs
@@ -28,13 +28,13 @@
 - ✅ Skip automatique adapté au codec cible
 - ✅ Validation encodeur FFmpeg avant conversion
 
-## v2.2 (Décembre 2025)
+## v2.2
 
 - ✅ Option `-f/--file` pour convertir un fichier unique (bypass index/queue)
 - ✅ Affichage du gain de place total dans le résumé final (avant → après, économie en %)
 - ✅ Amélioration fiabilité pipefail et nettoyage fichiers temporaires
 
-## v2.1 (Décembre 2025)
+## v2.1
 
 - ✅ Mode film optimisé qualité (two-pass 2035 kbps, keyint=240)
 - ✅ GOP différencié : 240 frames (film) vs 600 frames (série)
@@ -42,7 +42,7 @@
 - ✅ Tests refactorisés : comportement vs valeurs en dur
 - ✅ Affichage tests condensé avec progression temps réel
 
-## v2.0 (Décembre 2025)
+## v2.0
 
 - ✅ Nouveaux paramètres x265 optimisés pour le mode série
 - ✅ Pass 1 rapide (`no-slow-firstpass`) pour gain de temps

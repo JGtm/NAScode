@@ -3,6 +3,7 @@ logs/
 Converted/
 .temp_processing/
 .idea/
+.vs/
 
 # Dossiers de travail (contiennent les fichiers utilisateur)
 Input/
