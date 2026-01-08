@@ -108,6 +108,23 @@ PY
 # NORMALISATION CHEMINS FFPROBE (WINDOWS/GIT BASH)
 ###########################################################
 
+# Résout un chemin (fichier ou dossier) en chemin absolu.
+# Usage: abspath_path <path>
+# Retourne le chemin absolu sur stdout. Retourne 1 si résolution impossible.
+abspath_path() {
+    local path="$1"
+    if [[ -z "$path" ]]; then
+        echo ""
+        return 1
+    fi
+
+    local dir base
+    dir="$(dirname "$path")"
+    base="$(basename "$path")"
+
+    (cd "$dir" 2>/dev/null && printf "%s/%s\n" "$(pwd)" "$base")
+}
+
 # Convertit un chemin Git Bash (/c/...) en chemin Windows (C:/...) pour ffprobe
 # ffprobe sur Windows/Git Bash ne gère pas bien /c/ avec des caractères spéciaux (accents, apostrophes)
 normalize_path_for_ffprobe() {

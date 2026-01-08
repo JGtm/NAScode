@@ -8,6 +8,7 @@
 - ✅ **Windows / Git Bash** : normalisation chemins/CRLF et meilleure robustesse avec caractères spéciaux
 - ✅ **VMAF & UX** : ajustements d'affichage + paramètre de subsampling, amélioration des messages et compteurs
 - ✅ **Tests** : refactor et optimisations pour exécution plus rapide et plus robuste
+- ✅ **Refactor audio** : extraction de la logique “smart codec” dans `lib/audio_decision.sh` (et `lib/audio_params.sh` recentré sur FFmpeg/layout)
 
 ## v2.4
 
@@ -15,7 +16,7 @@
 - ✅ **Logique anti-upscaling** : ne convertit l'audio que si gain réel (>20%)
 - ✅ Bitrates optimisés : AAC 160k, AC3 384k, Opus 128k
 - ✅ Suffixe audio dans le nom de fichier (`_aac`, `_opus`, etc.)
-- ✅ Refactoring audio : nouveau module `audio_params.sh` dédié
+- ✅ Refactoring audio : nouveau module `audio_params.sh` dédié (paramètres FFmpeg/layout)
 - ✅ Aide colorée avec options mises en évidence
 - ✅ Affichage codec vidéo dans les paramètres actifs
 

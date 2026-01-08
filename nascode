@@ -97,16 +97,31 @@ main() {
     
     # Mode fichier unique : traiter directement sans index/queue
     if [[ -n "${SINGLE_FILE:-}" ]]; then
-        # Convertir en chemin absolu
-        SINGLE_FILE=$(cd "$(dirname "$SINGLE_FILE")" && pwd)/$(basename "$SINGLE_FILE")
+        # Convertir en chemin absolu (robuste aux espaces)
+        local single_file_input="$SINGLE_FILE"
+        if ! SINGLE_FILE="$(abspath_path "$single_file_input")"; then
+            echo -e "${RED}❌ ERREUR: Chemin de fichier invalide : $single_file_input${NOCOLOR}"
+            exit 1
+        fi
+
+        # Valider l'entrée
+        if [[ ! -f "$SINGLE_FILE" ]]; then
+            echo -e "${RED}❌ ERREUR: Le fichier source n'existe pas : $SINGLE_FILE${NOCOLOR}"
+            exit 1
+        fi
+
         # SOURCE = dossier contenant le fichier (pour les chemins relatifs)
-        SOURCE=$(dirname "$SINGLE_FILE")
+        SOURCE="$(dirname "$SINGLE_FILE")"
         
         # Vérifications minimales
         check_lock
         check_dependencies
         initialize_directories
         init_async_transfers
+
+        # Vérification interactive du suffixe de sortie (cohérent avec le mode batch)
+        check_output_suffix
+
         detect_hwaccel
         check_vmaf
         export_variables

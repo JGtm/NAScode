@@ -44,6 +44,9 @@ export_variables() {
     export -f _get_audio_target_bitrate _get_audio_conversion_info _build_audio_params _build_stream_mapping
     export -f _should_convert_audio _probe_audio_info _probe_audio_channels _probe_audio_full
     export -f _is_audio_multichannel _get_target_audio_layout _build_audio_layout_filter
+    export -f _get_multichannel_target_bitrate _compute_eac3_target_bitrate_kbps
+    export -f is_audio_codec_premium_passthrough is_audio_codec_lossless is_audio_codec_efficient
+    export -f get_audio_codec_rank get_audio_ffmpeg_encoder get_audio_codec_target_bitrate
     
     # ========================================================
     # FONCTIONS DE PRÉPARATION ET FINALISATION
@@ -112,9 +115,11 @@ export_variables() {
     export ADAPTIVE_TARGET_KBPS ADAPTIVE_MAXRATE_KBPS ADAPTIVE_BUFSIZE_KBPS
     
     # --- Variables audio ---
-    export AUDIO_CODEC AUDIO_BITRATE_KBPS
+    export AUDIO_CODEC AUDIO_BITRATE_KBPS NO_LOSSLESS FORCE_AUDIO_CODEC
     export AUDIO_BITRATE_AAC_DEFAULT AUDIO_BITRATE_AC3_DEFAULT AUDIO_BITRATE_OPUS_DEFAULT
-    export AUDIO_CONVERSION_THRESHOLD_KBPS
+    export AUDIO_BITRATE_EAC3_DEFAULT AUDIO_BITRATE_FLAC_DEFAULT
+    export AUDIO_BITRATE_OPUS_MULTICHANNEL AUDIO_BITRATE_AAC_MULTICHANNEL AUDIO_BITRATE_EAC3_MULTICHANNEL
+    export AUDIO_ANTI_UPSCALE_THRESHOLD_KBPS AUDIO_CONVERSION_THRESHOLD_KBPS
     
     # ========================================================
     # VARIABLES DE CHEMINS

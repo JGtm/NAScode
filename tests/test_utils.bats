@@ -130,6 +130,26 @@ teardown() {
 }
 
 ###########################################################
+# Tests de abspath_path()
+###########################################################
+
+@test "abspath_path: résout un chemin relatif avec espaces" {
+    local dir="$TEST_TEMP_DIR/dir with spaces"
+    local file="$dir/video file.mkv"
+    mkdir -p "$dir"
+    touch "$file"
+
+    cd "$TEST_TEMP_DIR"
+    result=$(abspath_path "dir with spaces/video file.mkv")
+    [ "$result" = "$file" ]
+}
+
+@test "abspath_path: échoue sur une chaîne vide" {
+    run abspath_path ""
+    [ "$status" -ne 0 ]
+}
+
+###########################################################
 # Tests de compute_md5_prefix()
 ###########################################################
 

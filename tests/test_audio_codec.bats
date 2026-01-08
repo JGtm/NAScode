@@ -395,7 +395,7 @@ STUB
     [ "$status" -eq 0 ]
 }
 
-@test "_build_audio_params: mode serie force stereo si source >= 6ch (stub)" {
+@test "_build_audio_params: mode serie eac3 5.1 → copy (pas conversion AAC sans --force-audio)" {
     # Stub ffprobe pour simuler audio multicanal avec layout non standard
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
@@ -413,15 +413,16 @@ STUB
     CONVERSION_MODE="serie"
     AUDIO_CODEC="aac"
     AUDIO_BITRATE_KBPS=0
+    FORCE_AUDIO_CODEC=false
 
     local result
     result=$(_build_audio_params "/fake/file.mkv")
 
-    [[ "$result" =~ "-c:a aac" ]]
-    [[ "$result" =~ "-af aformat=channel_layouts=stereo" ]]
+    # EAC3 5.1 384k → copy car codec efficace multichannel OK
+    [[ "$result" =~ "-c:a copy" ]]
 }
 
-@test "_build_audio_params: mode film preserve 5.1 si source >= 6ch (stub)" {
+@test "_build_audio_params: mode film eac3 5.1 → copy (pas conversion AAC sans --force-audio)" {
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
     cat > "$stub_dir/ffprobe" << 'STUB'
@@ -438,12 +439,13 @@ STUB
     CONVERSION_MODE="film"
     AUDIO_CODEC="aac"
     AUDIO_BITRATE_KBPS=0
+    FORCE_AUDIO_CODEC=false
 
     local result
     result=$(_build_audio_params "/fake/file.mkv")
 
-    [[ "$result" =~ "-c:a aac" ]]
-    [[ "$result" =~ "-af aformat=channel_layouts=5.1" ]]
+    # EAC3 5.1 384k → copy car codec efficace multichannel OK
+    [[ "$result" =~ "-c:a copy" ]]
 }
 
 @test "_build_audio_params: mode film force stereo si source < 6ch (stub)" {

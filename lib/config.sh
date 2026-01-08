@@ -40,6 +40,10 @@ MIN_SIZE_BYTES=0
 AUDIO_CODEC="aac"
 AUDIO_BITRATE_KBPS=0  # 0 = utiliser le défaut selon le codec
 
+# Option --no-lossless : force la conversion des codecs lossless/premium (DTS/DTS-HD/TrueHD/FLAC)
+# vers le codec cible (stéréo) ou EAC3 384k (multi-channel)
+NO_LOSSLESS=false
+
 # ----- Codec vidéo -----
 # Codec cible pour l'encodage (hevc, av1)
 # L'encodeur est choisi automatiquement selon le codec (modifiable dans codec_profiles.sh)
@@ -142,11 +146,19 @@ readonly ADAPTIVE_720P_SCALE_PERCENT=70
 # Ces valeurs sont utilisées si AUDIO_BITRATE_KBPS=0 (auto)
 # Hiérarchie qualité/efficacité (du meilleur au moins bon) :
 #   Opus > AAC > E-AC3 > AC3 > FLAC (lossless, cas spécial)
-readonly AUDIO_BITRATE_OPUS_DEFAULT=128     # Opus : 128k excellent (plus efficace)
-readonly AUDIO_BITRATE_AAC_DEFAULT=160      # AAC : 160k pour 5.1 (polyvalent)
+readonly AUDIO_BITRATE_OPUS_DEFAULT=128     # Opus : 128k stéréo (plus efficace)
+readonly AUDIO_BITRATE_AAC_DEFAULT=160      # AAC : 160k stéréo (polyvalent)
 readonly AUDIO_BITRATE_EAC3_DEFAULT=384     # E-AC3 (DD+) : 384k pour séries HD/Atmos
 readonly AUDIO_BITRATE_AC3_DEFAULT=640      # AC3 (Dolby) : 640k rétro-compatibilité
 readonly AUDIO_BITRATE_FLAC_DEFAULT=0       # FLAC : variable (lossless, pas de limite)
+
+# Bitrates multi-channel (5.1) - plafonds par codec
+readonly AUDIO_BITRATE_OPUS_MULTICHANNEL=224    # Opus 5.1 : 224k (excellent)
+readonly AUDIO_BITRATE_AAC_MULTICHANNEL=320     # AAC 5.1 : 320k (plafond)
+readonly AUDIO_BITRATE_EAC3_MULTICHANNEL=384    # EAC3 5.1 : 384k (codec par défaut multichannel)
+
+# Seuil anti-upscale : ne pas convertir si source < ce seuil (évite réencodage inutile)
+readonly AUDIO_ANTI_UPSCALE_THRESHOLD_KBPS=256
 
 # Seuil de conversion : ne convertir l'audio que si le bitrate source dépasse ce seuil
 # Cela évite de "gonfler" un audio déjà compressé à bas débit

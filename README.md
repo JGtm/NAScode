@@ -50,26 +50,37 @@ Defaults importants (issus de la config) :
 Ces tableaux résument les décisions les plus fréquentes (skip / copy / convert / downscale).
 Pour la logique complète et les détails, voir [docs/SMART_CODEC.md](docs/SMART_CODEC.md).
 
-### Audio (cible par défaut : `aac`)
+### Audio (cible par défaut : `aac` stéréo, `eac3` multichannel)
 
 Rappels :
 - `--audio copy` : copie l'audio sans modification.
 - `--force-audio` : force la conversion vers le codec cible (bypass smart).
+- `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC).
 
 **Gestion des canaux (multicanal) :**
-- **Mode série** : l'audio multicanal (5.1, 7.1) est **mixé en stéréo** (économie d'espace).
-- **Mode film** : l'audio multicanal est **préservé en 5.1** (home cinema).
+- **Layout cible** : stéréo (2ch) ou **5.1** (downmix automatique si 7.1).
+- **Codec par défaut multichannel** : EAC3 384k (compatible TV/receivers).
+- **AAC multichannel** : uniquement avec `-a aac --force-audio` (plafond 320k).
+- **Opus multichannel** : `-a opus` (plafond 224k).
+- **Anti-upscale** : pas de conversion si source < 256k (sauf downmix requis).
 
-| Codec source | Statut | Bitrate source | Action | Résultat (défaut) |
-|-------------|--------|----------------|--------|-------------------|
-| FLAC / TrueHD | Lossless | * | `copy` | Conservé (qualité max) |
-| Opus | Efficace | $\le$ 128k | `copy` | Conservé tel quel |
-| Opus | Efficace | $>$ 128k | `downscale` | Opus → 128k |
-| AAC | Efficace | $\le$ 160k | `copy` | Conservé tel quel |
-| AAC | Efficace | $>$ 176k | `downscale` | AAC → 160k |
-| Vorbis | Efficace | * | `copy` | Conservé tel quel |
-| E-AC3 / AC3 / DTS | Inefficace | * | `convert` | → AAC 160k |
-| MP3 / PCM / autres | Inefficace | * | `convert` | → AAC 160k |
+**Codecs premium (DTS/DTS-HD/TrueHD/FLAC) :**
+- **Sans `--no-lossless`** : passthrough (conservés si déjà 5.1, sinon downmix → EAC3 384k).
+- **Avec `--no-lossless`** : conversion forcée (stéréo → codec cible, multichannel → EAC3 384k).
+
+| Codec source | Statut | Channels | Bitrate source | Action | Résultat |
+|-------------|--------|----------|----------------|--------|----------|
+| DTS / DTS-HD / TrueHD | Premium | 5.1 | * | `copy` | Conservé (passthrough) |
+| DTS / DTS-HD / TrueHD | Premium | 7.1 | * | `convert` | → EAC3 384k 5.1 (downmix) |
+| FLAC | Lossless | * | * | `copy` | Conservé (qualité max) |
+| Opus | Efficace | stéréo | $\le$ 128k | `copy` | Conservé tel quel |
+| Opus | Efficace | 5.1+ | $\le$ 224k | `copy` | Conservé tel quel |
+| AAC | Efficace | stéréo | $\le$ 160k | `copy` | Conservé tel quel |
+| AAC | Efficace | 5.1 | $\le$ 320k | `copy` | Conservé tel quel |
+| EAC3 | Standard | 5.1 | $\le$ 384k | `copy` | Conservé tel quel |
+| EAC3 | Standard | 5.1 | $>$ 384k | `downscale` | EAC3 → 384k |
+| AC3 | Inefficace | 5.1 | * | `convert` | → EAC3 384k |
+| MP3 / PCM / autres | Inefficace | * | * | `convert` | → codec cible |
 
 ### Vidéo (cible par défaut : `hevc`)
 
@@ -107,6 +118,10 @@ Guides détaillés :
 - [docs/DOCS.md](docs/DOCS.md)
 - [docs/USAGE.md](docs/USAGE.md)
 - [docs/CONFIG.md](docs/CONFIG.md)
+
+Référence code (audio) :
+- Décision “smart codec” : [lib/audio_decision.sh](lib/audio_decision.sh)
+- Construction FFmpeg/layout : [lib/audio_params.sh](lib/audio_params.sh)
 
 ## Logs & sortie
 

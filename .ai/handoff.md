@@ -1,6 +1,65 @@
 # Handoff
 
-## Dernière session (04/01/2026)
+## Dernière session (08/01/2026)
+
+### Tâches accomplies
+
+#### Implémentation multichannel audio et option --no-lossless
+
+**Nouvelles fonctionnalités :**
+- `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC)
+- Gestion complète de l'audio multichannel (5.1, 7.1)
+
+**Règles multichannel implémentées :**
+- DTS/DTS-HD/TrueHD : passthrough si 5.1 ou moins, conversion obligatoire si 7.1 (downmix)
+- 7.1 → 5.1 : toujours downmixer (re-encode requis)
+- EAC3 : codec par défaut pour multichannel (cap 384kbps)
+- AAC multichannel : uniquement avec `-a aac --force-audio` (320kbps)
+- Opus multichannel : avec `-a opus` (224kbps)
+- AC3 → EAC3 (ou Opus avec `-a opus`)
+- Anti-upscale : copy si source < 256kbps (ne pas gonfler artificiellement)
+
+**Code ajouté/modifié :**
+- `lib/config.sh` : constantes multichannel (bitrates, seuils)
+- `lib/args.sh` : parsing `--no-lossless`
+- `lib/audio_decision.sh` : module dédié à la décision audio (smart codec + multichannel)
+  - `_get_smart_audio_decision()`, `_get_audio_conversion_info()`, `_should_convert_audio()`
+  - `is_audio_codec_premium_passthrough()`, `_compute_eac3_target_bitrate_kbps()`, `_get_multichannel_target_bitrate()`
+- `lib/audio_params.sh` : allégé (layout audio + construction des paramètres FFmpeg)
+- `lib/exports.sh` : exports des nouvelles fonctions/variables
+- `README.md` : documentation des règles multichannel
+
+**Refactor (option 2) :**
+- Extraction de la logique “decision engine” audio vers `lib/audio_decision.sh`
+- Mise à jour de `docs/SMART_CODEC.md` (pointeurs vers les bons modules)
+
+**Tests :**
+- Nouveau fichier `tests/test_audio_multichannel.bats` : 38 tests
+- Mise à jour `tests/test_audio_codec.bats` : comportement multichannel
+- **610 tests passent (100%)**
+
+### Fichiers modifiés
+
+- `lib/config.sh`
+- `lib/args.sh`
+- `lib/audio_params.sh`
+- `lib/audio_decision.sh` (nouveau)
+- `lib/exports.sh`
+- `README.md`
+- `tests/test_audio_codec.bats`
+- `tests/test_audio_multichannel.bats` (nouveau)
+
+### Branche en cours
+
+- `feature/no-lossless-multichannel`
+
+### Prochain step
+
+- Review/merge vers `main` après validation utilisateur
+
+---
+
+## Session précédente (08/01/2026)
 
 ### Tâches accomplies
 
@@ -153,7 +212,7 @@
 
 #### 2. Centralisation ffprobe audio
 - **Création `_probe_audio_info()`** dans `media_probe.sh` pour centraliser les appels ffprobe audio
-- **Refactoring audio_params.sh** : `_get_smart_audio_decision()` et `_get_audio_conversion_info()` utilisent `_probe_audio_info()`
+- **Refactoring audio (decision engine)** : `_get_smart_audio_decision()` et `_get_audio_conversion_info()` utilisent `_probe_audio_info()` (désormais dans `lib/audio_decision.sh`)
 - **Export fonctions codec_profiles.sh** : `get_codec_encoder`, `get_codec_suffix`, `is_codec_better_or_equal`, etc.
 - **Suppression fallbacks `declare -f`** dans `config.sh`, `conversion.sh`, `transcode_video.sh`, `video_params.sh`
 
@@ -170,7 +229,7 @@
   - `show_summary()` réduite de ~150 à ~70 lignes
 - **video_params.sh** : 
   - Suppression `compute_output_height()` et `compute_effective_bitrate()` (wrappers jamais utilisés)
-- **audio_params.sh** : `_get_smart_audio_decision()` déjà bien structurée avec early-returns
+- **audio_decision.sh** : `_get_smart_audio_decision()` (ex-audio_params.sh) déjà bien structurée avec early-returns
 
 ### Bilan
 - **~180 lignes supprimées** (duplications, fallbacks, wrappers)
