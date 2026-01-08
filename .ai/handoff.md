@@ -63,8 +63,8 @@
 
 ### Tâches accomplies
 
-- Ajout d'une entrée `v2.5 (Janvier 2026)` dans `docs/CHANGELOG.md`.
-- Préparation de la release `v2.5` (tag Git) pour refléter les changements récents.
+- Ajout d'une entrée `v2.6 (Janvier 2026)` dans `docs/CHANGELOG.md`.
+- Préparation de la release `v2.6` (tag Git) pour refléter les changements récents.
 
 ## Dernière session (03/01/2026)
 
