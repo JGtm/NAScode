@@ -43,7 +43,7 @@ Cette logique s'applique uniquement lors d'une **conversion** (`convert` ou `dow
 
 ### Hiérarchie (efficacité)
 
-La logique s’appuie sur un rang d’efficacité (voir `get_audio_codec_rank()` dans [lib/audio_params.sh](../lib/audio_params.sh)) :
+La logique s’appuie sur un rang d’efficacité (voir `get_audio_codec_rank()` dans [lib/audio_decision.sh](../lib/audio_decision.sh)) :
 
 - Opus (très efficace)
 - AAC (efficace)
@@ -95,5 +95,5 @@ Pour forcer : `--force-video`.
 Les seuils exacts et la logique fine dépendent du mode, de la résolution et des paramètres d’encodage.
 
 Pour une lecture “code source” :
-- Audio : [lib/audio_params.sh](../lib/audio_params.sh)
+- Audio : [lib/audio_decision.sh](../lib/audio_decision.sh) (décision) + [lib/audio_params.sh](../lib/audio_params.sh) (FFmpeg/layout)
 - Vidéo : [lib/video_params.sh](../lib/video_params.sh), [lib/transcode_video.sh](../lib/transcode_video.sh)

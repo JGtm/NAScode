@@ -22,12 +22,16 @@
 **Code ajouté/modifié :**
 - `lib/config.sh` : constantes multichannel (bitrates, seuils)
 - `lib/args.sh` : parsing `--no-lossless`
-- `lib/audio_params.sh` : refonte majeure de `_get_smart_audio_decision()` (~250 lignes)
-  - `is_audio_codec_premium_passthrough()` : détection DTS/TrueHD/FLAC
-  - `_compute_eac3_target_bitrate_kbps()` : calcul bitrate EAC3 avec cap 384k
-  - `_get_multichannel_target_bitrate()` : bitrate cible selon codec
+- `lib/audio_decision.sh` : module dédié à la décision audio (smart codec + multichannel)
+  - `_get_smart_audio_decision()`, `_get_audio_conversion_info()`, `_should_convert_audio()`
+  - `is_audio_codec_premium_passthrough()`, `_compute_eac3_target_bitrate_kbps()`, `_get_multichannel_target_bitrate()`
+- `lib/audio_params.sh` : allégé (layout audio + construction des paramètres FFmpeg)
 - `lib/exports.sh` : exports des nouvelles fonctions/variables
 - `README.md` : documentation des règles multichannel
+
+**Refactor (option 2) :**
+- Extraction de la logique “decision engine” audio vers `lib/audio_decision.sh`
+- Mise à jour de `docs/SMART_CODEC.md` (pointeurs vers les bons modules)
 
 **Tests :**
 - Nouveau fichier `tests/test_audio_multichannel.bats` : 38 tests
@@ -39,6 +43,7 @@
 - `lib/config.sh`
 - `lib/args.sh`
 - `lib/audio_params.sh`
+- `lib/audio_decision.sh` (nouveau)
 - `lib/exports.sh`
 - `README.md`
 - `tests/test_audio_codec.bats`
