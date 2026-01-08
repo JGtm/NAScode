@@ -4,26 +4,57 @@
 
 ### Tâches accomplies
 
-- Mode fichier unique : résolution de chemin absolu plus robuste (espaces OK) + validation explicite du fichier.
-- Mode fichier unique : appelle désormais `check_output_suffix` (sans ajouter la logique `.plexignore`, et sans toucher au dry-run).
-- Ajout d'un helper `abspath_path()` dans `lib/utils.sh` + tests unitaires Bats associés.
+#### Implémentation multichannel audio et option --no-lossless
+
+**Nouvelles fonctionnalités :**
+- `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC)
+- Gestion complète de l'audio multichannel (5.1, 7.1)
+
+**Règles multichannel implémentées :**
+- DTS/DTS-HD/TrueHD : passthrough si 5.1 ou moins, conversion obligatoire si 7.1 (downmix)
+- 7.1 → 5.1 : toujours downmixer (re-encode requis)
+- EAC3 : codec par défaut pour multichannel (cap 384kbps)
+- AAC multichannel : uniquement avec `-a aac --force-audio` (320kbps)
+- Opus multichannel : avec `-a opus` (224kbps)
+- AC3 → EAC3 (ou Opus avec `-a opus`)
+- Anti-upscale : copy si source < 256kbps (ne pas gonfler artificiellement)
+
+**Code ajouté/modifié :**
+- `lib/config.sh` : constantes multichannel (bitrates, seuils)
+- `lib/args.sh` : parsing `--no-lossless`
+- `lib/audio_params.sh` : refonte majeure de `_get_smart_audio_decision()` (~250 lignes)
+  - `is_audio_codec_premium_passthrough()` : détection DTS/TrueHD/FLAC
+  - `_compute_eac3_target_bitrate_kbps()` : calcul bitrate EAC3 avec cap 384k
+  - `_get_multichannel_target_bitrate()` : bitrate cible selon codec
+- `lib/exports.sh` : exports des nouvelles fonctions/variables
+- `README.md` : documentation des règles multichannel
+
+**Tests :**
+- Nouveau fichier `tests/test_audio_multichannel.bats` : 38 tests
+- Mise à jour `tests/test_audio_codec.bats` : comportement multichannel
+- **610 tests passent (100%)**
 
 ### Fichiers modifiés
 
-- `nascode`
-- `lib/utils.sh`
-- `tests/test_utils.bats`
-
-### Derniers prompts
-
-- "Tu peux reparcourir la fonction main et me dire si on a besoin de la retravailler ?"
-- "Ok vas y pour les points à vérifier (sauf cette histoire de dry run) ry vas y aussi pour les points a a ameliorer (sauf pour cette logique plexignore)"
+- `lib/config.sh`
+- `lib/args.sh`
+- `lib/audio_params.sh`
+- `lib/exports.sh`
+- `README.md`
+- `tests/test_audio_codec.bats`
+- `tests/test_audio_multichannel.bats` (nouveau)
 
 ### Branche en cours
 
-- `fix/single-file-robustness`
+- `feature/no-lossless-multichannel`
 
-## Dernière session (04/01/2026)
+### Prochain step
+
+- Review/merge vers `main` après validation utilisateur
+
+---
+
+## Session précédente (08/01/2026)
 
 ### Tâches accomplies
 
