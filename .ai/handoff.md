@@ -1,5 +1,28 @@
 # Handoff
 
+## Dernière session (08/01/2026)
+
+### Tâches accomplies
+
+- Mode fichier unique : résolution de chemin absolu plus robuste (espaces OK) + validation explicite du fichier.
+- Mode fichier unique : appelle désormais `check_output_suffix` (sans ajouter la logique `.plexignore`, et sans toucher au dry-run).
+- Ajout d'un helper `abspath_path()` dans `lib/utils.sh` + tests unitaires Bats associés.
+
+### Fichiers modifiés
+
+- `nascode`
+- `lib/utils.sh`
+- `tests/test_utils.bats`
+
+### Derniers prompts
+
+- "Tu peux reparcourir la fonction main et me dire si on a besoin de la retravailler ?"
+- "Ok vas y pour les points à vérifier (sauf cette histoire de dry run) ry vas y aussi pour les points a a ameliorer (sauf pour cette logique plexignore)"
+
+### Branche en cours
+
+- `fix/single-file-robustness`
+
 ## Dernière session (04/01/2026)
 
 ### Tâches accomplies

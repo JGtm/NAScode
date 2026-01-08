@@ -190,6 +190,11 @@ parse_arguments() {
                 FORCE_VIDEO_CODEC=true
                 shift
                 ;;
+            --no-lossless)
+                # Force la conversion des codecs lossless/premium (DTS/DTS-HD/TrueHD/FLAC)
+                NO_LOSSLESS=true
+                shift
+                ;;
             -*) 
                 # On vérifie si l'argument est une option courte groupée
                 if [[ "$1" =~ ^-[a-zA-Z]{2,}$ ]]; then
@@ -278,6 +283,8 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-t, --sample${NOCOLOR}                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
     ${GREEN}-f, --file${NOCOLOR} FILE              Convertir un fichier unique (bypass index/queue) (ARG)
     ${GREEN}-a, --audio${NOCOLOR} CODEC            Codec audio cible : copy, aac, ac3, eac3, opus (ARG) [défaut : aac]
+                                 ${DIM}Multi-channel (5.1+) : cible par défaut = EAC3 384k
+                                 AAC en multi-channel : uniquement avec -a aac --force-audio${NOCOLOR}
     ${GREEN}-2, --two-pass${NOCOLOR}               Forcer le mode two-pass (défaut : single-pass CRF 21 pour séries)
     ${GREEN}-c, --codec${NOCOLOR} CODEC            Codec vidéo cible : hevc, av1 (ARG) [défaut : hevc]
     ${GREEN}-p, --off-peak${NOCOLOR} [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
@@ -285,6 +292,8 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}--force-audio${NOCOLOR}                Forcer la conversion audio vers le codec cible (bypass smart codec)
     ${GREEN}--force-video${NOCOLOR}                Forcer le réencodage vidéo (bypass smart codec)
     ${GREEN}--force${NOCOLOR}                      Raccourci pour --force-audio et --force-video
+    ${GREEN}--no-lossless${NOCOLOR}                Convertir les codecs lossless/premium (DTS/DTS-HD/TrueHD/FLAC)
+                                 ${DIM}Stéréo → codec cible, Multi-channel → EAC3 384k 5.1${NOCOLOR}
 
 ${CYAN}Remarque sur les options courtes groupées :${NOCOLOR}
     ${DIM}- Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
