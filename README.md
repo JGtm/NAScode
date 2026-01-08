@@ -119,6 +119,10 @@ Guides détaillés :
 - [docs/USAGE.md](docs/USAGE.md)
 - [docs/CONFIG.md](docs/CONFIG.md)
 
+Référence code (audio) :
+- Décision “smart codec” : [lib/audio_decision.sh](lib/audio_decision.sh)
+- Construction FFmpeg/layout : [lib/audio_params.sh](lib/audio_params.sh)
+
 ## Logs & sortie
 
 - Sortie par défaut : `Converted/`

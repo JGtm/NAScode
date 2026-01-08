@@ -212,7 +212,7 @@
 
 #### 2. Centralisation ffprobe audio
 - **Création `_probe_audio_info()`** dans `media_probe.sh` pour centraliser les appels ffprobe audio
-- **Refactoring audio_params.sh** : `_get_smart_audio_decision()` et `_get_audio_conversion_info()` utilisent `_probe_audio_info()`
+- **Refactoring audio (decision engine)** : `_get_smart_audio_decision()` et `_get_audio_conversion_info()` utilisent `_probe_audio_info()` (désormais dans `lib/audio_decision.sh`)
 - **Export fonctions codec_profiles.sh** : `get_codec_encoder`, `get_codec_suffix`, `is_codec_better_or_equal`, etc.
 - **Suppression fallbacks `declare -f`** dans `config.sh`, `conversion.sh`, `transcode_video.sh`, `video_params.sh`
 
@@ -229,7 +229,7 @@
   - `show_summary()` réduite de ~150 à ~70 lignes
 - **video_params.sh** : 
   - Suppression `compute_output_height()` et `compute_effective_bitrate()` (wrappers jamais utilisés)
-- **audio_params.sh** : `_get_smart_audio_decision()` déjà bien structurée avec early-returns
+- **audio_decision.sh** : `_get_smart_audio_decision()` (ex-audio_params.sh) déjà bien structurée avec early-returns
 
 ### Bilan
 - **~180 lignes supprimées** (duplications, fallbacks, wrappers)
