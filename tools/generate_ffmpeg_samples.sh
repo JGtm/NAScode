@@ -454,6 +454,7 @@ _make_dts_5_1() {
 		-c:a dca -b:a 1536k -ac 6 -metadata:s:a:0 language=eng \
 		-strict -2 \
 		"$out"; then
+		rm -f -- "$out"
 		echo "[samples]   skip: échec encodage DTS (dca)"
 		return 0
 	fi
@@ -483,6 +484,7 @@ _make_dts_7_1() {
 		-c:a dca -b:a 1536k -ac 8 -metadata:s:a:0 language=eng \
 		-strict -2 \
 		"$out"; then
+		rm -f -- "$out"
 		echo "[samples]   skip: encodage DTS 7.1 non supporté (ou a échoué)"
 		return 0
 	fi
@@ -511,6 +513,7 @@ _make_truehd_5_1() {
 		-c:a truehd -ac 6 -metadata:s:a:0 language=eng \
 		-strict -2 \
 		"$out"; then
+		rm -f -- "$out"
 		echo "[samples]   skip: échec encodage TrueHD"
 		return 0
 	fi
@@ -539,6 +542,7 @@ _make_truehd_7_1() {
 		-c:a truehd -ac 8 -metadata:s:a:0 language=eng \
 		-strict -2 \
 		"$out"; then
+		rm -f -- "$out"
 		echo "[samples]   skip: encodage TrueHD 7.1 non supporté (ou a échoué)"
 		return 0
 	fi
