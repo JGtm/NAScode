@@ -62,13 +62,22 @@ _determine_conversion_mode() {
     # Calcul dynamique du seuil de skip
     # En mode film-adaptive, on utilise le maxrate adaptatif calculé pour ce fichier
     # Sinon on utilise le MAXRATE_KBPS global
-    local effective_maxrate_kbps="${MAXRATE_KBPS}"
+    local effective_maxrate_kbps="${MAXRATE_KBPS:-0}"
+    local skip_tolerance_percent="${SKIP_TOLERANCE_PERCENT:-10}"
+
+    # Robustesse: si un module a modifié ces valeurs de façon inattendue
+    if [[ ! "$effective_maxrate_kbps" =~ ^[0-9]+$ ]]; then
+        effective_maxrate_kbps=0
+    fi
+    if [[ ! "$skip_tolerance_percent" =~ ^[0-9]+$ ]]; then
+        skip_tolerance_percent=10
+    fi
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]] && [[ -n "$adaptive_maxrate_kbps" ]] && [[ "$adaptive_maxrate_kbps" =~ ^[0-9]+$ ]]; then
         effective_maxrate_kbps="$adaptive_maxrate_kbps"
     fi
     
     local base_threshold_bits=$((effective_maxrate_kbps * 1000))
-    local tolerance_bits=$((effective_maxrate_kbps * SKIP_TOLERANCE_PERCENT * 10))
+    local tolerance_bits=$((effective_maxrate_kbps * skip_tolerance_percent * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
     
     # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible
@@ -391,6 +400,66 @@ _copy_to_temp_storage() {
 # FONCTION DE CONVERSION PRINCIPALE
 ###########################################################
 
+_convert_get_full_metadata() {
+    local file_original="$1"
+
+    # Format attendu:
+    # video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
+    if declare -f get_full_media_metadata &>/dev/null; then
+        get_full_media_metadata "$file_original"
+        return 0
+    fi
+
+    # Fallback (pour tests ou si fonction manquante)
+    local v_meta
+    v_meta=$(get_video_metadata "$file_original")
+    local v_props
+    v_props=$(get_video_stream_props "$file_original")
+
+    local v_bitrate v_codec duration_secs
+    IFS='|' read -r v_bitrate v_codec duration_secs <<< "$v_meta"
+
+    local v_width v_height v_pix_fmt
+    IFS='|' read -r v_width v_height v_pix_fmt <<< "$v_props"
+
+    # Audio probe séparé
+    local a_info
+    a_info=$(_get_audio_conversion_info "$file_original")
+    local a_codec a_bitrate _
+    IFS='|' read -r a_codec a_bitrate _ <<< "$a_info"
+
+    echo "${v_bitrate}|${v_codec}|${duration_secs}|${v_width}|${v_height}|${v_pix_fmt}|${a_codec}|${a_bitrate}"
+}
+
+_convert_run_adaptive_analysis_and_export() {
+    local tmp_input="$1"
+
+    local adaptive_params
+    adaptive_params=$(compute_video_params_adaptive "$tmp_input")
+
+    # Format:
+    # pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
+    local _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf
+    local complexity_c complexity_desc stddev_val adaptive_target_kbps
+    IFS='|' read -r _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf complexity_c complexity_desc stddev_val adaptive_target_kbps <<< "$adaptive_params"
+
+    local adaptive_maxrate_kbps adaptive_bufsize_kbps
+    adaptive_maxrate_kbps="${_mr%k}"
+    adaptive_bufsize_kbps="${_bs%k}"
+
+    # Afficher l'analyse de complexité
+    if [[ "$NO_PROGRESS" != true ]]; then
+        display_complexity_analysis "$tmp_input" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
+    fi
+
+    # Stocker les paramètres adaptatifs dans des variables d'environnement
+    export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
+    export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
+    export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
+
+    echo "${adaptive_target_kbps}|${adaptive_maxrate_kbps}|${adaptive_bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev_val}"
+}
+
 convert_file() {
     set -o pipefail
 
@@ -411,22 +480,7 @@ convert_file() {
     # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel
     # Format: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
     local full_metadata
-    if declare -f get_full_media_metadata &>/dev/null; then
-        full_metadata=$(get_full_media_metadata "$file_original")
-    else
-        # Fallback (pour tests ou si fonction manquante)
-        local v_meta=$(get_video_metadata "$file_original")
-        local v_props=$(get_video_stream_props "$file_original")
-        local v_bitrate v_codec duration_secs
-        IFS='|' read -r v_bitrate v_codec duration_secs <<< "$v_meta"
-        local v_width v_height v_pix_fmt
-        IFS='|' read -r v_width v_height v_pix_fmt <<< "$v_props"
-        # Audio probe séparé
-        local a_info=$(_get_audio_conversion_info "$file_original")
-        local a_codec a_bitrate _
-        IFS='|' read -r a_codec a_bitrate _ <<< "$a_info"
-        full_metadata="${v_bitrate}|${v_codec}|${duration_secs}|${v_width}|${v_height}|${v_pix_fmt}|${a_codec}|${a_bitrate}"
-    fi
+    full_metadata=$(_convert_get_full_metadata "$file_original")
     
     local v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate
     IFS='|' read -r v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate <<< "$full_metadata"
@@ -486,27 +540,10 @@ convert_file() {
     # 6. Analyse adaptative APRÈS téléchargement (mode film-adaptive uniquement)
     # L'analyse sur fichier local (SSD) est beaucoup plus rapide que sur fichier réseau
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
-        # Calculer les paramètres adaptatifs sur le fichier LOCAL (tmp_input)
-        local adaptive_params
-        adaptive_params=$(compute_video_params_adaptive "$tmp_input")
-        
-        # Format: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
-        local _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf
-        IFS='|' read -r _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf complexity_c complexity_desc stddev_val adaptive_target_kbps <<< "$adaptive_params"
-        
-        # Extraire le maxrate adaptatif (enlever le 'k' si présent)
-        adaptive_maxrate_kbps="${_mr%k}"
-        adaptive_bufsize_kbps="${_bs%k}"
-        
-        # Afficher l'analyse de complexité
-        if [[ "$NO_PROGRESS" != true ]]; then
-            display_complexity_analysis "$tmp_input" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
-        fi
-        
-        # Stocker les paramètres adaptatifs dans des variables d'environnement
-        export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
-        export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
-        export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
+        local adaptive_info
+        adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input")
+
+        IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
         
         # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
         if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then

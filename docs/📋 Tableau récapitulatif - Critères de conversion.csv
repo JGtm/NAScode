@@ -7,12 +7,12 @@ hevc;hevc;≤ 2772 kbps;2520 × 1.1;⏭️ SKIP (déjà optimisé);
 hevc;hevc;> 2772 kbps;2520 × 1.1;✅ CONVERTIR (bitrate trop haut);
 hevc;av1;Quelconque;—;✅ CONVERTIR (upgrade codec);
 av1;hevc;≤ 2772 kbps;2520 × 1.1;⏭️ SKIP (codec supérieur);
-av1;hevc;> 2772 kbps;2520 × 1.1;⏭️ SKIP (codec supérieur);
+av1;hevc;> 2772 kbps;2520 × 1.1;✅ CONVERTIR (bitrate trop haut — ré-encodage vers codec cible);
 av1;av1;≤ 1980 kbps;1800 × 1.1;⏭️ SKIP (déjà optimisé);
 av1;av1;> 1980 kbps;1800 × 1.1;✅ CONVERTIR (bitrate trop haut);
-"Note : Un codec ""supérieur"" (AV1 > HEVC > H264) n'est jamais ré-encodé vers un codec inférieur.";;;;;
+"Note : Si le codec source est ≥ codec cible mais que le bitrate dépasse le seuil, le script ré-encode quand même (warning dans les logs).";;;;;
 ;;;;;
-🔊 AUDIO — Décision de conversion (défaut: AAC 160k);;;;;
+🔊 AUDIO — Décision de conversion (stéréo 2ch — défaut: AAC 160k);;;;;
 Codec source;Bitrate source;Codec cible;Cible;Seuil (+10%);Décision
 aac;≤ 160 kbps;aac;160k;176k;⏭️ COPY (déjà AAC optimisé)
 aac;161-175 kbps;aac;160k;176k;⏭️ COPY (dans la marge 10%)
@@ -21,9 +21,20 @@ eac3;≤ 160 kbps;aac;160k;176k;⏭️ COPY (bitrate ≤ cible)
 eac3;161-175 kbps;aac;160k;176k;⏭️ COPY (dans la marge 10%)
 eac3;> 176 kbps;aac;160k;176k;✅ CONVERTIR (gain > 10%)
 ac3;> 176 kbps;aac;160k;176k;✅ CONVERTIR (gain > 10%)
-truehd;Quelconque;aac;160k;—;✅ CONVERTIR (lossless → lossy)
-dts-hd;Quelconque;aac;160k;—;✅ CONVERTIR (lossless → lossy)
-Inconnu;—;aac;160k;—;⏭️ COPY (sécurité)
+truehd;Quelconque;aac;160k;—;⏭️ COPY (premium passthrough, sauf --no-lossless)
+dts-hd;Quelconque;aac;160k;—;⏭️ COPY (premium passthrough, sauf --no-lossless)
+Inconnu;—;aac;160k;—;✅ CONVERTIR (codec inconnu → codec cible)
+;;;;;
+🔊 AUDIO — Multicanal (≥ 5.1 — défaut: EAC3 384k, downmix 7.1→5.1);;;;;
+Codec source;Canaux;Option;Codec cible effectif;Bitrate cible;Décision
+dts-hd;5.1;défaut;—;—;⏭️ COPY (premium passthrough)
+dts-hd;7.1;défaut;eac3;min(source,384)k;✅ CONVERTIR (downmix requis)
+truehd;5.1;--no-lossless;eac3;min(source,384)k;✅ CONVERTIR (no-lossless)
+eac3;5.1;défaut;eac3;384k;⏭️ COPY si ≤384k
+eac3;5.1;défaut;eac3;384k;✅ DOWNSCALE si >384k
+eac3;7.1;défaut;eac3;min(source,384)k;✅ CONVERTIR (downmix requis)
+ac3;5.1;défaut;eac3;min(source,384)k;✅ CONVERTIR (AC3 → EAC3)
+aac;5.1;défaut;eac3;min(source,384)k;✅ CONVERTIR (AAC → EAC3, sauf anti-upscale <256k)
 📊 Bitrates par codec (mode série 1080p);;;;;
 Codec;Efficacité;Target;Maxrate;Bufsize;Seuil skip
 HEVC;70%;2070 kbps;2520 kbps;3780 kbps;2772 kbps
@@ -37,4 +48,4 @@ Cible : -c av1 -a aac;;;;;
 ;;;;;
 Flux;Source;Cible;Seuil;Décision;
 Vidéo;AV1 2400 kbps;AV1 1800 kbps max;1980 kbps;✅ CONVERTIR (2400 > 1980);
-Audio;E-AC3 640 kbps;AAC 160 kbps;176 kbps;✅ CONVERTIR (640 > 176);
+Audio;E-AC3 640 kbps (5.1);E-AC3 384 kbps (5.1);384 kbps;✅ DOWNSCALE (640 > 384);
