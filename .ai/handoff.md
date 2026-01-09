@@ -1,5 +1,37 @@
 # Handoff
 
+## Dernière session (09/01/2026 - clean code light)
+
+### Tâches accomplies
+
+- VMAF : validation du refactor de `compute_vmaf_score()` (commande FFmpeg dédupliquée, `-progress` conditionnel).
+- Suffixe vidéo : refactor de `_build_effective_suffix_for_dims()` en helpers internes dans `lib/video_params.sh` (réduction de complexité, aucun changement de format attendu).
+- Documentation : mise à jour du tableau récapitulatif des critères de conversion (vidéo skip vs bitrate, audio premium passthrough, section multicanal, exemple mis à jour).
+
+### Fichiers modifiés
+
+- `lib/video_params.sh`
+- `docs/📋 Tableau récapitulatif - Critères de conversion.csv`
+- `.ai/handoff.md`
+- `.ai/DEVBOOK.md`
+
+### Validation
+
+- Tests ciblés : `bash run_tests.sh -f vmaf` (OK, 1 skip)
+- Tests ciblés : `bash run_tests.sh -f transcode_video` (OK)
+- Tests ciblés : `bash run_tests.sh -f encoding_subfunctions` (OK)
+- Tests ciblés : `bash run_tests.sh -f audio_codec` (OK)
+
+### Branche en cours
+
+- `fix/clean-code-light`
+
+### Derniers prompts
+
+- "Fais un check sur les opportunités de refactorisations, surtout pour les longues fonctions d'audio ou de video"
+- "Fais le plan pour tous les axes que tu as détecté"
+- "on exécute c’est bon"
+
 ## Dernière session (08/01/2026 - clean code)
 
 ### Tâches accomplies

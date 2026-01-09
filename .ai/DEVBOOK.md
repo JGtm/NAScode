@@ -13,6 +13,26 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-09
+
+#### Refactor “clean code light” (sans changement UX/CLI)
+- **Quoi** : refactor ciblé des fonctions longues audio/vidéo/VMAF, avec une construction de commandes FFmpeg plus sûre via tableaux d’arguments, et découpage de `_build_effective_suffix_for_dims()` en helpers internes.
+- **Où** :
+  - `lib/utils.sh` : ajout helper `_cmd_append_words()` (append contrôlé d’options multi-mots dans un tableau)
+  - `lib/audio_decision.sh` / `lib/audio_params.sh` : normalisation centralisée des noms de codecs audio via `_normalize_audio_codec()`
+  - `lib/transcode_video.sh` : construction cmd FFmpeg via `_cmd_append_words()`, extraction d’aides pipeline (release slot / affichage erreurs)
+  - `lib/conversion.sh` : extraction helpers metadata/adaptive pour clarifier `convert_file()`
+  - `lib/vmaf.sh` : déduplication de la commande FFmpeg, `-progress` conditionnel
+  - `lib/video_params.sh` : découpage suffixe (`_build_effective_suffix_for_dims()`)
+- **Pourquoi** : améliorer lisibilité/maintenabilité et réduire les risques de word-splitting implicite dans les commandes FFmpeg.
+- **Impact** : aucun changement attendu côté utilisateur (formats et options inchangés).
+- **Validation** : tests Bats ciblés OK (transcode_video / encoding_subfunctions / audio_codec / vmaf / regression_exports_contract).
+
+#### Docs : tableau récapitulatif des critères de conversion
+- **Quoi** : alignement du tableau sur le comportement réel (vidéo : le codec “supérieur” peut être ré-encodé si le bitrate dépasse le seuil ; audio : premium passthrough par défaut, ajout section multicanal et exemple E-AC3 mis à jour).
+- **Où** : `docs/📋 Tableau récapitulatif - Critères de conversion.csv`
+- **Pourquoi** : éviter les règles obsolètes/inexactes côté documentation et garder une “source de vérité” cohérente avec le code.
+
 ### 2026-01-02
 
 #### UX : Compteur fichiers convertis pour mode limite
