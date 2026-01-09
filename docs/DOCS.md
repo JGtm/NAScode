@@ -2,8 +2,6 @@
 
 Cette section contient la documentation détaillée. Le [README principal](../README.md) reste volontairement court.
 
-Index principal : [README.md](README.md)
-
 ## Guides
 
 - Usage (options + exemples) : [USAGE.md](USAGE.md)
