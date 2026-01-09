@@ -11,8 +11,8 @@ Ce document explique *pourquoi* le script peut **skip**, **copier** (passthrough
 
 Règles principales :
 
-- Si `--audio copy` : l’audio est toujours copié.
-- Si la source est **lossless** (FLAC, TrueHD) : toujours copié.
+- Si `--audio copy` : l’audio est copié **sauf** si un downmix est explicitement requis (ex: stéréo forcée en mode `serie`).
+- Si la source est **lossless** (FLAC, TrueHD) : copiée par défaut, sauf si un downmix/conversion est requis (ex: `--no-lossless`, 7.1→5.1 en mode film, ou stéréo forcée en mode `serie`).
 - Si la source est déjà le **même codec** que la cible :
 	- copié si bitrate $\le$ cible,
 	- downscale si bitrate $>$ 110% de la cible,
@@ -39,7 +39,7 @@ Le script gère automatiquement le nombre de canaux audio selon le mode :
 - **Mode série** : priorité à l'économie d'espace. La stéréo suffit pour un visionnage sur PC/tablette/mobile.
 - **Mode film** : priorité à la qualité. Le 5.1 permet de profiter d'un système home cinema.
 
-Cette logique s'applique uniquement lors d'une **conversion** (`convert` ou `downscale`). Si l'audio est copié (`copy`), les canaux sont conservés tels quels.
+Note : si une décision `copy` est retenue, les canaux sont conservés tels quels. En mode `serie`, une source multicanal force une décision de conversion/downmix afin de garantir une sortie stéréo.
 
 ### Hiérarchie (efficacité)
 

@@ -38,6 +38,11 @@ fi
 # Règle : multichannel (>=6ch) → toujours 5.1 (downmix si 7.1)
 _get_target_audio_layout() {
     local channels="${1:-2}"
+
+    if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]]; then
+        echo "stereo"
+        return 0
+    fi
     
     if _is_audio_multichannel "$channels"; then
         echo "5.1"

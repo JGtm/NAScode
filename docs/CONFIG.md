@@ -21,6 +21,7 @@ Les modes sont définis dans [lib/config.sh](../lib/config.sh) via `set_conversi
 | GOP (keyint) | 600 (~25s @ ~24fps) | 240 (~10s @ ~24fps) |
 | Tune fastdecode | Oui | Non |
 | x265 extra params | Oui (optimisations série) | Non (qualité max) |
+| Audio (layout cible) | **Stéréo forcée** (downmix si multicanal) | Stéréo/5.1 selon la source |
 
 Notes :
 - Le projet vise du **10-bit** (`yuv420p10le`) côté vidéo.
@@ -73,6 +74,7 @@ Dans [lib/config.sh](../lib/config.sh), on retrouve notamment :
 - `CONVERSION_MODE`
 - `VIDEO_CODEC`
 - `AUDIO_CODEC`
+- `AUDIO_FORCE_STEREO` (activé automatiquement en mode `serie`)
 - `SAMPLE_DURATION`
 
 Autres variables utiles :

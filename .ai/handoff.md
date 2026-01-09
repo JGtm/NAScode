@@ -1,5 +1,63 @@
 # Handoff
 
+## Dernière session (09/01/2026 - stéréo forcée en mode série)
+
+### Objectif
+
+- Garantir une sortie **stéréo** en mode `serie` (downmix systématique) sans réinventer la logique audio.
+- Réduire la dispersion des paramètres dépendants du mode (centralisation autour de `set_conversion_mode_parameters`).
+
+### Tâches accomplies
+
+- Ajout d’un flag global `AUDIO_FORCE_STEREO` (activé en `serie`, désactivé en `film` / `film-adaptive`).
+- Audio :
+  - Forçage du layout cible à `stereo` via `_get_target_audio_layout()`.
+  - Bypass “stéréo forcée” dans `_get_smart_audio_decision()` pour les sources `>= 6` canaux : décision `convert/downscale` afin de garantir le downmix (y compris pour les cas premium/passthrough).
+  - Gestion du cas `AUDIO_CODEC=copy` : bascule vers `aac` si downmix requis (impossible en copy).
+- Vidéo / centralisation mode-based :
+  - Ajout de `ENCODER_MODE_PROFILE` (ex: `film-adaptive` → `film`) et `ENCODER_MODE_PARAMS` calculé une fois dans `set_conversion_mode_parameters`.
+  - `lib/transcode_video.sh` n’appelle plus `get_encoder_mode_params(..., CONVERSION_MODE)` à la volée : utilise `ENCODER_MODE_PARAMS`.
+  - SVT-AV1 : utilisation de `FILM_KEYINT` (centralisé) au lieu de `get_mode_keyint(CONVERSION_MODE)`.
+- CLI : suppression de la désactivation automatique de `SINGLE_PASS_MODE` dans `parse_arguments` (centralisé dans `set_conversion_mode_parameters`).
+- Exports : ajout des exports `AUDIO_FORCE_STEREO`, `ENCODER_MODE_PROFILE`, `ENCODER_MODE_PARAMS`.
+
+### Tests / doc
+
+- Tests Bats mis à jour :
+  - `tests/test_args.bats` : prend en compte la centralisation (effet visible après `set_conversion_mode_parameters`).
+  - `tests/test_audio_codec.bats` : le cas “série + source multicanal” attend désormais un downmix AAC stéréo.
+- Documentation : mise à jour pour expliciter “stéréo forcée en mode `serie`” et ses implications (y compris exceptions à `--audio copy`).
+
+### Fichiers modifiés
+
+- `lib/config.sh`
+- `lib/audio_params.sh`
+- `lib/audio_decision.sh`
+- `lib/transcode_video.sh`
+- `lib/args.sh`
+- `lib/exports.sh`
+- `tests/test_args.bats`
+- `tests/test_audio_codec.bats`
+- `README.md`
+- `docs/SMART_CODEC.md`
+- `docs/CONFIG.md`
+- `.ai/DEVBOOK.md`
+
+### Validation
+
+- Vérification éditeur : aucun problème signalé dans les fichiers modifiés.
+- Suite de tests complète : **non lancée** (à faire côté utilisateur : `bash run_tests.sh`).
+
+### Branche en cours
+
+- `fix/docs-index-link`
+
+### Derniers prompts
+
+- "m’assurer que --force-audio donne le même résultat que --force"
+- "est-ce qu’on force bien la sortie stéréo par défaut dans le mode série ?"
+- "ok option C… stéréo garantie… réanalyse… et recentraliser dans set_conversion_mode_parameters" + "go"
+
 ## Dernière session (09/01/2026 - samples FFmpeg)
 
 ### Tâches accomplies

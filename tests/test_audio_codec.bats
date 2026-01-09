@@ -414,12 +414,14 @@ STUB
     AUDIO_CODEC="aac"
     AUDIO_BITRATE_KBPS=0
     FORCE_AUDIO_CODEC=false
+    AUDIO_FORCE_STEREO=true
 
     local result
     result=$(_build_audio_params "/fake/file.mkv")
 
-    # EAC3 5.1 384k → copy car codec efficace multichannel OK
-    [[ "$result" =~ "-c:a copy" ]]
+    # En mode série, stéréo forcée : downmix + conversion vers AAC
+    [[ "$result" =~ "-c:a aac" ]]
+    [[ "$result" =~ "-af aformat=channel_layouts=stereo" ]]
 }
 
 @test "_build_audio_params: mode film eac3 5.1 → copy (pas conversion AAC sans --force-audio)" {
@@ -440,6 +442,7 @@ STUB
     AUDIO_CODEC="aac"
     AUDIO_BITRATE_KBPS=0
     FORCE_AUDIO_CODEC=false
+    AUDIO_FORCE_STEREO=false
 
     local result
     result=$(_build_audio_params "/fake/file.mkv")
