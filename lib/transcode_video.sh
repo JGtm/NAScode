@@ -47,13 +47,13 @@ _setup_video_encoding_params() {
     VIDEO_FILTER_OPTS=""
     if [[ -n "$downscale_filter" ]]; then
         VIDEO_FILTER_OPTS="-vf $downscale_filter"
-        if [[ "$NO_PROGRESS" != true ]]; then
+        if [[ "$NO_PROGRESS" != true ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
             echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
         fi
     fi
     
     # Affichage 10-bit si applicable
-    if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]]; then
+    if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
         if [[ "$OUTPUT_PIX_FMT" == "yuv420p10le" ]]; then
             echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
         fi

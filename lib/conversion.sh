@@ -510,12 +510,17 @@ _convert_handle_adaptive_mode() {
     return 0
 }
 
-# Affiche les messages informatifs avant la conversion (codec, bitrate, audio multicanal).
-# Usage: _convert_display_info_messages <v_codec> <tmp_input>
+# Affiche les messages informatifs avant la conversion (codec, bitrate, downscale/10-bit, audio).
+# Usage: _convert_display_info_messages <v_codec> <tmp_input> <v_width> <v_height> <v_pix_fmt> <a_codec> <a_bitrate>
 # Effets de bord: echo vers stdout
 _convert_display_info_messages() {
     local v_codec="$1"
     local tmp_input="$2"
+    local v_width="${3:-}"
+    local v_height="${4:-}"
+    local v_pix_fmt="${5:-}"
+    local a_codec="${6:-}"
+    local a_bitrate="${7:-}"
 
     [[ "$NO_PROGRESS" == true ]] && return 0
 
@@ -532,14 +537,85 @@ _convert_display_info_messages() {
         fi
     fi
 
-    # Info audio multicanal (mode film/film-adaptive uniquement)
-    if [[ "${CONVERSION_MODE:-serie}" == "film" || "${CONVERSION_MODE:-serie}" == "film-adaptive" ]]; then
-        if declare -f _probe_audio_channels &>/dev/null && declare -f _is_audio_multichannel &>/dev/null; then
-            local channel_info channels
-            channel_info=$(_probe_audio_channels "$tmp_input")
-            channels=$(echo "$channel_info" | cut -d'|' -f1)
-            if _is_audio_multichannel "$channels"; then
-                echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Préservation 5.1${NOCOLOR}"
+    # Option B : afficher downscale + 10-bit AVANT lancement FFmpeg (centralisé ici)
+    # (Uniquement si on encode la vidéo ; pas en passthrough vidéo)
+    if [[ "${CONVERSION_ACTION:-full}" != "video_passthrough" ]]; then
+        if declare -f _build_downscale_filter_if_needed &>/dev/null; then
+            local downscale_filter
+            downscale_filter=$(_build_downscale_filter_if_needed "$v_width" "$v_height")
+            if [[ -n "$downscale_filter" ]]; then
+                echo -e "${CYAN}  ⬇️  Downscale activé : ${v_width}x${v_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+                VIDEO_PRECONVERSION_VIDEOINFO_SHOWN=true
+            fi
+        fi
+
+        if declare -f _select_output_pix_fmt &>/dev/null; then
+            local output_pix_fmt
+            output_pix_fmt=$(_select_output_pix_fmt "$v_pix_fmt")
+            if [[ -n "$v_pix_fmt" && "$output_pix_fmt" == "yuv420p10le" ]]; then
+                echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+                VIDEO_PRECONVERSION_VIDEOINFO_SHOWN=true
+            fi
+        fi
+    fi
+
+    # Probe canaux audio (une fois) sur le fichier local
+    local channels=""
+    if declare -f _probe_audio_channels &>/dev/null; then
+        local channel_info
+        channel_info=$(_probe_audio_channels "$tmp_input")
+        channels=$(echo "$channel_info" | cut -d'|' -f1)
+    fi
+
+    # Info audio multicanal : afficher en série ET en film, avec wording cohérent.
+    if [[ -n "$channels" && "$channels" =~ ^[0-9]+$ ]] && declare -f _is_audio_multichannel &>/dev/null; then
+        if _is_audio_multichannel "$channels"; then
+            if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]]; then
+                echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Downmix stéréo${NOCOLOR}"
+            else
+                if [[ "$channels" -gt 6 ]]; then
+                    echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Downmix 7.1 → 5.1${NOCOLOR}"
+                else
+                    echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Préservation 5.1${NOCOLOR}"
+                fi
+            fi
+        fi
+    fi
+
+    # Option 2A : résumé audio effectif (uniquement si utile)
+    if declare -f _get_smart_audio_decision &>/dev/null && [[ -n "$channels" && "$channels" =~ ^[0-9]+$ ]]; then
+        local audio_decision action effective_codec target_bitrate reason
+        audio_decision=$(_get_smart_audio_decision "$tmp_input" "$a_codec" "$a_bitrate" "$channels")
+        IFS='|' read -r action effective_codec target_bitrate reason <<< "$audio_decision"
+
+        local show_audio_summary=false
+        if [[ "$action" != "copy" ]]; then
+            show_audio_summary=true
+        elif [[ "${AUDIO_FORCE_STEREO:-false}" == true && "$channels" -ge 6 ]]; then
+            show_audio_summary=true
+        fi
+
+        if [[ "$show_audio_summary" == true ]]; then
+            local layout=""
+            if declare -f _get_target_audio_layout &>/dev/null; then
+                layout=$(_get_target_audio_layout "$channels")
+            else
+                if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]]; then
+                    layout="stereo"
+                else
+                    layout=$([[ "$channels" -ge 6 ]] && echo "5.1" || echo "stereo")
+                fi
+            fi
+
+            local codec_label="${effective_codec^^}"
+            [[ "$effective_codec" == "eac3" ]] && codec_label="EAC3"
+            [[ "$effective_codec" == "aac" ]] && codec_label="AAC"
+            [[ "$effective_codec" == "opus" ]] && codec_label="OPUS"
+
+            if [[ -n "$target_bitrate" && "$target_bitrate" =~ ^[0-9]+$ ]] && [[ "$target_bitrate" -gt 0 ]]; then
+                echo -e "${CYAN}  🎧 Audio → ${codec_label} ${target_bitrate}k (${layout})${NOCOLOR}"
+            else
+                echo -e "${CYAN}  🎧 Audio → ${codec_label} (${layout})${NOCOLOR}"
             fi
         fi
     fi
@@ -556,6 +632,7 @@ convert_file() {
     # Compteurs initiaux
     CURRENT_FILE_NUMBER=$(call_if_exists increment_starting_counter) || CURRENT_FILE_NUMBER=0
     LIMIT_DISPLAY_SLOT=0
+    VIDEO_PRECONVERSION_VIDEOINFO_SHOWN=false
     
     # 1. Récupérer TOUTES les métadonnées en un seul appel
     local full_metadata
@@ -618,7 +695,7 @@ convert_file() {
     fi
     
     # 7. Messages informatifs
-    _convert_display_info_messages "$v_codec" "$tmp_input"
+    _convert_display_info_messages "$v_codec" "$tmp_input" "$v_width" "$v_height" "$v_pix_fmt" "$a_codec" "$a_bitrate"
     
     # 8. Exécution de la conversion
     local conversion_success=false

@@ -1,5 +1,43 @@
 # Handoff
 
+## Dernière session (09/01/2026 - UX messages pré-conversion)
+
+### Objectif
+
+- Améliorer les messages informatifs affichés juste avant la conversion (modes `serie` et `film`).
+- Centraliser l'affichage downscale / 10-bit dans l'orchestrateur (éviter les doublons).
+
+### Tâches accomplies
+
+- `lib/conversion.sh`
+  - Extension de `_convert_display_info_messages(...)` :
+    - Downscale + 10-bit affichés avant lancement FFmpeg (si encodage vidéo, pas en passthrough).
+    - Message multicanal affiché en `serie` ET en `film`, avec wording dépendant de `AUDIO_FORCE_STEREO`.
+    - Ajout d'un résumé audio effectif (codec/bitrate/layout) basé sur `_get_smart_audio_decision()`.
+  - Ajout d'un flag `VIDEO_PRECONVERSION_VIDEOINFO_SHOWN` (reset par fichier) pour dédoublonner l'affichage côté `transcode_video.sh`.
+- `lib/transcode_video.sh`
+  - Garde anti-doublon sur les messages downscale/10-bit tout en conservant l'application réelle du filtre.
+
+### Tests / doc
+
+- Tests Bats : non relancés dans cette session (à faire côté utilisateur : `bash run_tests.sh`).
+- Documentation : non modifiée (changement purement UX/logs).
+
+### Branche en cours
+
+- `feat/ux-preconversion-messages`
+
+### Fichiers modifiés
+
+- `lib/conversion.sh`
+- `lib/transcode_video.sh`
+
+### Derniers prompts
+
+- "Je voudrais que les messages ... soient affichés en mode série et en mode film..."
+- "Option B ... oui ... non. Fais moi un plan d’implémentation"
+- "Vas-y ... fais une nouvelle branche à partir de refactor/convert-file-cleanup"
+
 ## Dernière session (09/01/2026 - stéréo forcée en mode série)
 
 ### Objectif
