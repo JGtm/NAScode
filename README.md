@@ -132,7 +132,7 @@ Détails : [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 ## Documentation
 
-- Index docs : [docs/README.md](docs/README.md)
+- Index docs : [docs/DOCS.md](docs/DOCS.md)
 - Ajouter un nouveau codec : [docs/ADDING_NEW_CODEC.md](docs/ADDING_NEW_CODEC.md)
 - Instructions macOS : [docs/Instructions-Mac.txt](docs/Instructions-Mac.txt)
 - Critères de conversion (CSV) : [docs/📋%20Tableau%20récapitulatif%20-%20Critères%20de%20conversion.csv](docs/%F0%9F%93%8B%20Tableau%20r%C3%A9capitulatif%20-%20Crit%C3%A8res%20de%20conversion.csv)
