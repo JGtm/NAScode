@@ -1,5 +1,52 @@
 # Handoff
 
+## Dernière session (08/01/2026 - clean code)
+
+### Tâches accomplies
+
+- Refactor ciblé "clean code" sans changement UX : commande FFmpeg construite via tableaux d'arguments (réduit le word-splitting implicite).
+- Durcissement léger de la décision de conversion : valeurs par défaut sûres si `MAXRATE_KBPS` / `SKIP_TOLERANCE_PERCENT` sont absents ou non numériques.
+- Ajout de tests Bats dédiés sur la décision `skip` / `video_passthrough` / `full`.
+- VMAF: refactor des appels `ffmpeg` en tableaux d'arguments + usage de `get_file_size_bytes`.
+
+### Fichiers modifiés
+
+- `lib/transcode_video.sh`
+- `lib/conversion.sh`
+- `lib/vmaf.sh`
+- `tests/test_conversion_mode.bats` (nouveau)
+
+### Validation
+
+- Tests ciblés : `bash run_tests.sh -f args` (OK)
+- Tests ciblés : `bash run_tests.sh -f conversion_mode` (OK)
+- Tests ciblés : `bash run_tests.sh -f transcode_video` (OK)
+- Tests ciblés : `bash run_tests.sh -f vmaf` (OK, 1 skip)
+
+### Notes
+
+- `ffprobe_safe` est utilisé pour éviter les soucis de chemins Windows/Git Bash (accents, /c/...).
+- ShellCheck n'était pas disponible dans l'environnement Git Bash pendant cette session.
+
+### Branche en cours
+
+- `fix/clean-code-light`
+
+### Derniers prompts
+
+- "Estce que tu peux me dire si mon code respecte les principes du clean code ?"
+- "vas y puis dresse moi un petit plan pour améliorer tout ça, sans que ça soit trop lourd"
+- "Vas y fait tout"
+- "vas y continue"
+- "option A et B"
+- "vas y continue jusqu'au bout"
+
+## Suite (Option A + B)
+
+- Remplacements ciblés `ffprobe` → `ffprobe_safe` (robustesse Windows/Git Bash) dans `lib/vmaf.sh` et `lib/video_params.sh`.
+- Durcissement léger du parsing CLI : ajout de `_args_require_value` dans `lib/args.sh` pour éviter les cas “option sans valeur” et fournir une erreur claire.
+- Tests : ajout de cas Bats sur `--source` / `--output-dir` sans valeur dans `tests/test_args.bats`.
+
 ## Dernière session (08/01/2026)
 
 ### Tâches accomplies
