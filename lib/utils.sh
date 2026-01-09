@@ -187,6 +187,26 @@ clean_number() {
 }
 
 ###########################################################
+# CONSTRUCTION DE COMMANDES (TABLEAUX)
+###########################################################
+
+# Ajoute à un tableau (nommé) les mots issus d'une chaîne d'options.
+# Convention interne: la chaîne est supposée contrôlée (options FFmpeg, wrappers, etc.).
+# Compatible bash 3.2 (pas de local -n).
+# Usage: _cmd_append_words cmd "-hwaccel cuda -extra 1"
+_cmd_append_words() {
+    local array_name="$1"
+    local words_str="${2:-}"
+
+    [[ -z "$array_name" || -z "$words_str" ]] && return 0
+
+    local -a _tmp=()
+    read -r -a _tmp <<< "$words_str"
+    # shellcheck disable=SC2140
+    eval "$array_name+=(\"\${_tmp[@]}\")"
+}
+
+###########################################################
 # TAILLES DE FICHIERS / PARSING
 ###########################################################
 

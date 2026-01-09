@@ -5,6 +5,7 @@
 - ✅ **Audio lossless/premium** : option `--no-lossless` pour forcer la conversion des pistes DTS/DTS-HD, TrueHD, FLAC (désactive le passthrough “premium”)
 - ✅ **Audio multicanal** : règles finalisées (downmix 7.1 → 5.1, EAC3 par défaut, Opus multicanal via `-a opus`, AAC multicanal uniquement avec `--force-audio`)
 - ✅ **Refactor audio** : séparation claire entre décision (`lib/audio_decision.sh`) et paramètres FFmpeg/layout (`lib/audio_params.sh`)
+- ✅ **Refactor “clean code light”** : simplification interne des grosses fonctions (audio/vidéo/VMAF/suffixe) et construction des commandes FFmpeg via tableaux d’arguments (pas de changement UX/CLI attendu)
 - ✅ **Tests & docs** : nouveaux tests Bats multicanal + docs alignées (README + docs)
 
 ## v2.5
