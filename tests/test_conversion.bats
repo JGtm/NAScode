@@ -20,6 +20,14 @@ teardown() {
 # Tests de _prepare_file_paths()
 ###########################################################
 
+@test "_get_counter_prefix: mode limite affiche un slot 1-based" {
+    LIMIT_FILES=5
+    LIMIT_DISPLAY_SLOT=1
+    local result
+    result=$(_get_counter_prefix)
+    [[ "$result" =~ "[1/5]" ]]
+}
+
 @test "_prepare_file_paths: extrait correctement le nom de fichier" {
     local result
     result=$(_prepare_file_paths "/source/videos/test.mkv" "/output")

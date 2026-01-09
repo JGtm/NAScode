@@ -28,6 +28,11 @@ Objectifs :
 - **Impact** : changement de comportement en mode `serie` (5.1/7.1 → stéréo systématique). Mode `film` / `film-adaptive` inchangé.
 - **Doc** : `README.md`, `docs/SMART_CODEC.md`, `docs/CONFIG.md`.
 
+#### UX : compteur mode limite 1-based
+- **Quoi** : en mode limite (`-l`), le préfixe affiché sur la ligne “Démarrage du fichier” ne commence plus à `[0/N]` mais à `[1/N]` (slot en cours).
+- **Où** : `lib/conversion.sh` (préfixe `_get_counter_prefix` via `LIMIT_DISPLAY_SLOT`).
+- **Pourquoi** : éviter une impression de bug et rendre la progression plus intuitive.
+
 #### Refactor “clean code light” (sans changement UX/CLI)
 - **Quoi** : refactor ciblé des fonctions longues audio/vidéo/VMAF, avec une construction de commandes FFmpeg plus sûre via tableaux d’arguments, et découpage de `_build_effective_suffix_for_dims()` en helpers internes.
 - **Où** :
