@@ -2,11 +2,14 @@
 
 Cette section contient la documentation détaillée. Le [README principal](../README.md) reste volontairement court.
 
+Index principal : [README.md](README.md)
+
 ## Guides
 
 - Usage (options + exemples) : [USAGE.md](USAGE.md)
+- Architecture (modules + flux) : [ARCHITECTURE.md](ARCHITECTURE.md)
 - Configuration (modes, variables, codecs, off-peak) : [CONFIG.md](CONFIG.md)
-- Logique “smart codec” (audio/vidéo, seuils, `--force`) : [SMART_CODEC.md](SMART_CODEC.md)
+- Logique “smart codec” (audio/vidéo, multicanal, seuils, `--force`) : [SMART_CODEC.md](SMART_CODEC.md)
 
 Référence code (audio) :
 - Décision “smart codec” : [../lib/audio_decision.sh](../lib/audio_decision.sh)
