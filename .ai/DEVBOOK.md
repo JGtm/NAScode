@@ -33,6 +33,12 @@ Objectifs :
 - **Où** : `lib/conversion.sh` (préfixe `_get_counter_prefix` via `LIMIT_DISPLAY_SLOT`).
 - **Pourquoi** : éviter une impression de bug et rendre la progression plus intuitive.
 
+#### UX : compteur mode limite robuste en parallèle
+- **Quoi** : le slot `[X/N]` en mode limite est désormais réservé de façon **atomique** (mutex) via `increment_converted_count`, ce qui évite les slots dupliqués quand `PARALLEL_JOBS>1`.
+- **Où** : `lib/conversion.sh`.
+- **Pourquoi** : stabiliser l'UX et éviter les collisions de compteur en exécution concurrente.
+- **Notes** : en `film-adaptive`, le slot est réservé après l'analyse (pour éviter de “gâcher” des slots sur des skips post-analyse).
+
 #### Refactor “clean code light” (sans changement UX/CLI)
 - **Quoi** : refactor ciblé des fonctions longues audio/vidéo/VMAF, avec une construction de commandes FFmpeg plus sûre via tableaux d’arguments, et découpage de `_build_effective_suffix_for_dims()` en helpers internes.
 - **Où** :
