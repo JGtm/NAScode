@@ -79,7 +79,7 @@ check_plexignore() {
         case "$response" in
             [oO]|[yY]|'')
                 echo "*" > "$plexignore_file"
-                print_success "Fichier .plexignore créé dans '$OUTPUT_DIR'"
+                print_success "Fichier .plexignore créé dans le répertoire de destination"
                 ;;
             [nN]|*)
                 print_info "Création de .plexignore ignorée"
