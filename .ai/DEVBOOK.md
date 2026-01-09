@@ -15,6 +15,30 @@ Objectifs :
 
 ### 2026-01-09
 
+#### Audio : stéréo forcée en mode `serie` + centralisation mode-based (vidéo)
+- **Quoi** : en mode `serie`, garantir une sortie stéréo (downmix) même pour les sources multicanal et même si elles auraient été copiées (premium/passthrough). En parallèle, calculer une fois les paramètres encodeur dépendants du mode.
+- **Où** :
+  - `lib/config.sh` : `AUDIO_FORCE_STEREO`, `ENCODER_MODE_PROFILE`, `ENCODER_MODE_PARAMS` + initialisation par mode
+  - `lib/audio_decision.sh` : bypass décision “stéréo forcée” pour `channels>=6`
+  - `lib/audio_params.sh` : layout cible `stereo` si `AUDIO_FORCE_STEREO=true`
+  - `lib/transcode_video.sh` : utilisation de `ENCODER_MODE_PARAMS` et `FILM_KEYINT` centralisés
+  - `lib/args.sh` : suppression de la règle film→two-pass dans le parsing (centralisé dans `set_conversion_mode_parameters`)
+  - Tests : `tests/test_args.bats`, `tests/test_audio_codec.bats`
+- **Pourquoi** : compatibilité maximale et taille maîtrisée en série ; éviter des décisions “mode-based” dispersées.
+- **Impact** : changement de comportement en mode `serie` (5.1/7.1 → stéréo systématique). Mode `film` / `film-adaptive` inchangé.
+- **Doc** : `README.md`, `docs/SMART_CODEC.md`, `docs/CONFIG.md`.
+
+#### UX : compteur mode limite 1-based
+- **Quoi** : en mode limite (`-l`), le préfixe affiché sur la ligne “Démarrage du fichier” ne commence plus à `[0/N]` mais à `[1/N]` (slot en cours).
+- **Où** : `lib/conversion.sh` (préfixe `_get_counter_prefix` via `LIMIT_DISPLAY_SLOT`).
+- **Pourquoi** : éviter une impression de bug et rendre la progression plus intuitive.
+
+#### UX : compteur mode limite robuste en parallèle
+- **Quoi** : le slot `[X/N]` en mode limite est désormais réservé de façon **atomique** (mutex) via `increment_converted_count`, ce qui évite les slots dupliqués quand `PARALLEL_JOBS>1`.
+- **Où** : `lib/conversion.sh`.
+- **Pourquoi** : stabiliser l'UX et éviter les collisions de compteur en exécution concurrente.
+- **Notes** : en `film-adaptive`, le slot est réservé après l'analyse (pour éviter de “gâcher” des slots sur des skips post-analyse).
+
 #### Refactor “clean code light” (sans changement UX/CLI)
 - **Quoi** : refactor ciblé des fonctions longues audio/vidéo/VMAF, avec une construction de commandes FFmpeg plus sûre via tableaux d’arguments, et découpage de `_build_effective_suffix_for_dims()` en helpers internes.
 - **Où** :
@@ -33,47 +57,11 @@ Objectifs :
 - **Où** : `docs/📋 Tableau récapitulatif - Critères de conversion.csv`
 - **Pourquoi** : éviter les règles obsolètes/inexactes côté documentation et garder une “source de vérité” cohérente avec le code.
 
-#### Outil : génération de samples FFmpeg (edge cases)
-- **Quoi** : script pour générer des médias courts et reproductibles (VFR, 10-bit, multiaudio, sous-titres, metadata rotate, dimensions impaires, etc.).
-- **Où** :
-  - `tools/generate_ffmpeg_samples.sh`
-  - `docs/SAMPLES.md`
-  - `docs/DOCS.md` (lien ajouté)
-  - `.gitignore` (ignore `samples/_generated/`)
-- **Pourquoi** : faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
-- **Impact** : aucun impact sur NAScode ; artefacts générés ignorés par git.
-
 #### Samples : cas 7.1 (TrueHD/DTS) plus robustes
 - **Quoi** : détection préventive du support 7.1 par les encodeurs FFmpeg (`truehd`, `dca`) + suppression d'artefacts invalides (0 octet / sans vidéo) quand `--force` n'est pas utilisé.
 - **Où** : `tools/generate_ffmpeg_samples.sh`
 - **Pourquoi** : sur certaines builds, les encodeurs refusent 7.1 (jusqu'à 5.1 seulement) ; éviter du bruit d'erreurs et empêcher qu'un ancien fichier audio-only soit réutilisé.
 - **Impact** : `19_dts_7_1.mkv` / `21_truehd_7_1.mkv` peuvent être "skip" proprement ; pas de fichiers invalides laissés sur disque.
-
-#### UI : prompt `.plexignore` harmonisé
-- **Quoi** : l'invite de création du fichier `.plexignore` utilise le même rendu que les autres questions (bloc `ask_question` + messages `print_success`/`print_info`).
-- **Où** : `lib/system.sh` (`check_plexignore()`)
-- **Pourquoi** : cohérence de l'UI interactive.
-
-### 2026-01-08
-
-#### Feature : `--no-lossless` (multi-canal)
-- **Quoi** : ajout d'une option pour éviter le passthrough lossless/premium en audio, y compris en contexte multi-canal.
-- **Où** :
-  - `lib/args.sh`, `nascode` : parsing / câblage CLI
-  - `lib/audio_decision.sh`, `lib/audio_params.sh` : décision smart audio, règles multi-canal
-  - `lib/config.sh`, `lib/exports.sh` : config + exports
-  - Tests : `tests/test_audio_codec.bats`, `tests/test_audio_multichannel.bats`
-  - Docs : `docs/SMART_CODEC.md`, `docs/DOCS.md`, `README.md`, `docs/CHANGELOG.md`
-- **Pourquoi** : permettre un mode “compatibilité / taille” où l'audio lossless n'est pas conservé, même si le fichier source est premium.
-
-#### Refactor : extraction du moteur de décision audio
-- **Quoi** : factorisation/clarification de la logique de décision smart audio.
-- **Où** : `lib/audio_decision.sh`, `lib/audio_params.sh` (+ doc `docs/SMART_CODEC.md`).
-- **Pourquoi** : rendre les règles plus lisibles, testables et faciles à faire évoluer.
-
-#### Docs : changelog v2.6
-- **Quoi** : mise à jour du changelog pour refléter les évolutions.
-- **Où** : `docs/CHANGELOG.md`
 
 ### 2026-01-02
 
@@ -163,3 +151,20 @@ Objectifs :
   - ~100 lignes supprimées/factorisées
   - Aucun changement de comportement
   - Tests ajoutés pour les nouvelles fonctions
+
+### 2026-01-09
+
+#### Outil : génération de samples FFmpeg (edge cases)
+- **Quoi** : Ajout d'un script pour générer des médias courts et reproductibles (VFR, 10-bit, multiaudio, sous-titres, metadata rotate, dimensions impaires, etc.).
+- **Où** :
+  - `tools/generate_ffmpeg_samples.sh`
+  - `docs/SAMPLES.md`
+  - `docs/DOCS.md` (lien ajouté)
+  - `.gitignore` (ignore `samples/_generated/`)
+- **Pourquoi** : Faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
+- **Impact** : Aucun impact sur NAScode; artefacts générés ignorés par git.
+
+#### UI : prompt `.plexignore` harmonisé
+- **Quoi** : l'invite de création du fichier `.plexignore` utilise désormais le même rendu que les autres questions (bloc `ask_question` + messages `print_success`/`print_info`).
+- **Où** : `lib/system.sh` (`check_plexignore()`)
+- **Pourquoi** : cohérence de l'UI interactive.

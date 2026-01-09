@@ -12,9 +12,15 @@ CONVERSION_ACTION=""
 # Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
 CURRENT_FILE_NUMBER=0
 
+# En mode limite (-l), afficher un compteur “slot en cours” 1-based pour l'UX.
+# Le slot est réservé de façon atomique (mutex) uniquement quand on sait
+# qu'on ne va PAS skip le fichier (y compris après analyse adaptative).
+# Il reste stable pendant tout le traitement du fichier.
+LIMIT_DISPLAY_SLOT=0
+
 # Génère le préfixe [X/Y] pour les messages si le compteur est disponible
 # Usage: _get_counter_prefix
-# - Avec limite (-l) : affiche [converted/LIMIT] (commence à 0)
+# - Avec limite (-l) : affiche [slot/LIMIT] (commence à 1)
 # - Sans limite : affiche [X/Y] avec le total réel
 # Retourne une chaîne vide si pas de compteur actif
 _get_counter_prefix() {
@@ -22,13 +28,12 @@ _get_counter_prefix() {
     local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
     local limit="${LIMIT_FILES:-0}"
     
-    # Mode limite : afficher [converted/LIMIT]
+    # Mode limite : afficher [slot/LIMIT] uniquement si un slot a été réservé.
     if [[ "$limit" -gt 0 ]]; then
-        local converted=0
-        if declare -f get_converted_count &>/dev/null; then
-            converted=$(get_converted_count)
+        local slot="${LIMIT_DISPLAY_SLOT:-0}"
+        if [[ "$slot" =~ ^[0-9]+$ ]] && [[ "$slot" -gt 0 ]]; then
+            echo "${DIM}[${slot}/${limit}]${NOCOLOR} "
         fi
-        echo "${DIM}[${converted}/${limit}]${NOCOLOR} "
         return
     fi
     
@@ -62,13 +67,22 @@ _determine_conversion_mode() {
     # Calcul dynamique du seuil de skip
     # En mode film-adaptive, on utilise le maxrate adaptatif calculé pour ce fichier
     # Sinon on utilise le MAXRATE_KBPS global
-    local effective_maxrate_kbps="${MAXRATE_KBPS}"
+    local effective_maxrate_kbps="${MAXRATE_KBPS:-0}"
+    local skip_tolerance_percent="${SKIP_TOLERANCE_PERCENT:-10}"
+
+    # Robustesse: si un module a modifié ces valeurs de façon inattendue
+    if [[ ! "$effective_maxrate_kbps" =~ ^[0-9]+$ ]]; then
+        effective_maxrate_kbps=0
+    fi
+    if [[ ! "$skip_tolerance_percent" =~ ^[0-9]+$ ]]; then
+        skip_tolerance_percent=10
+    fi
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]] && [[ -n "$adaptive_maxrate_kbps" ]] && [[ "$adaptive_maxrate_kbps" =~ ^[0-9]+$ ]]; then
         effective_maxrate_kbps="$adaptive_maxrate_kbps"
     fi
     
     local base_threshold_bits=$((effective_maxrate_kbps * 1000))
-    local tolerance_bits=$((effective_maxrate_kbps * SKIP_TOLERANCE_PERCENT * 10))
+    local tolerance_bits=$((effective_maxrate_kbps * skip_tolerance_percent * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
     
     # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible
@@ -391,6 +405,66 @@ _copy_to_temp_storage() {
 # FONCTION DE CONVERSION PRINCIPALE
 ###########################################################
 
+_convert_get_full_metadata() {
+    local file_original="$1"
+
+    # Format attendu:
+    # video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
+    if declare -f get_full_media_metadata &>/dev/null; then
+        get_full_media_metadata "$file_original"
+        return 0
+    fi
+
+    # Fallback (pour tests ou si fonction manquante)
+    local v_meta
+    v_meta=$(get_video_metadata "$file_original")
+    local v_props
+    v_props=$(get_video_stream_props "$file_original")
+
+    local v_bitrate v_codec duration_secs
+    IFS='|' read -r v_bitrate v_codec duration_secs <<< "$v_meta"
+
+    local v_width v_height v_pix_fmt
+    IFS='|' read -r v_width v_height v_pix_fmt <<< "$v_props"
+
+    # Audio probe séparé
+    local a_info
+    a_info=$(_get_audio_conversion_info "$file_original")
+    local a_codec a_bitrate _
+    IFS='|' read -r a_codec a_bitrate _ <<< "$a_info"
+
+    echo "${v_bitrate}|${v_codec}|${duration_secs}|${v_width}|${v_height}|${v_pix_fmt}|${a_codec}|${a_bitrate}"
+}
+
+_convert_run_adaptive_analysis_and_export() {
+    local tmp_input="$1"
+
+    local adaptive_params
+    adaptive_params=$(compute_video_params_adaptive "$tmp_input")
+
+    # Format:
+    # pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
+    local _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf
+    local complexity_c complexity_desc stddev_val adaptive_target_kbps
+    IFS='|' read -r _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf complexity_c complexity_desc stddev_val adaptive_target_kbps <<< "$adaptive_params"
+
+    local adaptive_maxrate_kbps adaptive_bufsize_kbps
+    adaptive_maxrate_kbps="${_mr%k}"
+    adaptive_bufsize_kbps="${_bs%k}"
+
+    # Afficher l'analyse de complexité
+    if [[ "$NO_PROGRESS" != true ]]; then
+        display_complexity_analysis "$tmp_input" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
+    fi
+
+    # Stocker les paramètres adaptatifs dans des variables d'environnement
+    export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
+    export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
+    export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
+
+    echo "${adaptive_target_kbps}|${adaptive_maxrate_kbps}|${adaptive_bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev_val}"
+}
+
 convert_file() {
     set -o pipefail
 
@@ -407,26 +481,14 @@ convert_file() {
     if declare -f increment_starting_counter &>/dev/null; then
         CURRENT_FILE_NUMBER=$(increment_starting_counter)
     fi
+
+    # Réinitialiser le slot limite (réservé plus tard, seulement si pas de skip)
+    LIMIT_DISPLAY_SLOT=0
     
     # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel
     # Format: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
     local full_metadata
-    if declare -f get_full_media_metadata &>/dev/null; then
-        full_metadata=$(get_full_media_metadata "$file_original")
-    else
-        # Fallback (pour tests ou si fonction manquante)
-        local v_meta=$(get_video_metadata "$file_original")
-        local v_props=$(get_video_stream_props "$file_original")
-        local v_bitrate v_codec duration_secs
-        IFS='|' read -r v_bitrate v_codec duration_secs <<< "$v_meta"
-        local v_width v_height v_pix_fmt
-        IFS='|' read -r v_width v_height v_pix_fmt <<< "$v_props"
-        # Audio probe séparé
-        local a_info=$(_get_audio_conversion_info "$file_original")
-        local a_codec a_bitrate _
-        IFS='|' read -r a_codec a_bitrate _ <<< "$a_info"
-        full_metadata="${v_bitrate}|${v_codec}|${duration_secs}|${v_width}|${v_height}|${v_pix_fmt}|${a_codec}|${a_bitrate}"
-    fi
+    full_metadata=$(_convert_get_full_metadata "$file_original")
     
     local v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate
     IFS='|' read -r v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate <<< "$full_metadata"
@@ -452,10 +514,6 @@ convert_file() {
     local tmp_output=$(_get_temp_filename "$file_original" ".out.mkv")
     local ffmpeg_log_temp=$(_get_temp_filename "$file_original" "_err.log")
     
-    _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
-    
-    _check_disk_space "$file_original" || return 1
-    
     # 4. Décision de conversion préliminaire (basée sur codec, pas sur bitrate adaptatif)
     # En mode film-adaptive, on ne peut pas skip ici car on n'a pas encore le seuil adaptatif
     # On vérifie juste si c'est déjà le bon codec avec un bitrate raisonnable
@@ -472,13 +530,27 @@ convert_file() {
             return 0
         fi
     fi
+
+    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]]; then
+        # À partir d'ici, on sait qu'on ne skip pas en mode non-adaptatif.
+        # Réserver un slot limite (unique même avec PARALLEL_JOBS>1) pour l'UX.
+        if [[ "${LIMIT_FILES:-0}" -gt 0 ]] && declare -f increment_converted_count &>/dev/null; then
+            local _slot
+            _slot=$(increment_converted_count 2>/dev/null || echo "0")
+            if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
+                LIMIT_DISPLAY_SLOT="$_slot"
+            fi
+        fi
+
+        _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
+    else
+        # En mode adaptatif, on affiche le "démarrage" après l'analyse (slot fiable).
+        mkdir -p "$final_dir" 2>/dev/null || true
+    fi
+
+    _check_disk_space "$file_original" || return 1
     
     local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
-    
-    # Incrémenter le compteur de fichiers réellement convertis (UX mode limite)
-    if declare -f increment_converted_count &>/dev/null; then
-        increment_converted_count >/dev/null
-    fi
     
     # 5. Téléchargement AVANT l'analyse de complexité (plus efficace sur fichier local)
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
@@ -486,27 +558,10 @@ convert_file() {
     # 6. Analyse adaptative APRÈS téléchargement (mode film-adaptive uniquement)
     # L'analyse sur fichier local (SSD) est beaucoup plus rapide que sur fichier réseau
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
-        # Calculer les paramètres adaptatifs sur le fichier LOCAL (tmp_input)
-        local adaptive_params
-        adaptive_params=$(compute_video_params_adaptive "$tmp_input")
-        
-        # Format: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
-        local _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf
-        IFS='|' read -r _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf complexity_c complexity_desc stddev_val adaptive_target_kbps <<< "$adaptive_params"
-        
-        # Extraire le maxrate adaptatif (enlever le 'k' si présent)
-        adaptive_maxrate_kbps="${_mr%k}"
-        adaptive_bufsize_kbps="${_bs%k}"
-        
-        # Afficher l'analyse de complexité
-        if [[ "$NO_PROGRESS" != true ]]; then
-            display_complexity_analysis "$tmp_input" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
-        fi
-        
-        # Stocker les paramètres adaptatifs dans des variables d'environnement
-        export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
-        export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
-        export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
+        local adaptive_info
+        adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input")
+
+        IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
         
         # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
         if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
@@ -518,6 +573,18 @@ convert_file() {
             increment_processed_count || true
             return 0
         fi
+
+        # En mode adaptatif, on ne réserve le slot limite qu'après l'analyse (pour éviter les slots "gâchés").
+        if [[ "${LIMIT_FILES:-0}" -gt 0 ]] && declare -f increment_converted_count &>/dev/null; then
+            local _slot
+            _slot=$(increment_converted_count 2>/dev/null || echo "0")
+            if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
+                LIMIT_DISPLAY_SLOT="$_slot"
+            fi
+        fi
+
+        # (Re)afficher le démarrage après pré-checks adaptatifs, avec le bon slot.
+        _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
     fi
     
     # Afficher les messages informatifs après le transfert, avant la conversion

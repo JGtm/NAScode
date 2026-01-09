@@ -61,29 +61,6 @@ check_plexignore() {
     output_abs=$(cd "$OUTPUT_DIR" && pwd)
     local plexignore_file="$OUTPUT_DIR/.plexignore"
 
-    local plex_section_printed=false
-    _plex_section() {
-        if [[ "$plex_section_printed" == true ]]; then
-            return 0
-        fi
-        plex_section_printed=true
-        echo ""
-        print_separator 28 "$DIM"
-    }
-
-    _plex_line() {
-        local msg="$1"
-        _plex_section
-        echo -e "  ${DIM}${BOX_DOT}${NOCOLOR} ${DIM}${msg}${NOCOLOR}"
-    }
-
-    _plex_prompt_yn() {
-        local question="$1"
-        local default="${2:-O/n}"
-        _plex_section
-        echo -ne "  ${DIM}${BOX_QUESTION}${NOCOLOR} ${DIM}${question}${NOCOLOR} ${DIM}(${default})${NOCOLOR} "
-    }
-
     # Ne pas proposer .plexignore si source et destination sont identiques
     if [[ "$source_abs" == "$output_abs" ]]; then
         return 0
@@ -92,22 +69,20 @@ check_plexignore() {
     # Vérifier si OUTPUT_DIR est un sous-dossier de SOURCE
     if [[ "$output_abs" = "$source_abs"/* ]]; then
         if [[ -f "$plexignore_file" ]]; then
-            _plex_line "Fichier .plexignore déjà présent dans le répertoire de destination"
-            echo ""
+            print_info "Fichier .plexignore déjà présent dans le répertoire de destination"
             return 0
         fi
 
-        _plex_prompt_yn "Créer un fichier .plexignore dans le répertoire de destination pour éviter les doublons dans Plex ?"
+        ask_question "Créer un fichier .plexignore dans le répertoire de destination pour éviter les doublons dans Plex ?" "O/n"
         read -r response
 
         case "$response" in
             [oO]|[yY]|'')
                 echo "*" > "$plexignore_file"
-                _plex_line "Fichier .plexignore créé dans '$OUTPUT_DIR'"
+                print_success "Fichier .plexignore créé dans le répertoire de destination"
                 ;;
             [nN]|*)
-                _plex_line "Création de .plexignore ignorée"
-                echo ""
+                print_info "Création de .plexignore ignorée"
                 ;;
         esac
     fi

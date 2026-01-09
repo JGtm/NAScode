@@ -5,6 +5,9 @@ Converted/
 .idea/
 .vs/
 
+# Samples générés (ffmpeg)
+samples/_generated/
+
 # Dossiers de travail (contiennent les fichiers utilisateur)
 Input/
 Output/
@@ -27,3 +30,4 @@ Capture*.PNG
 *~x265_2pass.log
 x265_2pass.log.cutree
 x265_2pass.log
+.vscode/settings.json

@@ -38,6 +38,11 @@ fi
 # Règle : multichannel (>=6ch) → toujours 5.1 (downmix si 7.1)
 _get_target_audio_layout() {
     local channels="${1:-2}"
+
+    if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]]; then
+        echo "stereo"
+        return 0
+    fi
     
     if _is_audio_multichannel "$channels"; then
         echo "5.1"
@@ -100,9 +105,6 @@ _build_audio_params() {
             echo "-c:a copy"
             ;;
         "convert"|"downscale")
-            local encoder
-            encoder=$(get_audio_ffmpeg_encoder "$effective_codec")
-            
             # Déterminer le layout cible (toujours 5.1 si multichannel)
             local layout_filter
             layout_filter=$(_build_audio_layout_filter "$channels")
@@ -165,26 +167,14 @@ _get_effective_audio_codec() {
     local decision action effective_codec
     decision=$(_get_smart_audio_decision "$input_file" "$opt_source_codec" "$opt_source_bitrate_kbps")
     IFS='|' read -r action effective_codec _ _ <<< "$decision"
+
+    local normalized
+    normalized=$(_normalize_audio_codec "$effective_codec")
     
     if [[ "$action" == "copy" && "$effective_codec" != "copy" && "$effective_codec" != "unknown" ]]; then
-        # On garde le codec source tel quel
-        # Normaliser le nom pour le suffixe
-        case "$effective_codec" in
-            libopus)  echo "opus" ;;
-            aac_latm) echo "aac" ;;
-            ec-3|dd+) echo "eac3" ;;
-            a52)      echo "ac3" ;;
-            *)        echo "$effective_codec" ;;
-        esac
+        echo "$normalized"
     elif [[ "$action" == "convert" || "$action" == "downscale" ]]; then
-        # On va encoder vers ce codec
-        case "$effective_codec" in
-            libopus)  echo "opus" ;;
-            aac_latm) echo "aac" ;;
-            ec-3|dd+) echo "eac3" ;;
-            a52)      echo "ac3" ;;
-            *)        echo "$effective_codec" ;;
-        esac
+        echo "$normalized"
     else
         echo "copy"
     fi

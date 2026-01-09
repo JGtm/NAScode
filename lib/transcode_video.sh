@@ -101,8 +101,7 @@ _setup_video_encoding_params() {
     esac
     
     # Ajouter les paramètres spécifiques au mode (tuning, optimisations)
-    local mode_params
-    mode_params=$(get_encoder_mode_params "$encoder" "${CONVERSION_MODE:-serie}")
+    local mode_params="${ENCODER_MODE_PARAMS:-}"
     
     # Combiner VBV + mode params
     ENCODER_BASE_PARAMS="$vbv_params"
@@ -119,7 +118,7 @@ _setup_video_encoding_params() {
     if [[ "$encoder" == "libsvtav1" ]]; then
         if [[ "$ENCODER_BASE_PARAMS" != *"keyint="* ]]; then
             local mode_keyint
-            mode_keyint=$(get_mode_keyint "${CONVERSION_MODE:-serie}")
+            mode_keyint="${FILM_KEYINT:-600}"
             if [[ -n "$mode_keyint" ]]; then
                 if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
                     ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:keyint=${mode_keyint}"
@@ -385,23 +384,57 @@ _run_ffmpeg_encode() {
     fi
 
     # Exécution FFmpeg unifiée
-    # shellcheck disable=SC2086
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $SAMPLE_SEEK_PARAMS \
-        $hwaccel_opts \
-        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-        -g "$keyint_value" -keyint_min "$keyint_value" \
-        -c:v "$encoder" $preset_opt \
-        $tune_opt $bitrate_opt $encoder_specific_opts \
-        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
-        $audio_opt \
-        $stream_opt \
-        $output_dest \
-        -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
-    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    local -a cmd
+    cmd=()
+
+    # Préfixe (ionice) si disponible
+    if [[ -n "${IO_PRIORITY_CMD:-}" ]]; then
+        _cmd_append_words cmd "$IO_PRIORITY_CMD"
+    fi
+
+    cmd+=(ffmpeg -y -loglevel warning)
+
+    # Ces variables sont historiquement des strings contenant plusieurs options.
+    # On les split volontairement en mots (contrôlé en interne) pour éviter les expansions non-quotées.
+    _cmd_append_words cmd "${SAMPLE_SEEK_PARAMS:-}"
+    _cmd_append_words cmd "$hwaccel_opts"
+
+    cmd+=(-i "$input_file")
+
+    _cmd_append_words cmd "${SAMPLE_DURATION_PARAMS:-}"
+    _cmd_append_words cmd "$VIDEO_FILTER_OPTS"
+
+    cmd+=(-pix_fmt "$OUTPUT_PIX_FMT")
+    cmd+=(-g "$keyint_value" -keyint_min "$keyint_value")
+    cmd+=(-c:v "$encoder")
+
+    _cmd_append_words cmd "$preset_opt"
+    _cmd_append_words cmd "$tune_opt"
+    _cmd_append_words cmd "$bitrate_opt"
+    _cmd_append_words cmd "$encoder_specific_opts"
+
+    cmd+=(-maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE")
+
+    _cmd_append_words cmd "$audio_opt"
+    _cmd_append_words cmd "$stream_opt"
+
+    case "$mode" in
+        "pass1")
+            cmd+=(-f null /dev/null)
+            ;;
+        *)
+            cmd+=("$output_file")
+            ;;
+    esac
+
+    # Garder l'ordre historique (output puis progress) pour minimiser le risque de régression.
+    cmd+=(-progress pipe:1 -nostats)
+
+    "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}" | \
+        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
+            -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+            -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+            "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
     # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
     local ffmpeg_rc=${PIPESTATUS[0]:-0}
@@ -425,6 +458,35 @@ _run_ffmpeg_encode() {
         fi
     fi
     return 1
+}
+
+###########################################################
+# HELPERS PIPELINE FFMPEG
+###########################################################
+
+_ffmpeg_pipeline_release_slot_if_needed() {
+    local is_parallel="${1:-0}"
+    local progress_slot="${2:-0}"
+
+    if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+        release_progress_slot "$progress_slot"
+    fi
+}
+
+_ffmpeg_pipeline_show_error() {
+    local error_msg="$1"
+    local log_file="$2"
+
+    if [[ "${_INTERRUPTED:-0}" -ne 1 ]]; then
+        log_error "$error_msg"
+        if [[ -f "$log_file" ]]; then
+            local err_preview
+            err_preview=$(tail -10 "$log_file" 2>/dev/null || echo "(log indisponible)")
+            echo -e "${RED}--- Extrait du log FFmpeg ---${NOCOLOR}"
+            echo "$err_preview"
+            echo -e "${RED}-----------------------------${NOCOLOR}"
+        fi
+    fi
 }
 
 # Prépare les paramètres du mode sample (seek + durée)
@@ -549,31 +611,6 @@ _execute_ffmpeg_pipeline() {
     local stream_mapping
     stream_mapping=$(_build_stream_mapping "$tmp_input")
 
-    # Helper pour libérer le slot et retourner en erreur
-    _pipeline_cleanup_and_fail() {
-        if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-            release_progress_slot "$progress_slot"
-        fi
-        return 1
-    }
-
-    # Helper pour afficher les erreurs FFmpeg
-    _pipeline_show_error() {
-        local error_msg="$1"
-        local log_file="$2"
-        
-        if [[ "${_INTERRUPTED:-0}" -ne 1 ]]; then
-            log_error "$error_msg"
-            if [[ -f "$log_file" ]]; then
-                local err_preview
-                err_preview=$(tail -10 "$log_file" 2>/dev/null || echo "(log indisponible)")
-                echo -e "${RED}--- Extrait du log FFmpeg ---${NOCOLOR}"
-                echo "$err_preview"
-                echo -e "${RED}-----------------------------${NOCOLOR}"
-            fi
-        fi
-    }
-
     # ===== EXÉCUTION SELON LE MODE =====
     
     # Texte à afficher dans la barre de progression
@@ -588,25 +625,40 @@ _execute_ffmpeg_pipeline() {
         "passthrough")
             # Mode passthrough : vidéo copiée, audio traité
             # En mode sample, on applique seek+durée pour ne copier que le segment
-            $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-                $SAMPLE_SEEK_PARAMS \
-                -i "$tmp_input" $SAMPLE_DURATION_PARAMS \
-                -c:v copy \
-                $audio_params \
-                $stream_mapping -f matroska \
-                "$tmp_output" \
-                -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-            awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
-                -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-                -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
-                "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+            local -a cmd
+            cmd=()
+
+            if [[ -n "${IO_PRIORITY_CMD:-}" ]]; then
+                _cmd_append_words cmd "$IO_PRIORITY_CMD"
+            fi
+
+            cmd+=(ffmpeg -y -loglevel warning)
+
+            _cmd_append_words cmd "${SAMPLE_SEEK_PARAMS:-}"
+
+            cmd+=(-i "$tmp_input")
+
+            _cmd_append_words cmd "${SAMPLE_DURATION_PARAMS:-}"
+
+            cmd+=(-c:v copy)
+
+            _cmd_append_words cmd "$audio_params"
+            _cmd_append_words cmd "$stream_mapping"
+
+            cmd+=(-f matroska "$tmp_output" -progress pipe:1 -nostats)
+
+            "${cmd[@]}" 2> "$ffmpeg_log_temp" | \
+                awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
+                    -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+                    -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
+                    "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
             local ffmpeg_rc=${PIPESTATUS[0]:-0}
             local awk_rc=${PIPESTATUS[1]:-0}
 
             if [[ "$ffmpeg_rc" -ne 0 || "$awk_rc" -ne 0 ]]; then
-                _pipeline_show_error "Erreur lors du remuxage" "$ffmpeg_log_temp"
-                _pipeline_cleanup_and_fail
+                _ffmpeg_pipeline_show_error "Erreur lors du remuxage" "$ffmpeg_log_temp"
+                _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                 return 1
             fi
             ;;
@@ -630,7 +682,7 @@ _execute_ffmpeg_pipeline() {
                 if ! _run_ffmpeg_encode "crf" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
                                         "$encoder_base_params" "$audio_params" "$stream_mapping" \
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
-                    _pipeline_cleanup_and_fail
+                    _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
             else
@@ -639,7 +691,7 @@ _execute_ffmpeg_pipeline() {
                 if ! _run_ffmpeg_encode "pass1" "$tmp_input" "" "$ffmpeg_log_temp" "$base_name" \
                                         "$encoder_base_params" "" "" \
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
-                    _pipeline_cleanup_and_fail
+                    _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
 
@@ -649,7 +701,7 @@ _execute_ffmpeg_pipeline() {
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
                     rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
                     rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
-                    _pipeline_cleanup_and_fail
+                    _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
 
@@ -661,7 +713,7 @@ _execute_ffmpeg_pipeline() {
 
         *)
             log_error "Mode FFmpeg inconnu: $mode"
-            _pipeline_cleanup_and_fail
+            _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
             return 1
             ;;
     esac

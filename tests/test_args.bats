@@ -193,11 +193,18 @@ _reset_cli_state() {
     # Test 1: single-pass désactivé automatiquement pour mode film
     _reset_cli_state
     parse_arguments --mode film
+    [ "$SINGLE_PASS_MODE" = "true" ]
+
+    # La désactivation se fait dans set_conversion_mode_parameters (appelé après parse_arguments)
+    set_conversion_mode_parameters
     [ "$SINGLE_PASS_MODE" = "false" ]
     
     # Test 2: single-pass reste actif pour mode serie
     _reset_cli_state
     parse_arguments --mode serie
+    [ "$SINGLE_PASS_MODE" = "true" ]
+
+    set_conversion_mode_parameters
     [ "$SINGLE_PASS_MODE" = "true" ]
     
     # Test 3: dry-run désactive VMAF et sample
@@ -405,6 +412,16 @@ _reset_cli_state() {
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments -d l 3'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "Argument inattendu" ]]
+
+    # Test 6: option nécessitant une valeur (source)
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --source'
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "source" ]] || [[ "$output" =~ "valeur" ]]
+
+    # Test 7: option nécessitant une valeur (output-dir)
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --output-dir'
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "output" ]] || [[ "$output" =~ "valeur" ]]
 }
 
 @test "parse_arguments: off-peak invalide (sous-shell)" {

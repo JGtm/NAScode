@@ -23,7 +23,7 @@ export_variables() {
     export -f get_codec_encoder get_codec_suffix get_codec_ffmpeg_names
     export -f is_codec_match is_codec_supported get_codec_rank get_codec_efficiency
     export -f is_codec_better_or_equal convert_preset validate_codec_config
-    export -f get_encoder_mode_params get_mode_keyint get_encoder_params_flag
+    export -f get_encoder_params_flag
     
     # --- Fonctions de paramètres vidéo (video_params.sh) ---
     export -f _select_output_pix_fmt _build_downscale_filter_if_needed
@@ -100,6 +100,7 @@ export_variables() {
     export ENCODER_PRESET TARGET_BITRATE_KBPS TARGET_BITRATE_FFMPEG HWACCEL
     export MAXRATE_KBPS BUFSIZE_KBPS MAXRATE_FFMPEG BUFSIZE_FFMPEG X265_VBV_PARAMS
     export X265_EXTRA_PARAMS X265_PASS1_FAST
+    export ENCODER_MODE_PROFILE ENCODER_MODE_PARAMS
     export SKIP_TOLERANCE_PERCENT
     export MIN_SIZE_BYTES
     export DOWNSCALE_MAX_WIDTH DOWNSCALE_MAX_HEIGHT
@@ -115,7 +116,7 @@ export_variables() {
     export ADAPTIVE_TARGET_KBPS ADAPTIVE_MAXRATE_KBPS ADAPTIVE_BUFSIZE_KBPS
     
     # --- Variables audio ---
-    export AUDIO_CODEC AUDIO_BITRATE_KBPS NO_LOSSLESS FORCE_AUDIO_CODEC
+    export AUDIO_CODEC AUDIO_BITRATE_KBPS NO_LOSSLESS FORCE_AUDIO_CODEC AUDIO_FORCE_STEREO
     export AUDIO_BITRATE_AAC_DEFAULT AUDIO_BITRATE_AC3_DEFAULT AUDIO_BITRATE_OPUS_DEFAULT
     export AUDIO_BITRATE_EAC3_DEFAULT AUDIO_BITRATE_FLAC_DEFAULT
     export AUDIO_BITRATE_OPUS_MULTICHANNEL AUDIO_BITRATE_AAC_MULTICHANNEL AUDIO_BITRATE_EAC3_MULTICHANNEL

@@ -1,6 +1,86 @@
 # Handoff
 
-## Dernière session (09/01/2026 - clean code light)
+## Dernière session (09/01/2026 - stéréo forcée en mode série)
+
+### Objectif
+
+- Garantir une sortie **stéréo** en mode `serie` (downmix systématique) sans réinventer la logique audio.
+- Réduire la dispersion des paramètres dépendants du mode (centralisation autour de `set_conversion_mode_parameters`).
+
+### Tâches accomplies
+
+- Ajout d’un flag global `AUDIO_FORCE_STEREO` (activé en `serie`, désactivé en `film` / `film-adaptive`).
+- Audio :
+  - Forçage du layout cible à `stereo` via `_get_target_audio_layout()`.
+  - Bypass “stéréo forcée” dans `_get_smart_audio_decision()` pour les sources `>= 6` canaux : décision `convert/downscale` afin de garantir le downmix (y compris pour les cas premium/passthrough).
+  - Gestion du cas `AUDIO_CODEC=copy` : bascule vers `aac` si downmix requis (impossible en copy).
+- Vidéo / centralisation mode-based :
+  - Ajout de `ENCODER_MODE_PROFILE` (ex: `film-adaptive` → `film`) et `ENCODER_MODE_PARAMS` calculé une fois dans `set_conversion_mode_parameters`.
+  - `lib/transcode_video.sh` n’appelle plus `get_encoder_mode_params(..., CONVERSION_MODE)` à la volée : utilise `ENCODER_MODE_PARAMS`.
+  - SVT-AV1 : utilisation de `FILM_KEYINT` (centralisé) au lieu de `get_mode_keyint(CONVERSION_MODE)`.
+- CLI : suppression de la désactivation automatique de `SINGLE_PASS_MODE` dans `parse_arguments` (centralisé dans `set_conversion_mode_parameters`).
+- Exports : ajout des exports `AUDIO_FORCE_STEREO`, `ENCODER_MODE_PROFILE`, `ENCODER_MODE_PARAMS`.
+- UX : en mode limite (`-l`), le compteur affiché sur “Démarrage du fichier” commence à `[1/N]` (slot en cours) au lieu de `[0/N]`.
+- UX (robustesse) : le slot `[X/N]` en mode limite est réservé de façon atomique (mutex) pour éviter les doublons quand `PARALLEL_JOBS>1` ; en `film-adaptive`, la réservation est faite après l'analyse (évite les slots “gâchés” si skip post-analyse).
+
+### Tests / doc
+
+- Tests Bats mis à jour :
+  - `tests/test_args.bats` : prend en compte la centralisation (effet visible après `set_conversion_mode_parameters`).
+  - `tests/test_audio_codec.bats` : le cas “série + source multicanal” attend désormais un downmix AAC stéréo.
+- Documentation : mise à jour pour expliciter “stéréo forcée en mode `serie`” et ses implications (y compris exceptions à `--audio copy`).
+
+### Fichiers modifiés
+
+- `lib/config.sh`
+- `lib/audio_params.sh`
+- `lib/audio_decision.sh`
+- `lib/transcode_video.sh`
+- `lib/args.sh`
+- `lib/exports.sh`
+- `tests/test_args.bats`
+- `tests/test_audio_codec.bats`
+- `README.md`
+- `docs/SMART_CODEC.md`
+- `docs/CONFIG.md`
+- `.ai/DEVBOOK.md`
+
+### Validation
+
+- Vérification éditeur : aucun problème signalé dans les fichiers modifiés.
+- Suite de tests complète : **non lancée** (à faire côté utilisateur : `bash run_tests.sh`).
+
+### Branche en cours
+
+- `fix/docs-index-link`
+
+### Derniers prompts
+
+- "m’assurer que --force-audio donne le même résultat que --force"
+- "est-ce qu’on force bien la sortie stéréo par défaut dans le mode série ?"
+- "ok option C… stéréo garantie… réanalyse… et recentraliser dans set_conversion_mode_parameters" + "go"
+
+## Dernière session (09/01/2026 - samples FFmpeg)
+
+### Tâches accomplies
+
+#### Ajout de samples FFmpeg (edge cases)
+
+- Ajout du script `tools/generate_ffmpeg_samples.sh` pour générer des médias courts et reproductibles via `lavfi`.
+- Ajout de la doc `docs/SAMPLES.md` + lien dans `docs/DOCS.md`.
+- Ajout d'une règle `.gitignore` pour ignorer `samples/_generated/`.
+- Correction `vfr_concat` sous Git Bash/Windows (concat demuxer + chemins relatifs).
+- Ajout DTS/TrueHD : génération 5.1 OK; 7.1 dépend du support de l'encodeur (skip explicite si non supporté).
+
+### Branche en cours
+
+- `fix/docs-index-link`
+
+### Derniers prompts
+
+2026-01-09 : "Nan regarde plutôt pour le script ne considère pas ce fichier comme une vidéo" — ajout d'un nettoyage automatique des artefacts invalides (0 octet / sans flux vidéo) pour `21_truehd_7_1.mkv` et `19_dts_7_1.mkv` quand `--force` n'est pas utilisé.
+
+2026-01-09 : "Juste petit correction niveau UI" — harmonisation du prompt `.plexignore` avec le format UI standard (`ask_question` + `print_success`).
 
 ### Tâches accomplies
 
@@ -78,6 +158,7 @@
 - Remplacements ciblés `ffprobe` → `ffprobe_safe` (robustesse Windows/Git Bash) dans `lib/vmaf.sh` et `lib/video_params.sh`.
 - Durcissement léger du parsing CLI : ajout de `_args_require_value` dans `lib/args.sh` pour éviter les cas “option sans valeur” et fournir une erreur claire.
 - Tests : ajout de cas Bats sur `--source` / `--output-dir` sans valeur dans `tests/test_args.bats`.
+
 
 ## Dernière session (08/01/2026)
 
