@@ -20,6 +20,8 @@
 
 2026-01-09 : "Nan regarde plutôt pour le script ne considère pas ce fichier comme une vidéo" — ajout d'un nettoyage automatique des artefacts invalides (0 octet / sans flux vidéo) pour `21_truehd_7_1.mkv` et `19_dts_7_1.mkv` quand `--force` n'est pas utilisé.
 
+2026-01-09 : "Juste petit correction niveau UI" — harmonisation du prompt `.plexignore` avec le format UI standard (`ask_question` + `print_success`).
+
 ### Tâches accomplies
 
 - VMAF : validation du refactor de `compute_vmaf_score()` (commande FFmpeg dédupliquée, `-progress` conditionnel).

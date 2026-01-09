@@ -139,3 +139,8 @@ Objectifs :
   - `.gitignore` (ignore `samples/_generated/`)
 - **Pourquoi** : Faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
 - **Impact** : Aucun impact sur NAScode; artefacts générés ignorés par git.
+
+#### UI : prompt `.plexignore` harmonisé
+- **Quoi** : l'invite de création du fichier `.plexignore` utilise désormais le même rendu que les autres questions (bloc `ask_question` + messages `print_success`/`print_info`).
+- **Où** : `lib/system.sh` (`check_plexignore()`)
+- **Pourquoi** : cohérence de l'UI interactive.
