@@ -12,9 +12,14 @@ CONVERSION_ACTION=""
 # Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
 CURRENT_FILE_NUMBER=0
 
+# En mode limite (-l), afficher un compteur “slot en cours” 1-based pour l'UX.
+# Il est calculé au début de convert_file (avant l'incrément du compteur 'converti')
+# et reste stable pendant tout le traitement du fichier.
+LIMIT_DISPLAY_SLOT=0
+
 # Génère le préfixe [X/Y] pour les messages si le compteur est disponible
 # Usage: _get_counter_prefix
-# - Avec limite (-l) : affiche [converted/LIMIT] (commence à 0)
+# - Avec limite (-l) : affiche [slot/LIMIT] (commence à 1)
 # - Sans limite : affiche [X/Y] avec le total réel
 # Retourne une chaîne vide si pas de compteur actif
 _get_counter_prefix() {
@@ -24,11 +29,14 @@ _get_counter_prefix() {
     
     # Mode limite : afficher [converted/LIMIT]
     if [[ "$limit" -gt 0 ]]; then
-        local converted=0
-        if declare -f get_converted_count &>/dev/null; then
-            converted=$(get_converted_count)
+        local slot="${LIMIT_DISPLAY_SLOT:-0}"
+        if [[ ! "$slot" =~ ^[0-9]+$ ]] || [[ "$slot" -le 0 ]]; then
+            slot=0
+            if declare -f get_converted_count &>/dev/null; then
+                slot=$(get_converted_count)
+            fi
         fi
-        echo "${DIM}[${converted}/${limit}]${NOCOLOR} "
+        echo "${DIM}[${slot}/${limit}]${NOCOLOR} "
         return
     fi
     
@@ -475,6 +483,21 @@ convert_file() {
     CURRENT_FILE_NUMBER=0
     if declare -f increment_starting_counter &>/dev/null; then
         CURRENT_FILE_NUMBER=$(increment_starting_counter)
+    fi
+
+    # UX mode limite : calculer le “slot en cours” (1-based) avant toute conversion.
+    # On se base sur le nombre de fichiers déjà convertis (pas les skips), +1.
+    LIMIT_DISPLAY_SLOT=0
+    if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
+        local converted_so_far=0
+        if declare -f get_converted_count &>/dev/null; then
+            converted_so_far=$(get_converted_count)
+        fi
+        if [[ "$converted_so_far" =~ ^[0-9]+$ ]]; then
+            LIMIT_DISPLAY_SLOT=$((converted_so_far + 1))
+        else
+            LIMIT_DISPLAY_SLOT=1
+        fi
     fi
     
     # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel

@@ -20,6 +20,7 @@
   - SVT-AV1 : utilisation de `FILM_KEYINT` (centralisé) au lieu de `get_mode_keyint(CONVERSION_MODE)`.
 - CLI : suppression de la désactivation automatique de `SINGLE_PASS_MODE` dans `parse_arguments` (centralisé dans `set_conversion_mode_parameters`).
 - Exports : ajout des exports `AUDIO_FORCE_STEREO`, `ENCODER_MODE_PROFILE`, `ENCODER_MODE_PARAMS`.
+- UX : en mode limite (`-l`), le compteur affiché sur “Démarrage du fichier” commence à `[1/N]` (slot en cours) au lieu de `[0/N]`.
 
 ### Tests / doc
 
