@@ -138,36 +138,31 @@ _compute_effective_bitrate_kbps_for_height() {
 # Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_<audio_codec>][_sample]
 # Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_<audio_codec>][_sample]
 # Usage: _build_effective_suffix_for_dims <width> <height> [input_file] [opt_audio_codec] [opt_audio_bitrate] [source_video_codec]
-_build_effective_suffix_for_dims() {
-    local src_width="$1"
-    local src_height="$2"
-    local input_file="${3:-}"
-    local opt_audio_codec="${4:-}"
-    local opt_audio_bitrate="${5:-}"
-    local source_video_codec="${6:-}"
+
+_suffix_select_video_codec_suffix() {
+    local source_video_codec="$1"
 
     # Suffixe basé sur le codec vidéo
     # Si source_video_codec est fourni et est supérieur ou égal au codec cible,
     # on utilise le codec source (cas video_passthrough)
     local codec_suffix="x265"
     local use_source_codec=false
-    
+
     if [[ -n "$source_video_codec" ]] && is_codec_better_or_equal "$source_video_codec" "${VIDEO_CODEC:-hevc}"; then
         use_source_codec=true
     fi
-    
+
     if [[ "$use_source_codec" == true ]]; then
-        # Utiliser le codec source pour le suffixe
         codec_suffix=$(get_codec_suffix "$source_video_codec")
     else
         codec_suffix=$(get_codec_suffix "${VIDEO_CODEC:-hevc}")
     fi
 
-    local suffix="_${codec_suffix}"
+    echo "$codec_suffix"
+}
 
-    # Résolution de sortie estimée (après downscale éventuel)
-    local output_height
-    output_height=$(_compute_output_height_for_bitrate "$src_width" "$src_height")
+_suffix_build_quality_part() {
+    local output_height="$1"
 
     # Mode single-pass CRF ou two-pass bitrate
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
@@ -189,47 +184,90 @@ _build_effective_suffix_for_dims() {
                 [[ $effective_crf -gt 63 ]] && effective_crf=63
                 ;;
         esac
-        suffix="${suffix}_crf${effective_crf}"
+        echo "_crf${effective_crf}"
+        return 0
+    fi
+
+    local effective_bitrate_kbps
+    effective_bitrate_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
+    if [[ -n "$effective_bitrate_kbps" ]] && [[ "$effective_bitrate_kbps" =~ ^[0-9]+$ ]]; then
+        echo "_${effective_bitrate_kbps}k"
     else
-        # Bitrate effectif (selon hauteur) pour two-pass
-        local effective_bitrate_kbps
-        effective_bitrate_kbps=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
-        if [[ -n "$effective_bitrate_kbps" ]] && [[ "$effective_bitrate_kbps" =~ ^[0-9]+$ ]]; then
-            suffix="${suffix}_${effective_bitrate_kbps}k"
-        else
-            suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
-        fi
+        echo "_${TARGET_BITRATE_KBPS}k"
     fi
+}
 
-    # Ajout de la résolution (si connue)
+_suffix_build_resolution_part() {
+    local output_height="$1"
+
     if [[ -n "$output_height" ]] && [[ "$output_height" =~ ^[0-9]+$ ]]; then
-        suffix="${suffix}_${output_height}p"
+        echo "_${output_height}p"
+    else
+        echo ""
     fi
+}
 
-    # Preset d'encodage
+_suffix_get_audio_codec() {
+    local input_file="$1"
+    local opt_audio_codec="$2"
+    local opt_audio_bitrate="$3"
+
+    if [[ -n "$input_file" && -f "$input_file" ]] && declare -f _get_effective_audio_codec &>/dev/null; then
+        _get_effective_audio_codec "$input_file" "$opt_audio_codec" "$opt_audio_bitrate"
+    else
+        echo "${AUDIO_CODEC:-copy}"
+    fi
+}
+
+_suffix_build_audio_part() {
+    local audio_codec="$1"
+
+    case "$audio_codec" in
+        copy|unknown|"")  echo "" ;;
+        aac)   echo "_aac" ;;
+        ac3)   echo "_ac3" ;;
+        eac3)  echo "_eac3" ;;
+        opus)  echo "_opus" ;;
+        flac)  echo "_flac" ;;
+        *)     echo "_${audio_codec}" ;;
+    esac
+}
+
+_suffix_build_sample_part() {
+    if [[ "${SAMPLE_MODE:-false}" == true ]]; then
+        echo "_sample"
+    else
+        echo ""
+    fi
+}
+
+_build_effective_suffix_for_dims() {
+    local src_width="$1"
+    local src_height="$2"
+    local input_file="${3:-}"
+    local opt_audio_codec="${4:-}"
+    local opt_audio_bitrate="${5:-}"
+    local source_video_codec="${6:-}"
+
+    local codec_suffix
+    codec_suffix=$(_suffix_select_video_codec_suffix "$source_video_codec")
+
+    local suffix="_${codec_suffix}"
+
+    # Résolution de sortie estimée (après downscale éventuel)
+    local output_height
+    output_height=$(_compute_output_height_for_bitrate "$src_width" "$src_height")
+
+    suffix="${suffix}$(_suffix_build_quality_part "$output_height")"
+
+    suffix="${suffix}$(_suffix_build_resolution_part "$output_height")"
+
     suffix="${suffix}_${ENCODER_PRESET}"
 
-    # Indicateur du codec audio effectif (smart codec logic)
-    local audio_suffix=""
-    if [[ -n "$input_file" && -f "$input_file" ]] && declare -f _get_effective_audio_codec &>/dev/null; then
-        audio_suffix=$(_get_effective_audio_codec "$input_file" "$opt_audio_codec" "$opt_audio_bitrate")
-    else
-        audio_suffix="${AUDIO_CODEC:-copy}"
-    fi
-
-    case "$audio_suffix" in
-        copy|unknown|"")  ;;
-        aac)   suffix="${suffix}_aac" ;;
-        ac3)   suffix="${suffix}_ac3" ;;
-        eac3)  suffix="${suffix}_eac3" ;;
-        opus)  suffix="${suffix}_opus" ;;
-        flac)  suffix="${suffix}_flac" ;;
-        *)     suffix="${suffix}_${audio_suffix}" ;;
-    esac
-
-    if [[ "${SAMPLE_MODE:-false}" == true ]]; then
-        suffix="${suffix}_sample"
-    fi
+    local audio_codec
+    audio_codec=$(_suffix_get_audio_codec "$input_file" "$opt_audio_codec" "$opt_audio_bitrate")
+    suffix="${suffix}$(_suffix_build_audio_part "$audio_codec")"
+    suffix="${suffix}$(_suffix_build_sample_part)"
 
     echo "$suffix"
 }

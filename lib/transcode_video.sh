@@ -390,82 +390,34 @@ _run_ffmpeg_encode() {
 
     # Préfixe (ionice) si disponible
     if [[ -n "${IO_PRIORITY_CMD:-}" ]]; then
-        local -a io_cmd
-        read -r -a io_cmd <<< "$IO_PRIORITY_CMD"
-        cmd+=("${io_cmd[@]}")
+        _cmd_append_words cmd "$IO_PRIORITY_CMD"
     fi
 
     cmd+=(ffmpeg -y -loglevel warning)
 
     # Ces variables sont historiquement des strings contenant plusieurs options.
     # On les split volontairement en mots (contrôlé en interne) pour éviter les expansions non-quotées.
-    if [[ -n "${SAMPLE_SEEK_PARAMS:-}" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$SAMPLE_SEEK_PARAMS"
-        cmd+=("${_tmp[@]}")
-    fi
-
-    if [[ -n "$hwaccel_opts" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$hwaccel_opts"
-        cmd+=("${_tmp[@]}")
-    fi
+    _cmd_append_words cmd "${SAMPLE_SEEK_PARAMS:-}"
+    _cmd_append_words cmd "$hwaccel_opts"
 
     cmd+=(-i "$input_file")
 
-    if [[ -n "${SAMPLE_DURATION_PARAMS:-}" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$SAMPLE_DURATION_PARAMS"
-        cmd+=("${_tmp[@]}")
-    fi
-
-    if [[ -n "$VIDEO_FILTER_OPTS" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$VIDEO_FILTER_OPTS"
-        cmd+=("${_tmp[@]}")
-    fi
+    _cmd_append_words cmd "${SAMPLE_DURATION_PARAMS:-}"
+    _cmd_append_words cmd "$VIDEO_FILTER_OPTS"
 
     cmd+=(-pix_fmt "$OUTPUT_PIX_FMT")
     cmd+=(-g "$keyint_value" -keyint_min "$keyint_value")
     cmd+=(-c:v "$encoder")
 
-    if [[ -n "$preset_opt" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$preset_opt"
-        cmd+=("${_tmp[@]}")
-    fi
-
-    if [[ -n "$tune_opt" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$tune_opt"
-        cmd+=("${_tmp[@]}")
-    fi
-
-    if [[ -n "$bitrate_opt" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$bitrate_opt"
-        cmd+=("${_tmp[@]}")
-    fi
-
-    if [[ -n "$encoder_specific_opts" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$encoder_specific_opts"
-        cmd+=("${_tmp[@]}")
-    fi
+    _cmd_append_words cmd "$preset_opt"
+    _cmd_append_words cmd "$tune_opt"
+    _cmd_append_words cmd "$bitrate_opt"
+    _cmd_append_words cmd "$encoder_specific_opts"
 
     cmd+=(-maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE")
 
-    if [[ -n "$audio_opt" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$audio_opt"
-        cmd+=("${_tmp[@]}")
-    fi
-
-    if [[ -n "$stream_opt" ]]; then
-        local -a _tmp
-        read -r -a _tmp <<< "$stream_opt"
-        cmd+=("${_tmp[@]}")
-    fi
+    _cmd_append_words cmd "$audio_opt"
+    _cmd_append_words cmd "$stream_opt"
 
     case "$mode" in
         "pass1")
@@ -507,6 +459,35 @@ _run_ffmpeg_encode() {
         fi
     fi
     return 1
+}
+
+###########################################################
+# HELPERS PIPELINE FFMPEG
+###########################################################
+
+_ffmpeg_pipeline_release_slot_if_needed() {
+    local is_parallel="${1:-0}"
+    local progress_slot="${2:-0}"
+
+    if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
+        release_progress_slot "$progress_slot"
+    fi
+}
+
+_ffmpeg_pipeline_show_error() {
+    local error_msg="$1"
+    local log_file="$2"
+
+    if [[ "${_INTERRUPTED:-0}" -ne 1 ]]; then
+        log_error "$error_msg"
+        if [[ -f "$log_file" ]]; then
+            local err_preview
+            err_preview=$(tail -10 "$log_file" 2>/dev/null || echo "(log indisponible)")
+            echo -e "${RED}--- Extrait du log FFmpeg ---${NOCOLOR}"
+            echo "$err_preview"
+            echo -e "${RED}-----------------------------${NOCOLOR}"
+        fi
+    fi
 }
 
 # Prépare les paramètres du mode sample (seek + durée)
@@ -631,31 +612,6 @@ _execute_ffmpeg_pipeline() {
     local stream_mapping
     stream_mapping=$(_build_stream_mapping "$tmp_input")
 
-    # Helper pour libérer le slot et retourner en erreur
-    _pipeline_cleanup_and_fail() {
-        if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then
-            release_progress_slot "$progress_slot"
-        fi
-        return 1
-    }
-
-    # Helper pour afficher les erreurs FFmpeg
-    _pipeline_show_error() {
-        local error_msg="$1"
-        local log_file="$2"
-        
-        if [[ "${_INTERRUPTED:-0}" -ne 1 ]]; then
-            log_error "$error_msg"
-            if [[ -f "$log_file" ]]; then
-                local err_preview
-                err_preview=$(tail -10 "$log_file" 2>/dev/null || echo "(log indisponible)")
-                echo -e "${RED}--- Extrait du log FFmpeg ---${NOCOLOR}"
-                echo "$err_preview"
-                echo -e "${RED}-----------------------------${NOCOLOR}"
-            fi
-        fi
-    }
-
     # ===== EXÉCUTION SELON LE MODE =====
     
     # Texte à afficher dans la barre de progression
@@ -674,40 +630,21 @@ _execute_ffmpeg_pipeline() {
             cmd=()
 
             if [[ -n "${IO_PRIORITY_CMD:-}" ]]; then
-                local -a io_cmd
-                read -r -a io_cmd <<< "$IO_PRIORITY_CMD"
-                cmd+=("${io_cmd[@]}")
+                _cmd_append_words cmd "$IO_PRIORITY_CMD"
             fi
 
             cmd+=(ffmpeg -y -loglevel warning)
 
-            if [[ -n "${SAMPLE_SEEK_PARAMS:-}" ]]; then
-                local -a _tmp
-                read -r -a _tmp <<< "$SAMPLE_SEEK_PARAMS"
-                cmd+=("${_tmp[@]}")
-            fi
+            _cmd_append_words cmd "${SAMPLE_SEEK_PARAMS:-}"
 
             cmd+=(-i "$tmp_input")
 
-            if [[ -n "${SAMPLE_DURATION_PARAMS:-}" ]]; then
-                local -a _tmp
-                read -r -a _tmp <<< "$SAMPLE_DURATION_PARAMS"
-                cmd+=("${_tmp[@]}")
-            fi
+            _cmd_append_words cmd "${SAMPLE_DURATION_PARAMS:-}"
 
             cmd+=(-c:v copy)
 
-            if [[ -n "$audio_params" ]]; then
-                local -a _tmp
-                read -r -a _tmp <<< "$audio_params"
-                cmd+=("${_tmp[@]}")
-            fi
-
-            if [[ -n "$stream_mapping" ]]; then
-                local -a _tmp
-                read -r -a _tmp <<< "$stream_mapping"
-                cmd+=("${_tmp[@]}")
-            fi
+            _cmd_append_words cmd "$audio_params"
+            _cmd_append_words cmd "$stream_mapping"
 
             cmd+=(-f matroska "$tmp_output" -progress pipe:1 -nostats)
 
@@ -721,8 +658,8 @@ _execute_ffmpeg_pipeline() {
             local awk_rc=${PIPESTATUS[1]:-0}
 
             if [[ "$ffmpeg_rc" -ne 0 || "$awk_rc" -ne 0 ]]; then
-                _pipeline_show_error "Erreur lors du remuxage" "$ffmpeg_log_temp"
-                _pipeline_cleanup_and_fail
+                _ffmpeg_pipeline_show_error "Erreur lors du remuxage" "$ffmpeg_log_temp"
+                _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                 return 1
             fi
             ;;
@@ -746,7 +683,7 @@ _execute_ffmpeg_pipeline() {
                 if ! _run_ffmpeg_encode "crf" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
                                         "$encoder_base_params" "$audio_params" "$stream_mapping" \
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
-                    _pipeline_cleanup_and_fail
+                    _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
             else
@@ -755,7 +692,7 @@ _execute_ffmpeg_pipeline() {
                 if ! _run_ffmpeg_encode "pass1" "$tmp_input" "" "$ffmpeg_log_temp" "$base_name" \
                                         "$encoder_base_params" "" "" \
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
-                    _pipeline_cleanup_and_fail
+                    _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
 
@@ -765,7 +702,7 @@ _execute_ffmpeg_pipeline() {
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
                     rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
                     rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
-                    _pipeline_cleanup_and_fail
+                    _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
 
@@ -777,7 +714,7 @@ _execute_ffmpeg_pipeline() {
 
         *)
             log_error "Mode FFmpeg inconnu: $mode"
-            _pipeline_cleanup_and_fail
+            _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
             return 1
             ;;
     esac
