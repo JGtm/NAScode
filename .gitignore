@@ -5,6 +5,9 @@ Converted/
 .idea/
 .vs/
 
+# Samples générés (ffmpeg)
+samples/_generated/
+
 # Dossiers de travail (contiennent les fichiers utilisateur)
 Input/
 Output/
