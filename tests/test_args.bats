@@ -405,6 +405,16 @@ _reset_cli_state() {
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments -d l 3'
     [ "$status" -ne 0 ]
     [[ "$output" =~ "Argument inattendu" ]]
+
+    # Test 6: option nécessitant une valeur (source)
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --source'
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "source" ]] || [[ "$output" =~ "valeur" ]]
+
+    # Test 7: option nécessitant une valeur (output-dir)
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --output-dir'
+    [ "$status" -ne 0 ]
+    [[ "$output" =~ "output" ]] || [[ "$output" =~ "valeur" ]]
 }
 
 @test "parse_arguments: off-peak invalide (sous-shell)" {

@@ -355,7 +355,7 @@ compute_video_params_adaptive() {
 
     # Récupérer le FPS
     local fps
-    fps=$(ffprobe -v error -select_streams v:0 \
+    fps=$(ffprobe_safe -v error -select_streams v:0 \
         -show_entries stream=r_frame_rate \
         -of default=noprint_wrappers=1:nokey=1 \
         "$input_file" 2>/dev/null | head -1)

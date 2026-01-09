@@ -56,7 +56,7 @@ compute_vmaf_score() {
     # Or, la conversion peut downscaler automatiquement (>1080p). Dans ce cas,
     # on scale l'original à la résolution EXACTE du fichier converti.
     local conv_dims
-    conv_dims=$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height \
+    conv_dims=$(ffprobe_safe -v error -select_streams v:0 -show_entries stream=width,height \
         -of csv=p=0:s=x "$converted" 2>/dev/null | head -1)
     local conv_w="" conv_h=""
     if [[ -n "$conv_dims" ]] && [[ "$conv_dims" =~ ^([0-9]+)x([0-9]+)$ ]]; then
@@ -93,7 +93,7 @@ compute_vmaf_score() {
         # Obtenir la durée totale de la vidéo en microsecondes pour la progression
     local duration_us=0
     local duration_str
-    duration_str=$(ffprobe -v error -select_streams v:0 -show_entries format=duration \
+    duration_str=$(ffprobe_safe -v error -select_streams v:0 -show_entries format=duration \
         -of default=noprint_wrappers=1:nokey=1 "$converted" 2>/dev/null)
     if [[ -n "$duration_str" ]]; then
         # Convertir en microsecondes (durée est en secondes avec décimales)
@@ -107,10 +107,34 @@ compute_vmaf_score() {
         # Lancer ffmpeg en arrière-plan avec progression vers fichier
         # hwaccel pour accélérer le décodage de l'original
         # Note: On utilise $ffmpeg_cmd qui peut être un FFmpeg alternatif avec libvmaf
-        "$ffmpeg_cmd" -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
-            -lavfi "$lavfi_filter" \
-            -progress "$progress_file" \
-            -f null - >/dev/null 2>&1 &
+        local -a cmd
+        cmd=()
+
+        # Permettre un wrapper ffmpeg (ex: "ffmpeg", "path/ffmpeg")
+        # Si la variable contient des options, elles seront splittées (convention interne).
+        local -a ffmpeg_cmd_arr
+        read -r -a ffmpeg_cmd_arr <<< "$ffmpeg_cmd"
+        cmd+=("${ffmpeg_cmd_arr[@]}")
+        cmd+=(-hide_banner -nostdin -i "$converted")
+
+        if [[ -n "$hwaccel_opts" ]]; then
+            local -a _tmp
+            read -r -a _tmp <<< "$hwaccel_opts"
+            cmd+=("${_tmp[@]}")
+        fi
+
+        if [[ -n "$original_input_opts" ]]; then
+            local -a _tmp
+            read -r -a _tmp <<< "$original_input_opts"
+            cmd+=("${_tmp[@]}")
+        fi
+
+        cmd+=(-i "$original")
+        cmd+=(-lavfi "$lavfi_filter")
+        cmd+=(-progress "$progress_file")
+        cmd+=(-f null -)
+
+        "${cmd[@]}" >/dev/null 2>&1 &
         local ffmpeg_pid=$!
         
         local last_percent=-1
@@ -155,9 +179,31 @@ compute_vmaf_score() {
     else
         # Sans barre de progression
         # Note: On utilise $ffmpeg_cmd qui peut être un FFmpeg alternatif avec libvmaf
-        "$ffmpeg_cmd" -hide_banner -nostdin -i "$converted" $hwaccel_opts $original_input_opts -i "$original" \
-            -lavfi "$lavfi_filter" \
-            -f null - >/dev/null 2>&1
+        local -a cmd
+        cmd=()
+
+        local -a ffmpeg_cmd_arr
+        read -r -a ffmpeg_cmd_arr <<< "$ffmpeg_cmd"
+        cmd+=("${ffmpeg_cmd_arr[@]}")
+        cmd+=(-hide_banner -nostdin -i "$converted")
+
+        if [[ -n "$hwaccel_opts" ]]; then
+            local -a _tmp
+            read -r -a _tmp <<< "$hwaccel_opts"
+            cmd+=("${_tmp[@]}")
+        fi
+
+        if [[ -n "$original_input_opts" ]]; then
+            local -a _tmp
+            read -r -a _tmp <<< "$original_input_opts"
+            cmd+=("${_tmp[@]}")
+        fi
+
+        cmd+=(-i "$original")
+        cmd+=(-lavfi "$lavfi_filter")
+        cmd+=(-f null -)
+
+        "${cmd[@]}" >/dev/null 2>&1
     fi
     
     # Nettoyer les fichiers temporaires
@@ -263,7 +309,7 @@ process_vmaf_queue() {
         
         # Vérifier que le fichier converti n'est pas vide (dryrun crée des fichiers de 0 octets)
         local converted_size
-        converted_size=$(stat -c%s "$final_actual" 2>/dev/null || stat -f%z "$final_actual" 2>/dev/null || echo "0")
+        converted_size=$(get_file_size_bytes "$final_actual")
         if [[ "$converted_size" -eq 0 ]]; then
             if [[ "$NO_PROGRESS" != true ]]; then
                 printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-45s${NOCOLOR} : NA (fichier vide)\n" "$current" "$vmaf_count" "$display_name" >&2

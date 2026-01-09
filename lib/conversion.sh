@@ -62,13 +62,22 @@ _determine_conversion_mode() {
     # Calcul dynamique du seuil de skip
     # En mode film-adaptive, on utilise le maxrate adaptatif calculé pour ce fichier
     # Sinon on utilise le MAXRATE_KBPS global
-    local effective_maxrate_kbps="${MAXRATE_KBPS}"
+    local effective_maxrate_kbps="${MAXRATE_KBPS:-0}"
+    local skip_tolerance_percent="${SKIP_TOLERANCE_PERCENT:-10}"
+
+    # Robustesse: si un module a modifié ces valeurs de façon inattendue
+    if [[ ! "$effective_maxrate_kbps" =~ ^[0-9]+$ ]]; then
+        effective_maxrate_kbps=0
+    fi
+    if [[ ! "$skip_tolerance_percent" =~ ^[0-9]+$ ]]; then
+        skip_tolerance_percent=10
+    fi
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]] && [[ -n "$adaptive_maxrate_kbps" ]] && [[ "$adaptive_maxrate_kbps" =~ ^[0-9]+$ ]]; then
         effective_maxrate_kbps="$adaptive_maxrate_kbps"
     fi
     
     local base_threshold_bits=$((effective_maxrate_kbps * 1000))
-    local tolerance_bits=$((effective_maxrate_kbps * SKIP_TOLERANCE_PERCENT * 10))
+    local tolerance_bits=$((effective_maxrate_kbps * skip_tolerance_percent * 10))
     local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
     
     # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible

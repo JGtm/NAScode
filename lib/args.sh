@@ -3,22 +3,35 @@
 # PARSING DES ARGUMENTS
 ###########################################################
 
+_args_require_value() {
+    local opt="$1"
+    local val="${2:-}"
+    if [[ -z "$val" ]]; then
+        print_error "${opt} doit être suivi d'une valeur"
+        exit 1
+    fi
+}
+
 parse_arguments() {
     while [[ $# -gt 0 ]]; do
         case "$1" in
             -s|--source) 
+                _args_require_value "$1" "${2:-}"
                 SOURCE="$2"
                 shift 2 
                 ;;
             -o|--output-dir) 
+                _args_require_value "$1" "${2:-}"
                 OUTPUT_DIR="$2"
                 shift 2 
                 ;;
             -e|--exclude) 
+                _args_require_value "$1" "${2:-}"
                 EXCLUDES+=("$2")
                 shift 2 
                 ;;
             -m|--mode) 
+                _args_require_value "$1" "${2:-}"
                 CONVERSION_MODE="$2"
                 shift 2 
                 ;;
@@ -55,6 +68,7 @@ parse_arguments() {
                 shift 2
                 ;;
             -q|--queue)
+                _args_require_value "$1" "${2:-}"
                 if [[ -f "$2" ]]; then
                     CUSTOM_QUEUE="$2"
                     shift 2
@@ -99,6 +113,7 @@ parse_arguments() {
                 shift
                 ;;
             -f|--file)
+                _args_require_value "$1" "${2:-}"
                 if [[ -f "$2" ]]; then
                     SINGLE_FILE="$2"
                     shift 2
