@@ -21,6 +21,7 @@
 - CLI : suppression de la désactivation automatique de `SINGLE_PASS_MODE` dans `parse_arguments` (centralisé dans `set_conversion_mode_parameters`).
 - Exports : ajout des exports `AUDIO_FORCE_STEREO`, `ENCODER_MODE_PROFILE`, `ENCODER_MODE_PARAMS`.
 - UX : en mode limite (`-l`), le compteur affiché sur “Démarrage du fichier” commence à `[1/N]` (slot en cours) au lieu de `[0/N]`.
+- UX (robustesse) : le slot `[X/N]` en mode limite est réservé de façon atomique (mutex) pour éviter les doublons quand `PARALLEL_JOBS>1` ; en `film-adaptive`, la réservation est faite après l'analyse (évite les slots “gâchés” si skip post-analyse).
 
 ### Tests / doc
 

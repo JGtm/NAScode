@@ -13,8 +13,9 @@ CONVERSION_ACTION=""
 CURRENT_FILE_NUMBER=0
 
 # En mode limite (-l), afficher un compteur “slot en cours” 1-based pour l'UX.
-# Il est calculé au début de convert_file (avant l'incrément du compteur 'converti')
-# et reste stable pendant tout le traitement du fichier.
+# Le slot est réservé de façon atomique (mutex) uniquement quand on sait
+# qu'on ne va PAS skip le fichier (y compris après analyse adaptative).
+# Il reste stable pendant tout le traitement du fichier.
 LIMIT_DISPLAY_SLOT=0
 
 # Génère le préfixe [X/Y] pour les messages si le compteur est disponible
@@ -27,16 +28,12 @@ _get_counter_prefix() {
     local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
     local limit="${LIMIT_FILES:-0}"
     
-    # Mode limite : afficher [converted/LIMIT]
+    # Mode limite : afficher [slot/LIMIT] uniquement si un slot a été réservé.
     if [[ "$limit" -gt 0 ]]; then
         local slot="${LIMIT_DISPLAY_SLOT:-0}"
-        if [[ ! "$slot" =~ ^[0-9]+$ ]] || [[ "$slot" -le 0 ]]; then
-            slot=0
-            if declare -f get_converted_count &>/dev/null; then
-                slot=$(get_converted_count)
-            fi
+        if [[ "$slot" =~ ^[0-9]+$ ]] && [[ "$slot" -gt 0 ]]; then
+            echo "${DIM}[${slot}/${limit}]${NOCOLOR} "
         fi
-        echo "${DIM}[${slot}/${limit}]${NOCOLOR} "
         return
     fi
     
@@ -485,20 +482,8 @@ convert_file() {
         CURRENT_FILE_NUMBER=$(increment_starting_counter)
     fi
 
-    # UX mode limite : calculer le “slot en cours” (1-based) avant toute conversion.
-    # On se base sur le nombre de fichiers déjà convertis (pas les skips), +1.
+    # Réinitialiser le slot limite (réservé plus tard, seulement si pas de skip)
     LIMIT_DISPLAY_SLOT=0
-    if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
-        local converted_so_far=0
-        if declare -f get_converted_count &>/dev/null; then
-            converted_so_far=$(get_converted_count)
-        fi
-        if [[ "$converted_so_far" =~ ^[0-9]+$ ]]; then
-            LIMIT_DISPLAY_SLOT=$((converted_so_far + 1))
-        else
-            LIMIT_DISPLAY_SLOT=1
-        fi
-    fi
     
     # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel
     # Format: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
@@ -529,10 +514,6 @@ convert_file() {
     local tmp_output=$(_get_temp_filename "$file_original" ".out.mkv")
     local ffmpeg_log_temp=$(_get_temp_filename "$file_original" "_err.log")
     
-    _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
-    
-    _check_disk_space "$file_original" || return 1
-    
     # 4. Décision de conversion préliminaire (basée sur codec, pas sur bitrate adaptatif)
     # En mode film-adaptive, on ne peut pas skip ici car on n'a pas encore le seuil adaptatif
     # On vérifie juste si c'est déjà le bon codec avec un bitrate raisonnable
@@ -549,13 +530,27 @@ convert_file() {
             return 0
         fi
     fi
+
+    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]]; then
+        # À partir d'ici, on sait qu'on ne skip pas en mode non-adaptatif.
+        # Réserver un slot limite (unique même avec PARALLEL_JOBS>1) pour l'UX.
+        if [[ "${LIMIT_FILES:-0}" -gt 0 ]] && declare -f increment_converted_count &>/dev/null; then
+            local _slot
+            _slot=$(increment_converted_count 2>/dev/null || echo "0")
+            if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
+                LIMIT_DISPLAY_SLOT="$_slot"
+            fi
+        fi
+
+        _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
+    else
+        # En mode adaptatif, on affiche le "démarrage" après l'analyse (slot fiable).
+        mkdir -p "$final_dir" 2>/dev/null || true
+    fi
+
+    _check_disk_space "$file_original" || return 1
     
     local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
-    
-    # Incrémenter le compteur de fichiers réellement convertis (UX mode limite)
-    if declare -f increment_converted_count &>/dev/null; then
-        increment_converted_count >/dev/null
-    fi
     
     # 5. Téléchargement AVANT l'analyse de complexité (plus efficace sur fichier local)
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
@@ -578,6 +573,18 @@ convert_file() {
             increment_processed_count || true
             return 0
         fi
+
+        # En mode adaptatif, on ne réserve le slot limite qu'après l'analyse (pour éviter les slots "gâchés").
+        if [[ "${LIMIT_FILES:-0}" -gt 0 ]] && declare -f increment_converted_count &>/dev/null; then
+            local _slot
+            _slot=$(increment_converted_count 2>/dev/null || echo "0")
+            if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
+                LIMIT_DISPLAY_SLOT="$_slot"
+            fi
+        fi
+
+        # (Re)afficher le démarrage après pré-checks adaptatifs, avec le bon slot.
+        _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
     fi
     
     # Afficher les messages informatifs après le transfert, avant la conversion
