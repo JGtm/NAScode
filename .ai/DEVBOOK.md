@@ -33,11 +33,47 @@ Objectifs :
 - **Où** : `docs/📋 Tableau récapitulatif - Critères de conversion.csv`
 - **Pourquoi** : éviter les règles obsolètes/inexactes côté documentation et garder une “source de vérité” cohérente avec le code.
 
+#### Outil : génération de samples FFmpeg (edge cases)
+- **Quoi** : script pour générer des médias courts et reproductibles (VFR, 10-bit, multiaudio, sous-titres, metadata rotate, dimensions impaires, etc.).
+- **Où** :
+  - `tools/generate_ffmpeg_samples.sh`
+  - `docs/SAMPLES.md`
+  - `docs/DOCS.md` (lien ajouté)
+  - `.gitignore` (ignore `samples/_generated/`)
+- **Pourquoi** : faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
+- **Impact** : aucun impact sur NAScode ; artefacts générés ignorés par git.
+
 #### Samples : cas 7.1 (TrueHD/DTS) plus robustes
 - **Quoi** : détection préventive du support 7.1 par les encodeurs FFmpeg (`truehd`, `dca`) + suppression d'artefacts invalides (0 octet / sans vidéo) quand `--force` n'est pas utilisé.
 - **Où** : `tools/generate_ffmpeg_samples.sh`
 - **Pourquoi** : sur certaines builds, les encodeurs refusent 7.1 (jusqu'à 5.1 seulement) ; éviter du bruit d'erreurs et empêcher qu'un ancien fichier audio-only soit réutilisé.
 - **Impact** : `19_dts_7_1.mkv` / `21_truehd_7_1.mkv` peuvent être "skip" proprement ; pas de fichiers invalides laissés sur disque.
+
+#### UI : prompt `.plexignore` harmonisé
+- **Quoi** : l'invite de création du fichier `.plexignore` utilise le même rendu que les autres questions (bloc `ask_question` + messages `print_success`/`print_info`).
+- **Où** : `lib/system.sh` (`check_plexignore()`)
+- **Pourquoi** : cohérence de l'UI interactive.
+
+### 2026-01-08
+
+#### Feature : `--no-lossless` (multi-canal)
+- **Quoi** : ajout d'une option pour éviter le passthrough lossless/premium en audio, y compris en contexte multi-canal.
+- **Où** :
+  - `lib/args.sh`, `nascode` : parsing / câblage CLI
+  - `lib/audio_decision.sh`, `lib/audio_params.sh` : décision smart audio, règles multi-canal
+  - `lib/config.sh`, `lib/exports.sh` : config + exports
+  - Tests : `tests/test_audio_codec.bats`, `tests/test_audio_multichannel.bats`
+  - Docs : `docs/SMART_CODEC.md`, `docs/DOCS.md`, `README.md`, `docs/CHANGELOG.md`
+- **Pourquoi** : permettre un mode “compatibilité / taille” où l'audio lossless n'est pas conservé, même si le fichier source est premium.
+
+#### Refactor : extraction du moteur de décision audio
+- **Quoi** : factorisation/clarification de la logique de décision smart audio.
+- **Où** : `lib/audio_decision.sh`, `lib/audio_params.sh` (+ doc `docs/SMART_CODEC.md`).
+- **Pourquoi** : rendre les règles plus lisibles, testables et faciles à faire évoluer.
+
+#### Docs : changelog v2.6
+- **Quoi** : mise à jour du changelog pour refléter les évolutions.
+- **Où** : `docs/CHANGELOG.md`
 
 ### 2026-01-02
 
@@ -127,20 +163,3 @@ Objectifs :
   - ~100 lignes supprimées/factorisées
   - Aucun changement de comportement
   - Tests ajoutés pour les nouvelles fonctions
-
-### 2026-01-09
-
-#### Outil : génération de samples FFmpeg (edge cases)
-- **Quoi** : Ajout d'un script pour générer des médias courts et reproductibles (VFR, 10-bit, multiaudio, sous-titres, metadata rotate, dimensions impaires, etc.).
-- **Où** :
-  - `tools/generate_ffmpeg_samples.sh`
-  - `docs/SAMPLES.md`
-  - `docs/DOCS.md` (lien ajouté)
-  - `.gitignore` (ignore `samples/_generated/`)
-- **Pourquoi** : Faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
-- **Impact** : Aucun impact sur NAScode; artefacts générés ignorés par git.
-
-#### UI : prompt `.plexignore` harmonisé
-- **Quoi** : l'invite de création du fichier `.plexignore` utilise désormais le même rendu que les autres questions (bloc `ask_question` + messages `print_success`/`print_info`).
-- **Où** : `lib/system.sh` (`check_plexignore()`)
-- **Pourquoi** : cohérence de l'UI interactive.
