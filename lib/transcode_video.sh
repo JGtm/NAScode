@@ -385,23 +385,105 @@ _run_ffmpeg_encode() {
     fi
 
     # Exécution FFmpeg unifiée
-    # shellcheck disable=SC2086
-    $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-        $SAMPLE_SEEK_PARAMS \
-        $hwaccel_opts \
-        -i "$input_file" $SAMPLE_DURATION_PARAMS $VIDEO_FILTER_OPTS -pix_fmt "$OUTPUT_PIX_FMT" \
-        -g "$keyint_value" -keyint_min "$keyint_value" \
-        -c:v "$encoder" $preset_opt \
-        $tune_opt $bitrate_opt $encoder_specific_opts \
-        -maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE" \
-        $audio_opt \
-        $stream_opt \
-        $output_dest \
-        -progress pipe:1 -nostats 2> "${ffmpeg_log}${log_suffix}" | \
-    awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
-        -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
-        "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    local -a cmd
+    cmd=()
+
+    # Préfixe (ionice) si disponible
+    if [[ -n "${IO_PRIORITY_CMD:-}" ]]; then
+        local -a io_cmd
+        read -r -a io_cmd <<< "$IO_PRIORITY_CMD"
+        cmd+=("${io_cmd[@]}")
+    fi
+
+    cmd+=(ffmpeg -y -loglevel warning)
+
+    # Ces variables sont historiquement des strings contenant plusieurs options.
+    # On les split volontairement en mots (contrôlé en interne) pour éviter les expansions non-quotées.
+    if [[ -n "${SAMPLE_SEEK_PARAMS:-}" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$SAMPLE_SEEK_PARAMS"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    if [[ -n "$hwaccel_opts" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$hwaccel_opts"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    cmd+=(-i "$input_file")
+
+    if [[ -n "${SAMPLE_DURATION_PARAMS:-}" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$SAMPLE_DURATION_PARAMS"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    if [[ -n "$VIDEO_FILTER_OPTS" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$VIDEO_FILTER_OPTS"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    cmd+=(-pix_fmt "$OUTPUT_PIX_FMT")
+    cmd+=(-g "$keyint_value" -keyint_min "$keyint_value")
+    cmd+=(-c:v "$encoder")
+
+    if [[ -n "$preset_opt" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$preset_opt"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    if [[ -n "$tune_opt" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$tune_opt"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    if [[ -n "$bitrate_opt" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$bitrate_opt"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    if [[ -n "$encoder_specific_opts" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$encoder_specific_opts"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    cmd+=(-maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE")
+
+    if [[ -n "$audio_opt" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$audio_opt"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    if [[ -n "$stream_opt" ]]; then
+        local -a _tmp
+        read -r -a _tmp <<< "$stream_opt"
+        cmd+=("${_tmp[@]}")
+    fi
+
+    case "$mode" in
+        "pass1")
+            cmd+=(-f null /dev/null)
+            ;;
+        *)
+            cmd+=("$output_file")
+            ;;
+    esac
+
+    # Garder l'ordre historique (output puis progress) pour minimiser le risque de régression.
+    cmd+=(-progress pipe:1 -nostats)
+
+    "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}" | \
+        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
+            -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+            -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+            "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
     # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
     local ffmpeg_rc=${PIPESTATUS[0]:-0}
@@ -588,18 +670,52 @@ _execute_ffmpeg_pipeline() {
         "passthrough")
             # Mode passthrough : vidéo copiée, audio traité
             # En mode sample, on applique seek+durée pour ne copier que le segment
-            $IO_PRIORITY_CMD ffmpeg -y -loglevel warning \
-                $SAMPLE_SEEK_PARAMS \
-                -i "$tmp_input" $SAMPLE_DURATION_PARAMS \
-                -c:v copy \
-                $audio_params \
-                $stream_mapping -f matroska \
-                "$tmp_output" \
-                -progress pipe:1 -nostats 2> "$ffmpeg_log_temp" | \
-            awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
-                -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-                -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
-                "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+            local -a cmd
+            cmd=()
+
+            if [[ -n "${IO_PRIORITY_CMD:-}" ]]; then
+                local -a io_cmd
+                read -r -a io_cmd <<< "$IO_PRIORITY_CMD"
+                cmd+=("${io_cmd[@]}")
+            fi
+
+            cmd+=(ffmpeg -y -loglevel warning)
+
+            if [[ -n "${SAMPLE_SEEK_PARAMS:-}" ]]; then
+                local -a _tmp
+                read -r -a _tmp <<< "$SAMPLE_SEEK_PARAMS"
+                cmd+=("${_tmp[@]}")
+            fi
+
+            cmd+=(-i "$tmp_input")
+
+            if [[ -n "${SAMPLE_DURATION_PARAMS:-}" ]]; then
+                local -a _tmp
+                read -r -a _tmp <<< "$SAMPLE_DURATION_PARAMS"
+                cmd+=("${_tmp[@]}")
+            fi
+
+            cmd+=(-c:v copy)
+
+            if [[ -n "$audio_params" ]]; then
+                local -a _tmp
+                read -r -a _tmp <<< "$audio_params"
+                cmd+=("${_tmp[@]}")
+            fi
+
+            if [[ -n "$stream_mapping" ]]; then
+                local -a _tmp
+                read -r -a _tmp <<< "$stream_mapping"
+                cmd+=("${_tmp[@]}")
+            fi
+
+            cmd+=(-f matroska "$tmp_output" -progress pipe:1 -nostats)
+
+            "${cmd[@]}" 2> "$ffmpeg_log_temp" | \
+                awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
+                    -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+                    -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
+                    "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
 
             local ffmpeg_rc=${PIPESTATUS[0]:-0}
             local awk_rc=${PIPESTATUS[1]:-0}
