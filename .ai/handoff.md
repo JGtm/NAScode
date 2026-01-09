@@ -18,9 +18,7 @@
 
 ### Derniers prompts
 
-- "Tu peux me créer des samples avec ffmpeg pour les cas un peu edge ?"
-
-## Dernière session (09/01/2026 - clean code light)
+2026-01-09 : "Nan regarde plutôt pour le script ne considère pas ce fichier comme une vidéo" — ajout d'un nettoyage automatique des artefacts invalides (0 octet / sans flux vidéo) pour `21_truehd_7_1.mkv` et `19_dts_7_1.mkv` quand `--force` n'est pas utilisé.
 
 ### Tâches accomplies
 

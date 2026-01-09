@@ -63,6 +63,16 @@ _has_encoder() {
 	ffmpeg -hide_banner -encoders 2>/dev/null | awk '{print $2}' | grep -Fxq "$enc"
 }
 
+_encoder_supports_channel_layout() {
+	local enc="$1"
+	local layout="$2"
+
+	# Certains encodeurs (ex: truehd, dca) n'acceptent pas tous les layouts selon la build.
+	# On essaie de détecter proprement via l'aide FFmpeg, sinon on laisse tenter l'encodage.
+	ffmpeg -hide_banner -h "encoder=$enc" 2>/dev/null | grep -Fq "${layout}" && return 0
+	return 1
+}
+
 _mkdirp() {
 	mkdir -p -- "$1"
 }
@@ -83,6 +93,31 @@ _ffmpeg_overwrite_flag() {
 		echo "-y"
 	else
 		echo "-n"
+	fi
+}
+
+_maybe_remove_invalid_existing_video_sample() {
+	local path="$1"
+
+	# Quand --force n'est pas utilisé, ffmpeg refusera d'écraser (-n).
+	# Si un ancien artefact existe (0 octet / audio-only), on le supprime pour éviter
+	# que NAScode le traite comme "pas de flux vidéo".
+	[[ "$FORCE" == "1" ]] && return 0
+	[[ ! -e "$path" ]] && return 0
+
+	# Cas évident: fichier vide.
+	if [[ ! -s "$path" ]]; then
+		echo "[samples]   note: suppression sample invalide (0 octet): $path"
+		rm -f -- "$path"
+		return 0
+	fi
+
+	# Si ffprobe est dispo, on vérifie qu'il y a au moins un flux vidéo.
+	if command -v ffprobe >/dev/null 2>&1; then
+		if ! ffprobe -v error -select_streams v:0 -show_entries stream=index -of csv=p=0 "$path" | grep -Eq '^[0-9]'; then
+			echo "[samples]   note: suppression sample invalide (pas de vidéo): $path"
+			rm -f -- "$path"
+		fi
 	fi
 }
 
@@ -464,12 +499,18 @@ _make_dts_7_1() {
 	local out="$OUT_DIR/19_dts_7_1.mkv"
 	echo "[samples] -> $out"
 
+	_maybe_remove_invalid_existing_video_sample "$out"
+
 	if ! _has_encoder libx264; then
 		echo "[samples]   skip: libx264 non disponible"
 		return 0
 	fi
 	if ! _has_encoder dca; then
 		echo "[samples]   skip: dca (DTS) encoder non disponible"
+		return 0
+	fi
+	if ! _encoder_supports_channel_layout dca "7.1"; then
+		echo "[samples]   skip: l'encodeur dca ne supporte pas 7.1 sur cette build"
 		return 0
 	fi
 
@@ -523,12 +564,18 @@ _make_truehd_7_1() {
 	local out="$OUT_DIR/21_truehd_7_1.mkv"
 	echo "[samples] -> $out"
 
+	_maybe_remove_invalid_existing_video_sample "$out"
+
 	if ! _has_encoder libx264; then
 		echo "[samples]   skip: libx264 non disponible"
 		return 0
 	fi
 	if ! _has_encoder truehd; then
 		echo "[samples]   skip: truehd encoder non disponible"
+		return 0
+	fi
+	if ! _encoder_supports_channel_layout truehd "7.1"; then
+		echo "[samples]   skip: l'encodeur truehd ne supporte pas 7.1 sur cette build"
 		return 0
 	fi
 
