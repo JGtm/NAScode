@@ -28,6 +28,17 @@ Objectifs :
 - **Impact** : aucun changement attendu côté utilisateur (formats et options inchangés).
 - **Validation** : tests Bats ciblés OK (transcode_video / encoding_subfunctions / audio_codec / vmaf / regression_exports_contract).
 
+#### Docs : tableau récapitulatif des critères de conversion
+- **Quoi** : alignement du tableau sur le comportement réel (vidéo : le codec “supérieur” peut être ré-encodé si le bitrate dépasse le seuil ; audio : premium passthrough par défaut, ajout section multicanal et exemple E-AC3 mis à jour).
+- **Où** : `docs/📋 Tableau récapitulatif - Critères de conversion.csv`
+- **Pourquoi** : éviter les règles obsolètes/inexactes côté documentation et garder une “source de vérité” cohérente avec le code.
+
+#### Samples : cas 7.1 (TrueHD/DTS) plus robustes
+- **Quoi** : détection préventive du support 7.1 par les encodeurs FFmpeg (`truehd`, `dca`) + suppression d'artefacts invalides (0 octet / sans vidéo) quand `--force` n'est pas utilisé.
+- **Où** : `tools/generate_ffmpeg_samples.sh`
+- **Pourquoi** : sur certaines builds, les encodeurs refusent 7.1 (jusqu'à 5.1 seulement) ; éviter du bruit d'erreurs et empêcher qu'un ancien fichier audio-only soit réutilisé.
+- **Impact** : `19_dts_7_1.mkv` / `21_truehd_7_1.mkv` peuvent être "skip" proprement ; pas de fichiers invalides laissés sur disque.
+
 ### 2026-01-02
 
 #### UX : Compteur fichiers convertis pour mode limite
