@@ -50,7 +50,7 @@ Defaults importants (issus de la config) :
 Ces tableaux résument les décisions les plus fréquentes (skip / copy / convert / downscale).
 Pour la logique complète et les détails, voir [docs/SMART_CODEC.md](docs/SMART_CODEC.md).
 
-### Audio (cible par défaut : `aac` stéréo, `eac3` multichannel)
+### Audio (par défaut : `aac` stéréo)
 
 Rappels :
 - `--audio copy` : copie l'audio sans modification.
@@ -58,8 +58,9 @@ Rappels :
 - `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC).
 
 **Gestion des canaux (multicanal) :**
-- **Layout cible** : stéréo (2ch) ou **5.1** (downmix automatique si 7.1).
-- **Codec par défaut multichannel** : EAC3 384k (compatible TV/receivers).
+- **Mode `serie`** : stéréo forcée (downmix systématique si 5.1/7.1+).
+- **Modes `film` / `film-adaptive`** : layout cible stéréo (2ch) ou **5.1** (downmix automatique si 7.1).
+- **Codec par défaut multichannel (film/film-adaptive)** : EAC3 384k (compatible TV/receivers).
 - **AAC multichannel** : uniquement avec `-a aac --force-audio` (plafond 320k).
 - **Opus multichannel** : `-a opus` (plafond 224k).
 - **Anti-upscale** : pas de conversion si source < 256k (sauf downmix requis).
@@ -67,6 +68,8 @@ Rappels :
 **Codecs premium (DTS/DTS-HD/TrueHD/FLAC) :**
 - **Sans `--no-lossless`** : passthrough (conservés si déjà 5.1, sinon downmix → EAC3 384k).
 - **Avec `--no-lossless`** : conversion forcée (stéréo → codec cible, multichannel → EAC3 384k).
+
+Note : en mode `serie`, la stéréo forcée peut convertir des cas autrement en `copy` (y compris premium) afin de garantir une sortie 2.0.
 
 | Codec source | Statut | Channels | Bitrate source | Action | Résultat |
 |-------------|--------|----------|----------------|--------|----------|

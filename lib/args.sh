@@ -257,11 +257,6 @@ parse_arguments() {
         fi
     fi
     
-    # Single-pass désactivé automatiquement pour les films (two-pass pour qualité max)
-    if [[ "${SINGLE_PASS_MODE:-true}" == true ]] && [[ "$CONVERSION_MODE" == "film" ]]; then
-        SINGLE_PASS_MODE=false
-    fi
-
     # Recalculer la regex d'exclusions après avoir potentiellement ajouté des patterns via -e/--exclude.
     # (EXCLUDES_REGEX est initialisée au chargement de config.sh.)
     if declare -f _build_excludes_regex &>/dev/null; then

@@ -193,11 +193,18 @@ _reset_cli_state() {
     # Test 1: single-pass désactivé automatiquement pour mode film
     _reset_cli_state
     parse_arguments --mode film
+    [ "$SINGLE_PASS_MODE" = "true" ]
+
+    # La désactivation se fait dans set_conversion_mode_parameters (appelé après parse_arguments)
+    set_conversion_mode_parameters
     [ "$SINGLE_PASS_MODE" = "false" ]
     
     # Test 2: single-pass reste actif pour mode serie
     _reset_cli_state
     parse_arguments --mode serie
+    [ "$SINGLE_PASS_MODE" = "true" ]
+
+    set_conversion_mode_parameters
     [ "$SINGLE_PASS_MODE" = "true" ]
     
     # Test 3: dry-run désactive VMAF et sample

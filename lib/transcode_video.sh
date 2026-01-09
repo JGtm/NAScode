@@ -101,8 +101,7 @@ _setup_video_encoding_params() {
     esac
     
     # Ajouter les paramètres spécifiques au mode (tuning, optimisations)
-    local mode_params
-    mode_params=$(get_encoder_mode_params "$encoder" "${CONVERSION_MODE:-serie}")
+    local mode_params="${ENCODER_MODE_PARAMS:-}"
     
     # Combiner VBV + mode params
     ENCODER_BASE_PARAMS="$vbv_params"
@@ -119,7 +118,7 @@ _setup_video_encoding_params() {
     if [[ "$encoder" == "libsvtav1" ]]; then
         if [[ "$ENCODER_BASE_PARAMS" != *"keyint="* ]]; then
             local mode_keyint
-            mode_keyint=$(get_mode_keyint "${CONVERSION_MODE:-serie}")
+            mode_keyint="${FILM_KEYINT:-600}"
             if [[ -n "$mode_keyint" ]]; then
                 if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
                     ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:keyint=${mode_keyint}"

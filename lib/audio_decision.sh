@@ -210,6 +210,30 @@ _get_smart_audio_decision() {
     local source_codec_norm
     source_codec_norm=$(_normalize_audio_codec "$source_codec")
 
+    # Mode stéréo forcé : si la source est multicanal, on downmix toujours en stéréo.
+    # Important : on ne peut pas faire de downmix en mode "copy".
+    if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]] && [[ "$channels" -ge 6 ]]; then
+        local forced_target_codec="${AUDIO_CODEC:-aac}"
+        if [[ "$forced_target_codec" == "copy" ]]; then
+            forced_target_codec="aac"
+        fi
+
+        local forced_target_bitrate
+        forced_target_bitrate=$(_get_audio_target_bitrate "$forced_target_codec")
+
+        local forced_target_codec_norm
+        forced_target_codec_norm=$(_normalize_audio_codec "$forced_target_codec")
+
+        if [[ "$source_codec_norm" == "$forced_target_codec_norm" ]] && \
+           [[ "$source_bitrate_kbps" -gt 0 ]] && [[ "$forced_target_bitrate" -gt 0 ]] && \
+           [[ "$source_bitrate_kbps" -gt "$forced_target_bitrate" ]]; then
+            echo "downscale|${forced_target_codec}|${forced_target_bitrate}|force_stereo_downmix_downscale"
+        else
+            echo "convert|${forced_target_codec}|${forced_target_bitrate}|force_stereo_downmix"
+        fi
+        return 0
+    fi
+
     local is_multichannel=false
     _is_audio_multichannel "$channels" && is_multichannel=true
 

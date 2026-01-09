@@ -15,6 +15,19 @@ Objectifs :
 
 ### 2026-01-09
 
+#### Audio : stéréo forcée en mode `serie` + centralisation mode-based (vidéo)
+- **Quoi** : en mode `serie`, garantir une sortie stéréo (downmix) même pour les sources multicanal et même si elles auraient été copiées (premium/passthrough). En parallèle, calculer une fois les paramètres encodeur dépendants du mode.
+- **Où** :
+  - `lib/config.sh` : `AUDIO_FORCE_STEREO`, `ENCODER_MODE_PROFILE`, `ENCODER_MODE_PARAMS` + initialisation par mode
+  - `lib/audio_decision.sh` : bypass décision “stéréo forcée” pour `channels>=6`
+  - `lib/audio_params.sh` : layout cible `stereo` si `AUDIO_FORCE_STEREO=true`
+  - `lib/transcode_video.sh` : utilisation de `ENCODER_MODE_PARAMS` et `FILM_KEYINT` centralisés
+  - `lib/args.sh` : suppression de la règle film→two-pass dans le parsing (centralisé dans `set_conversion_mode_parameters`)
+  - Tests : `tests/test_args.bats`, `tests/test_audio_codec.bats`
+- **Pourquoi** : compatibilité maximale et taille maîtrisée en série ; éviter des décisions “mode-based” dispersées.
+- **Impact** : changement de comportement en mode `serie` (5.1/7.1 → stéréo systématique). Mode `film` / `film-adaptive` inchangé.
+- **Doc** : `README.md`, `docs/SMART_CODEC.md`, `docs/CONFIG.md`.
+
 #### Refactor “clean code light” (sans changement UX/CLI)
 - **Quoi** : refactor ciblé des fonctions longues audio/vidéo/VMAF, avec une construction de commandes FFmpeg plus sûre via tableaux d’arguments, et découpage de `_build_effective_suffix_for_dims()` en helpers internes.
 - **Où** :

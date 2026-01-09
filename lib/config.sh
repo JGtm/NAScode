@@ -44,6 +44,10 @@ AUDIO_BITRATE_KBPS=0  # 0 = utiliser le défaut selon le codec
 # vers le codec cible (stéréo) ou EAC3 384k (multi-channel)
 NO_LOSSLESS=false
 
+# En mode "serie", forcer un rendu stéréo (downmix si source multicanal).
+# Objectif : compatibilité maximale et taille maîtrisée.
+AUDIO_FORCE_STEREO=false
+
 # ----- Codec vidéo -----
 # Codec cible pour l'encodage (hevc, av1)
 # L'encodeur est choisi automatiquement selon le codec (modifiable dans codec_profiles.sh)
@@ -187,6 +191,12 @@ X265_EXTRA_PARAMS=""
 # Pass 1 rapide (no-slow-firstpass) - désactivé par défaut pour qualité max
 X265_PASS1_FAST=false
 
+# Profil logique utilisé pour les paramètres encodeur (regroupe film-adaptive -> film).
+ENCODER_MODE_PROFILE="serie"
+
+# Paramètres encodeur spécifiques au mode (calculés dans set_conversion_mode_parameters)
+ENCODER_MODE_PARAMS=""
+
 set_conversion_mode_parameters() {
     # Bitrates de référence HEVC (seront ajustés selon le codec)
     local base_target_kbps base_maxrate_kbps base_bufsize_kbps
@@ -209,6 +219,8 @@ set_conversion_mode_parameters() {
             FILM_KEYINT=240
             # Pas de tune fastdecode pour qualité max
             FILM_TUNE_FASTDECODE=false
+            ENCODER_MODE_PROFILE="film"
+            AUDIO_FORCE_STEREO=false
             ;;
         film-adaptive)
             # Films adaptatifs : bitrate calculé par fichier selon complexité
@@ -230,6 +242,8 @@ set_conversion_mode_parameters() {
             FILM_TUNE_FASTDECODE=false
             # Flag pour activer le calcul adaptatif dans video_params
             ADAPTIVE_COMPLEXITY_MODE=true
+            ENCODER_MODE_PROFILE="film"
+            AUDIO_FORCE_STEREO=false
             ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 21 (single-pass)
@@ -256,6 +270,8 @@ set_conversion_mode_parameters() {
             FILM_KEYINT=600
             # Tune fastdecode pour décodage fluide sur appareils variés
             FILM_TUNE_FASTDECODE=true
+            ENCODER_MODE_PROFILE="serie"
+            AUDIO_FORCE_STEREO=true
             ;;
         *)
             print_error "Mode de conversion inconnu : $CONVERSION_MODE"
@@ -285,6 +301,13 @@ set_conversion_mode_parameters() {
     # Initialiser l'encodeur selon le codec (si pas déjà spécifié)
     if [[ -z "$VIDEO_ENCODER" ]]; then
         VIDEO_ENCODER=$(get_codec_encoder "$VIDEO_CODEC")
+    fi
+
+    # Paramètres encodeur dépendants du mode (centralisés ici)
+    if declare -f get_encoder_mode_params &>/dev/null; then
+        ENCODER_MODE_PARAMS=$(get_encoder_mode_params "$VIDEO_ENCODER" "${ENCODER_MODE_PROFILE:-${CONVERSION_MODE:-serie}}")
+    else
+        ENCODER_MODE_PARAMS=""
     fi
     
     # Valider que le codec/encodeur est disponible dans FFmpeg
