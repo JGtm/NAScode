@@ -7,6 +7,7 @@ Cette section contient la documentation détaillée. Le [README principal](../RE
 - Usage (options + exemples) : [USAGE.md](USAGE.md)
 - Configuration (modes, variables, codecs, off-peak) : [CONFIG.md](CONFIG.md)
 - Logique “smart codec” (audio/vidéo, seuils, `--force`) : [SMART_CODEC.md](SMART_CODEC.md)
+- Samples FFmpeg (edge cases) : [SAMPLES.md](SAMPLES.md)
 
 Référence code (audio) :
 - Décision “smart codec” : [../lib/audio_decision.sh](../lib/audio_decision.sh)

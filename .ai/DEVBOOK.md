@@ -101,3 +101,15 @@ Objectifs :
   - ~100 lignes supprimées/factorisées
   - Aucun changement de comportement
   - Tests ajoutés pour les nouvelles fonctions
+
+### 2026-01-09
+
+#### Outil : génération de samples FFmpeg (edge cases)
+- **Quoi** : Ajout d'un script pour générer des médias courts et reproductibles (VFR, 10-bit, multiaudio, sous-titres, metadata rotate, dimensions impaires, etc.).
+- **Où** :
+  - `tools/generate_ffmpeg_samples.sh`
+  - `docs/SAMPLES.md`
+  - `docs/DOCS.md` (lien ajouté)
+  - `.gitignore` (ignore `samples/_generated/`)
+- **Pourquoi** : Faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
+- **Impact** : Aucun impact sur NAScode; artefacts générés ignorés par git.

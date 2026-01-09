@@ -1,5 +1,23 @@
 # Handoff
 
+## Dernière session (09/01/2026)
+
+### Tâches accomplies
+
+#### Ajout de samples FFmpeg (edge cases)
+
+- Ajout du script `tools/generate_ffmpeg_samples.sh` pour générer des médias courts et reproductibles via `lavfi`.
+- Ajout de la doc `docs/SAMPLES.md` + lien dans `docs/DOCS.md`.
+- Ajout d'une règle `.gitignore` pour ignorer `samples/_generated/`.
+
+### Branche en cours
+
+- `fix/docs-index-link`
+
+### Derniers prompts
+
+- "Tu peux me créer des samples avec ffmpeg pour les cas un peu edge ?"
+
 ## Dernière session (08/01/2026)
 
 ### Tâches accomplies
