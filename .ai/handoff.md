@@ -6,10 +6,14 @@
 
 - VMAF : validation du refactor de `compute_vmaf_score()` (commande FFmpeg dédupliquée, `-progress` conditionnel).
 - Suffixe vidéo : refactor de `_build_effective_suffix_for_dims()` en helpers internes dans `lib/video_params.sh` (réduction de complexité, aucun changement de format attendu).
+- Documentation : mise à jour du tableau récapitulatif des critères de conversion (vidéo skip vs bitrate, audio premium passthrough, section multicanal, exemple mis à jour).
 
 ### Fichiers modifiés
 
 - `lib/video_params.sh`
+- `docs/📋 Tableau récapitulatif - Critères de conversion.csv`
+- `.ai/handoff.md`
+- `.ai/DEVBOOK.md`
 
 ### Validation
 
