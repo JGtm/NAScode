@@ -58,6 +58,26 @@ PY
 }
 
 ###########################################################
+# APPEL CONDITIONNEL DE FONCTION
+###########################################################
+
+# Appelle une fonction si elle est définie, sinon retourne 1.
+# Usage: call_if_exists func_name [args...]
+# Retourne: le code retour de la fonction, ou 1 si non définie
+# Exemple:
+#   result=$(call_if_exists my_func "$arg") || result="default"
+#   call_if_exists increment_counter && echo "incrémenté"
+call_if_exists() {
+    local func="$1"
+    shift
+    if declare -f "$func" &>/dev/null; then
+        "$func" "$@"
+    else
+        return 1
+    fi
+}
+
+###########################################################
 # HORODATAGE HAUTE RÉSOLUTION
 ###########################################################
 

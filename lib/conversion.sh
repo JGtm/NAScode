@@ -465,48 +465,119 @@ _convert_run_adaptive_analysis_and_export() {
     echo "${adaptive_target_kbps}|${adaptive_maxrate_kbps}|${adaptive_bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev_val}"
 }
 
+# Gère le mode adaptatif : analyse, skip post-analyse, réservation slot.
+# Usage: _convert_handle_adaptive_mode <tmp_input> <v_codec> <v_bitrate> <filename> <file_original> <a_codec> <a_bitrate> <final_dir>
+# Retourne: 0 si on continue, 1 si skip (fichier temporaire nettoyé)
+# Effets de bord: définit LIMIT_DISPLAY_SLOT, exporte ADAPTIVE_*_KBPS
+_convert_handle_adaptive_mode() {
+    local tmp_input="$1"
+    local v_codec="$2"
+    local v_bitrate="$3"
+    local filename="$4"
+    local file_original="$5"
+    local a_codec="$6"
+    local a_bitrate="$7"
+    local final_dir="$8"
+
+    local adaptive_info
+    adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input")
+
+    local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
+    local complexity_c complexity_desc stddev_val
+    IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
+
+    # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
+    if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
+        rm -f "$tmp_input" 2>/dev/null || true
+        if [[ "$LIMIT_FILES" -gt 0 ]]; then
+            call_if_exists update_queue || true
+        fi
+        call_if_exists increment_processed_count || true
+        return 1
+    fi
+
+    # Réserver le slot limite après l'analyse (évite les slots "gâchés")
+    if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
+        local _slot
+        _slot=$(call_if_exists increment_converted_count) || _slot="0"
+        if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
+            LIMIT_DISPLAY_SLOT="$_slot"
+        fi
+    fi
+
+    # Afficher le démarrage avec le bon slot
+    _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
+    return 0
+}
+
+# Affiche les messages informatifs avant la conversion (codec, bitrate, audio multicanal).
+# Usage: _convert_display_info_messages <v_codec> <tmp_input>
+# Effets de bord: echo vers stdout
+_convert_display_info_messages() {
+    local v_codec="$1"
+    local tmp_input="$2"
+
+    [[ "$NO_PROGRESS" == true ]] && return 0
+
+    local codec_display="${v_codec^^}"
+    [[ "$v_codec" == "hevc" || "$v_codec" == "h265" ]] && codec_display="X265"
+    [[ "$v_codec" == "av1" ]] && codec_display="AV1"
+
+    if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
+        echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → Conversion audio seule${NOCOLOR}"
+    else
+        local target_codec="${VIDEO_CODEC:-hevc}"
+        if is_codec_better_or_equal "$v_codec" "$target_codec"; then
+            echo -e "${CYAN}  🎯 Codec ${codec_display} optimal → Limitation du bitrate${NOCOLOR}"
+        fi
+    fi
+
+    # Info audio multicanal (mode film/film-adaptive uniquement)
+    if [[ "${CONVERSION_MODE:-serie}" == "film" || "${CONVERSION_MODE:-serie}" == "film-adaptive" ]]; then
+        if declare -f _probe_audio_channels &>/dev/null && declare -f _is_audio_multichannel &>/dev/null; then
+            local channel_info channels
+            channel_info=$(_probe_audio_channels "$tmp_input")
+            channels=$(echo "$channel_info" | cut -d'|' -f1)
+            if _is_audio_multichannel "$channels"; then
+                echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Préservation 5.1${NOCOLOR}"
+            fi
+        fi
+    fi
+}
+
 convert_file() {
     set -o pipefail
 
     local file_original="$1"
-    # Windows/Git Bash : un chemin lu depuis un fichier peut contenir un '\r' (CRLF)
-    # Ce '\r' rend ffprobe/ffmpeg incapables d'ouvrir le fichier => faux "Pas de flux vidéo".
-    # On normalise dès l'entrée.
+    # Windows/Git Bash : normaliser les CRLF
     file_original="${file_original//$'\r'/}"
     local output_dir="$2"
     
-    # Incrémenter le compteur de fichiers au tout début (pour affichage [X/Y])
-    # Cette variable sera utilisée par tous les messages (skips inclus)
-    CURRENT_FILE_NUMBER=0
-    if declare -f increment_starting_counter &>/dev/null; then
-        CURRENT_FILE_NUMBER=$(increment_starting_counter)
-    fi
-
-    # Réinitialiser le slot limite (réservé plus tard, seulement si pas de skip)
+    # Compteurs initiaux
+    CURRENT_FILE_NUMBER=$(call_if_exists increment_starting_counter) || CURRENT_FILE_NUMBER=0
     LIMIT_DISPLAY_SLOT=0
     
-    # 1. Optimisation : Récupérer TOUTES les métadonnées en un seul appel
-    # Format: video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
+    # 1. Récupérer TOUTES les métadonnées en un seul appel
     local full_metadata
     full_metadata=$(_convert_get_full_metadata "$file_original")
     
     local v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate
     IFS='|' read -r v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate <<< "$full_metadata"
     
-    # 2. Préparation des chemins (avec métadonnées pour suffixe)
+    # 2. Préparation des chemins
     local path_info
     path_info=$(_prepare_file_paths "$file_original" "$output_dir" "$v_width" "$v_height" "$a_codec" "$a_bitrate" "$v_codec") || return 1
     
     IFS='|' read -r filename final_dir base_name effective_suffix final_output <<< "$path_info"
     
-    # 3. Vérifications standard
+    # 3. Vérifications standard (skip rapide)
     if _check_output_exists "$file_original" "$filename" "$final_output"; then
-        increment_processed_count || true
+        call_if_exists increment_processed_count || true
         return 0
     fi
     
     if _handle_dryrun_mode "$final_dir" "$final_output"; then
-        increment_processed_count || true
+        call_if_exists increment_processed_count || true
         return 0
     fi
     
@@ -514,37 +585,21 @@ convert_file() {
     local tmp_output=$(_get_temp_filename "$file_original" ".out.mkv")
     local ffmpeg_log_temp=$(_get_temp_filename "$file_original" "_err.log")
     
-    # 4. Décision de conversion préliminaire (basée sur codec, pas sur bitrate adaptatif)
-    # En mode film-adaptive, on ne peut pas skip ici car on n'a pas encore le seuil adaptatif
-    # On vérifie juste si c'est déjà le bon codec avec un bitrate raisonnable
-    local adaptive_target_kbps="" adaptive_maxrate_kbps="" adaptive_bufsize_kbps=""
-    local complexity_c="" complexity_desc="" stddev_val=""
-    
-    # En mode non-adaptatif, vérifier si on peut skip maintenant
+    # 4. Décision de conversion (mode non-adaptatif : skip possible ici)
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]]; then
         if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" ""; then
-            if [[ "$LIMIT_FILES" -gt 0 ]]; then
-                update_queue || true
-            fi
-            increment_processed_count || true
+            [[ "$LIMIT_FILES" -gt 0 ]] && call_if_exists update_queue || true
+            call_if_exists increment_processed_count || true
             return 0
         fi
-    fi
-
-    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]]; then
-        # À partir d'ici, on sait qu'on ne skip pas en mode non-adaptatif.
-        # Réserver un slot limite (unique même avec PARALLEL_JOBS>1) pour l'UX.
-        if [[ "${LIMIT_FILES:-0}" -gt 0 ]] && declare -f increment_converted_count &>/dev/null; then
+        # Réserver le slot limite
+        if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
             local _slot
-            _slot=$(increment_converted_count 2>/dev/null || echo "0")
-            if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
-                LIMIT_DISPLAY_SLOT="$_slot"
-            fi
+            _slot=$(call_if_exists increment_converted_count) || _slot="0"
+            [[ "$_slot" =~ ^[0-9]+$ && "$_slot" -gt 0 ]] && LIMIT_DISPLAY_SLOT="$_slot"
         fi
-
         _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
     else
-        # En mode adaptatif, on affiche le "démarrage" après l'analyse (slot fiable).
         mkdir -p "$final_dir" 2>/dev/null || true
     fi
 
@@ -552,94 +607,33 @@ convert_file() {
     
     local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
     
-    # 5. Téléchargement AVANT l'analyse de complexité (plus efficace sur fichier local)
+    # 5. Téléchargement vers stockage temporaire
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
     
-    # 6. Analyse adaptative APRÈS téléchargement (mode film-adaptive uniquement)
-    # L'analyse sur fichier local (SSD) est beaucoup plus rapide que sur fichier réseau
+    # 6. Mode adaptatif : analyse + skip post-analyse + slot
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
-        local adaptive_info
-        adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input")
-
-        IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
-        
-        # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
-        if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
-            # Nettoyer le fichier temporaire
-            rm -f "$tmp_input" 2>/dev/null || true
-            if [[ "$LIMIT_FILES" -gt 0 ]]; then
-                update_queue || true
-            fi
-            increment_processed_count || true
-            return 0
-        fi
-
-        # En mode adaptatif, on ne réserve le slot limite qu'après l'analyse (pour éviter les slots "gâchés").
-        if [[ "${LIMIT_FILES:-0}" -gt 0 ]] && declare -f increment_converted_count &>/dev/null; then
-            local _slot
-            _slot=$(increment_converted_count 2>/dev/null || echo "0")
-            if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
-                LIMIT_DISPLAY_SLOT="$_slot"
-            fi
-        fi
-
-        # (Re)afficher le démarrage après pré-checks adaptatifs, avec le bon slot.
-        _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
-    fi
-    
-    # Afficher les messages informatifs après le transfert, avant la conversion
-    if [[ "$NO_PROGRESS" != true ]]; then
-        local codec_display="${v_codec^^}"
-        [[ "$v_codec" == "hevc" || "$v_codec" == "h265" ]] && codec_display="X265"
-        [[ "$v_codec" == "av1" ]] && codec_display="AV1"
-        
-        if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
-            # Mode passthrough : vidéo conservée, seul l'audio sera converti
-            echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → Conversion audio seule${NOCOLOR}"
-        else
-            # Mode full : vérifier si le codec source est meilleur/égal à la cible
-            local target_codec="${VIDEO_CODEC:-hevc}"
-            if is_codec_better_or_equal "$v_codec" "$target_codec"; then
-                # Le codec source est efficace mais le bitrate est trop élevé
-                local target_display="${target_codec^^}"
-                [[ "$target_codec" == "hevc" || "$target_codec" == "h265" ]] && target_display="X265"
-                echo -e "${CYAN}  🎯 Codec ${codec_display} optimal → Limitation du bitrate${NOCOLOR}"
-            fi
-        fi
-        
-        # Info sur le traitement audio multicanal (mode film/film-adaptive uniquement)
-        if [[ "${CONVERSION_MODE:-serie}" == "film" || "${CONVERSION_MODE:-serie}" == "film-adaptive" ]]; then
-            if declare -f _probe_audio_channels &>/dev/null && declare -f _is_audio_multichannel &>/dev/null; then
-                local channel_info channels
-                channel_info=$(_probe_audio_channels "$tmp_input")
-                channels=$(echo "$channel_info" | cut -d'|' -f1)
-                if _is_audio_multichannel "$channels"; then
-                    echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Préservation 5.1${NOCOLOR}"
-                fi
-            fi
+        if ! _convert_handle_adaptive_mode "$tmp_input" "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$final_dir"; then
+            return 0  # Skip post-analyse
         fi
     fi
     
-    # Choix du mode de conversion selon CONVERSION_ACTION (défini par should_skip_conversion)
+    # 7. Messages informatifs
+    _convert_display_info_messages "$v_codec" "$tmp_input"
+    
+    # 8. Exécution de la conversion
     local conversion_success=false
     if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
-        # Mode passthrough : vidéo copiée, seul l'audio est converti
-        if _execute_video_passthrough "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name"; then
-            conversion_success=true
-        fi
+        _execute_video_passthrough "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true
     else
-        # Mode standard : conversion complète (vidéo + audio)
-        if _execute_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name"; then
-            conversion_success=true
-        fi
+        _execute_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true
     fi
     
+    # 9. Finalisation
     if [[ "$conversion_success" == true ]]; then
         _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$size_before_mb"
     else
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
     fi
     
-    # Incrémenter le compteur de fichiers traités (signal pour le FIFO writer)
-    increment_processed_count || true
+    call_if_exists increment_processed_count || true
 }

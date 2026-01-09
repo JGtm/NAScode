@@ -55,6 +55,7 @@ export_variables() {
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
     export -f _setup_temp_files_and_logs _check_disk_space _get_temp_filename
     export -f _analyze_video _copy_to_temp_storage
+    export -f _convert_handle_adaptive_mode _convert_display_info_messages
     export -f _finalize_conversion_success _finalize_try_move
     export -f _finalize_log_and_verify _finalize_conversion_error
     
@@ -85,7 +86,7 @@ export_variables() {
     # FONCTIONS UTILITAIRES
     # ========================================================
     export -f is_excluded count_null_separated compute_md5_prefix now_ts compute_sha256
-    export -f normalize_path
+    export -f normalize_path call_if_exists
     
     # --- Fonctions de logging (logging.sh) ---
     export -f log_error log_warning log_info log_success
