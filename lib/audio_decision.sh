@@ -395,6 +395,17 @@ _get_smart_audio_decision() {
         return 0
     fi
 
+    # Si le codec cible est PLUS efficace que le source, convertir
+    # Ex: source=AAC (rang 4), cible=Opus (rang 5) → convertir vers Opus
+    local source_rank target_rank
+    source_rank=$(get_audio_codec_rank "$source_codec_norm")
+    target_rank=$(get_audio_codec_rank "$target_codec_norm")
+    
+    if [[ "$target_rank" -gt "$source_rank" ]]; then
+        echo "convert|${target_codec}|${target_bitrate}|target_more_efficient"
+        return 0
+    fi
+
     if is_audio_codec_efficient "$source_codec"; then
         local source_limit
         source_limit=$(get_audio_codec_target_bitrate "$source_codec")

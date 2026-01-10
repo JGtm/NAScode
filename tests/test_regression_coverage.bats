@@ -272,7 +272,33 @@ STUB
     [ "$should_convert" -eq 1 ]
 }
 
-@test "AUDIO: audio AAC bas bitrate ne déclenche pas conversion (stub)" {
+@test "AUDIO: audio AAC bas bitrate est converti vers Opus si cible=opus (stub)" {
+    # Créer un stub ffprobe qui simule un fichier avec audio AAC bas bitrate
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+# Simuler audio AAC à 128kbps
+echo "codec_name=aac"
+echo "bit_rate=128000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    
+    PATH="$stub_dir:$PATH"
+    AUDIO_CODEC="opus"
+    
+    local result
+    result=$(_get_audio_conversion_info "/fake/aac_low.mkv")
+    
+    # should_convert doit être 1 car Opus (rang 5) est plus efficace que AAC (rang 4)
+    local should_convert
+    should_convert=$(echo "$result" | cut -d'|' -f3)
+    [ "$should_convert" -eq 1 ]
+}
+
+@test "AUDIO: audio AAC bas bitrate reste en copy si cible=aac (stub)" {
     # Créer un stub ffprobe qui simule un fichier avec audio AAC bas bitrate
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
@@ -287,13 +313,12 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     
     PATH="$stub_dir:$PATH"
-    AUDIO_CODEC="opus"
-    # AUDIO_CONVERSION_THRESHOLD_KBPS est readonly à 160, on utilise la valeur par défaut
+    AUDIO_CODEC="aac"  # Cible = même codec que source
     
     local result
     result=$(_get_audio_conversion_info "/fake/aac_low.mkv")
     
-    # should_convert doit être 0 (bitrate 128k < seuil 160k)
+    # should_convert doit être 0 (même codec, bitrate OK)
     local should_convert
     should_convert=$(echo "$result" | cut -d'|' -f3)
     [ "$should_convert" -eq 0 ]
