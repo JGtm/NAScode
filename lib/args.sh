@@ -81,6 +81,12 @@ parse_arguments() {
                 NO_PROGRESS=true
                 shift
                 ;;
+            -Q|--quiet)
+                # Mode silencieux : limiter l'affichage aux warnings/erreurs
+                UI_QUIET=true
+                NO_PROGRESS=true
+                shift
+                ;;
             -h|--help)
                 show_help
                 exit 0
@@ -286,6 +292,7 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-j, --jobs${NOCOLOR} N                 Nombre de conversions parallèles (ARG) [défaut : 1]
     ${GREEN}-q, --queue${NOCOLOR} FILE             Utiliser un fichier queue personnalisé (ARG)
     ${GREEN}-n, --no-progress${NOCOLOR}            Désactiver l'affichage des indicateurs de progression (FLAG)
+    ${GREEN}-Q, --quiet${NOCOLOR}                  Mode silencieux : n'affiche que les warnings/erreurs (FLAG)
     ${GREEN}-h, --help${NOCOLOR}                   Afficher cette aide (FLAG)
     ${GREEN}-k, --keep-index${NOCOLOR}             Conserver l'index existant sans demande interactive (FLAG)
     ${GREEN}-R, --regenerate-index${NOCOLOR}       Forcer la régénération de l'index au démarrage (FLAG)
@@ -333,7 +340,8 @@ ${CYAN}Exemples :${NOCOLOR}
   ${DIM}./conversion.sh
   ./conversion.sh -s /media/videos -o /media/converted
   ./conversion.sh --mode film --dry-run
-  ./conversion.sh --mode serie --no-progress
+    ./conversion.sh --mode serie --no-progress
+    ./conversion.sh --mode film --quiet
   ./conversion.sh -xdrk -l 5      -x (no-suffix) -d (dry-run) -r (random) -k (keep-index) puis -l 5
   ./conversion.sh -dnr            -d (dry-run) -n (no-progress) -r (random)
   ./conversion.sh --vmaf          Activer l'évaluation VMAF après conversion

@@ -44,6 +44,9 @@ bash nascode -f "/chemin/vers/video.mkv"
 
 # Dry-run (simulation)
 bash nascode -d -s "/chemin/source"
+
+# Quiet (warnings/erreurs uniquement)
+bash nascode --quiet -s "/chemin/vers/series"
 ```
 
 ## Options principales (rappel)
@@ -58,6 +61,8 @@ Le script évolue : la table ci-dessous est un rappel, l’autorité reste `bash
 - `--min-size SIZE` : filtrer l’index/queue (ne garder que les fichiers >= SIZE, ex: `700M`, `1G`)
 - `-v, --vmaf` : activer VMAF
 - `-t, --sample` : encoder un segment de test
+- `-n, --no-progress` : désactiver l’affichage des indicateurs de progression
+- `-Q, --quiet` : mode silencieux (n’affiche que les warnings/erreurs)
 - `-p, --off-peak [HH:MM-HH:MM]` : n’exécuter que pendant les heures creuses
 - `--force-audio` / `--force-video` / `--force` : bypass de certaines décisions smart
 

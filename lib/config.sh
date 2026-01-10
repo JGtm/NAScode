@@ -22,6 +22,7 @@ SUFFIX_MODE="ask"
 REGENERATE_INDEX=false    # Régénérer l'index via -R/--regenerate-index
 PARALLEL_JOBS=1
 NO_PROGRESS=false
+UI_QUIET=false
 CONVERSION_MODE="serie"
 VMAF_ENABLED=false  # Évaluation VMAF désactivée par défaut
 SINGLE_FILE=""       # Chemin vers un fichier unique à convertir (bypass index/queue)
@@ -93,7 +94,7 @@ readonly DRYRUN_SUFFIX="-dryrun-sample"
 SUFFIX_STRING=""  # Suffixe par défaut (sera mis à jour par build_dynamic_suffix selon le codec)
 
 # Exclusions par défaut
-EXCLUDES=("./logs" "./*.sh" "./*.txt" "./Converted" "./tests" "../ConversionPy")
+EXCLUDES=("./logs" "./*.sh" "./*.txt" "./Converted" "./samples" "./tests" "../ConversionPy")
 
 # ----- Paramètres système -----
 readonly TMP_DIR="/tmp/video_convert"

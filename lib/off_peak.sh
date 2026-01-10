@@ -170,9 +170,9 @@ wait_for_off_peak() {
     local wait_formatted
     wait_formatted=$(format_wait_time "$wait_seconds")
     
-    echo -e "${YELLOW}⏸️  Heures pleines détectées (${OFF_PEAK_START}-${OFF_PEAK_END} = heures creuses)${NOCOLOR}"
-    echo -e "${YELLOW}   Attente estimée : ${wait_formatted} (reprise à ${OFF_PEAK_START})${NOCOLOR}"
-    echo -e "${CYAN}   Vérification toutes les ${OFF_PEAK_CHECK_INTERVAL}s... (Ctrl+C pour annuler)${NOCOLOR}"
+    print_info "⏸️  Heures pleines détectées (${OFF_PEAK_START}-${OFF_PEAK_END} = heures creuses)"
+    print_info "Attente estimée : ${wait_formatted} (reprise à ${OFF_PEAK_START})"
+    print_info "Vérification toutes les ${OFF_PEAK_CHECK_INTERVAL}s... (Ctrl+C pour annuler)"
     
     # Compteur pour l'affichage périodique
     local check_count=0
@@ -180,7 +180,7 @@ wait_for_off_peak() {
     while ! is_off_peak_time; do
         # Vérifier si le script a été interrompu
         if [[ -f "$STOP_FLAG" ]]; then
-            echo -e "${RED}⚠️  Arrêt demandé pendant l'attente des heures creuses${NOCOLOR}"
+            print_warning "Arrêt demandé pendant l'attente des heures creuses"
             return 1
         fi
         
@@ -191,7 +191,7 @@ wait_for_off_peak() {
             remaining=$(seconds_until_off_peak)
             local remaining_fmt
             remaining_fmt=$(format_wait_time "$remaining")
-            echo -e "${CYAN}   ⏳ Temps restant estimé : ${remaining_fmt}${NOCOLOR}"
+            print_info "⏳ Temps restant estimé : ${remaining_fmt}"
         fi
         
         sleep "$OFF_PEAK_CHECK_INTERVAL"
@@ -207,7 +207,7 @@ wait_for_off_peak() {
     
     local actual_wait_fmt
     actual_wait_fmt=$(format_wait_time "$actual_wait")
-    echo -e "${GREEN}▶️  Heures creuses ! Reprise du traitement (attendu ${actual_wait_fmt})${NOCOLOR}"
+    print_info "▶️  Heures creuses ! Reprise du traitement (attendu ${actual_wait_fmt})"
     
     return 0
 }

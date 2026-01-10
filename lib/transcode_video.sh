@@ -544,7 +544,7 @@ _setup_sample_mode_params() {
     if [[ "$available_range" -gt 0 ]]; then
         echo -e "${YELLOW}  🎯 Segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
     else
-        echo -e "${YELLOW}  ⚠️ Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+        print_warning "Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}"
     fi
 }
 

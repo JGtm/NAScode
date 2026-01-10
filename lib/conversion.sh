@@ -27,12 +27,25 @@ _get_counter_prefix() {
     local current_num="${CURRENT_FILE_NUMBER:-0}"
     local total_num="${TOTAL_FILES_TO_PROCESS:-0}"
     local limit="${LIMIT_FILES:-0}"
+
+    # Mode random : le "total" est déjà la sélection (ex: 10 fichiers).
+    # UX attendue : compteur de position [X/Y], pas une logique de slot/limite.
+    if [[ "${RANDOM_MODE:-false}" == true ]]; then
+        if [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
+            echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
+        fi
+        return
+    fi
     
     # Mode limite : afficher [slot/LIMIT] uniquement si un slot a été réservé.
     if [[ "$limit" -gt 0 ]]; then
         local slot="${LIMIT_DISPLAY_SLOT:-0}"
         if [[ "$slot" =~ ^[0-9]+$ ]] && [[ "$slot" -gt 0 ]]; then
             echo "${DIM}[${slot}/${limit}]${NOCOLOR} "
+        elif [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
+            # Fallback (ex: film-adaptive) : le slot est réservé après l'analyse,
+            # mais on veut un compteur visible dès le démarrage.
+            echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
         fi
         return
     fi
@@ -322,14 +335,16 @@ _setup_temp_files_and_logs() {
     local filename="$1"
     local file_original="$2"
     local final_dir="$3"
+    local print_start="${4:-true}"
+    local log_start="${5:-true}"
     
     mkdir -p "$final_dir" 2>/dev/null || true
-    if [[ "$NO_PROGRESS" != true ]]; then
+    if [[ "$print_start" == true ]] && [[ "$NO_PROGRESS" != true ]] && [[ "${UI_QUIET:-false}" != true ]]; then
         echo ""
         local counter_str=$(_get_counter_prefix)
         echo -e "${counter_str}▶️ Démarrage du fichier : $filename"
     fi
-    if [[ -n "$LOG_PROGRESS" ]]; then
+    if [[ "$log_start" == true ]] && [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
     fi
 }
@@ -376,11 +391,13 @@ _copy_to_temp_storage() {
     if [[ "$NO_PROGRESS" != true ]]; then
         print_transfer_item "$filename"
     else
-        echo -e "${CYAN}→ $filename${NOCOLOR}"
+        if [[ "${UI_QUIET:-false}" != true ]]; then
+            echo -e "${CYAN}→ $filename${NOCOLOR}"
+        fi
     fi
 
     if ! custom_pv "$file_original" "$tmp_input" "$CYAN"; then
-        echo -e "${RED}❌ ERREUR Impossible de déplacer (custom_pv) : $file_original${NOCOLOR}"
+        print_error "ERREUR Impossible de déplacer (custom_pv) : $file_original"
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR custom_pv copy failed | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
@@ -437,10 +454,10 @@ _convert_get_full_metadata() {
 }
 
 _convert_run_adaptive_analysis_and_export() {
-    local tmp_input="$1"
+    local file_to_analyze="$1"
 
     local adaptive_params
-    adaptive_params=$(compute_video_params_adaptive "$tmp_input")
+    adaptive_params=$(compute_video_params_adaptive "$file_to_analyze")
 
     # Format:
     # pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
@@ -453,9 +470,8 @@ _convert_run_adaptive_analysis_and_export() {
     adaptive_bufsize_kbps="${_bs%k}"
 
     # Afficher l'analyse de complexité
-    if [[ "$NO_PROGRESS" != true ]]; then
-        display_complexity_analysis "$tmp_input" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps"
-    fi
+    # Note: appelé dans des $(...) ; on force l'affichage sur stderr.
+    display_complexity_analysis "$file_to_analyze" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps" >&2
 
     # Stocker les paramètres adaptatifs dans des variables d'environnement
     export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
@@ -478,6 +494,9 @@ _convert_handle_adaptive_mode() {
     local a_codec="$6"
     local a_bitrate="$7"
     local final_dir="$8"
+
+    # Note UX: en mode adaptatif, le "Démarrage" est affiché avant le transfert
+    # (aligné avec les autres modes). Ici, on évite d'imprimer une 2e fois.
 
     local adaptive_info
     adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input")
@@ -505,8 +524,8 @@ _convert_handle_adaptive_mode() {
         fi
     fi
 
-    # Afficher le démarrage avec le bon slot
-    _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
+    # Log de démarrage (sans ré-afficher la ligne déjà imprimée avant l'analyse)
+    _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir" false true
     return 0
 }
 
@@ -576,7 +595,7 @@ _convert_display_info_messages() {
                 if [[ "$channels" -gt 6 ]]; then
                     echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Downmix 7.1 → 5.1${NOCOLOR}"
                 else
-                    echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Préservation 5.1${NOCOLOR}"
+                    echo -e "${CYAN}  🔊 Audio multicanal 5.1 (${channels}ch) → Layout conservé (pas de downmix stéréo)${NOCOLOR}"
                 fi
             fi
         fi
@@ -613,9 +632,9 @@ _convert_display_info_messages() {
             [[ "$effective_codec" == "opus" ]] && codec_label="OPUS"
 
             if [[ -n "$target_bitrate" && "$target_bitrate" =~ ^[0-9]+$ ]] && [[ "$target_bitrate" -gt 0 ]]; then
-                echo -e "${CYAN}  🎧 Audio → ${codec_label} ${target_bitrate}k (${layout})${NOCOLOR}"
+                echo -e "${CYAN}  🎧 Conversion audio vers ${codec_label} ${target_bitrate}k (${layout})${NOCOLOR}"
             else
-                echo -e "${CYAN}  🎧 Audio → ${codec_label} (${layout})${NOCOLOR}"
+                echo -e "${CYAN}  🎧 Conversion audio vers ${codec_label} (${layout})${NOCOLOR}"
             fi
         fi
     fi
@@ -677,7 +696,33 @@ convert_file() {
         fi
         _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
     else
+        # Mode adaptatif : analyse AVANT transfert pour calculer le seuil adaptatif
+        # et décider du skip sans télécharger inutilement.
         mkdir -p "$final_dir" 2>/dev/null || true
+
+        local adaptive_info
+        adaptive_info=$(_convert_run_adaptive_analysis_and_export "$file_original")
+
+        local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
+        local complexity_c complexity_desc stddev_val
+        IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
+
+        # Skip avec seuil adaptatif (avant transfert)
+        if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
+            [[ "$LIMIT_FILES" -gt 0 ]] && call_if_exists update_queue || true
+            call_if_exists increment_processed_count || true
+            return 0
+        fi
+
+        # Réserver le slot limite après l'analyse (évite les slots "gâchés")
+        if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
+            local _slot
+            _slot=$(call_if_exists increment_converted_count) || _slot="0"
+            [[ "$_slot" =~ ^[0-9]+$ && "$_slot" -gt 0 ]] && LIMIT_DISPLAY_SLOT="$_slot"
+        fi
+
+        # Maintenant qu'on sait qu'on ne skip pas : démarrage + log START (comme les autres modes)
+        _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
     fi
 
     _check_disk_space "$file_original" || return 1
@@ -687,12 +732,7 @@ convert_file() {
     # 5. Téléchargement vers stockage temporaire
     _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
     
-    # 6. Mode adaptatif : analyse + skip post-analyse + slot
-    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
-        if ! _convert_handle_adaptive_mode "$tmp_input" "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$final_dir"; then
-            return 0  # Skip post-analyse
-        fi
-    fi
+    # 6. Mode adaptatif : analyse/skip/slot déjà traités avant transfert.
     
     # 7. Messages informatifs
     _convert_display_info_messages "$v_codec" "$tmp_input" "$v_width" "$v_height" "$v_pix_fmt" "$a_codec" "$a_bitrate"

@@ -13,6 +13,21 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-10
+
+#### UX CLI : `--quiet` (warnings/erreurs uniquement) + centralisation des sorties
+- **Quoi** : consolidation du mode `--quiet` pour garantir une sortie “warnings/erreurs only” (infos/succès/sections silencieux), et migration ciblée de sorties user-facing (`echo -e`) vers les helpers UI centralisés.
+- **Où** :
+  - `lib/ui.sh` : extension des guards quiet à des fonctions restantes (status, success_box, empty_state, indexation, summary, fins de phases).
+  - `lib/off_peak.sh`, `lib/processing.sh` : attente heures creuses en `print_info`; interruptions en `print_warning`.
+  - `lib/finalize.sh` : succès en `print_success` (silencieux), erreurs/warnings en `print_error`/`print_warning` (visibles même si `NO_PROGRESS=true`).
+  - `lib/queue.sh`, `lib/system.sh`, `lib/transfer.sh`, `lib/lock.sh`, `lib/complexity.sh`, `lib/transcode_video.sh`, `lib/conversion.sh` : migration de messages user-facing vers helpers UI et suppression d’un cas bruité en quiet.
+- **Pourquoi** : éviter les oublis (prints dispersés) et rendre `--quiet` prédictible.
+- **Impact** :
+  - UX : `--quiet` devient globalement cohérent.
+  - Tests : `tests/test_args.bats` couvre `--quiet` (et reset `UI_QUIET`).
+  - Doc : `docs/USAGE.md` mentionne `--quiet`.
+
 ### 2026-01-09
 
 #### Audio : stéréo forcée en mode `serie` + centralisation mode-based (vidéo)

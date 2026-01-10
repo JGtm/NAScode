@@ -35,7 +35,7 @@ _process_queue_simple() {
     while IFS= read -r -d '' file; do
         # Vérifier les heures creuses avant de lancer une nouvelle conversion
         if ! check_off_peak_before_processing; then
-            echo -e "${YELLOW}⚠️  Traitement interrompu (arrêt demandé pendant l'attente)${NOCOLOR}"
+            print_warning "Traitement interrompu (arrêt demandé pendant l'attente)"
             break
         fi
         
@@ -175,7 +175,7 @@ _process_queue_with_fifo() {
         while IFS= read -r -d '' file; do
             # Vérifier les heures creuses avant de lancer une nouvelle conversion
             if ! check_off_peak_before_processing; then
-                echo -e "${YELLOW}⚠️  Traitement interrompu (arrêt demandé pendant l'attente)${NOCOLOR}"
+                print_warning "Traitement interrompu (arrêt demandé pendant l'attente)"
                 break
             fi
             

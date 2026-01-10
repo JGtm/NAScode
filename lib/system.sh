@@ -48,7 +48,9 @@ check_dependencies() {
     else
         print_item "Mode conversion" "$CONVERSION_MODE (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)" "$CYAN"
     fi
+
     print_success "Environnement validé"
+    echo ""
 }
 
 ###########################################################
@@ -69,7 +71,7 @@ check_plexignore() {
     # Vérifier si OUTPUT_DIR est un sous-dossier de SOURCE
     if [[ "$output_abs" = "$source_abs"/* ]]; then
         if [[ -f "$plexignore_file" ]]; then
-            print_info "Fichier .plexignore déjà présent dans le répertoire de destination"
+            print_info_compact "Fichier .plexignore déjà présent dans le répertoire de destination"
             return 0
         fi
 
@@ -80,6 +82,7 @@ check_plexignore() {
             [oO]|[yY]|'')
                 echo "*" > "$plexignore_file"
                 print_success "Fichier .plexignore créé dans le répertoire de destination"
+                echo ""
                 ;;
             [nN]|*)
                 print_info "Création de .plexignore ignorée"
@@ -111,7 +114,7 @@ check_output_suffix() {
         custom:*)
             # -S "valeur" : suffixe personnalisé
             SUFFIX_STRING="${SUFFIX_MODE#custom:}"
-            echo -e "  ${YELLOW}⚠️  Utilisation forcée du suffixe de sortie : ${SUFFIX_STRING}${NOCOLOR}"
+            print_warning "Utilisation forcée du suffixe de sortie : ${SUFFIX_STRING}"
             ;;
         on)
             # -S sans argument : activer le suffixe dynamique sans question
@@ -211,7 +214,7 @@ check_vmaf() {
     if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
         # Si on utilise un FFmpeg alternatif pour VMAF, afficher une info
         if [[ -n "${FFMPEG_VMAF:-}" ]] && [[ "$FFMPEG_VMAF" != "ffmpeg" ]]; then
-            echo -e "  ${CYAN}ℹ${NOCOLOR}  VMAF via FFmpeg alternatif (libvmaf détecté)"
+            print_info "VMAF via FFmpeg alternatif (libvmaf détecté)"
         fi
         # L'affichage sera groupé avec les autres options dans show_active_options
         return 0

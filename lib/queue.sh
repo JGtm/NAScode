@@ -18,26 +18,26 @@ validate_queue_file() {
     local queue_file="$1"
     
     if [[ ! -f "$queue_file" ]]; then
-        echo -e "${RED}ERREUR : Le fichier queue '$queue_file' n'existe pas.${NOCOLOR}"
+        print_error "ERREUR : Le fichier queue '$queue_file' n'existe pas."
         return 1
     fi
     
     if [[ ! -s "$queue_file" ]]; then
-        echo -e "${RED}ERREUR : Le fichier queue '$queue_file' est vide.${NOCOLOR}"
+        print_error "Le fichier queue est vide"
         return 1
     fi
     
     local file_count=$(count_null_separated "$queue_file")
     if [[ $file_count -eq 0 ]]; then
-        echo -e "${RED}ERREUR : Le fichier queue n'a pas le format attendu (fichiers séparés par null).${NOCOLOR}"
+        print_error "Format du fichier queue invalide (séparateur NUL attendu)"
         return 1
     fi
     
     local test_read=$(head -c 100 "$queue_file" | tr '\0' '\n' | head -1)
     if [[ -z "$test_read" ]] && [[ $file_count -gt 0 ]]; then
-        echo -e "  ${YELLOW}⚠️  Le fichier queue semble valide ($file_count fichiers détectés).${NOCOLOR}"
+        print_info "Le fichier queue semble valide ($file_count fichiers détectés)."
     else
-        echo -e "  ${GREEN}✅ Fichier queue validé ($file_count fichiers détectés).${NOCOLOR}"
+        print_success "Fichier queue validé : $queue_file"
     fi
     
     return 0
@@ -68,18 +68,14 @@ _normalize_source_path() {
 _validate_index_source() {
     # Si régénération forcée demandée
     if [[ "${REGENERATE_INDEX:-false}" == true ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "${YELLOW}  ⚠️  Régénération forcée de l'index demandée.${NOCOLOR}"
-        fi
+        print_warning "Régénération forcée de l'index demandée."
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
     fi
 
     # Si pas de fichier de métadonnées, on ne peut pas valider → régénérer
     if [[ ! -f "$INDEX_META" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️  Pas de métadonnées pour l'index existant, régénération...${NOCOLOR}"
-        fi
+        print_warning "Pas de métadonnées pour l'index existant, régénération..."
         rm -f "$INDEX" "$INDEX_READABLE"
         return 1
     fi
@@ -89,9 +85,7 @@ _validate_index_source() {
     stored_source=$(grep '^SOURCE=' "$INDEX_META" 2>/dev/null | cut -d'=' -f2-)
     
     if [[ -z "$stored_source" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️  Source non trouvée dans les métadonnées, régénération...${NOCOLOR}"
-        fi
+        print_warning "Source non trouvée dans les métadonnées, régénération..."
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
     fi
@@ -101,8 +95,10 @@ _validate_index_source() {
     local stored_source_normalized=$(_normalize_source_path "$stored_source")
     
     if [[ "$current_source_normalized" != "$stored_source_normalized" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️  La source a changé :${NOCOLOR}"
+        if [[ "${UI_QUIET:-false}" == true ]]; then
+            print_warning "La source a changé, régénération automatique de l'index."
+        else
+            print_warning "La source a changé :"
             echo -e "  ${YELLOW}    Index créé pour : $stored_source${NOCOLOR}"
             echo -e "  ${YELLOW}    Source actuelle : $SOURCE${NOCOLOR}"
             echo -e "  ${YELLOW}    Régénération automatique de l'index...${NOCOLOR}"
@@ -133,7 +129,7 @@ _handle_custom_queue() {
     if [[ -n "$CUSTOM_QUEUE" ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
             echo ""
-            echo -e "${CYAN}📄 Utilisation du fichier queue personnalisé : $CUSTOM_QUEUE${NOCOLOR}"
+                print_info "Utilisation du fichier queue personnalisé : $CUSTOM_QUEUE"
         fi
         
         if ! validate_queue_file "$CUSTOM_QUEUE"; then
@@ -169,9 +165,7 @@ _handle_existing_index() {
     
     # Vérifier que l'index n'est pas vide
     if ! [[ -s "$INDEX" ]]; then 
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${YELLOW}⚠️  Index vide, régénération nécessaire...${NOCOLOR}"
-        fi
+        print_warning "Index vide, régénération nécessaire..."
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
     fi
@@ -363,7 +357,7 @@ _apply_queue_limitations() {
     
     # Stocker les informations de limitation pour affichage groupé
     if [[ "$RANDOM_MODE" == true ]]; then
-        _LIMIT_MESSAGE="Sélection aléatoire de $limit_count fichier(s) maximum"
+        _LIMIT_MESSAGE="Sélection de $limit_count fichier(s) maximum"
         _LIMIT_MODE="random"
     else
         _LIMIT_MESSAGE="$limit_count fichier(s) maximum"
@@ -399,9 +393,10 @@ _display_random_mode_selection() {
     if [[ "$RANDOM_MODE" != true ]] || [[ "$NO_PROGRESS" == true ]]; then
         return 0
     fi
-    
-    echo -e "\n${CYAN}📋 Fichiers sélectionnés aléatoirement : ${NOCOLOR}"
-    tr '\0' '\n' < "$QUEUE" | nl -w2 -s'. '
+
+    echo -e "\n  ${CYAN}📋 Fichiers sélectionnés aléatoirement${NOCOLOR}"
+    echo -e "  ${DIM}─────────────────────────────────────────────${NOCOLOR}"
+    tr '\0' '\n' < "$QUEUE" | sed 's|.*/||' | nl -w2 -s'. ' | sed 's/^/  /'
     echo ""
 }
 
@@ -596,6 +591,11 @@ _show_active_options() {
     # Option Codec Audio (si différent de copy)
     if [[ "${AUDIO_CODEC:-copy}" != "copy" ]]; then
         options+=("$(format_option_audio)")
+    fi
+
+    # Option Mode aléatoire
+    if [[ "${RANDOM_MODE:-false}" == true ]]; then
+        options+=("$(format_option_random_mode)")
     fi
     
     # Option Limitation

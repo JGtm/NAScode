@@ -209,7 +209,7 @@ _finalize_conversion_success() {
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
         # Avertir si un fichier converti risque d'être perdu
         if [[ -f "$tmp_output" ]]; then
-            echo -e "  ${YELLOW}⚠️  Conversion interrompue, fichier temporaire conservé: $tmp_output${NOCOLOR}" >&2
+            print_warning "Conversion interrompue, fichier temporaire conservé: $tmp_output"
             # Log pour récupération manuelle si besoin
             if [[ -n "$LOG_SESSION" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | INTERRUPTED | $file_original -> $tmp_output (fichier temp conservé)" >> "$LOG_SESSION" 2>/dev/null || true
@@ -262,12 +262,12 @@ _finalize_conversion_success() {
             size_part=" | ${before_fmt} → ${after_fmt}"
         fi
 
-        echo -e "  ${GREEN}✅ Conversion terminée en ${elapsed_display}${size_part}${NOCOLOR}"
+        print_success "Conversion terminée en ${elapsed_display}${size_part}"
     fi
 
     # Vérifier que le fichier de sortie temporaire existe
     if [[ ! -f "$tmp_output" ]]; then
-        echo -e "  ${RED}❌ ERREUR: Fichier temporaire introuvable après encodage: $tmp_output${NOCOLOR}" >&2
+        print_error "ERREUR: Fichier temporaire introuvable après encodage: $tmp_output"
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output (fichier temp absent)" >> "$LOG_SESSION" 2>/dev/null || true
         fi
@@ -315,9 +315,7 @@ _finalize_conversion_error() {
     local ffmpeg_log_temp="$5"
     
     if [[ ! -f "$STOP_FLAG" ]]; then
-        if [[ "$NO_PROGRESS" != true ]]; then
-            echo -e "  ${RED}❌ Échec de la conversion : $filename${NOCOLOR}"
-        fi
+        print_error "Échec de la conversion : $filename"
     fi
     if [[ -n "$LOG_SESSION" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_SESSION" 2>/dev/null || true

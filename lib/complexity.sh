@@ -131,6 +131,9 @@ analyze_video_complexity() {
     local file="$1"
     local duration="$2"
     local show_progress="${3:-false}"
+
+    # Label utilisé par la progression (utile quand plusieurs jobs s'entrelacent)
+    ANALYSIS_PROGRESS_LABEL=$(basename "$file")
     
     # Validation des entrées
     if [[ -z "$file" ]] || [[ ! -f "$file" ]]; then
@@ -146,6 +149,18 @@ analyze_video_complexity() {
     # Convertir la durée en entier pour les calculs (LC_NUMERIC pour gérer les décimales)
     local duration_int
     duration_int=$(LC_NUMERIC=C printf "%.0f" "$duration")
+
+    # Note UX: l'analyse peut s'exécuter dans un sous-shell ($( ... )).
+    # On imprime donc un titre explicite sur stderr pour éviter la confusion en parallèle.
+    if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]] && [[ "${UI_QUIET:-false}" != true ]]; then
+        local filename
+        filename=$(basename "$file")
+        local counter_prefix=""
+        if declare -f _get_counter_prefix &>/dev/null; then
+            counter_prefix=$(_get_counter_prefix)
+        fi
+        echo -e "${counter_prefix}▶️ Analyse de complexité du fichier : ${filename}" >&2
+    fi
     
     # Minimum requis : 60 secondes pour une analyse fiable
     if [[ "$duration_int" -lt 60 ]]; then
@@ -156,6 +171,7 @@ analyze_video_complexity() {
         local all_frames
         all_frames=$(_get_frame_sizes "$file" 0 "$duration_int")
         _compute_normalized_stddev "$all_frames"
+        unset ANALYSIS_PROGRESS_LABEL
         return 0
     fi
     
@@ -206,6 +222,7 @@ analyze_video_complexity() {
     # car printf dans un sous-shell ($()) ne peut pas effacer correctement
     
     _compute_normalized_stddev "$all_frames"
+    unset ANALYSIS_PROGRESS_LABEL
 }
 
 # Affiche une barre de progression pour l'analyse de complexité
@@ -214,6 +231,22 @@ _show_analysis_progress() {
     local current="$1"
     local total="$2"
     local percent=$((current * 100 / total))
+
+    local status_label
+    if [[ "$percent" -ge 100 ]]; then
+        status_label="⚡ Calcul terminé"
+    else
+        status_label="⚡ Calcul en cours"
+    fi
+
+    local left
+    # Aligner avec la progression FFmpeg : champ fixe 25 caractères avant la barre.
+    printf -v left "  %-25.25s" "$status_label"
+
+        # Aligner avec la progression FFmpeg :
+        # "  <emoji> <label sur 25 chars> <bar> ..."
+        local emoji="⚡"
+        local label_text="${status_label#${emoji} }"
     
     # Construire la barre de progression (20 caractères)
     local bar_width=20
@@ -226,9 +259,9 @@ _show_analysis_progress() {
     # Afficher sur stderr pour ne pas polluer la sortie
     if [[ "$percent" -ge 100 ]]; then
         # Terminé : afficher avec ✓ et nouvelle ligne pour garder visible
-        printf "\r\033[K  ✓ Analyse de complexité %s 100%%\n" "$bar" >&2
+           printf "\r\033[K  %s %-25.25s %s 100%%\n" "$emoji" "$label_text" "$bar" >&2
     else
-        printf "\r\033[K  📊 Analyse de complexité %s %3d%%" "$bar" "$percent" >&2
+           printf "\r\033[K  %s %-25.25s %s %3d%%" "$emoji" "$label_text" "$bar" "$percent" >&2
     fi
 }
 
@@ -400,14 +433,16 @@ display_complexity_analysis() {
     local stddev="$4"
     local target_kbps="$5"
     
-    if [[ "${NO_PROGRESS:-false}" == true ]]; then
+    # --no-progress ne doit pas cacher les infos (seulement les barres de progression).
+    # --quiet (UI_QUIET) doit rester silencieux.
+    if [[ "${UI_QUIET:-false}" == true ]]; then
         return 0
     fi
     
     local filename
     filename=$(basename "$file")
-    
-    echo -e "${CYAN}  📊 Analyse de complexité :${NOCOLOR}"
+
+    echo -e "  📊 Analyse de complexité (${filename}) :"
     echo -e "${DIM}     └─ Coefficient de variation : ${stddev}${NOCOLOR}"
     echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
     echo -e "${DIM}     └─ Bitrate adaptatif : ${target_kbps} kbps${NOCOLOR}"

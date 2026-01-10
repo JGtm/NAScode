@@ -200,6 +200,14 @@ Pour les petits changements (typo, ajustement local, test manquant évident) : p
 - **Documentation** : Si une option CLI, un mode, un suffixe, ou une convention de log change : mettre à jour `README.md`.
 - **Robustesse** : Ne pas “corriger” les tests en les affaiblissant : préférer rendre le code plus déterministe/robuste.
 
+## ⛔ RÈGLE OBLIGATOIRE AVANT MERGE : Mettre à jour le DEVBOOK
+
+Avant tout merge (ou avant de demander une review pour merge), **mettre à jour obligatoirement** `.ai/DEVBOOK.md`.
+
+- Objectif : conserver une mémoire durable des décisions et changements qui impactent UX/CLI/tests/archi.
+- Contenu attendu : *quoi*, *où* (fichiers), *pourquoi*, et *impact* (tests/doc/risques).
+- Cette étape est requise même si les changements semblent “mineurs” dès lors qu’ils modifient le comportement, les logs, ou l’UX.
+
 ## Règle après merge avec `main`
 
 Après chaque merge (ou rebase) depuis `main`, faire systématiquement une passe de cohérence :

@@ -23,6 +23,7 @@ Cette règle est **non négociable**. Ne jamais modifier directement `main`.
 - Si changement non-trivial : proposer un plan + analyse + options **avant** d’exécuter.
 - Si une fonction/comportement change : mettre à jour les tests Bats (`tests/*.bats`).
 - Si CLI/logs/suffixes/comportement utilisateur change : mettre à jour le README.
+- **Avant chaque merge** : mettre à jour obligatoirement `.ai/DEVBOOK.md`.
 - Après merge/rebase depuis `main` : relire/mettre à jour le README + relancer `bash run_tests.sh`.
 - Commits : explicites, un sujet par commit, corps « un point par ligne ».
 

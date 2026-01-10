@@ -43,7 +43,7 @@ cleanup() {
     # Note: On utilise une variable pour détecter les signaux plutôt que le code de sortie
     if [[ "${_INTERRUPTED:-}" == "1" ]] && [[ ! -f "$STOP_FLAG" ]]; then
         echo ""
-        echo -e "\n${YELLOW}⚠️ Interruption détectée, arrêt en cours...${NOCOLOR}"
+        print_warning "Interruption détectée, arrêt en cours..."
     fi
     
     # IMPORTANT: Ne créer le STOP_FLAG que lors d'une vraie interruption (Ctrl+C, kill, etc.)
@@ -117,10 +117,10 @@ check_lock() {
         pid=$(cat "$LOCKFILE")
         
         if ps -p "$pid" > /dev/null 2>&1; then
-            echo -e "${RED}⛔ Le script est déjà en cours d'exécution (PID $pid).${NOCOLOR}"
+            print_error "Le script est déjà en cours d'exécution (PID $pid)."
             exit 1
         else
-            echo -e "${YELLOW}⚠️ Fichier lock trouvé mais processus absent. Nettoyage...${NOCOLOR}"
+            print_warning "Fichier lock trouvé mais processus absent. Nettoyage..."
             rm -f "$LOCKFILE"
         fi
     fi

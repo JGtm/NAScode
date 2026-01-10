@@ -40,9 +40,14 @@ readonly BOX_QUESTION="?"
 # FONCTIONS D'AFFICHAGE STYLISÉ
 ###########################################################
 
+_ui_is_quiet() {
+    [[ "${UI_QUIET:-false}" == true ]]
+}
+
 # Affiche un séparateur horizontal stylé
 # Usage: print_separator [largeur] [couleur]
 print_separator() {
+    _ui_is_quiet && return 0
     local width="${1:-50}"
     local color="${2:-$DIM}"
     local line=""
@@ -55,6 +60,7 @@ print_separator() {
 # Affiche un titre encadré
 # Usage: print_header "Titre" [couleur]
 print_header() {
+    _ui_is_quiet && return 0
     local title="$1"
     local color="${2:-$CYAN}"
     local padding=2
@@ -84,23 +90,42 @@ print_header() {
 # Affiche une section avec titre
 # Usage: print_section "Titre de section"
 print_section() {
+    _ui_is_quiet && return 0
     local title="$1"
     echo ""
-    echo -e "${BLUE}${BOX_ARROW} ${WHITE}${title}${NOCOLOR}"
-    print_separator 45 "$DIM"
+
+    # Indentation cohérente avec print_item/print_success/print_warning
+    echo -e "  ${BLUE}${BOX_ARROW} ${WHITE}${title}${NOCOLOR}"
+
+    local width=45
+    local line=""
+    for ((i=0; i<width; i++)); do
+        line+="$BOX_H"
+    done
+    echo -e "  ${DIM}${line}${NOCOLOR}"
 }
 
 # Affiche un message d'information stylé
 # Usage: print_info "Message"
 print_info() {
+    _ui_is_quiet && return 0
     local message="$1"
     echo -e "  ${CYAN}${BOX_INFO}${NOCOLOR}  ${message}"
     echo ""
 }
 
+# Affiche un message d'information stylé (version compacte, sans saut de ligne)
+# Usage: print_info_compact "Message"
+print_info_compact() {
+    _ui_is_quiet && return 0
+    local message="$1"
+    echo -e "  ${CYAN}${BOX_INFO}${NOCOLOR}  ${message}"
+}
+
 # Affiche un message de succès stylé
 # Usage: print_success "Message"
 print_success() {
+    _ui_is_quiet && return 0
     local message="$1"
     echo -e "  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}${message}${NOCOLOR}"
 }
@@ -122,6 +147,7 @@ print_error() {
 # Affiche un élément de liste
 # Usage: print_item "Label" "Valeur" [couleur_valeur]
 print_item() {
+    _ui_is_quiet && return 0
     local label="$1"
     local value="$2"
     local value_color="${3:-$WHITE}"
@@ -172,6 +198,7 @@ print_warning_box() {
 # Affiche un encadré d'information
 # Usage: print_info_box "Titre" "Message"
 print_info_box() {
+    _ui_is_quiet && return 0
     local title="$1"
     local message="$2"
     
@@ -185,6 +212,7 @@ print_info_box() {
 # Affiche une boîte de succès
 # Usage: print_success_box "Message"
 print_success_box() {
+    _ui_is_quiet && return 0
     local message="$1"
     echo -e "${GREEN}  ╭${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}╮${NOCOLOR}"
     echo -e "${GREEN}  │ ${BOX_CHECK} ${GREEN}${message}${NOCOLOR}"
@@ -194,6 +222,7 @@ print_success_box() {
 # Affiche un en-tête de transfert/téléchargement
 # Usage: print_transfer_item "Nom du fichier"
 print_transfer_item() {
+    _ui_is_quiet && return 0
     local filename="$1"
     echo -e "${CYAN}  ┌─ 📥 ${WHITE}Téléchargement vers dossier temporaire${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
@@ -202,12 +231,14 @@ print_transfer_item() {
 # Ferme l'encadré de transfert (après la barre de progression)
 # Usage: print_transfer_item_end
 print_transfer_item_end() {
+    _ui_is_quiet && return 0
     echo -e "${CYAN}  └───────────────────────────────────────${NOCOLOR}"
 }
 
 # Affiche un spinner de chargement (pour les attentes)
 # Usage: print_status "En cours..." [couleur]
 print_status() {
+    _ui_is_quiet && return 0
     local message="$1"
     local color="${2:-$CYAN}"
     echo -e "  ${color}◐${NOCOLOR} ${message}"
@@ -216,6 +247,7 @@ print_status() {
 # Affiche un état vide (rien à traiter)
 # Usage: print_empty_state "Message"
 print_empty_state() {
+    _ui_is_quiet && return 0
     local message="$1"
     echo ""
     echo -e "${DIM}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
@@ -231,6 +263,7 @@ print_empty_state() {
 # Affiche l'en-tête du bloc d'indexation
 # Usage: print_indexing_start
 print_indexing_start() {
+    _ui_is_quiet && return 0
     echo ""
     echo -e "${MAGENTA}  ┌──────────────────────────────────────────────────┐${NOCOLOR}"
 }
@@ -239,6 +272,7 @@ print_indexing_start() {
 # Usage: print_indexing_progress <current> <total>
 # Largeur interne : 50 caractères (supporte jusqu'à 9999/9999 fichiers)
 print_indexing_progress() {
+    _ui_is_quiet && return 0
     local current="$1"
     local total="$2"
     # Format : "  │  📊 Indexation : 9999/9999 fichiers             │"
@@ -248,6 +282,7 @@ print_indexing_progress() {
 # Affiche la fin du bloc d'indexation avec le résultat
 # Usage: print_indexing_end <count>
 print_indexing_end() {
+    _ui_is_quiet && return 0
     local count="$1"
     echo "" >&2
     echo -e "${MAGENTA}  ├──────────────────────────────────────────────────┤${NOCOLOR}" >&2
@@ -259,6 +294,7 @@ print_indexing_end() {
 # Affiche un cadre quand l'index existant est conservé
 # Usage: print_index_kept <message>
 print_index_kept() {
+    _ui_is_quiet && return 0
     local message="$1"
     # Compenser les caractères UTF-8 multi-octets (accentués)
     # strlen compte les octets, wc -m compte les caractères visuels
@@ -280,6 +316,7 @@ print_index_kept() {
 # Affiche l'en-tête du résumé de conversion
 # Usage: print_summary_header
 print_summary_header() {
+    _ui_is_quiet && return 0
     echo ""
     echo -e "${GREEN}  ╔═══════════════════════════════════════════╗${NOCOLOR}"
     echo -e "${GREEN}  ║                                           ║${NOCOLOR}"
@@ -291,6 +328,7 @@ print_summary_header() {
 # Affiche une ligne du résumé
 # Usage: print_summary_item "Label" "Valeur" [couleur_valeur]
 print_summary_item() {
+    _ui_is_quiet && return 0
     local label="$1"
     local value="$2"
     local color="${3:-$WHITE}"
@@ -318,6 +356,7 @@ print_summary_item() {
 # Affiche une valeur seule (sans label) alignée à droite dans le résumé
 # Usage: print_summary_value_only "Valeur" [couleur_valeur]
 print_summary_value_only() {
+    _ui_is_quiet && return 0
     local value="$1"
     local color="${2:-$WHITE}"
     # Largeur intérieure totale = 43 colonnes, valeur alignée à droite avec 2 espaces de marge
@@ -371,6 +410,7 @@ print_summary_footer() {
 # Affiche le démarrage d'une phase de traitement
 # Usage: print_phase_start "🎬 CONVERSION" "5 fichiers" [couleur]
 print_phase_start() {
+    _ui_is_quiet && return 0
     local title="$1"
     local subtitle="$2"
     local color="${3:-$CYAN}"
@@ -388,6 +428,7 @@ print_phase_start() {
 # Affiche un groupe d'options actives dans un encadré
 # Usage: print_active_options "option1" "option2" ...
 print_active_options() {
+    _ui_is_quiet && return 0
     local options=("$@")
     local count=${#options[@]}
     
@@ -419,6 +460,12 @@ format_option_limit() {
     fi
     
     echo -e "${icon}  ${YELLOW}LIMITATION${NOCOLOR} : ${message}"
+}
+
+# Formate une option mode aléatoire pour print_active_options
+# Usage: format_option_random_mode
+format_option_random_mode() {
+    echo -e "🎲  Mode aléatoire : ${YELLOW}activé${NOCOLOR}"
 }
 
 # Formate une option mode échantillon pour print_active_options
@@ -496,6 +543,7 @@ format_option_file_count() {
 # Affiche une limitation active (fonction legacy, utilisée si pas de regroupement)
 # Usage: print_limitation "Traitement de 5 fichiers maximum" [mode]
 print_limitation() {
+    _ui_is_quiet && return 0
     local message="$1"
     local mode="${2:-normal}"  # normal ou random
     local icon="🔒"
@@ -522,6 +570,7 @@ print_transfer_start() {
 # Affiche la fin de la section transfert
 # Usage: print_transfer_complete
 print_transfer_complete() {
+    _ui_is_quiet && return 0
     echo ""
     echo -e "${CYAN}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
     echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Tous les transferts terminés${NOCOLOR}${CYAN}        ┃${NOCOLOR}"
@@ -538,6 +587,7 @@ print_vmaf_start() {
 # Affiche la fin de la section VMAF
 # Usage: print_vmaf_complete
 print_vmaf_complete() {
+    _ui_is_quiet && return 0
     echo ""
     echo -e "${YELLOW}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
     echo -e "${YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Analyses VMAF terminées${NOCOLOR}${YELLOW}             ┃${NOCOLOR}"
@@ -560,6 +610,7 @@ print_conversion_start() {
 # Affiche la fin de la section conversion
 # Usage: print_conversion_complete
 print_conversion_complete() {
+    _ui_is_quiet && return 0
     echo ""
     echo -e "${BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
     echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Toutes les conversions terminées${NOCOLOR}${BLUE}    ┃${NOCOLOR}"

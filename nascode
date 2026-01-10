@@ -190,8 +190,8 @@ main() {
 
     # Afficher le résumé final
     if [[ "$DRYRUN" == true ]]; then
-        echo -e "${GREEN}Dry run terminé${NOCOLOR}"
         dry_run_compare_names
+        print_header "🧪 Dry run terminé" "$GREEN"
     else
         show_summary
     fi
