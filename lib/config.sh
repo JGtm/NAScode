@@ -138,12 +138,21 @@ HWACCEL=""
 # changent pas le mode global (film/serie) affiché dans le résumé.
 readonly ADAPTIVE_BITRATE_BY_RESOLUTION=true
 
-# Profil 720p (déclenché si la hauteur de sortie estimée <= 720)
+# Profil 720p (déclenché si la hauteur de sortie estimée <= 720 et > 480)
 readonly ADAPTIVE_720P_MAX_HEIGHT=720
 
 # Facteur appliqué aux bitrates base (TARGET/MAXRATE/BUFSIZE) quand profil 720p.
 # Exemple : 70 => 2070k (1080p) devient ~1449k (720p)
 readonly ADAPTIVE_720P_SCALE_PERCENT=70
+
+# Profil 480p/SD (déclenché si la hauteur de sortie estimée <= 480)
+# Pour les contenus SD, le bitrate est encore plus réduit car moins de pixels.
+readonly ADAPTIVE_480P_MAX_HEIGHT=480
+
+# Facteur appliqué aux bitrates base quand profil 480p.
+# Exemple : 50 => 2070k (1080p) devient ~1035k (480p)
+# Note : HEVC est très efficace en SD, 50% suffit largement pour une qualité équivalente.
+readonly ADAPTIVE_480P_SCALE_PERCENT=50
 
 # ----- Paramètres audio par codec -----
 # Bitrates cibles (kbps) pour chaque codec audio

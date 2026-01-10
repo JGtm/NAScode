@@ -119,6 +119,19 @@ _compute_effective_bitrate_kbps_for_height() {
         return 0
     fi
 
+    # Profil 480p/SD : réduction plus agressive pour contenus basse résolution
+    if [[ "$output_height" -le "${ADAPTIVE_480P_MAX_HEIGHT:-480}" ]]; then
+        local scale_percent="${ADAPTIVE_480P_SCALE_PERCENT:-50}"
+        if [[ -z "$scale_percent" ]] || ! [[ "$scale_percent" =~ ^[0-9]+$ ]] || [[ "$scale_percent" -le 0 ]]; then
+            echo "$base_kbps"
+            return 0
+        fi
+        # Arrondi au plus proche
+        echo $(( (base_kbps * scale_percent + 50) / 100 ))
+        return 0
+    fi
+
+    # Profil 720p : réduction modérée
     if [[ "$output_height" -le "${ADAPTIVE_720P_MAX_HEIGHT}" ]]; then
         local scale_percent="${ADAPTIVE_720P_SCALE_PERCENT}"
         if [[ -z "$scale_percent" ]] || ! [[ "$scale_percent" =~ ^[0-9]+$ ]] || [[ "$scale_percent" -le 0 ]]; then
