@@ -32,6 +32,9 @@ load_base_modules() {
     # Charger les couleurs (désactivées pour les tests)
     source "$LIB_DIR/ui.sh"
     
+    # Charger les options UI (format_option_*, print_active_options)
+    source "$LIB_DIR/ui_options.sh"
+    
     # Charger la détection système
     source "$LIB_DIR/detect.sh"
     
@@ -62,6 +65,7 @@ load_base_modules() {
 load_base_modules_fast() {
     export SCRIPT_DIR="$PROJECT_ROOT"
     source "$LIB_DIR/ui.sh"
+    source "$LIB_DIR/ui_options.sh"
     # Mock des variables de détection (évite les appels système lents)
     export HAS_MD5SUM=1 HAS_MD5=0 HAS_PYTHON3=1 HAS_DATE_NANO=1 HAS_PERL_HIRES=0
     export HAS_GAWK=1 HAS_SHA256SUM=1 HAS_SHASUM=0 HAS_OPENSSL=1
@@ -82,6 +86,7 @@ load_base_modules_fast() {
 load_minimal() {
     export SCRIPT_DIR="$PROJECT_ROOT"
     source "$LIB_DIR/ui.sh"
+    source "$LIB_DIR/ui_options.sh"
     source "$LIB_DIR/detect.sh"
     source "$LIB_DIR/config.sh"
     source "$LIB_DIR/codec_profiles.sh"
@@ -92,6 +97,7 @@ load_minimal() {
 load_minimal_fast() {
     export SCRIPT_DIR="$PROJECT_ROOT"
     source "$LIB_DIR/ui.sh"
+    source "$LIB_DIR/ui_options.sh"
     # Mock des variables de détection (évite les appels système lents)
     export HAS_MD5SUM=1
     export HAS_MD5=0

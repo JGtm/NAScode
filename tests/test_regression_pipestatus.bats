@@ -69,17 +69,18 @@ teardown() {
 @test "regression: PIPESTATUS capturé avant rm dans _execute_conversion" {
     # Test complémentaire: vérifier que la ligne "local ffmpeg_rc=\${PIPESTATUS"
     # apparaît dans _run_ffmpeg_encode et que rm -f est après dans _execute_conversion
+    # Note: _execute_conversion est maintenant dans lib/ffmpeg_pipeline.sh
     
-    local transcode_file="$LIB_DIR/transcode_video.sh"
+    local pipeline_file="$LIB_DIR/ffmpeg_pipeline.sh"
     
     # Vérifier que PIPESTATUS est capturé dans _run_ffmpeg_encode
     # La fonction unifiée capture PIPESTATUS juste après le pipeline ffmpeg
     local pipestatus_in_encode
-    pipestatus_in_encode=$(grep -n "ffmpeg_rc=.*PIPESTATUS" "$transcode_file" | head -1 | cut -d: -f1)
+    pipestatus_in_encode=$(grep -n "ffmpeg_rc=.*PIPESTATUS" "$pipeline_file" | head -1 | cut -d: -f1)
     
     # Vérifier que rm -f x265_2pass est dans _execute_conversion (après l'appel)
     local rm_line
-    rm_line=$(grep -n 'rm -f "x265_2pass.log"' "$transcode_file" | head -1 | cut -d: -f1)
+    rm_line=$(grep -n 'rm -f "x265_2pass.log"' "$pipeline_file" | head -1 | cut -d: -f1)
     
     # Les deux patterns doivent exister
     [ -n "$pipestatus_in_encode" ]
@@ -90,12 +91,13 @@ teardown() {
     [ "$pipestatus_in_encode" -lt "$rm_line" ]
 }
 
-@test "regression: pattern PIPESTATUS immédiat présent dans transcode_video.sh" {
+@test "regression: pattern PIPESTATUS immédiat présent dans ffmpeg_pipeline.sh" {
     # Vérifie que le commentaire de documentation est présent
     # pour rappeler pourquoi PIPESTATUS doit être capturé immédiatement
+    # Note: ce code est maintenant dans lib/ffmpeg_pipeline.sh
     
-    local transcode_file="$LIB_DIR/transcode_video.sh"
+    local pipeline_file="$LIB_DIR/ffmpeg_pipeline.sh"
     
-    grep -q "CRITIQUE.*PIPESTATUS.*immédiatement" "$transcode_file" || \
-    grep -q "capturer PIPESTATUS immédiatement" "$transcode_file"
+    grep -q "CRITIQUE.*PIPESTATUS.*immédiatement" "$pipeline_file" || \
+    grep -q "capturer PIPESTATUS immédiatement" "$pipeline_file"
 }

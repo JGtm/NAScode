@@ -15,6 +15,8 @@ setup() {
         source "$LIB_DIR/ui.sh"
         source "$LIB_DIR/config.sh"
         source "$LIB_DIR/utils.sh"
+        source "$LIB_DIR/index.sh"
+        source "$LIB_DIR/counters.sh"
         source "$LIB_DIR/queue.sh"
         _QUEUE_TEST_LOADED=1
     fi

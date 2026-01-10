@@ -382,13 +382,14 @@ teardown() {
     # Ce test vérifie que _setup_sample_mode_params est appelée AVANT le case
     # dans _execute_ffmpeg_pipeline, ce qui est nécessaire pour que
     # SAMPLE_KEYFRAME_POS soit défini et transmis à la queue VMAF.
+    # Note: _execute_ffmpeg_pipeline est maintenant dans lib/ffmpeg_pipeline.sh
     
-    local transcode_file="$LIB_DIR/transcode_video.sh"
+    local pipeline_file="$LIB_DIR/ffmpeg_pipeline.sh"
     
     # Extraire uniquement la fonction _execute_ffmpeg_pipeline
     # et vérifier que _setup_sample_mode_params est appelée avant le case
     local func_content
-    func_content=$(sed -n '/^_execute_ffmpeg_pipeline()/,/^[^ ]/p' "$transcode_file" | head -n -1)
+    func_content=$(sed -n '/^_execute_ffmpeg_pipeline()/,/^[^ ]/p' "$pipeline_file" | head -n -1)
     
     # Vérifier que _setup_sample_mode_params est présent
     echo "$func_content" | grep -q "_setup_sample_mode_params"
@@ -405,12 +406,13 @@ teardown() {
 
 @test "regression: mode passthrough utilise SAMPLE_SEEK_PARAMS" {
     # Vérifier que la commande FFmpeg passthrough inclut les paramètres sample
-    local transcode_file="$LIB_DIR/transcode_video.sh"
+    # Note: ce code est maintenant dans lib/ffmpeg_pipeline.sh
+    local pipeline_file="$LIB_DIR/ffmpeg_pipeline.sh"
     
     # Extraire le bloc passthrough et vérifier qu'il contient SAMPLE_SEEK_PARAMS
     # On cherche entre "passthrough)" et le prochain ";;"
     local passthrough_block
-    passthrough_block=$(sed -n '/\"passthrough\")/,/;;/p' "$transcode_file")
+    passthrough_block=$(sed -n '/\"passthrough\")/,/;;/p' "$pipeline_file")
     
     echo "$passthrough_block" | grep -q 'SAMPLE_SEEK_PARAMS'
     echo "$passthrough_block" | grep -q 'SAMPLE_DURATION_PARAMS'

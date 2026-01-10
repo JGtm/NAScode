@@ -38,7 +38,8 @@ setup() {
     # Stubs pour éviter des dépendances
     process_vmaf_queue() { :; }
 
-    # Charger le module testé
+    # Charger les modules testés
+    source "$LIB_DIR/summary.sh"
     source "$LIB_DIR/finalize.sh"
 }
 

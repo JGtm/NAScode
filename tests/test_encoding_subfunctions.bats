@@ -9,6 +9,7 @@ load 'test_helper'
 setup() {
     setup_test_env
     load_base_modules
+    source "$LIB_DIR/ffmpeg_pipeline.sh"
     source "$LIB_DIR/transcode_video.sh"
     
     # Initialiser le mode conversion (définit TARGET_BITRATE_KBPS, etc.)

@@ -11,6 +11,7 @@ setup() {
     if [[ -z "${_AUDIO_TEST_LOADED:-}" ]]; then
         export SCRIPT_DIR="$PROJECT_ROOT"
         source "$LIB_DIR/ui.sh"
+        source "$LIB_DIR/ui_options.sh"
         # Mock detect.sh variables (faster)
         export HAS_MD5SUM=1 HAS_MD5=0 HAS_PYTHON3=1 HAS_DATE_NANO=1 HAS_PERL_HIRES=0
         export HAS_GAWK=1 HAS_SHA256SUM=1 HAS_SHASUM=0 HAS_OPENSSL=1
