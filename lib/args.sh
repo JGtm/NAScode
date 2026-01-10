@@ -150,7 +150,7 @@ parse_arguments() {
                             VIDEO_CODEC="$2"
                             ;;
                         *)
-                            print_error "Codec invalide : '$2'. Valeurs acceptées : hevc, av1"
+                            print_error "Codec invalide : '$2'. Valeurs acceptées : hevc, av1, ..."
                             exit 1
                             ;;
                     esac
