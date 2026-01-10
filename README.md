@@ -44,6 +44,7 @@ Defaults importants (issus de la config) :
 - Supporte un mode **video passthrough** (vidéo copiée, audio optimisé si pertinent).
 - Ajoute un **suffixe** (dynamique ou personnalisé) pour refléter les paramètres.
 - Optionnel : **VMAF** et **sample** pour tester rapidement.
+- Limitation : les vidéos **en mode portrait** (vertical / rotation metadata) ne sont pas prises en charge de manière effective ; la logique d’estimation résolution/bitrate est principalement conçue pour des sources “paysage”, et peut produire des paramètres peu adaptés.
 
 ## 🎯 Matrices de décision (smart codec)
 
