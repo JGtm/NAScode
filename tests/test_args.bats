@@ -30,6 +30,7 @@ _reset_cli_state() {
     SAMPLE_MODE=false
     SINGLE_PASS_MODE=true
     NO_PROGRESS=false
+    UI_QUIET=false
     PARALLEL_JOBS=1
     CONVERSION_MODE="serie"
     VIDEO_CODEC="hevc"
@@ -162,6 +163,13 @@ _reset_cli_state() {
     # Test 4: -n active NO_PROGRESS
     _reset_cli_state
     parse_arguments --no-progress
+    [ "$NO_PROGRESS" = "true" ]
+    [ "$UI_QUIET" = "false" ]
+
+    # Test 4b: --quiet active UI_QUIET + NO_PROGRESS
+    _reset_cli_state
+    parse_arguments --quiet
+    [ "$UI_QUIET" = "true" ]
     [ "$NO_PROGRESS" = "true" ]
     
     # Test 5: -v active VMAF_ENABLED
@@ -368,17 +376,17 @@ _reset_cli_state() {
     # Test 1: --min-size invalide
     run parse_arguments --min-size 10Z
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "min-size" ]] || [[ "$output" =~ "Taille" ]]
+    [[ "$output" == *"--min-size"* ]]
     
     # Test 2: codec invalide
     run parse_arguments --codec xyz
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "invalide" ]] || [[ "$output" =~ "Invalid" ]]
+    [[ "$output" == *"xyz"* ]]
     
     # Test 3: -f avec fichier inexistant
     run parse_arguments -f "/chemin/inexistant/video.mkv"
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "introuvable" ]]
+    [[ "$output" == *"/chemin/inexistant/video.mkv"* ]]
 }
 
 @test "parse_arguments: --help affiche l'aide et sort 0" {
@@ -401,27 +409,27 @@ _reset_cli_state() {
     # Test 3: --queue inexistant
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --queue "/nonexistent/file.queue"'
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "introuvable" ]]
+    [[ "$output" == *"/nonexistent/file.queue"* ]]
     
     # Test 4: option inconnue
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --definitivement-pas-une-option'
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "Option" ]]
+    [[ "$output" == *"--definitivement-pas-une-option"* ]]
     
     # Test 5: argument positionnel inattendu
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments -d l 3'
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "Argument inattendu" ]]
+    [[ "$output" == *": l"* ]]
 
     # Test 6: option nécessitant une valeur (source)
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --source'
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "source" ]] || [[ "$output" =~ "valeur" ]]
+    [[ "$output" == *"--source"* ]]
 
     # Test 7: option nécessitant une valeur (output-dir)
     run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/args.sh; parse_arguments --output-dir'
     [ "$status" -ne 0 ]
-    [[ "$output" =~ "output" ]] || [[ "$output" =~ "valeur" ]]
+    [[ "$output" == *"--output-dir"* ]]
 }
 
 @test "parse_arguments: off-peak invalide (sous-shell)" {

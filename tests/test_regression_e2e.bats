@@ -77,8 +77,8 @@ teardown() {
         fi
     fi
     
-    # Ou dans la sortie standard
-    if [[ "$output" =~ "corrupted" ]] || [[ "$output" =~ "skip" ]] || [[ "$output" =~ "erreur" ]] || [[ "$output" =~ "Invalid" ]]; then
+    # Ou dans la sortie standard (sans dépendre du wording d'erreur)
+    if [[ "$output" == *"corrupted_video"* ]]; then
         found_in_logs=true
     fi
     

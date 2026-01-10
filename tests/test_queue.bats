@@ -67,7 +67,6 @@ teardown() {
 @test "validate_queue_file: retourne erreur si fichier n'existe pas" {
     run validate_queue_file "/nonexistent/file.queue"
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "n'existe pas" ]]
 }
 
 @test "validate_queue_file: retourne erreur si fichier vide" {
@@ -75,7 +74,6 @@ teardown() {
     
     run validate_queue_file "$TEST_QUEUE_DIR/empty.queue"
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "vide" ]]
 }
 
 @test "validate_queue_file: accepte un fichier queue valide" {
@@ -84,7 +82,6 @@ teardown() {
     
     run validate_queue_file "$TEST_QUEUE_DIR/valid.queue"
     [ "$status" -eq 0 ]
-    [[ "$output" =~ "validé" ]] || [[ "$output" =~ "valide" ]]
 }
 
 ###########################################################

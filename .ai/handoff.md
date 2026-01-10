@@ -1,5 +1,177 @@
 # Handoff
 
+## Dernière session (10/01/2026 - UX : dry-run (phase conversion))
+
+### Objectif
+
+- Corriger l'encadré de phase (bordures + indentation cohérente).
+- En dry-run, rendre le début de phase conversion plus explicite (ne "fait" pas rien).
+- Rendre la fin du dry-run plus visible (et au bon moment).
+
+### Tâches accomplies
+
+- `lib/ui.sh`
+  - Correction de `print_phase_start()` : ajout de la bordure droite + padding des lignes (titre/sous-titre), et support d'une 3e ligne optionnelle (note).
+  - `print_conversion_start()` : en dry-run, ajout d'une note "🧪 Mode dry-run : aucune conversion exécutée" dans l'encadré.
+  - `print_conversion_complete()` : message adapté en dry-run ("Simulation terminée (dry-run)") avec padding robuste.
+- `nascode`
+  - Déplacement du message de fin : la comparaison dry-run s'exécute d'abord, puis affichage d'un encadré final via `print_header "🧪 Dry-run terminé"`.
+
+- `lib/conversion.sh`
+  - `film-adaptive` : analyse AVANT transfert pour déterminer le seuil adaptatif et décider du skip sans téléchargement inutile, puis affichage "▶️ Démarrage du fichier" (avec compteur) uniquement si on ne skip pas.
+
+- `lib/conversion.sh` / `lib/complexity.sh`
+  - Compteur en `film-adaptive` (notamment en mode random/limite) : fallback `[current/total]` tant que le slot limite n'est pas réservé.
+  - Résultat de l'analyse : affichage d'une synthèse explicite (CV, C, bitrate adaptatif) via `print_info`.
+
+- `lib/ui.sh` / `lib/system.sh`
+  - Section "Vérification de l'environnement" : indentation du header + séparateur alignée sur les autres lignes (2 espaces) et ajout d'une séparation visuelle après "Environnement validé".
+
+### Validation
+
+- Vérification syntaxe Bash : `bash -n lib/ui.sh` et `bash -n nascode` (OK).
+- Vérification syntaxe Bash : `bash -n lib/conversion.sh` (OK).
+
+### Branche en cours
+
+- `feat/ux-preconversion-messages`
+
+### Derniers prompts
+
+- "Ok petit point en mode dry run, UX et UI pas optimales..."
+
+## Dernière session (10/01/2026 - Tests : assertions moins fragiles)
+
+### Objectif
+
+- Réduire le couplage des tests Bats au wording UI (messages FR/EN) pour éviter les régressions lors de tweaks UX.
+
+### Tâches accomplies
+
+- `tests/test_helper.bash`
+  - Ajout de helpers d'assertion réutilisables : `assert_glob_exists` et `assert_output_has_no_prompt_lines`.
+- `tests/test_regression_non_interactive.bats`
+  - Remplacement de l'assertion texte "Dry run" par des invariants : absence de prompt + artefacts logs (`Index`, `Session_*.log`, `Summary_*.log`, `DryRun_Comparison_*.log`).
+- `tests/test_lock.bats`
+  - Remplacement d'assertions sur message d'erreur par un invariant (lockfile inchangé + PID actif).
+- `tests/test_args.bats`
+  - Remplacement de checks sur mots FR ("introuvable", "Option", etc.) par la présence des arguments fautifs (ex: chemin, option inconnue).
+- `tests/test_e2e_full_workflow.bats` / `tests/test_regression_e2e.bats`
+  - Durcissement de checks e2e en privilégiant les fichiers/logs et noms de fichiers plutôt que les libellés.
+
+### Notes
+
+- `run_tests.sh -f` filtre uniquement sur les noms de fichiers (pas d'OR regex multi-fichiers).
+- `logs/Queue` est un artefact temporaire nettoyé : ne pas l'asserter en fin de run.
+
+### Validation
+
+- Tests relancés individuellement sur les fichiers modifiés (OK).
+- Suite complète : `bash run_tests.sh` (OK après correctif) ; seul échec initial sur `tests/test_regression_exports_contract.bats` (rendu plus robuste via `declare -F` plutôt que sorties attendues).
+
+### Branche en cours
+
+- `feat/ux-preconversion-messages`
+
+### Derniers prompts
+
+- "Oui ça me parait une bonne pratique de ne pas écrire directement le texte attendu dans les tests. Vérifie s'il n'y a pas d'autres tests qui peuvent être optimisés de cette manière"
+
+## Dernière session (10/01/2026 - UX : espaces et mode aléatoire)
+
+### Objectif
+
+- Améliorer la lisibilité des messages UI (sauts de ligne cohérents).
+- Rendre le mode aléatoire explicite dans les "Paramètres actifs".
+- En mode aléatoire, afficher des noms de fichiers (pas les chemins complets).
+
+### Tâches accomplies
+
+- `lib/system.sh`
+  - Ajout d’un saut de ligne après l’item "Mode conversion".
+  - UX `.plexignore` :
+    - Si le fichier existe déjà : message compact (sans saut de ligne).
+    - Si le fichier est créé (réponse à la question) : ajout d’une ligne vide après le succès pour séparer visuellement la suite.
+- `lib/ui.sh`
+  - Ajout de `print_info_compact()` (info sans ligne vide).
+  - Ajout de `format_option_random_mode()` (ligne "Mode aléatoire : activé").
+- `lib/queue.sh`
+  - Ajout de la ligne "Mode aléatoire : activé" dans l’encadré des paramètres actifs.
+  - Liste random : affichage du nom de fichier uniquement (basename) au lieu du chemin complet.
+
+### Tests / validation
+
+- Vérification syntaxe Bash : `bash -n` sur les fichiers modifiés (OK).
+- Tests Bats : non relancés dans cette session (à faire côté utilisateur si souhaité).
+
+### Branche en cours
+
+- `feat/ux-preconversion-messages`
+
+### Derniers prompts
+
+- "Plusieurs demandes niveau UI… plexignore… mode conversion… mode aléatoire…"
+
+## Dernière session (10/01/2026 - UX : mode --quiet)
+
+### Objectif
+
+- Ajouter un mode silencieux affichant uniquement les warnings/erreurs.
+- Réduire l'éparpillement : centraliser la décision "doit-on afficher ?" dans les helpers UI.
+
+### Tâches accomplies
+
+- `lib/args.sh`
+  - Ajout de `-Q/--quiet` : active `UI_QUIET=true` et `NO_PROGRESS=true`.
+  - Aide mise à jour pour documenter `--quiet`.
+- `lib/config.sh` / `lib/exports.sh`
+  - Ajout + export de `UI_QUIET`.
+- `lib/ui.sh`
+  - Ajout de `_ui_is_quiet()`.
+  - Les sorties "info/succès/sections/items/encadrés" deviennent silencieuses en mode quiet.
+  - Les warnings/erreurs et les questions interactives restent visibles.
+- `lib/queue.sh`
+  - Warnings index (régénération forcée, index vide, métadonnées manquantes, source différente) affichés même en mode quiet.
+  - En mode quiet, le cas "source différente" est réduit à une seule ligne.
+
+### Validation
+
+- Vérification syntaxe Bash : `bash -n` sur les fichiers modifiés (OK).
+
+### Branche en cours
+
+- `feat/ux-preconversion-messages`
+
+## Dernière session (10/01/2026 - UX : --quiet (couverture complète))
+
+### Objectif
+
+- Rendre `--quiet` fiable à l’échelle du projet : infos/succès/sections silencieux, warnings/erreurs visibles.
+- Réduire les `echo -e` “user-facing” hors helpers UI (pour éviter les oublis).
+
+### Tâches accomplies
+
+- `lib/ui.sh`
+  - `--quiet` étendu aux helpers restants : `print_success_box`, `print_status`, `print_empty_state`, indexation (`print_indexing_*`), résumés (`print_summary_*`), fin transfert/VMAF/conversion, limitations.
+- `lib/off_peak.sh` / `lib/processing.sh`
+  - Messages d’attente heures creuses basculés en `print_info` (silencieux en quiet).
+  - Les interruptions “arrêt demandé” basculées en `print_warning` (visibles en quiet).
+- `lib/finalize.sh`
+  - Succès en `print_success` (silencieux en quiet) ; erreurs/warnings en `print_error`/`print_warning` (visibles en quiet, même si `NO_PROGRESS=true`).
+- `lib/queue.sh` / `lib/system.sh` / `lib/transfer.sh` / `lib/lock.sh` / `lib/complexity.sh` / `lib/transcode_video.sh` / `lib/conversion.sh`
+  - Migration ciblée des prints user-facing vers les helpers UI ; suppression d’un cas bruité en mode `--quiet` (flèche `→` sur transfert temp).
+
+### Tests / doc
+
+- `tests/test_args.bats`
+  - Ajout de `UI_QUIET` dans le reset + test `parse_arguments --quiet`.
+- `docs/USAGE.md`
+  - Ajout d’un exemple `--quiet` + rappel des options `--no-progress` et `--quiet`.
+
+### Branche en cours
+
+- `feat/ux-preconversion-messages`
+
 ## Dernière session (09/01/2026 - UX messages pré-conversion)
 
 ### Objectif

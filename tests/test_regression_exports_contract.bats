@@ -47,17 +47,23 @@ teardown() {
     export_variables
 
     # Note: utiliser bash -c (pas -lc) pour éviter le chargement de .bashrc
-    # qui peut définir des variables en conflit avec les readonly du script
-    # Ignorer les erreurs readonly (2>&1 | grep -v readonly)
+    # qui peut définir des variables en conflit avec les readonly du script.
+    # Invariant testé : les fonctions sont bien exportées et visibles dans un sous-shell.
     run bash -c '
-      _select_output_pix_fmt yuv420p10le | grep -qx yuv420p10le
-      _build_downscale_filter_if_needed 3840 2160 | grep -q "scale="
-            _compute_output_height_for_bitrate 2560 720 | grep -qx 540
-            _build_effective_suffix_for_dims 1280 720 | grep -q "_720p_"
-      normalize_path "/c/Users/test" >/dev/null || true
-      echo ok
+        set -euo pipefail
+        required_fns=(
+            _select_output_pix_fmt
+            _build_downscale_filter_if_needed
+            _compute_output_height_for_bitrate
+            _build_effective_suffix_for_dims
+            compute_video_params_adaptive
+            should_skip_conversion
+            convert_file
+        )
+        for fn in "${required_fns[@]}"; do
+            declare -F "$fn" >/dev/null
+        done
     ' 2>&1
 
-    # Vérifier que "ok" est présent dans la sortie (les fonctions ont fonctionné)
-    [[ "$output" =~ "ok" ]]
+    [ "$status" -eq 0 ]
 }

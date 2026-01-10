@@ -126,3 +126,29 @@ create_null_separated_file() {
 function_exists() {
     declare -f "$1" > /dev/null 2>&1
 }
+
+###########################################################
+# ASSERTIONS (helpers)
+###########################################################
+
+# Vérifie qu'au moins un fichier matche un glob.
+# Usage: assert_glob_exists "/path/to/pattern_*.log"
+assert_glob_exists() {
+    local pattern="$1"
+    if ! compgen -G "$pattern" > /dev/null; then
+        echo "Expected glob to match at least one file: $pattern" >&2
+        return 1
+    fi
+}
+
+# Vérifie qu'aucune ligne ne ressemble à un prompt interactif (ligne commençant par '?').
+# Usage: assert_output_has_no_prompt_lines
+assert_output_has_no_prompt_lines() {
+    # On évite d'encoder ici des textes de questions précis (fragiles).
+    # On détecte seulement le marqueur de prompt au début de ligne.
+    if printf '%s\n' "$output" | grep -qE '^[[:space:]]*\?[[:space:]]'; then
+        echo "Unexpected interactive prompt detected in output" >&2
+        printf '%s\n' "$output" >&2
+        return 1
+    fi
+}

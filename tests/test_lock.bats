@@ -52,12 +52,15 @@ teardown() {
 
 @test "check_lock: échoue si le lock existe avec un PID actif" {
     # Utiliser le PID du shell courant (qui est forcément actif)
-    echo "$$" > "$TEST_LOCKFILE"
+    local active_pid="$$"
+    echo "$active_pid" > "$TEST_LOCKFILE"
     
     # La fonction devrait quitter avec une erreur
     run bash -c "source '$LIB_DIR/ui.sh'; source '$LIB_DIR/lock.sh'; LOCKFILE='$TEST_LOCKFILE'; check_lock"
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "déjà en cours d'exécution" ]]
+    # Non-régression : le lock ne doit pas être écrasé
+    [ -f "$TEST_LOCKFILE" ]
+    [ "$(cat "$TEST_LOCKFILE")" = "$active_pid" ]
 }
 
 @test "check_lock: nettoie le lock si le PID n'existe plus" {
@@ -276,7 +279,8 @@ teardown() {
 
 @test "intégration: lock empêche une double exécution" {
     # Premier processus prend le lock
-    echo "$$" > "$TEST_LOCKFILE"
+    local active_pid="$$"
+    echo "$active_pid" > "$TEST_LOCKFILE"
     
     # Deuxième processus essaie de prendre le lock
     run bash -c "
@@ -287,7 +291,9 @@ teardown() {
     "
     
     [ "$status" -eq 1 ]
-    [[ "$output" =~ "déjà en cours d'exécution" ]]
+    # Non-régression : le lock existant ne doit pas être écrasé
+    [ -f "$TEST_LOCKFILE" ]
+    [ "$(cat "$TEST_LOCKFILE")" = "$active_pid" ]
 }
 
 @test "intégration: lock est libéré après sortie normale" {

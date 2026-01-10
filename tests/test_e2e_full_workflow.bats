@@ -495,9 +495,15 @@ teardown() {
     '
     
     [ "$status" -eq 0 ]
-    
-    # Le résumé doit contenir des informations de statistiques
-    [[ "$output" =~ "Succès" ]] || [[ "$output" =~ "Traités" ]] || [[ "$output" =~ "RÉSUMÉ" ]]
+
+    # Non-régression : un résumé est produit en fin de run.
+    local summary_file
+    summary_file=$(find "$WORKDIR/logs" -name "Summary_*.log" -type f | head -1)
+    [ -n "$summary_file" ]
+    [ -s "$summary_file" ]
+
+    # Vérifie une structure stable (caractères de box drawing) sans dépendre du wording.
+    [[ "$output" == *"╔"* ]]
 }
 
 @test "E2E résumé: fichier Summary.log créé" {

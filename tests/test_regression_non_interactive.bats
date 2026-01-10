@@ -31,6 +31,14 @@ teardown() {
         '
     [ "$status" -eq 0 ]
 
-        # Non-régression : le run doit terminer et annoncer la fin du dry-run.
-        [[ "$output" =~ "Dry run" ]]
+    # Non-régression : pas de prompt interactif imprimé.
+    assert_output_has_no_prompt_lines
+
+    # Non-régression : le dry-run a vraiment été exécuté (artefacts attendus).
+    [ -d "$WORKDIR/logs" ]
+    [ -f "$WORKDIR/logs/Index" ]
+    # Note: logs/Queue est un artefact temporaire nettoyé par le cleanup.
+    assert_glob_exists "$WORKDIR/logs/Session_*.log"
+    assert_glob_exists "$WORKDIR/logs/Summary_*.log"
+    assert_glob_exists "$WORKDIR/logs/DryRun_Comparison_*.log"
 }
