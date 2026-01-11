@@ -1,6 +1,54 @@
 # Handoff
 
-## Dernière session (11/01/2026 - UX film-adaptive + test E2E cap “qualité équivalente”)
+## Dernière session (11/01/2026 - Refactoring conversion.sh)
+
+### Objectif
+
+Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B+ validée par l'utilisateur.
+
+### Tâches accomplies
+
+**Nouveaux modules créés :**
+- `lib/skip_decision.sh` (206 lignes) - Logique skip/passthrough/full
+- `lib/conversion_prep.sh` (216 lignes) - Préparation fichiers, chemins, espace disque
+- `lib/adaptive_mode.sh` (146 lignes) - Mode film-adaptive (analyse complexité)
+
+**Modules modifiés :**
+- `lib/ui.sh` (+327 lignes) - Fonctions UI de conversion ajoutées
+- `lib/counters.sh` (+13 lignes) - Variables `CURRENT_FILE_NUMBER`, `LIMIT_DISPLAY_SLOT`
+- `lib/conversion.sh` (178 lignes) - Orchestration pure uniquement
+- `lib/exports.sh` - Renommage exports (`_display_skip_decision` → `print_skip_message`, etc.)
+- `nascode` - Chargement des nouveaux modules
+- `tests/test_helper.bash` - Chargement nouveaux modules dans tous les loaders
+- `tests/test_regression_exports_contract.bats` - Sources des nouveaux modules
+
+**Documentation :**
+- `DEVBOOK.md` - Entrée refactoring
+- `ARCHITECTURE.md` - Nouveaux modules documentés
+
+### Validation
+
+✅ **Tous les tests passent** : 628/628 (3 skips conditionnels)
+
+### Branche en cours
+
+- `refactor/conversion-split`
+
+### Commits
+
+1. `d796838` - feat(refactor): éclatement de conversion.sh (958 → 178 lignes)
+2. `00349ba` - docs: met à jour DEVBOOK.md et ARCHITECTURE.md
+3. `ee16d87` - fix(tests): corrige les exports et tests après refactoring
+
+### Prochaines étapes suggérées
+
+1. Review du code sur la branche `refactor/conversion-split`
+2. Merge vers `main` après validation
+3. Mise à jour `README.md` si nécessaire (comportement inchangé)
+
+---
+
+## Session précédente (11/01/2026 - UX film-adaptive + test E2E cap "qualité équivalente")
 
 ### Objectif
 
