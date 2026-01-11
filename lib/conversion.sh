@@ -531,6 +531,7 @@ _convert_get_full_metadata() {
 
 _convert_run_adaptive_analysis_and_export() {
     local file_to_analyze="$1"
+    local source_video_codec="${2:-}"
 
     local adaptive_params
     adaptive_params=$(compute_video_params_adaptive "$file_to_analyze")
@@ -563,6 +564,44 @@ _convert_run_adaptive_analysis_and_export() {
 
     display_complexity_analysis "$file_to_analyze" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps" >&2
 
+    # Option B (UX, conditionnelle) : afficher le seuil de skip uniquement quand il
+    # a du sens (source déjà dans un codec meilleur/égal au codec cible).
+    if [[ "${UI_QUIET:-false}" != true ]]; then
+        local show_skip_threshold=false
+        if [[ -n "$source_video_codec" ]] && declare -f is_codec_better_or_equal &>/dev/null; then
+            if is_codec_better_or_equal "$source_video_codec" "$target_codec"; then
+                show_skip_threshold=true
+            fi
+        fi
+
+        if [[ "$show_skip_threshold" == true ]]; then
+            local skip_tolerance_percent="${SKIP_TOLERANCE_PERCENT:-10}"
+            if [[ ! "$skip_tolerance_percent" =~ ^[0-9]+$ ]]; then
+                skip_tolerance_percent=10
+            fi
+
+            local compare_codec="$source_video_codec"
+            local compare_maxrate_kbps="$adaptive_maxrate_kbps"
+            if [[ "$compare_codec" != "$target_codec" ]] && declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
+                compare_maxrate_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_maxrate_kbps" "$target_codec" "$compare_codec")
+            fi
+
+            if [[ -z "$compare_maxrate_kbps" ]] || ! [[ "$compare_maxrate_kbps" =~ ^[0-9]+$ ]]; then
+                compare_maxrate_kbps="$adaptive_maxrate_kbps"
+            fi
+
+            local threshold_kbps=$(( compare_maxrate_kbps + (compare_maxrate_kbps * skip_tolerance_percent / 100) ))
+
+            local cmp_display="${compare_codec^^}"
+            [[ "$compare_codec" == "hevc" || "$compare_codec" == "h265" ]] && cmp_display="X265"
+            [[ "$compare_codec" == "av1" ]] && cmp_display="AV1"
+
+            if [[ "$threshold_kbps" -gt 0 ]]; then
+                echo -e "${DIM}     └─ Seuil skip : ${threshold_kbps} kbps (${cmp_display})${NOCOLOR}" >&2
+            fi
+        fi
+    fi
+
     # Stocker les paramètres adaptatifs dans des variables d'environnement
     export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
     export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
@@ -578,15 +617,13 @@ _convert_display_adaptive_decision_required() {
     [[ "${UI_QUIET:-false}" == true ]] && return 0
     [[ "${NO_PROGRESS:-false}" == true ]] && return 0
 
-    local counter_prefix=$(_get_counter_prefix)
-
     if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
-        echo -e "${counter_prefix}${CYAN}✅ Conversion requise : audio à optimiser (vidéo conservée)${NOCOLOR}" >&2
+        echo -e "${CYAN}  ✅ Conversion requise : audio à optimiser (vidéo conservée)${NOCOLOR}" >&2
         return 0
     fi
 
     if [[ ! "$v_bitrate_bits" =~ ^[0-9]+$ ]] || [[ "$v_bitrate_bits" -le 0 ]]; then
-        echo -e "${counter_prefix}${CYAN}✅ Conversion requise${NOCOLOR}" >&2
+        echo -e "${CYAN}  ✅ Conversion requise${NOCOLOR}" >&2
         return 0
     fi
 
@@ -601,17 +638,37 @@ _convert_display_adaptive_decision_required() {
     local cmp_display="${cmp_codec^^}"
     [[ "$cmp_codec" == "hevc" || "$cmp_codec" == "h265" ]] && cmp_display="X265"
 
+    local src_display="${v_codec^^}"
+    [[ "$v_codec" == "hevc" || "$v_codec" == "h265" ]] && src_display="X265"
+    [[ "$v_codec" == "av1" ]] && src_display="AV1"
+
     local effective_codec="${EFFECTIVE_VIDEO_CODEC:-${VIDEO_CODEC:-hevc}}"
     local target_codec="${VIDEO_CODEC:-hevc}"
 
+    local target_display="${target_codec^^}"
+    [[ "$target_codec" == "hevc" || "$target_codec" == "h265" ]] && target_display="X265"
+    [[ "$target_codec" == "av1" ]] && target_display="AV1"
+
+    local is_better_or_equal=false
+    if declare -f is_codec_better_or_equal &>/dev/null; then
+        is_codec_better_or_equal "$v_codec" "$target_codec" && is_better_or_equal=true
+    fi
+
     if [[ -n "$threshold_kbps" && "$threshold_kbps" -gt 0 ]]; then
-        if [[ "$effective_codec" != "$target_codec" ]]; then
-            echo -e "${counter_prefix}${CYAN}✅ Conversion requise : ${src_kbps}k > seuil ${threshold_kbps}k (${cmp_display}) → pas de downgrade (encodage ${effective_codec^^})${NOCOLOR}" >&2
+        if [[ "$is_better_or_equal" != true ]]; then
+            # Source dans un codec moins efficace : la conversion est requise pour changer de codec
+            # (le seuil skip n'est pas pertinent dans ce cas).
+            echo -e "${CYAN}  ✅ Conversion requise : codec source ${src_display} → ${target_display} (bitrate ${src_kbps}k)${NOCOLOR}" >&2
         else
-            echo -e "${counter_prefix}${CYAN}✅ Conversion requise : ${src_kbps}k > seuil ${threshold_kbps}k (${cmp_display})${NOCOLOR}" >&2
+            # Source déjà dans un codec meilleur/égal : la conversion est requise car le bitrate est trop élevé.
+            if [[ "$effective_codec" != "$target_codec" ]]; then
+                echo -e "${CYAN}  ✅ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display}) → pas de downgrade (encodage ${effective_codec^^})${NOCOLOR}" >&2
+            else
+                echo -e "${CYAN}  ✅ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display})${NOCOLOR}" >&2
+            fi
         fi
     else
-        echo -e "${counter_prefix}${CYAN}✅ Conversion requise${NOCOLOR}" >&2
+        echo -e "${CYAN}  ✅ Conversion requise${NOCOLOR}" >&2
     fi
 }
 
@@ -633,7 +690,7 @@ _convert_handle_adaptive_mode() {
     # (aligné avec les autres modes). Ici, on évite d'imprimer une 2e fois.
 
     local adaptive_info
-    adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input")
+    adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input" "$v_codec")
 
     local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
     local complexity_c complexity_desc stddev_val
@@ -841,7 +898,7 @@ convert_file() {
         mkdir -p "$final_dir" 2>/dev/null || true
 
         local adaptive_info
-        adaptive_info=$(_convert_run_adaptive_analysis_and_export "$file_original")
+        adaptive_info=$(_convert_run_adaptive_analysis_and_export "$file_original" "$v_codec")
 
         local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
         local complexity_c complexity_desc stddev_val

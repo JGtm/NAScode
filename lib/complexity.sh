@@ -445,5 +445,5 @@ display_complexity_analysis() {
     echo -e "  📊 Analyse de complexité (${filename}) :"
     echo -e "${DIM}     └─ Coefficient de variation : ${stddev}${NOCOLOR}"
     echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
-    echo -e "${DIM}     └─ Bitrate adaptatif : ${target_kbps} kbps${NOCOLOR}"
+    echo -e "${DIM}     └─ Bitrate cible (encodage) : ${target_kbps} kbps${NOCOLOR}"
 }

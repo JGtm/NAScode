@@ -290,6 +290,84 @@ teardown() {
 }
 
 ###########################################################
+# SECTION 4: CAP « QUALITÉ ÉQUIVALENTE » (codec source moins efficace)
+###########################################################
+
+@test "E2E EQUIV-QUALITY: H.264 low-bitrate → HEVC ne sur-encode pas (cap)" {
+    # Générer une source H.264 en CBR ~1000k (avec audio) pour avoir un bitrate mesurable.
+    ffmpeg -y \
+        -f lavfi -i "testsrc=duration=2:size=1920x1080:rate=24" \
+        -f lavfi -i "sine=frequency=1000:duration=2" \
+        -c:v libx264 -preset ultrafast \
+        -b:v 1000k -minrate 1000k -maxrate 1000k -bufsize 2000k \
+        -x264-params "nal-hrd=cbr" \
+        -c:a aac -b:a 96k \
+        "$SRC_DIR/src_h264_1000k.mkv" 2>/dev/null
+
+    if [[ ! -f "$SRC_DIR/src_h264_1000k.mkv" ]]; then
+        skip "Impossible de créer la vidéo H.264 de test"
+    fi
+
+    # Conversion standard (non-adaptive) vers HEVC.
+    run bash -lc '
+        set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+
+    [ "$status" -eq 0 ]
+
+    local out_file
+    out_file=$(find "$OUT_DIR" -type f -name "*.mkv" 2>/dev/null | head -1)
+    [ -n "$out_file" ]
+
+    # Bitrate vidéo source (kbps)
+    local src_bits
+    src_bits=$(ffprobe -v error -select_streams v:0 -show_entries stream=bit_rate -of csv=p=0 "$SRC_DIR/src_h264_1000k.mkv" 2>/dev/null | head -1)
+    if [[ -z "$src_bits" ]] || ! [[ "$src_bits" =~ ^[0-9]+$ ]] || [[ "$src_bits" -le 0 ]]; then
+        skip "Bitrate vidéo source non mesurable (ffprobe)"
+    fi
+    local src_kbps=$(( src_bits / 1000 ))
+
+    # Bitrate vidéo output (kbps)
+    local out_bits
+    out_bits=$(ffprobe -v error -select_streams v:0 -show_entries stream=bit_rate -of csv=p=0 "$out_file" 2>/dev/null | head -1)
+    if [[ -z "$out_bits" ]] || ! [[ "$out_bits" =~ ^[0-9]+$ ]] || [[ "$out_bits" -le 0 ]]; then
+        skip "Bitrate vidéo output non mesurable (ffprobe)"
+    fi
+    local out_kbps=$(( out_bits / 1000 ))
+
+    # Cap attendu (codec-aware), calculé via la même fonction que le code.
+    local expected_cap_kbps
+    expected_cap_kbps=$(bash -lc '
+        set -euo pipefail
+        source "$PROJECT_ROOT/lib/codec_profiles.sh"
+        translate_bitrate_kbps_between_codecs '"$src_kbps"' "h264" "hevc"
+    ')
+
+    if [[ -z "$expected_cap_kbps" ]] || ! [[ "$expected_cap_kbps" =~ ^[0-9]+$ ]] || [[ "$expected_cap_kbps" -le 0 ]]; then
+        skip "Cap attendu non calculable"
+    fi
+
+    # Tolérance: le bitrate réel peut fluctuer; on vérifie surtout qu'on n'est pas proche
+    # des budgets par défaut (sans cap). 35% laisse de la marge tout en détectant un oubli.
+    local max_allowed_kbps=$(( expected_cap_kbps * 135 / 100 ))
+
+    echo "src_kbps=$src_kbps expected_cap_kbps=$expected_cap_kbps out_kbps=$out_kbps max_allowed_kbps=$max_allowed_kbps" >&3
+
+    [ "$out_kbps" -le "$max_allowed_kbps" ]
+}
+
+###########################################################
 # SECTION 4: CHEMINS WINDOWS (ACCENTS/ESPACES) + ERREURS I/O
 ###########################################################
 
@@ -444,10 +522,21 @@ teardown() {
             --limit 1 <<< "n" &
         pid=$!
 
-        # Attendre un peu puis simuler une interruption.
+        # Attendre que NAScode ait réellement démarré (évite les faux négatifs si ça finit trop vite)
+        # - lockfile créé
+        # - et/ou répertoire TMP_DIR initialisé
+        for i in {1..50}; do
+            [[ -f /tmp/conversion_video.lock ]] && break
+            sleep 0.1
+        done
+        for i in {1..50}; do
+            [[ -d /tmp/video_convert ]] && break
+            sleep 0.1
+        done
+
+        # Simuler une interruption.
         # Note: Sous Bash/MSYS2, les jobs en arrière-plan peuvent ignorer SIGINT.
         # SIGTERM est plus fiable et est géré par le même trap (_handle_interrupt).
-        sleep 1
         kill -TERM "$pid" 2>/dev/null || true
 
         wait "$pid"

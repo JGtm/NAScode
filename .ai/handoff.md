@@ -1,5 +1,33 @@
 # Handoff
 
+## Dernière session (11/01/2026 - UX film-adaptive + test E2E cap “qualité équivalente”)
+
+### Objectif
+
+- Clarifier l’UX film-adaptive : distinguer clairement bitrate source / seuil de skip / bitrate appliqué à l’encodage.
+- Ajouter un test E2E (avec marge) pour valider le cap “qualité équivalente” (codec source moins efficace).
+
+### Tâches accomplies
+
+- `lib/conversion.sh`
+  - Message post-analyse “✅ Conversion requise” : suppression du compteur `[X/Y]`, indentation alignée, ajout du codec source dans la parenthèse.
+  - Analyse film-adaptive : la ligne “Seuil skip …” est affichée uniquement si la source est déjà dans un codec meilleur/égal (sinon décision “codec”).
+
+- `lib/complexity.sh`
+  - Renommage “Bitrate adaptatif” → “Bitrate cible (encodage)” pour clarifier l’usage.
+
+- `tests/test_regression_e2e.bats`
+  - Ajout d’un E2E “EQUIV-QUALITY” (H.264 ~1000k → HEVC) avec tolérance sur le bitrate mesuré.
+  - Stabilisation du test d’interruption : attendre un signe de démarrage (lock/TMP_DIR) avant d’envoyer SIGTERM.
+
+### Validation
+
+- `bash run_tests.sh -f "test_regression_e2e.bats"` (OK).
+
+### Branche en cours
+
+- `fix/equiv-quality-translate`
+
 ## Dernière session (11/01/2026 - Vidéo : cap qualité équivalente (source moins efficace))
 
 ### Objectif
