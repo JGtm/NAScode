@@ -28,6 +28,12 @@ Objectifs :
 - **Pourquoi** : éviter des skips trop agressifs sur codecs plus efficaces et empêcher la régression qualité liée à un downgrade codec implicite.
 - **Impact** : change le comportement de skip sur sources AV1 quand la cible est HEVC (seuil plus strict) ; doc mise à jour (`README.md`, `docs/SMART_CODEC.md`).
 
+#### Tests : stabilisation E2E interruption (Windows/MSYS2)
+- **Quoi** : fiabilisation du test d'interruption en cours : sous Bash/MSYS2, un job lancé en arrière-plan peut ignorer `SIGINT`, donc le test passait parfois avec un exit code `0` au lieu de `130`.
+- **Où** : `tests/test_regression_e2e.bats`.
+- **Pourquoi** : rendre le test déterministe sur Windows (Git Bash/MSYS2).
+- **Impact** : test E2E plus stable ; aucun changement de comportement runtime de NAScode.
+
 ### 2026-01-10
 
 #### UX CLI : `--quiet` (warnings/erreurs uniquement) + centralisation des sorties
