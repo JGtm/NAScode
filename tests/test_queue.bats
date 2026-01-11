@@ -13,6 +13,7 @@ setup() {
     if [[ -z "${_QUEUE_TEST_LOADED:-}" ]]; then
         export SCRIPT_DIR="$PROJECT_ROOT"
         source "$LIB_DIR/ui.sh"
+        source "$LIB_DIR/ui_options.sh"
         source "$LIB_DIR/config.sh"
         source "$LIB_DIR/utils.sh"
         source "$LIB_DIR/index.sh"
@@ -224,6 +225,37 @@ teardown() {
     local first
     first=$(tr '\0' '\n' < "$QUEUE" | head -1)
     [[ "$first" =~ "small.mkv" ]]
+}
+
+###########################################################
+# Tests UI : ordre de tri affiché (format_option_sort_mode)
+###########################################################
+
+@test "format_option_sort_mode: affiche taille décroissante" {
+    SORT_MODE="size_desc"
+    RANDOM_MODE=false
+
+    run format_option_sort_mode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"taille décroissante"* ]]
+}
+
+@test "format_option_sort_mode: affiche nom ascendant" {
+    SORT_MODE="name_asc"
+    RANDOM_MODE=false
+
+    run format_option_sort_mode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"nom ascendant"* ]]
+}
+
+@test "format_option_sort_mode: random -> tri aléatoire (sélection)" {
+    SORT_MODE="size_desc"
+    RANDOM_MODE=true
+
+    run format_option_sort_mode
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"aléatoire"* ]]
 }
 
 ###########################################################

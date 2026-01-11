@@ -56,6 +56,39 @@ format_option_random_mode() {
     echo -e "🎲  Mode aléatoire : ${YELLOW}activé${NOCOLOR}"
 }
 
+# Formate l'ordre de tri effectif de la queue pour print_active_options
+# Usage: format_option_sort_mode
+format_option_sort_mode() {
+    local sort_mode="${SORT_MODE:-size_desc}"
+
+    # En mode random, la sélection est aléatoire (l'ordre initial n'est pas pertinent)
+    if [[ "${RANDOM_MODE:-false}" == true ]]; then
+        echo -e "↕️  Tri de la queue : ${YELLOW}aléatoire (sélection)${NOCOLOR}"
+        return 0
+    fi
+
+    local label
+    case "$sort_mode" in
+        size_desc)
+            label="taille décroissante"
+            ;;
+        size_asc)
+            label="taille croissante"
+            ;;
+        name_asc)
+            label="nom ascendant"
+            ;;
+        name_desc)
+            label="nom descendant"
+            ;;
+        *)
+            label="$sort_mode"
+            ;;
+    esac
+
+    echo -e "↕️  Tri de la queue : ${YELLOW}${label}${NOCOLOR}"
+}
+
 # Formate une option mode échantillon pour print_active_options
 # Usage: format_option_sample
 format_option_sample() {

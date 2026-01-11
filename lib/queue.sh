@@ -193,6 +193,9 @@ _show_active_options() {
         options+=("$(format_option_audio)")
     fi
 
+    # Ordre de tri de la queue
+    options+=("$(format_option_sort_mode)")
+
     # Option Mode aléatoire
     if [[ "${RANDOM_MODE:-false}" == true ]]; then
         options+=("$(format_option_random_mode)")
