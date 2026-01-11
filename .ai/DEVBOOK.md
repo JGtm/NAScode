@@ -28,6 +28,29 @@ Objectifs :
   - Tests : `tests/test_args.bats` couvre `--quiet` (et reset `UI_QUIET`).
   - Doc : `docs/USAGE.md` mentionne `--quiet`.
 
+#### Bitrate : profil adaptatif 480p/SD
+- **Quoi** : ajout d’un profil adaptatif dédié aux sources SD (≤480p), en réduisant le bitrate cible (ex: 1080p→2070k vs 480p→~1035k) pour éviter les encodages trop “généreux” sur basse résolution.
+- **Où** : `lib/config.sh` (constantes), `lib/video_params.sh` (priorité 480p avant 720p), `lib/exports.sh`.
+- **Pourquoi** : mieux aligner taille/qualité sur la résolution source.
+
+#### Audio : respecter le codec cible plus efficace que la source
+- **Quoi** : si le codec cible est plus efficace que la source (ex: cible `opus` vs source `aac`), conversion forcée (corrige le cas où `-a opus` pouvait être ignoré sur source AAC).
+- **Où** : `lib/audio_decision.sh`, tests dans `tests/test_regression_coverage.bats`.
+- **Pourquoi** : respecter l’intention utilisateur et la logique “efficacité codec”.
+
+#### Tests : assertions moins fragiles
+- **Quoi** : ajout de helpers d’assertion Bats et remplacement d’assertions dépendantes du wording UI par des invariants (glob, détection de prompts, contrats de fonctions/export).
+- **Où** : `tests/test_helper.bash` + ajustements dans plusieurs suites (args/lock/queue/e2e/regressions) et mise à jour `.ai/handoff.md`.
+- **Pourquoi** : stabiliser la CI locale et réduire les faux positifs lors d’évolutions UX.
+
+#### Docs : préciser la limite des vidéos portrait
+- **Quoi** : précision documentaire sur le traitement/limite des vidéos portrait.
+- **Où** : `README.md`.
+
+#### UX : ajustement message d’erreur codec vidéo
+- **Quoi** : message d’erreur “codec invalide” rendu plus générique (liste non exhaustive), pour éviter une doc/UX trompeuse si la liste évolue.
+- **Où** : `lib/args.sh`.
+
 ### 2026-01-09
 
 #### Audio : stéréo forcée en mode `serie` + centralisation mode-based (vidéo)
@@ -72,11 +95,66 @@ Objectifs :
 - **Où** : `docs/📋 Tableau récapitulatif - Critères de conversion.csv`
 - **Pourquoi** : éviter les règles obsolètes/inexactes côté documentation et garder une “source de vérité” cohérente avec le code.
 
+#### Outil : génération de samples FFmpeg (edge cases)
+- **Quoi** : ajout d'un script pour générer des médias courts et reproductibles (VFR, 10-bit, multiaudio, sous-titres, metadata rotate, dimensions impaires, etc.).
+- **Où** :
+  - `tools/generate_ffmpeg_samples.sh`
+  - `docs/SAMPLES.md`
+  - `docs/DOCS.md` (lien ajouté)
+  - `.gitignore` (ignore `samples/_generated/`)
+- **Pourquoi** : faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
+- **Impact** : aucun impact sur NAScode; artefacts générés ignorés par git.
+
 #### Samples : cas 7.1 (TrueHD/DTS) plus robustes
 - **Quoi** : détection préventive du support 7.1 par les encodeurs FFmpeg (`truehd`, `dca`) + suppression d'artefacts invalides (0 octet / sans vidéo) quand `--force` n'est pas utilisé.
 - **Où** : `tools/generate_ffmpeg_samples.sh`
 - **Pourquoi** : sur certaines builds, les encodeurs refusent 7.1 (jusqu'à 5.1 seulement) ; éviter du bruit d'erreurs et empêcher qu'un ancien fichier audio-only soit réutilisé.
 - **Impact** : `19_dts_7_1.mkv` / `21_truehd_7_1.mkv` peuvent être "skip" proprement ; pas de fichiers invalides laissés sur disque.
+
+#### UI : prompt `.plexignore` harmonisé
+- **Quoi** : l'invite de création du fichier `.plexignore` utilise désormais le même rendu que les autres questions (bloc `ask_question` + messages `print_success`/`print_info`).
+- **Où** : `lib/system.sh` (`check_plexignore()`).
+- **Pourquoi** : cohérence de l'UI interactive.
+
+### 2026-01-08
+
+#### Feature : `--no-lossless` (multi-canal)
+- **Quoi** : ajout d'une option pour éviter le passthrough lossless/premium en audio, y compris en contexte multi-canal.
+- **Où** :
+  - `lib/args.sh`, `nascode` : parsing / câblage CLI
+  - `lib/audio_decision.sh`, `lib/audio_params.sh` : décision smart audio, règles multi-canal
+  - `lib/config.sh`, `lib/exports.sh` : config + exports
+  - Tests : `tests/test_audio_codec.bats`, `tests/test_audio_multichannel.bats`
+  - Docs : `docs/SMART_CODEC.md`, `docs/DOCS.md`, `README.md`, `docs/CHANGELOG.md`
+- **Pourquoi** : permettre un mode “compatibilité / taille” où l'audio lossless n'est pas conservé, même si le fichier source est premium.
+
+#### Refactor : extraction du moteur de décision audio
+- **Quoi** : factorisation/clarification de la logique de décision smart audio.
+- **Où** : `lib/audio_decision.sh`, `lib/audio_params.sh` (+ doc `docs/SMART_CODEC.md`).
+- **Pourquoi** : rendre les règles plus lisibles, testables et faciles à faire évoluer.
+
+#### Docs : changelog v2.6
+- **Quoi** : mise à jour du changelog pour refléter les évolutions.
+- **Où** : `docs/CHANGELOG.md`
+
+### 2026-01-03
+
+#### Refactorisation Quick Wins et Structurelle
+- **Quoi** : factorisation de code dupliqué et suppression de code mort.
+- **Où** :
+  - `lib/utils.sh` : ajout `format_duration_seconds()` et `format_duration_compact()`
+  - `lib/finalize.sh` : remplacement de 5 calculs de durée inline + 5 appels stat par les helpers
+  - `lib/vmaf.sh` : remplacement de 1 appel stat par `get_file_size_bytes()`
+  - `lib/transcode_video.sh` : suppression de `_build_encoder_ffmpeg_args()` (85 lignes de code mort, jamais appelé), fusion des deux branches if/else dans `_run_ffmpeg_encode()` (-14 lignes)
+  - `tests/test_utils.bats` : 13 tests unitaires pour les nouvelles fonctions format_duration_*
+- **Pourquoi** :
+  - Réduire la duplication améliore la maintenabilité
+  - Le code mort crée de la confusion et du bruit
+  - Les helpers testables sont plus fiables
+- **Impact** :
+  - ~100 lignes supprimées/factorisées
+  - Aucun changement de comportement
+  - Tests ajoutés pour les nouvelles fonctions
 
 ### 2026-01-02
 
@@ -148,38 +226,3 @@ Objectifs :
   - Log enrichi avec coefficient C et description du contenu
   - Tests Bats : 22 tests dans `test_film_adaptive.bats`
 
-### 2026-01-03
-
-#### Refactorisation Quick Wins et Structurelle
-- **Quoi** : Factorisation de code dupliqué et suppression de code mort.
-- **Où** :
-  - `lib/utils.sh` : ajout `format_duration_seconds()` et `format_duration_compact()`
-  - `lib/finalize.sh` : remplacement de 5 calculs de durée inline + 5 appels stat par les helpers
-  - `lib/vmaf.sh` : remplacement de 1 appel stat par `get_file_size_bytes()`
-  - `lib/transcode_video.sh` : suppression de `_build_encoder_ffmpeg_args()` (85 lignes de code mort, jamais appelé), fusion des deux branches if/else dans `_run_ffmpeg_encode()` (-14 lignes)
-  - `tests/test_utils.bats` : 13 tests unitaires pour les nouvelles fonctions format_duration_*
-- **Pourquoi** : 
-  - Réduire la duplication améliore la maintenabilité
-  - Le code mort crée de la confusion et du bruit
-  - Les helpers testables sont plus fiables
-- **Impact** :
-  - ~100 lignes supprimées/factorisées
-  - Aucun changement de comportement
-  - Tests ajoutés pour les nouvelles fonctions
-
-### 2026-01-09
-
-#### Outil : génération de samples FFmpeg (edge cases)
-- **Quoi** : Ajout d'un script pour générer des médias courts et reproductibles (VFR, 10-bit, multiaudio, sous-titres, metadata rotate, dimensions impaires, etc.).
-- **Où** :
-  - `tools/generate_ffmpeg_samples.sh`
-  - `docs/SAMPLES.md`
-  - `docs/DOCS.md` (lien ajouté)
-  - `.gitignore` (ignore `samples/_generated/`)
-- **Pourquoi** : Faciliter les tests manuels / debugging sur des cas "edge" sans dépendre de fichiers réels.
-- **Impact** : Aucun impact sur NAScode; artefacts générés ignorés par git.
-
-#### UI : prompt `.plexignore` harmonisé
-- **Quoi** : l'invite de création du fichier `.plexignore` utilise désormais le même rendu que les autres questions (bloc `ask_question` + messages `print_success`/`print_info`).
-- **Où** : `lib/system.sh` (`check_plexignore()`)
-- **Pourquoi** : cohérence de l'UI interactive.

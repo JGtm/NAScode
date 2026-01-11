@@ -1,5 +1,40 @@
 # Handoff
 
+## Dernière session (11/01/2026 - DEVBOOK + nouveaux tests E2E)
+
+### Objectif
+
+- Remettre `.ai/DEVBOOK.md` en ordre chronologique et compléter le résumé du 10/01.
+- Ajouter des tests E2E ciblant des cas d'intégration "terrain" : chemins Windows (accents/espaces), interruption en cours, stream mapping sous-titres, erreurs d'I/O.
+
+### Tâches accomplies
+
+- `.ai/DEVBOOK.md`
+  - Ré-ordonnancement chronologique (suppression du doublon `2026-01-09`).
+  - Restauration de l'entrée `2026-01-08`.
+  - Complétion de l'entrée `2026-01-10` avec : `--quiet`, profil adaptatif 480p/SD, fix audio "cible plus efficace", durcissement tests, doc portrait, ajustement message codec invalide.
+
+- `tests/test_regression_e2e.bats`
+  - Ajout E2E chemins avec accents/espaces.
+  - Ajout E2E erreur I/O : `output_dir` est un fichier.
+  - Ajout E2E interruption en cours (SIGINT) : lock nettoyé + `STOP_FLAG` présent.
+
+- `tests/test_e2e_stream_mapping.bats`
+  - Ajout E2E stream mapping sous-titres (fichiers réels générés via ffmpeg).
+
+### Notes / Validation
+
+- Les tests E2E nécessitent `ffmpeg` + `ffprobe` avec `libx265`.
+- Tests non relancés automatiquement dans cette session.
+
+### Branche en cours
+
+- `fix/audio-opus-option`
+
+### Derniers prompts
+
+- "ok ajoute en un pour les chemin windows avec accent espace, le stop en cours de traitement aussi et stream mapping erreurs d'I/O aussi. mais avant mets à jour le devbook..."
+
 ## Dernière session (10/01/2026 - UX : dry-run (phase conversion))
 
 ### Objectif
