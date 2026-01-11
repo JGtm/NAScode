@@ -1,5 +1,42 @@
 # Handoff
 
+## Dernière session (11/01/2026 - film-adaptive : seuil codec-aware + no-downgrade)
+
+### Objectif
+
+- Implémenter la traduction du seuil de skip selon l'efficacité codec (comparaison dans l'espace du codec source quand il est meilleur).
+- Empêcher tout downgrade vidéo implicite : une source AV1 trop haut débit est ré-encodée en AV1 (plafonnement) plutôt qu'en HEVC.
+- Rendre `film-adaptive` cohérent avec `--codec av1` (bitrate adaptatif traduit depuis la référence HEVC).
+
+### Tâches accomplies
+
+- `lib/codec_profiles.sh`
+  - Efficacités codec configurables via `CODEC_EFFICIENCY_*`.
+  - Ajout helper `translate_bitrate_kbps_between_codecs()`.
+
+- `lib/conversion.sh`
+  - Seuil codec-aware (traduction `MAXRATE_KBPS`/maxrate adaptatif vers le codec source quand la source est meilleure).
+  - Sélection par fichier : `EFFECTIVE_VIDEO_CODEC`/`EFFECTIVE_VIDEO_ENCODER` (no-downgrade sauf `--force-video`).
+  - En `film-adaptive`, traduction des bitrates calculés (référence HEVC) vers le codec cible actif.
+  - UX : message explicite "✅ Conversion requise" juste après l'analyse (avant transfert).
+
+- `lib/transcode_video.sh`
+  - Support du codec/encodeur effectif par fichier et traduction des budgets bitrate (standard + film-adaptive) vers le codec effectif.
+
+- Tests / doc
+  - `tests/test_conversion.bats`, `tests/test_conversion_mode.bats` mis à jour/complétés.
+  - `README.md` et `docs/SMART_CODEC.md` mis à jour.
+  - `.ai/DEVBOOK.md` mis à jour.
+
+### Branche en cours
+
+- `feature/film-adaptive-ux`
+
+### Notes / Validation
+
+- Les tests n'ont pas été relancés automatiquement (à faire côté utilisateur : `bash run_tests.sh`).
+
+
 ## Dernière session (11/01/2026 - DEVBOOK + nouveaux tests E2E)
 
 ### Objectif

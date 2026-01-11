@@ -9,6 +9,19 @@
 # - "full"             : conversion complète (vidéo + audio)
 CONVERSION_ACTION=""
 
+# Codec vidéo effectivement utilisé pour l'encodage (peut différer de VIDEO_CODEC
+# si la source est dans un codec supérieur et qu'on applique une politique
+# "no downgrade" : ré-encodage dans le même codec pour limiter le bitrate).
+EFFECTIVE_VIDEO_CODEC=""
+EFFECTIVE_VIDEO_ENCODER=""
+EFFECTIVE_ENCODER_MODE_PARAMS=""
+
+# Contexte du dernier calcul de seuil (utile pour l'UX).
+SKIP_THRESHOLD_CODEC=""                 # codec dans lequel on compare le bitrate
+SKIP_THRESHOLD_MAXRATE_KBPS=""           # maxrate (kbps) dans le codec de comparaison
+SKIP_THRESHOLD_MAX_TOLERATED_BITS=""     # seuil final (bits) après tolérance
+SKIP_THRESHOLD_TOLERANCE_PERCENT=""      # tolérance appliquée
+
 # Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
 CURRENT_FILE_NUMBER=0
 
@@ -77,6 +90,15 @@ _determine_conversion_mode() {
         return 1
     fi
     
+    # Reset (pour éviter d'exposer des infos obsolètes)
+    EFFECTIVE_VIDEO_CODEC=""
+    EFFECTIVE_VIDEO_ENCODER=""
+    EFFECTIVE_ENCODER_MODE_PARAMS=""
+    SKIP_THRESHOLD_CODEC=""
+    SKIP_THRESHOLD_MAXRATE_KBPS=""
+    SKIP_THRESHOLD_MAX_TOLERATED_BITS=""
+    SKIP_THRESHOLD_TOLERANCE_PERCENT=""
+
     # Calcul dynamique du seuil de skip
     # En mode film-adaptive, on utilise le maxrate adaptatif calculé pour ce fichier
     # Sinon on utilise le MAXRATE_KBPS global
@@ -93,17 +115,45 @@ _determine_conversion_mode() {
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]] && [[ -n "$adaptive_maxrate_kbps" ]] && [[ "$adaptive_maxrate_kbps" =~ ^[0-9]+$ ]]; then
         effective_maxrate_kbps="$adaptive_maxrate_kbps"
     fi
-    
-    local base_threshold_bits=$((effective_maxrate_kbps * 1000))
-    local tolerance_bits=$((effective_maxrate_kbps * skip_tolerance_percent * 10))
-    local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
-    
-    # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible
+
+    # Codec cible (config) et comparaison codec-aware
     local target_codec="${VIDEO_CODEC:-hevc}"
+    local compare_codec="$target_codec"
+
+    # Détecter si le fichier est déjà encodé dans un codec "meilleur ou égal" au codec cible
     local is_better_or_equal_codec=false
-    
     if is_codec_better_or_equal "$codec" "$target_codec"; then
         is_better_or_equal_codec=true
+        compare_codec="$codec"
+    fi
+
+    # Si la source est dans un codec supérieur/égal, traduire le seuil dans l'espace
+    # du codec source (ex: seuil HEVC -> seuil AV1) pour comparer "à qualité équivalente".
+    # C'est plus conservateur (on skip moins souvent) quand la source est plus efficace.
+    local compare_maxrate_kbps="$effective_maxrate_kbps"
+    if [[ "$is_better_or_equal_codec" == true ]] && [[ -n "$compare_codec" ]] && [[ "$compare_codec" != "$target_codec" ]]; then
+        if declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
+            compare_maxrate_kbps=$(translate_bitrate_kbps_between_codecs "$effective_maxrate_kbps" "$target_codec" "$compare_codec")
+        fi
+    fi
+
+    if [[ -z "$compare_maxrate_kbps" ]] || ! [[ "$compare_maxrate_kbps" =~ ^[0-9]+$ ]]; then
+        compare_maxrate_kbps="$effective_maxrate_kbps"
+    fi
+
+    local base_threshold_bits=$((compare_maxrate_kbps * 1000))
+    local tolerance_bits=$((compare_maxrate_kbps * skip_tolerance_percent * 10))
+    local max_tolerated_bits=$((base_threshold_bits + tolerance_bits))
+
+    # Exposer le contexte du seuil pour l'UX
+    SKIP_THRESHOLD_CODEC="$compare_codec"
+    SKIP_THRESHOLD_MAXRATE_KBPS="$compare_maxrate_kbps"
+    SKIP_THRESHOLD_MAX_TOLERATED_BITS="$max_tolerated_bits"
+    SKIP_THRESHOLD_TOLERANCE_PERCENT="$skip_tolerance_percent"
+
+    # Option --force-video : bypass smart (ne pas skip la vidéo)
+    if [[ "${FORCE_VIDEO_CODEC:-false}" == true ]]; then
+        is_better_or_equal_codec=false
     fi
     
     # Vidéo conforme (bon codec + bitrate optimisé) ?
@@ -130,6 +180,27 @@ _determine_conversion_mode() {
     
     # Vidéo non conforme → conversion complète
     CONVERSION_ACTION="full"
+
+    # Politique no-downgrade : si la source est dans un codec supérieur, on ré-encode
+    # dans le même codec pour plafonner le bitrate (sauf --force-video).
+    EFFECTIVE_VIDEO_CODEC="$target_codec"
+    if [[ "${FORCE_VIDEO_CODEC:-false}" != true ]]; then
+        local source_rank target_rank
+        source_rank=$(get_codec_rank "$codec")
+        target_rank=$(get_codec_rank "$target_codec")
+        if [[ -n "$source_rank" && -n "$target_rank" ]] && [[ "$source_rank" =~ ^[0-9]+$ ]] && [[ "$target_rank" =~ ^[0-9]+$ ]]; then
+            if [[ "$source_rank" -gt "$target_rank" ]]; then
+                EFFECTIVE_VIDEO_CODEC="$codec"
+            fi
+        fi
+    fi
+
+    if [[ -n "$EFFECTIVE_VIDEO_CODEC" ]] && declare -f get_codec_encoder &>/dev/null; then
+        EFFECTIVE_VIDEO_ENCODER=$(get_codec_encoder "$EFFECTIVE_VIDEO_CODEC")
+        if declare -f get_encoder_mode_params &>/dev/null; then
+            EFFECTIVE_ENCODER_MODE_PARAMS=$(get_encoder_mode_params "$EFFECTIVE_VIDEO_ENCODER" "${ENCODER_MODE_PROFILE:-${CONVERSION_MODE:-serie}}")
+        fi
+    fi
     return 0
 }
 
@@ -469,8 +540,22 @@ _convert_run_adaptive_analysis_and_export() {
     adaptive_maxrate_kbps="${_mr%k}"
     adaptive_bufsize_kbps="${_bs%k}"
 
+    # Traduire les bitrates "référence HEVC" vers le codec cible actif.
+    # Cela rend film-adaptive cohérent quand VIDEO_CODEC != hevc.
+    local target_codec="${VIDEO_CODEC:-hevc}"
+    if [[ "$target_codec" != "hevc" ]] && declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
+        adaptive_target_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_target_kbps" "hevc" "$target_codec")
+        adaptive_maxrate_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_maxrate_kbps" "hevc" "$target_codec")
+        adaptive_bufsize_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_bufsize_kbps" "hevc" "$target_codec")
+    fi
+
     # Afficher l'analyse de complexité
     # Note: appelé dans des $(...) ; on force l'affichage sur stderr.
+    # Note UX: expliquer pourquoi on analyse.
+    if [[ "${UI_QUIET:-false}" != true ]]; then
+        echo -e "${DIM}  🔎 Mode film-adaptive : analyse de complexité pour déterminer le bitrate/seuil${NOCOLOR}" >&2
+    fi
+
     display_complexity_analysis "$file_to_analyze" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps" >&2
 
     # Stocker les paramètres adaptatifs dans des variables d'environnement
@@ -479,6 +564,50 @@ _convert_run_adaptive_analysis_and_export() {
     export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
 
     echo "${adaptive_target_kbps}|${adaptive_maxrate_kbps}|${adaptive_bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev_val}"
+}
+
+_convert_display_adaptive_decision_required() {
+    local v_codec="$1"
+    local v_bitrate_bits="$2"
+
+    [[ "${UI_QUIET:-false}" == true ]] && return 0
+    [[ "${NO_PROGRESS:-false}" == true ]] && return 0
+
+    local counter_prefix=$(_get_counter_prefix)
+
+    if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
+        echo -e "${counter_prefix}${CYAN}✅ Conversion requise : audio à optimiser (vidéo conservée)${NOCOLOR}" >&2
+        return 0
+    fi
+
+    if [[ ! "$v_bitrate_bits" =~ ^[0-9]+$ ]] || [[ "$v_bitrate_bits" -le 0 ]]; then
+        echo -e "${counter_prefix}${CYAN}✅ Conversion requise${NOCOLOR}" >&2
+        return 0
+    fi
+
+    local src_kbps=$(( v_bitrate_bits / 1000 ))
+    local threshold_bits="${SKIP_THRESHOLD_MAX_TOLERATED_BITS:-0}"
+    local threshold_kbps=0
+    if [[ "$threshold_bits" =~ ^[0-9]+$ ]] && [[ "$threshold_bits" -gt 0 ]]; then
+        threshold_kbps=$(( threshold_bits / 1000 ))
+    fi
+
+    local cmp_codec="${SKIP_THRESHOLD_CODEC:-$v_codec}"
+    local cmp_display="${cmp_codec^^}"
+    [[ "$cmp_codec" == "hevc" || "$cmp_codec" == "h265" ]] && cmp_display="X265"
+
+    local effective_codec="${EFFECTIVE_VIDEO_CODEC:-${VIDEO_CODEC:-hevc}}"
+    local target_codec="${VIDEO_CODEC:-hevc}"
+
+    if [[ -n "$threshold_kbps" && "$threshold_kbps" -gt 0 ]]; then
+        if [[ "$effective_codec" != "$target_codec" ]]; then
+            echo -e "${counter_prefix}${CYAN}✅ Conversion requise : ${src_kbps}k > seuil ${threshold_kbps}k (${cmp_display}) → pas de downgrade (encodage ${effective_codec^^})${NOCOLOR}" >&2
+        else
+            echo -e "${counter_prefix}${CYAN}✅ Conversion requise : ${src_kbps}k > seuil ${threshold_kbps}k (${cmp_display})${NOCOLOR}" >&2
+        fi
+    else
+        echo -e "${counter_prefix}${CYAN}✅ Conversion requise${NOCOLOR}" >&2
+    fi
 }
 
 # Gère le mode adaptatif : analyse, skip post-analyse, réservation slot.
@@ -514,6 +643,8 @@ _convert_handle_adaptive_mode() {
         call_if_exists increment_processed_count || true
         return 1
     fi
+
+    _convert_display_adaptive_decision_required "$v_codec" "$v_bitrate"
 
     # Réserver le slot limite après l'analyse (évite les slots "gâchés")
     if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
@@ -713,6 +844,8 @@ convert_file() {
             call_if_exists increment_processed_count || true
             return 0
         fi
+
+        _convert_display_adaptive_decision_required "$v_codec" "$v_bitrate"
 
         # Réserver le slot limite après l'analyse (évite les slots "gâchés")
         if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then

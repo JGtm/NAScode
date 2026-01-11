@@ -13,6 +13,21 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-11
+
+#### Vidéo : seuil de skip codec-aware + politique "no downgrade" (dont `film-adaptive`)
+- **Quoi** :
+  - Traduction du seuil de skip dans l’espace du codec source quand celui-ci est **meilleur/plus efficace** (ex: AV1 vs cible HEVC), via les facteurs d’efficacité codec.
+  - Politique par défaut : **ne jamais downgrade** le codec vidéo. Si une source AV1 est jugée “trop haut débit”, elle est ré-encodée **en AV1** pour plafonner le bitrate (sauf `--force-video`).
+  - En `film-adaptive`, les bitrates calculés (référence HEVC) sont désormais traduits vers le codec cible actif (ex: `--codec av1`).
+- **Où** :
+  - `lib/conversion.sh` : seuil codec-aware + sélection `EFFECTIVE_VIDEO_CODEC` et message explicite "Conversion requise" après analyse.
+  - `lib/transcode_video.sh` : support d’un codec/encodeur effectif par fichier et traduction des budgets bitrate (standard + film-adaptive).
+  - `lib/codec_profiles.sh` : `translate_bitrate_kbps_between_codecs()` + overrides `CODEC_EFFICIENCY_*`.
+  - Tests : `tests/test_conversion.bats`, `tests/test_conversion_mode.bats`.
+- **Pourquoi** : éviter des skips trop agressifs sur codecs plus efficaces et empêcher la régression qualité liée à un downgrade codec implicite.
+- **Impact** : change le comportement de skip sur sources AV1 quand la cible est HEVC (seuil plus strict) ; doc mise à jour (`README.md`, `docs/SMART_CODEC.md`).
+
 ### 2026-01-10
 
 #### UX CLI : `--quiet` (warnings/erreurs uniquement) + centralisation des sorties

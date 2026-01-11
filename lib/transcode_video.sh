@@ -30,6 +30,16 @@ PROGRESS_DISPLAY_TEXT_FIXED="Traitement en cours"
 # ADAPTIVE_BUFSIZE_KBPS si elles sont définies.
 _setup_video_encoding_params() {
     local input_file="$1"
+
+    local base_codec="${VIDEO_CODEC:-hevc}"
+    local effective_codec="${EFFECTIVE_VIDEO_CODEC:-$base_codec}"
+
+    # Encodeur effectif : peut différer si on encode dans un codec différent de VIDEO_CODEC.
+    local encoder="${EFFECTIVE_VIDEO_ENCODER:-${VIDEO_ENCODER:-}}"
+    if [[ -z "$encoder" ]] && declare -f get_codec_encoder &>/dev/null; then
+        encoder=$(get_codec_encoder "$effective_codec")
+    fi
+    [[ -z "$encoder" ]] && encoder="libx265"
     
     # Récupérer les propriétés du flux vidéo source
     local input_props
@@ -69,6 +79,13 @@ _setup_video_encoding_params() {
         effective_target="${ADAPTIVE_TARGET_KBPS}"
         effective_maxrate="${ADAPTIVE_MAXRATE_KBPS}"
         effective_bufsize="${ADAPTIVE_BUFSIZE_KBPS}"
+
+        # Si on encode dans un codec différent (no-downgrade), traduire le budget bitrate.
+        if [[ "$effective_codec" != "$base_codec" ]] && declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
+            effective_target=$(translate_bitrate_kbps_between_codecs "$effective_target" "$base_codec" "$effective_codec")
+            effective_maxrate=$(translate_bitrate_kbps_between_codecs "$effective_maxrate" "$base_codec" "$effective_codec")
+            effective_bufsize=$(translate_bitrate_kbps_between_codecs "$effective_bufsize" "$base_codec" "$effective_codec")
+        fi
     else
         # Mode standard : calcul basé sur la résolution de sortie
         local output_height
@@ -77,6 +94,13 @@ _setup_video_encoding_params() {
         effective_target=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
         effective_maxrate=$(_compute_effective_bitrate_kbps_for_height "${MAXRATE_KBPS}" "$output_height")
         effective_bufsize=$(_compute_effective_bitrate_kbps_for_height "${BUFSIZE_KBPS}" "$output_height")
+
+        # Traduire le budget bitrate vers le codec effectif si nécessaire.
+        if [[ "$effective_codec" != "$base_codec" ]] && declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
+            effective_target=$(translate_bitrate_kbps_between_codecs "$effective_target" "$base_codec" "$effective_codec")
+            effective_maxrate=$(translate_bitrate_kbps_between_codecs "$effective_maxrate" "$base_codec" "$effective_codec")
+            effective_bufsize=$(translate_bitrate_kbps_between_codecs "$effective_bufsize" "$base_codec" "$effective_codec")
+        fi
     fi
 
     VIDEO_BITRATE="${effective_target}k"
@@ -86,7 +110,6 @@ _setup_video_encoding_params() {
     # Construire les paramètres de base pour l'encodeur (VBV + mode extras)
     # Pour x265: "vbv-maxrate=X:vbv-bufsize=Y:amp=0:rect=0:..."
     # Pour svtav1: "tune=0:film-grain=8:..."
-    local encoder="${VIDEO_ENCODER:-libx265}"
     local vbv_params=""
     
     # Paramètres VBV selon l'encodeur
@@ -101,7 +124,10 @@ _setup_video_encoding_params() {
     esac
     
     # Ajouter les paramètres spécifiques au mode (tuning, optimisations)
-    local mode_params="${ENCODER_MODE_PARAMS:-}"
+    local mode_params="${EFFECTIVE_ENCODER_MODE_PARAMS:-${ENCODER_MODE_PARAMS:-}}"
+    if [[ -z "$mode_params" ]] && declare -f get_encoder_mode_params &>/dev/null; then
+        mode_params=$(get_encoder_mode_params "$encoder" "${ENCODER_MODE_PROFILE:-${CONVERSION_MODE:-serie}}")
+    fi
     
     # Combiner VBV + mode params
     ENCODER_BASE_PARAMS="$vbv_params"
@@ -313,7 +339,7 @@ _run_ffmpeg_encode() {
     START_TS="$(date +%s)"
     
     # Encodeur à utiliser (défaut: libx265 pour rétro-compatibilité)
-    local encoder="${VIDEO_ENCODER:-libx265}"
+    local encoder="${EFFECTIVE_VIDEO_ENCODER:-${VIDEO_ENCODER:-libx265}}"
     
     # Construire les options hwaccel (vide si non disponible = fallback software)
     local hwaccel_opts=""

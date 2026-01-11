@@ -22,6 +22,7 @@ export_variables() {
     # --- Fonctions codec_profiles.sh (gestion des codecs vidéo) ---
     export -f get_codec_encoder get_codec_suffix get_codec_ffmpeg_names
     export -f is_codec_match is_codec_supported get_codec_rank get_codec_efficiency
+    export -f translate_bitrate_kbps_between_codecs
     export -f is_codec_better_or_equal convert_preset validate_codec_config
     export -f get_encoder_params_flag
     

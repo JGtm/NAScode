@@ -214,8 +214,31 @@ STUB
     chmod +x "$stub_dir/ffprobe"
     PATH="$stub_dir:$PATH"
     
-    run should_skip_conversion "av1" "2000000" "test.mkv" "/source/test.mkv"
+    # Seuil HEVC serie : 2520k (+10% tolérance) = 2772k
+    # Traduit en AV1 (efficacité 50 vs 70) : 2772 * 50/70 ≈ 1980k
+    run should_skip_conversion "av1" "1900000" "test.mkv" "/source/test.mkv"
     [ "$status" -eq 0 ]
+}
+
+@test "should_skip_conversion: pas de skip si av1 au-dessus du seuil traduit quand cible hevc" {
+    VIDEO_CODEC="hevc"
+    set_conversion_mode_parameters
+
+    # Audio déjà optimisé
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+echo "codec_name=opus"
+echo "bit_rate=128000"
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+
+    # 2000k > ~1980k (seuil AV1 traduit) => conversion nécessaire
+    run should_skip_conversion "av1" "2000000" "test.mkv" "/source/test.mkv"
+    [ "$status" -ne 0 ]
 }
 
 @test "should_skip_conversion: pas de skip si hevc quand cible av1" {

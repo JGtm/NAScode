@@ -119,13 +119,53 @@ get_codec_rank() {
 # - VVC   : ~65% plus efficace que H.264 → 35% (futur)
 get_codec_efficiency() {
     local codec="$1"
+
+    # Permet des overrides via variables d'env (utile pour calibrer sans modifier le code)
+    # Valeurs par défaut : H.264=100, HEVC=70, AV1=50, VVC=35
+    local eff_h264="${CODEC_EFFICIENCY_H264:-100}"
+    local eff_hevc="${CODEC_EFFICIENCY_HEVC:-70}"
+    local eff_av1="${CODEC_EFFICIENCY_AV1:-50}"
+    local eff_vvc="${CODEC_EFFICIENCY_VVC:-35}"
+
     case "$codec" in
-        h264|avc)  echo 100 ;;  # Référence
-        hevc|h265) echo 70 ;;   # ~30% plus efficace
-        av1)       echo 50 ;;   # ~50% plus efficace
-        vvc|h266)  echo 35 ;;   # ~65% plus efficace (futur)
+        h264|avc)  echo "$eff_h264" ;;  # Référence
+        hevc|h265) echo "$eff_hevc" ;;  # ~30% plus efficace
+        av1)       echo "$eff_av1" ;;   # ~50% plus efficace
+        vvc|h266)  echo "$eff_vvc" ;;   # ~65% plus efficace (futur)
         *)         echo 100 ;;  # Inconnu → prudent (bitrate H.264)
     esac
+}
+
+# Traduit un bitrate (kbps) entre deux codecs en conservant une qualité perçue équivalente.
+# Les efficacités sont celles de get_codec_efficiency() : plus bas = plus efficace.
+#
+# Usage: translate_bitrate_kbps_between_codecs <kbps> <from_codec> <to_codec>
+# Exemple: 2520 (HEVC) -> AV1 = 2520 * 50/70 ≈ 1800
+translate_bitrate_kbps_between_codecs() {
+    local kbps="$1"
+    local from_codec="${2:-hevc}"
+    local to_codec="${3:-hevc}"
+
+    if [[ -z "$kbps" ]] || ! [[ "$kbps" =~ ^[0-9]+$ ]]; then
+        echo "$kbps"
+        return 0
+    fi
+
+    local from_eff to_eff
+    from_eff=$(get_codec_efficiency "$from_codec")
+    to_eff=$(get_codec_efficiency "$to_codec")
+
+    if [[ -z "$from_eff" ]] || ! [[ "$from_eff" =~ ^[0-9]+$ ]] || [[ "$from_eff" -le 0 ]]; then
+        echo "$kbps"
+        return 0
+    fi
+    if [[ -z "$to_eff" ]] || ! [[ "$to_eff" =~ ^[0-9]+$ ]] || [[ "$to_eff" -le 0 ]]; then
+        echo "$kbps"
+        return 0
+    fi
+
+    # Arrondi au plus proche, mais reste déterministe en entier.
+    awk -v b="$kbps" -v f="$from_eff" -v t="$to_eff" 'BEGIN { printf "%.0f\n", (b * t) / f }'
 }
 
 # Vérifie si un codec source est "meilleur ou égal" au codec cible

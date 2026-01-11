@@ -54,6 +54,8 @@ La logique s’appuie sur un rang d’efficacité (voir `get_audio_codec_rank()`
 
 - Codec vidéo cible par défaut : `hevc`.
 - Un codec “meilleur ou égal” au codec cible peut être conservé si le bitrate est raisonnable.
+- Si la source est dans un codec plus efficace que la cible (ex: AV1 vs cible HEVC), le seuil est **traduit** dans l’espace du codec source via l’efficacité codec (cf. `get_codec_efficiency()` dans `lib/codec_profiles.sh`).
+- Politique par défaut : **ne pas downgrade** le codec vidéo (ex: un AV1 trop haut débit est ré-encodé en AV1 pour plafonner le bitrate, pas en HEVC).
 - Si la vidéo est OK mais l’audio peut être optimisé, le script peut faire du **video passthrough**.
 
 Pour forcer le ré-encodage : `--force-video`.
@@ -75,10 +77,16 @@ $$\text{seuil} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times \left(1 + \frac{\text{S
 - du codec cible (efficacité codec),
 - et éventuellement d’une adaptation par résolution (voir [CONFIG.md](CONFIG.md)).
 
+Quand la source est dans un codec “meilleur ou égal” à la cible, le seuil est comparé dans le codec source :
+
+$$\text{seuil}_{source} = \text{seuil}_{cible} \times \frac{\mathrm{eff}(source)}{\mathrm{eff}(cible)}$$
+
+Exemple (cible HEVC, source AV1) : $2772k \times 50/70 \approx 1980k$.
+
 ### Cas usuels (simplifiés)
 
 - Source meilleur ou égal au codec cible + bitrate raisonnable : **skip** (conserver)
-- Source meilleur ou égal mais bitrate trop élevé : **encode**
+- Source meilleur ou égal mais bitrate trop élevé : **encode** (dans le **codec source** si celui-ci est supérieur)
 - Source moins bon que cible : **encode**
 - Vidéo conforme mais audio perfectible : **video passthrough** (vidéo copiée, audio traité)
 

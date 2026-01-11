@@ -79,3 +79,28 @@ _reset_state() {
     [ "$status" -eq 0 ]
     [ "$CONVERSION_ACTION" = "full" ]
 }
+
+@test "_determine_conversion_mode: AV1 + bitrate sous seuil traduit (cible HEVC) => skip" {
+    _reset_state
+
+    # MAXRATE_KBPS (HEVC/serie)=2520, tolérance 10% -> 2772k
+    # Traduit en AV1 : 2772 * 50/70 ≈ 1980k
+    local status
+    if _determine_conversion_mode "av1" "1900000" "file.mkv" "/source/file.mkv" "aac" "160" ""; then
+        status=0
+    else
+        status=$?
+    fi
+    [ "$status" -eq 1 ]
+    [ "$CONVERSION_ACTION" = "skip" ]
+}
+
+@test "_determine_conversion_mode: AV1 + bitrate au-dessus seuil traduit (cible HEVC) => full + no-downgrade" {
+    _reset_state
+
+    _determine_conversion_mode "av1" "2000000" "file.mkv" "/source/file.mkv" "aac" "160" "" || true
+    [ "$CONVERSION_ACTION" = "full" ]
+
+    # Pas de downgrade : on ré-encode en AV1 pour plafonner le bitrate
+    [ "$EFFECTIVE_VIDEO_CODEC" = "av1" ]
+}

@@ -93,13 +93,14 @@ Rappels :
 - Le “skip” dépend d’un seuil dérivé de `MAXRATE_KBPS` et d’une tolérance :
 	- $\text{seuil} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times (1 + \text{tolérance})$
 	- Par défaut : tolérance 10%
-	- Exemples (mode `serie`) : HEVC maxrate 2520k → seuil 2772k ; AV1 maxrate 1800k → seuil 1980k
+	- Si la source est dans un codec **plus efficace** que la cible (ex: AV1 alors que la cible est HEVC), le seuil est **traduit** dans l’espace du codec source via l’efficacité codec.
+	- Exemple (mode `serie`, cible HEVC) : seuil HEVC 2772k → seuil AV1 ≈ $2772 \times 50/70 \approx 1980$k
 - `--force-video` : force le ré-encodage vidéo (bypass smart).
 
 | Codec source | vs cible | Bitrate (vs seuil) | Action | Résultat |
 |-------------|----------|--------------------|--------|----------|
-| AV1 | > HEVC | $\le$ seuil AV1 | `skip` | Conservé (meilleur codec, bitrate OK) |
-| AV1 | > HEVC | $>$ seuil AV1 | `encode` | Ré-encodage (bitrate trop élevé) |
+| AV1 | > HEVC | $\le$ seuil (traduit) | `skip` | Conservé (meilleur codec, bitrate OK) |
+| AV1 | > HEVC | $>$ seuil (traduit) | `encode` | Ré-encodage **en AV1** (pas de downgrade) |
 | HEVC | = HEVC | $\le$ seuil HEVC | `skip` | Conservé (déjà optimisé) |
 | HEVC | = HEVC | $>$ seuil HEVC | `encode` | Ré-encodage (bitrate trop élevé) |
 | VP9 / H.264 / MPEG4 | < HEVC | * | `encode` | Conversion → HEVC |
