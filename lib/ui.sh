@@ -697,7 +697,7 @@ _print_10bit_info() {
 # Usage: _print_audio_multichannel_info <channels>
 _print_audio_multichannel_info() {
     local channels="$1"
-    
+
     if [[ -n "$channels" && "$channels" =~ ^[0-9]+$ ]] && declare -f _is_audio_multichannel &>/dev/null; then
         if _is_audio_multichannel "$channels"; then
             if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]]; then
@@ -722,14 +722,14 @@ _print_audio_conversion_summary() {
     local a_codec="$2"
     local a_bitrate="$3"
     local channels="$4"
-    
+
     if ! declare -f _get_smart_audio_decision &>/dev/null; then
         return 1
     fi
     if [[ -z "$channels" ]] || ! [[ "$channels" =~ ^[0-9]+$ ]]; then
         return 1
     fi
-    
+
     local audio_decision action effective_codec target_bitrate reason
     audio_decision=$(_get_smart_audio_decision "$tmp_input" "$a_codec" "$a_bitrate" "$channels")
     IFS='|' read -r action effective_codec target_bitrate reason <<< "$audio_decision"
@@ -785,7 +785,6 @@ print_conversion_info() {
     local codec_display="${v_codec^^}"
     [[ "$v_codec" == "hevc" || "$v_codec" == "h265" ]] && codec_display="X265"
     [[ "$v_codec" == "av1" ]] && codec_display="AV1"
-
     if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
         echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → Conversion audio seule${NOCOLOR}"
     else
@@ -805,13 +804,13 @@ print_conversion_info() {
     local channels=""
     if declare -f _probe_audio_channels &>/dev/null; then
         local channel_info
-        channel_info=$(_probe_audio_channels "$tmp_input")
+        channel_info=$(_probe_audio_channels "$tmp_input" || true)
         channels=$(echo "$channel_info" | cut -d'|' -f1)
     fi
 
     # Info audio multicanal
-    _print_audio_multichannel_info "$channels"
+    _print_audio_multichannel_info "$channels" || true
 
     # Résumé audio effectif
-    _print_audio_conversion_summary "$tmp_input" "$a_codec" "$a_bitrate" "$channels"
+    _print_audio_conversion_summary "$tmp_input" "$a_codec" "$a_bitrate" "$channels" || true
 }

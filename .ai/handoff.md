@@ -1,6 +1,32 @@
 # Handoff
 
-## Dernière session (11/01/2026 - Refactoring conversion.sh)
+## Dernière session (11/01/2026 - Debug blocage post-téléchargement)
+
+### Symptôme
+
+- Après le transfert vers le dossier temporaire, l’exécution semblait “bloquée” et nécessitait Ctrl+C.
+
+### Diagnostic
+
+- `nascode` active `set -euo pipefail`.
+- `print_conversion_info()` appelait des helpers “informatifs” qui retournent `1` en cas normal (ex: audio stéréo = pas de message multicanal). Avec `errexit`, un `return 1` non géré peut interrompre silencieusement le flux, ce qui ressemble à un blocage.
+- `lib/audio_decision.sh` n’était pas sourcé alors que des helpers audio sont utilisés depuis `lib/ui.sh` et `lib/audio_params.sh`.
+
+### Correctifs
+
+- `nascode` : ajout du `source lib/audio_decision.sh` avant `lib/audio_params.sh`.
+- `lib/ui.sh` : `print_conversion_info()` ignore explicitement les retours non-erreur des helpers (`|| true`) et rend le probe audio plus robuste sous `set -e`.
+
+### Notes
+
+- Les noms de fichiers avec espaces/accents ne sont pas la cause principale ici (les chemins sont correctement quotés) ; le problème était lié aux codes de retour + `errexit`.
+
+### Statut
+
+- L’utilisateur confirme : “C’est bon ça remarche visiblement”.
+- Tests non relancés automatiquement (recommandé : `bash run_tests.sh`).
+
+## Session précédente (11/01/2026 - Refactoring conversion.sh)
 
 ### Objectif
 

@@ -28,6 +28,12 @@ Objectifs :
 - **Pourquoi** : conversion.sh était devenu trop long (958 lignes) avec des responsabilités mélangées (décision, préparation, UI, adaptatif). La séparation permet des tests unitaires ciblés et une meilleure lisibilité.
 - **Impact** : aucun changement de comportement ; doc ARCHITECTURE.md mise à jour.
 
+#### Fix : évite un arrêt silencieux (set -e) après préparation
+- **Quoi** : sécurisation de l'affichage audio (retours “informatifs” non fatals) + sourcing du module audio manquant.
+- **Où** : `nascode` (source `lib/audio_decision.sh`), `lib/ui.sh` (`print_conversion_info()` protège les helpers audio qui peuvent retourner `1`).
+- **Pourquoi** : sous `set -euo pipefail`, un `return 1` “normal” dans un helper UI arrêtait le script et donnait l’impression d’un blocage.
+- **Impact** : NAScode continue la conversion au lieu de quitter silencieusement ; pas de changement de paramètres d’encodage.
+
 #### Vidéo : seuil de skip codec-aware + politique "no downgrade" (dont `film-adaptive`)
 - **Quoi** :
   - Traduction du seuil de skip dans l’espace du codec source quand celui-ci est **meilleur/plus efficace** (ex: AV1 vs cible HEVC), via les facteurs d’efficacité codec.
