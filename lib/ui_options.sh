@@ -63,7 +63,7 @@ format_option_sort_mode() {
 
     # En mode random, la sélection est aléatoire (l'ordre initial n'est pas pertinent)
     if [[ "${RANDOM_MODE:-false}" == true ]]; then
-        echo -e "↕️  Tri de la queue : ${YELLOW}aléatoire (sélection)${NOCOLOR}"
+        echo -e "↕️   Tri de la queue : ${YELLOW}aléatoire (sélection)${NOCOLOR}"
         return 0
     fi
 
@@ -86,7 +86,7 @@ format_option_sort_mode() {
             ;;
     esac
 
-    echo -e "↕️  Tri de la queue : ${YELLOW}${label}${NOCOLOR}"
+    echo -e "↕️   Tri de la queue : ${YELLOW}${label}${NOCOLOR}"
 }
 
 # Formate une option mode échantillon pour print_active_options
