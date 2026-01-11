@@ -6,6 +6,19 @@
 ###########################################################
 
 ###########################################################
+# VARIABLES DE COMPTAGE (AFFICHAGE)
+###########################################################
+
+# Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
+CURRENT_FILE_NUMBER=0
+
+# En mode limite (-l), afficher un compteur "slot en cours" 1-based pour l'UX.
+# Le slot est réservé de façon atomique (mutex) uniquement quand on sait
+# qu'on ne va PAS skip le fichier (y compris après analyse adaptative).
+# Il reste stable pendant tout le traitement du fichier.
+LIMIT_DISPLAY_SLOT=0
+
+###########################################################
 # COMPTEURS DE FICHIERS TRAITÉS/CONVERTIS
 ###########################################################
 
