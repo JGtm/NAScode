@@ -59,6 +59,12 @@ Objectifs :
 - **Pourquoi** : éviter d’augmenter inutilement le bitrate/surface disque lors d’un ré-encodage vers un codec plus efficace.
 - **Impact** : paramètres d’encodage potentiellement plus bas sur sources H.264 bas débit ; logique de skip inchangée.
 
+#### SVT-AV1 : plafonnement du bitrate en mode CRF (MBR)
+- **Quoi** : en single-pass CRF avec `libsvtav1`, ajout du paramètre `mbr=` (Maximum BitRate) pour limiter le débit instantané et éviter des fichiers plus gros que la source sur du contenu très complexe.
+- **Où** : `lib/transcode_video.sh` (construction `ENCODER_BASE_PARAMS` pour `libsvtav1`).
+- **Pourquoi** : rendre le mode CRF plus prédictible côté taille quand la complexité explose.
+- **Impact** : uniquement SVT-AV1 + CRF ; pas d’impact sur x265/two-pass.
+
 ### 2026-01-10
 
 #### UX CLI : `--quiet` (warnings/erreurs uniquement) + centralisation des sorties
