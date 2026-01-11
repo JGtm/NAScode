@@ -1,5 +1,30 @@
 # Handoff
 
+## Dernière session (11/01/2026 - Vidéo : cap qualité équivalente (source moins efficace))
+
+### Objectif
+
+- Ajouter une traduction "qualité équivalente" quand la source est dans un codec moins efficace (ex: H.264 → HEVC), sans changer la logique de skip.
+
+### Tâches accomplies
+
+- `lib/conversion.sh`
+  - Expose `SOURCE_VIDEO_CODEC` et `SOURCE_VIDEO_BITRATE_BITS` (par fichier) pour le module d'encodage.
+
+- `lib/transcode_video.sh`
+  - En modes non adaptatifs : plafonne `TARGET/MAXRATE/BUFSIZE` à un budget "qualité équivalente" (via `translate_bitrate_kbps_between_codecs`) quand la source est moins efficace.
+
+- Tests
+  - `tests/test_encoding_subfunctions.bats` : ajout d'un test couvrant le cap (H.264 1000k → HEVC 700k).
+
+- Doc
+  - `docs/SMART_CODEC.md` : mention du plafonnement anti-upscaling.
+  - `.ai/DEVBOOK.md` : entrée de journal correspondante.
+
+### Validation
+
+- `bash run_tests.sh` (OK).
+
 ## Dernière session (11/01/2026 - Tests : stabilisation interruption E2E)
 
 ### Objectif

@@ -34,6 +34,12 @@ Objectifs :
 - **Pourquoi** : rendre le test déterministe sur Windows (Git Bash/MSYS2).
 - **Impact** : test E2E plus stable ; aucun changement de comportement runtime de NAScode.
 
+#### Vidéo : cap "qualité équivalente" quand la source est moins efficace (mode standard)
+- **Quoi** : en modes non adaptatifs, si la source est dans un codec moins efficace que le codec d’encodage effectif (ex: H.264 → HEVC) et que son bitrate est bas, plafonnement des budgets (target/maxrate/bufsize) à une valeur “qualité équivalente” via `translate_bitrate_kbps_between_codecs()`.
+- **Où** : `lib/transcode_video.sh` (calcul budgets), `lib/conversion.sh` (expose codec/bitrate source au module d’encodage), tests dans `tests/test_encoding_subfunctions.bats`.
+- **Pourquoi** : éviter d’augmenter inutilement le bitrate/surface disque lors d’un ré-encodage vers un codec plus efficace.
+- **Impact** : paramètres d’encodage potentiellement plus bas sur sources H.264 bas débit ; logique de skip inchangée.
+
 ### 2026-01-10
 
 #### UX CLI : `--quiet` (warnings/erreurs uniquement) + centralisation des sorties

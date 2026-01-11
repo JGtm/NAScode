@@ -103,6 +103,38 @@ _setup_video_encoding_params() {
         fi
     fi
 
+    # Cap "qualité équivalente" : si la source est dans un codec moins efficace que
+    # le codec d'encodage effectif, plafonner le budget pour éviter de gonfler le bitrate.
+    # Ne change pas la décision de skip : uniquement les paramètres d'encodage.
+    local src_codec="${SOURCE_VIDEO_CODEC:-}"
+    local src_bitrate_bits="${SOURCE_VIDEO_BITRATE_BITS:-}"
+    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]] && [[ -n "$src_codec" ]] && [[ "$src_bitrate_bits" =~ ^[0-9]+$ ]] && [[ "$src_bitrate_bits" -gt 0 ]]; then
+        if ! is_codec_better_or_equal "$src_codec" "$effective_codec"; then
+            local src_kbps=$((src_bitrate_bits / 1000))
+            if [[ "$src_kbps" -gt 0 ]] && [[ "$effective_target" =~ ^[0-9]+$ ]] && [[ "$effective_target" -gt 0 ]]; then
+                local cap_kbps="$src_kbps"
+                if declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
+                    cap_kbps=$(translate_bitrate_kbps_between_codecs "$src_kbps" "$src_codec" "$effective_codec")
+                fi
+
+                if [[ "$cap_kbps" =~ ^[0-9]+$ ]] && [[ "$cap_kbps" -gt 0 ]] && [[ "$cap_kbps" -lt "$effective_target" ]]; then
+                    local original_target_kbps="$effective_target"
+                    effective_target="$cap_kbps"
+
+                    if [[ "$effective_maxrate" =~ ^[0-9]+$ ]] && [[ "$effective_maxrate" -gt 0 ]]; then
+                        effective_maxrate=$((effective_maxrate * cap_kbps / original_target_kbps))
+                    fi
+                    if [[ "$effective_bufsize" =~ ^[0-9]+$ ]] && [[ "$effective_bufsize" -gt 0 ]]; then
+                        effective_bufsize=$((effective_bufsize * cap_kbps / original_target_kbps))
+                    fi
+
+                    [[ "$effective_maxrate" -lt "$effective_target" ]] && effective_maxrate="$effective_target"
+                    [[ "$effective_bufsize" -lt "$effective_maxrate" ]] && effective_bufsize="$effective_maxrate"
+                fi
+            fi
+        fi
+    fi
+
     VIDEO_BITRATE="${effective_target}k"
     VIDEO_MAXRATE="${effective_maxrate}k"
     VIDEO_BUFSIZE="${effective_bufsize}k"

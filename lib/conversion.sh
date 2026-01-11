@@ -25,6 +25,11 @@ SKIP_THRESHOLD_TOLERANCE_PERCENT=""      # tolérance appliquée
 # Variable pour stocker le numéro de fichier courant (pour affichage [X/Y])
 CURRENT_FILE_NUMBER=0
 
+# Métadonnées source (par fichier) utiles au calcul des paramètres d'encodage.
+# (ex: cap « qualité équivalente » quand le codec source est moins efficace)
+SOURCE_VIDEO_CODEC=""
+SOURCE_VIDEO_BITRATE_BITS=""
+
 # En mode limite (-l), afficher un compteur “slot en cours” 1-based pour l'UX.
 # Le slot est réservé de façon atomique (mutex) uniquement quand on sait
 # qu'on ne va PAS skip le fichier (y compris après analyse adaptative).
@@ -790,6 +795,10 @@ convert_file() {
     
     local v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate
     IFS='|' read -r v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate <<< "$full_metadata"
+
+    # Exposer les métadonnées source pour les modules d'encodage.
+    SOURCE_VIDEO_CODEC="$v_codec"
+    SOURCE_VIDEO_BITRATE_BITS="$v_bitrate"
     
     # 2. Préparation des chemins
     local path_info

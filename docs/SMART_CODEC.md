@@ -56,6 +56,7 @@ La logique s’appuie sur un rang d’efficacité (voir `get_audio_codec_rank()`
 - Un codec “meilleur ou égal” au codec cible peut être conservé si le bitrate est raisonnable.
 - Si la source est dans un codec plus efficace que la cible (ex: AV1 vs cible HEVC), le seuil est **traduit** dans l’espace du codec source via l’efficacité codec (cf. `get_codec_efficiency()` dans `lib/codec_profiles.sh`).
 - Politique par défaut : **ne pas downgrade** le codec vidéo (ex: un AV1 trop haut débit est ré-encodé en AV1 pour plafonner le bitrate, pas en HEVC).
+- Si la source est dans un codec **moins efficace** que le codec d’encodage (ex: H.264 → HEVC) et que son bitrate est déjà bas, le budget bitrate peut être **plafonné** à une valeur “qualité équivalente” pour éviter d’augmenter inutilement le bitrate lors du ré-encodage (anti-upscaling).
 - Si la vidéo est OK mais l’audio peut être optimisé, le script peut faire du **video passthrough**.
 
 Pour forcer le ré-encodage : `--force-video`.

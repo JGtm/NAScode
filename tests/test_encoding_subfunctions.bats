@@ -53,6 +53,27 @@ teardown() {
     [ "$bitrate_num" -gt 1400 ]
 }
 
+@test "_setup_video_encoding_params: cap qualité équivalente si codec source moins efficace" {
+    # Source: H.264 à 1000 kbps ; cible: HEVC.
+    # Avec efficacités par défaut (H264=100, HEVC=70), le cap attendu est 700 kbps.
+    CONVERSION_MODE="serie"
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="libx265"
+    set_conversion_mode_parameters
+
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    export -f get_video_stream_props
+
+    SOURCE_VIDEO_CODEC="h264"
+    SOURCE_VIDEO_BITRATE_BITS=1000000
+
+    _setup_video_encoding_params "/fake/file.mkv"
+
+    [ "$VIDEO_BITRATE" = "700k" ]
+    [ "$VIDEO_MAXRATE" = "852k" ]
+    [ "$VIDEO_BUFSIZE" = "1278k" ]
+}
+
 @test "_setup_video_encoding_params: définit OUTPUT_PIX_FMT" {
     get_video_stream_props() { echo "1920|1080|yuv420p10le"; }
     export -f get_video_stream_props
