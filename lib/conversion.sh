@@ -555,13 +555,6 @@ _convert_run_adaptive_analysis_and_export() {
         adaptive_bufsize_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_bufsize_kbps" "hevc" "$target_codec")
     fi
 
-    # Afficher l'analyse de complexité
-    # Note: appelé dans des $(...) ; on force l'affichage sur stderr.
-    # Note UX: expliquer pourquoi on analyse.
-    if [[ "${UI_QUIET:-false}" != true ]]; then
-        echo -e "${DIM}  🔎 Mode film-adaptive : analyse de complexité pour déterminer le bitrate/seuil${NOCOLOR}" >&2
-    fi
-
     display_complexity_analysis "$file_to_analyze" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps" >&2
 
     # Option B (UX, conditionnelle) : afficher le seuil de skip uniquement quand il
@@ -618,12 +611,12 @@ _convert_display_adaptive_decision_required() {
     [[ "${NO_PROGRESS:-false}" == true ]] && return 0
 
     if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
-        echo -e "${CYAN}  ✅ Conversion requise : audio à optimiser (vidéo conservée)${NOCOLOR}" >&2
+        echo -e "${CYAN}  ⚠ Conversion requise : audio à optimiser (vidéo conservée)${NOCOLOR}" >&2
         return 0
     fi
 
     if [[ ! "$v_bitrate_bits" =~ ^[0-9]+$ ]] || [[ "$v_bitrate_bits" -le 0 ]]; then
-        echo -e "${CYAN}  ✅ Conversion requise${NOCOLOR}" >&2
+        echo -e "${CYAN}  ⚠ Conversion requise${NOCOLOR}" >&2
         return 0
     fi
 
@@ -658,18 +651,25 @@ _convert_display_adaptive_decision_required() {
         if [[ "$is_better_or_equal" != true ]]; then
             # Source dans un codec moins efficace : la conversion est requise pour changer de codec
             # (le seuil skip n'est pas pertinent dans ce cas).
-            echo -e "${CYAN}  ✅ Conversion requise : codec source ${src_display} → ${target_display} (bitrate ${src_kbps}k)${NOCOLOR}" >&2
+            echo -e "${CYAN}  ⚠ Conversion requise : codec source ${src_display} → ${target_display} (bitrate ${src_kbps}k)${NOCOLOR}" >&2
         else
             # Source déjà dans un codec meilleur/égal : la conversion est requise car le bitrate est trop élevé.
             if [[ "$effective_codec" != "$target_codec" ]]; then
-                echo -e "${CYAN}  ✅ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display}) → pas de downgrade (encodage ${effective_codec^^})${NOCOLOR}" >&2
+                echo -e "${CYAN}  ⚠ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display}) → pas de downgrade (encodage ${effective_codec^^})${NOCOLOR}" >&2
             else
-                echo -e "${CYAN}  ✅ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display})${NOCOLOR}" >&2
+                echo -e "${CYAN}  ⚠ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display})${NOCOLOR}" >&2
             fi
         fi
     else
-        echo -e "${CYAN}  ✅ Conversion requise${NOCOLOR}" >&2
+        echo -e "${CYAN}  ⚠ Conversion requise${NOCOLOR}" >&2
     fi
+}
+
+_convert_display_adaptive_decision_not_required() {
+    [[ "${UI_QUIET:-false}" == true ]] && return 0
+    [[ "${NO_PROGRESS:-false}" == true ]] && return 0
+
+    echo -e "${CYAN}  ✅ Pas de conversion nécessaire${NOCOLOR}" >&2
 }
 
 # Gère le mode adaptatif : analyse, skip post-analyse, réservation slot.
@@ -698,6 +698,7 @@ _convert_handle_adaptive_mode() {
 
     # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
     if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
+        _convert_display_adaptive_decision_not_required
         rm -f "$tmp_input" 2>/dev/null || true
         if [[ "$LIMIT_FILES" -gt 0 ]]; then
             call_if_exists update_queue || true
@@ -906,6 +907,7 @@ convert_file() {
 
         # Skip avec seuil adaptatif (avant transfert)
         if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
+            _convert_display_adaptive_decision_not_required
             [[ "$LIMIT_FILES" -gt 0 ]] && call_if_exists update_queue || true
             call_if_exists increment_processed_count || true
             return 0
