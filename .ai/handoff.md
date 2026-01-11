@@ -1,5 +1,29 @@
 # Handoff
 
+## Dernière session (11/01/2026 - Tests : stabilisation interruption E2E)
+
+### Objectif
+
+- Corriger le test E2E d'interruption en cours (Windows/MSYS2) qui n'obtenait pas systématiquement `NASCODE_EXIT=130`.
+
+### Tâches accomplies
+
+- `tests/test_regression_e2e.bats`
+  - Stabilisation du scénario d'interruption : éviter le pipe en background (PID ambigu) et utiliser `SIGTERM` (fiable en job arrière-plan) au lieu de `SIGINT`.
+
+### Notes / Validation
+
+- Test ciblé relancé via `bats ... -f "interruption en cours"` (OK).
+- Suite complète `bash run_tests.sh` (OK, 0 échec).
+
+### Branche en cours
+
+- `feature/film-adaptive-ux`
+
+### Derniers prompts
+
+- "✗  [22/32] test_regression_e2e.bats ... `[[ \"$output\" =~ \"NASCODE_EXIT=130\" ]]` failed"
+
 ## Dernière session (11/01/2026 - film-adaptive : seuil codec-aware + no-downgrade)
 
 ### Objectif

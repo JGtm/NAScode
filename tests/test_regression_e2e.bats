@@ -435,18 +435,20 @@ teardown() {
         cd "$WORKDIR"
 
         # Lancer NAScode en arrière-plan
-        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+        bash "$PROJECT_ROOT/nascode" \
             -s "$SRC_DIR" -o "$OUT_DIR" \
             --mode serie \
             --keep-index \
             --no-suffix \
             --no-progress \
-            --limit 1 &
+            --limit 1 <<< "n" &
         pid=$!
 
-        # Attendre un peu puis simuler Ctrl+C
+        # Attendre un peu puis simuler une interruption.
+        # Note: Sous Bash/MSYS2, les jobs en arrière-plan peuvent ignorer SIGINT.
+        # SIGTERM est plus fiable et est géré par le même trap (_handle_interrupt).
         sleep 1
-        kill -INT "$pid" 2>/dev/null || true
+        kill -TERM "$pid" 2>/dev/null || true
 
         wait "$pid"
         exit_code=$?
