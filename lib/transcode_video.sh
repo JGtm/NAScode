@@ -171,9 +171,9 @@ _setup_video_encoding_params() {
         fi
     fi
 
-    # SVT-AV1: inclure le keyint dans -svtav1-params (en plus du -g générique)
-    # pour coller à la commande type et garder un paramétrage centralisé.
+    # SVT-AV1: paramètres spécifiques via -svtav1-params
     if [[ "$encoder" == "libsvtav1" ]]; then
+        # Keyint (en plus du -g générique) pour cohérence
         if [[ "$ENCODER_BASE_PARAMS" != *"keyint="* ]]; then
             local mode_keyint
             mode_keyint="${FILM_KEYINT:-600}"
@@ -182,6 +182,19 @@ _setup_video_encoding_params() {
                     ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:keyint=${mode_keyint}"
                 else
                     ENCODER_BASE_PARAMS="keyint=${mode_keyint}"
+                fi
+            fi
+        fi
+        
+        # MBR (Maximum BitRate) : plafonne le bitrate en mode CRF pour éviter
+        # les fichiers plus gros que la source sur du contenu complexe.
+        # Utilise effective_maxrate comme limite (plus permissif que effective_target).
+        if [[ "${SINGLE_PASS_MODE:-false}" == true ]] && [[ "$ENCODER_BASE_PARAMS" != *"mbr="* ]]; then
+            if [[ "$effective_maxrate" =~ ^[0-9]+$ ]] && [[ "$effective_maxrate" -gt 0 ]]; then
+                if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
+                    ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:mbr=${effective_maxrate}"
+                else
+                    ENCODER_BASE_PARAMS="mbr=${effective_maxrate}"
                 fi
             fi
         fi

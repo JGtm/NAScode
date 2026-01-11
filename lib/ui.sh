@@ -82,9 +82,9 @@ print_header() {
     done
     
     echo ""
-    echo -e "${color}${top_line}${NOCOLOR}"
-    echo -e "${color}${BOX_V}${NOCOLOR}${spaces}${WHITE}${title}${NOCOLOR}${spaces}${color}${BOX_V}${NOCOLOR}"
-    echo -e "${color}${bottom_line}${NOCOLOR}"
+    echo -e "  ${color}${top_line}${NOCOLOR}"
+    echo -e "  ${color}${BOX_V}${NOCOLOR}${spaces}${WHITE}${title}${NOCOLOR}${spaces}${color}${BOX_V}${NOCOLOR}"
+    echo -e "  ${color}${bottom_line}${NOCOLOR}"
 }
 
 # Affiche une section avec titre

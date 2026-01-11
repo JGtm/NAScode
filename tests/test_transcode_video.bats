@@ -263,6 +263,54 @@ teardown() {
 }
 
 ###########################################################
+# Tests MBR (Maximum BitRate) pour SVT-AV1 CRF contraint
+###########################################################
+
+@test "_setup_video_encoding_params: SVT-AV1 ajoute mbr en mode single-pass" {
+    # Setup minimal pour SVT-AV1 en mode single-pass CRF
+    SINGLE_PASS_MODE=true
+    VIDEO_ENCODER="libsvtav1"
+    EFFECTIVE_VIDEO_ENCODER="libsvtav1"
+    TARGET_CODEC="av1"
+    TARGET_BITRATE_KBPS=2070
+    MAXRATE_KBPS=2520
+    BUFSIZE_KBPS=3780
+    ENCODER_PRESET="medium"
+    FILM_KEYINT=240
+    ENCODER_MODE_PROFILE="film"
+    NO_PROGRESS=true
+    
+    _setup_video_encoding_params 1920 1080 "yuv420p"
+    
+    # Vérifier que mbr est dans ENCODER_BASE_PARAMS
+    [[ "$ENCODER_BASE_PARAMS" =~ "mbr=" ]]
+}
+
+@test "_setup_video_encoding_params: SVT-AV1 mbr utilise effective_maxrate" {
+    SINGLE_PASS_MODE=true
+    VIDEO_ENCODER="libsvtav1"
+    EFFECTIVE_VIDEO_ENCODER="libsvtav1"
+    TARGET_CODEC="av1"
+    TARGET_BITRATE_KBPS=1000
+    MAXRATE_KBPS=1500
+    BUFSIZE_KBPS=2250
+    ENCODER_PRESET="medium"
+    FILM_KEYINT=240
+    ENCODER_MODE_PROFILE="film"
+    NO_PROGRESS=true
+    
+    _setup_video_encoding_params 1280 720 "yuv420p"
+    
+    # mbr doit être présent avec une valeur (effective_maxrate après ajustement 720p)
+    [[ "$ENCODER_BASE_PARAMS" =~ "mbr=" ]]
+    # Vérifier qu'on a bien une valeur numérique
+    local mbr_value
+    mbr_value=$(echo "$ENCODER_BASE_PARAMS" | grep -oP 'mbr=\K[0-9]+')
+    [[ -n "$mbr_value" ]]
+    [[ "$mbr_value" -gt 0 ]]
+}
+
+###########################################################
 # Note: _get_encoder_params_flag_internal() a été supprimée (duplication).
 # Utiliser get_encoder_params_flag() de codec_profiles.sh à la place.
 # Les tests correspondants sont dans test_codec_profiles.bats.
