@@ -59,6 +59,14 @@ load_base_modules() {
     # Charger les paramètres vidéo et le mapping streams
     source "$LIB_DIR/video_params.sh"
     source "$LIB_DIR/stream_mapping.sh"
+
+    # Charger les compteurs (CURRENT_FILE_NUMBER, LIMIT_DISPLAY_SLOT)
+    source "$LIB_DIR/counters.sh"
+
+    # Charger les nouveaux modules de conversion
+    source "$LIB_DIR/skip_decision.sh"
+    source "$LIB_DIR/conversion_prep.sh"
+    source "$LIB_DIR/adaptive_mode.sh"
 }
 
 # Version rapide de load_base_modules qui mocke detect.sh (pour tests sans I/O réel)
@@ -80,6 +88,14 @@ load_base_modules_fast() {
     source "$LIB_DIR/complexity.sh"
     source "$LIB_DIR/video_params.sh"
     source "$LIB_DIR/stream_mapping.sh"
+
+    # Charger les compteurs (CURRENT_FILE_NUMBER, LIMIT_DISPLAY_SLOT)
+    source "$LIB_DIR/counters.sh"
+
+    # Charger les nouveaux modules de conversion
+    source "$LIB_DIR/skip_decision.sh"
+    source "$LIB_DIR/conversion_prep.sh"
+    source "$LIB_DIR/adaptive_mode.sh"
 }
 
 # Charger uniquement les couleurs et config (pour tests isolés)
@@ -90,6 +106,12 @@ load_minimal() {
     source "$LIB_DIR/detect.sh"
     source "$LIB_DIR/config.sh"
     source "$LIB_DIR/codec_profiles.sh"
+
+    # Charger les compteurs (CURRENT_FILE_NUMBER, LIMIT_DISPLAY_SLOT)
+    source "$LIB_DIR/counters.sh"
+
+    # Charger les nouveaux modules de conversion
+    source "$LIB_DIR/skip_decision.sh"
 }
 
 # Version rapide de load_minimal qui mocke detect.sh (pour tests sans I/O)
@@ -118,6 +140,12 @@ load_minimal_fast() {
     export HAS_LIBAOM=0
     source "$LIB_DIR/config.sh"
     source "$LIB_DIR/codec_profiles.sh"
+
+    # Charger les compteurs (CURRENT_FILE_NUMBER, LIMIT_DISPLAY_SLOT)
+    source "$LIB_DIR/counters.sh"
+
+    # Charger les nouveaux modules de conversion
+    source "$LIB_DIR/skip_decision.sh"
 }
 
 # Helper pour créer un fichier null-separated

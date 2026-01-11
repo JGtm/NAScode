@@ -17,7 +17,7 @@ export_variables() {
     # ========================================================
     export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel
     export -f should_skip_conversion should_skip_conversion_adaptive
-    export -f _determine_conversion_mode _display_skip_decision clean_number custom_pv
+    export -f _determine_conversion_mode print_skip_message clean_number custom_pv
     
     # --- Fonctions codec_profiles.sh (gestion des codecs vidéo) ---
     export -f get_codec_encoder get_codec_suffix get_codec_ffmpeg_names
@@ -56,7 +56,8 @@ export_variables() {
     export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
     export -f _setup_temp_files_and_logs _check_disk_space _get_temp_filename
     export -f _analyze_video _copy_to_temp_storage
-    export -f _convert_handle_adaptive_mode _convert_display_info_messages
+    export -f _convert_handle_adaptive_mode print_conversion_info
+    export -f print_conversion_required print_conversion_not_required
     export -f _finalize_conversion_success _finalize_try_move
     export -f _finalize_log_and_verify _finalize_conversion_error
     
