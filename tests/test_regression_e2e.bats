@@ -290,6 +290,66 @@ teardown() {
 }
 
 ###########################################################
+# SECTION 4: CHEMINS WINDOWS (ACCENTS/ESPACES) + ERREURS I/O
+###########################################################
+
+@test "E2E PATHS: chemins avec accents et espaces (source + nom de fichier)" {
+    export WEIRD_SRC_DIR="$SRC_DIR/Séries test é"
+    mkdir -p "$WEIRD_SRC_DIR"
+
+    cp "$FIXTURES_DIR/test_video_2s.mkv" "$WEIRD_SRC_DIR/Épisode 01 - test éà.mkv"
+
+    run bash -lc '
+        set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$WEIRD_SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+
+    [ "$status" -eq 0 ]
+
+    local out_files
+    out_files=$(find "$OUT_DIR" -type f -name "*.mkv" 2>/dev/null | wc -l)
+    [ "$out_files" -ge 1 ]
+}
+
+@test "E2E I/O: output_dir est un fichier (pas un dossier)" {
+    cp "$FIXTURES_DIR/test_video_2s.mkv" "$SRC_DIR/test_io_error.mkv"
+
+    export OUT_AS_FILE="$TEST_TEMP_DIR/out_as_file"
+    echo "not a dir" > "$OUT_AS_FILE"
+
+    run bash -lc '
+        set -u
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_AS_FILE" \
+            --mode serie \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+
+    # Doit échouer (impossible de créer/écrire dans output_dir)
+    [ "$status" -ne 0 ]
+
+    # Et ne pas laisser le lock derrière
+    [ ! -f /tmp/conversion_video.lock ]
+}
+
+###########################################################
 # SECTION 5: RÉGRESSION BUG STOP_FLAG
 ###########################################################
 
@@ -354,6 +414,59 @@ teardown() {
     
     # Le message d'interruption ne doit pas avoir été affiché
     [[ ! "$output" =~ "interrompue" ]]
+}
+
+@test "E2E STOP_FLAG: interruption en cours (SIGINT) nettoie le lock" {
+    # Objectif: simuler un Ctrl+C pendant une conversion et vérifier le cleanup
+
+    # Générer une vidéo un peu plus longue pour réduire la flakiness
+    ffmpeg -y -f lavfi -i "testsrc=duration=12:size=1920x1080:rate=24" \
+        -c:v libx264 -preset ultrafast -crf 35 \
+        "$SRC_DIR/long_test_interrupt.mkv" 2>/dev/null
+
+    if [[ ! -f "$SRC_DIR/long_test_interrupt.mkv" ]]; then
+        skip "Impossible de créer la vidéo longue de test"
+    fi
+
+    rm -f /tmp/conversion_video.lock /tmp/conversion_stop_flag
+
+    run bash -lc '
+        set -u
+        cd "$WORKDIR"
+
+        # Lancer NAScode en arrière-plan
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1 &
+        pid=$!
+
+        # Attendre un peu puis simuler Ctrl+C
+        sleep 1
+        kill -INT "$pid" 2>/dev/null || true
+
+        wait "$pid"
+        exit_code=$?
+        echo "NASCODE_EXIT=$exit_code"
+
+        # Ne pas propager l'exit code ici: le test Bats doit pouvoir l'asserter
+        exit 0
+    '
+
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+
+    # Le script doit avoir reçu l'interruption (code 130 attendu)
+    [[ "$output" =~ "NASCODE_EXIT=130" ]]
+
+    # Le lock doit être nettoyé par cleanup()
+    [ ! -f /tmp/conversion_video.lock ]
+
+    # Et un STOP_FLAG doit exister (vraie interruption)
+    [ -f /tmp/conversion_stop_flag ]
 }
 
 @test "E2E OUTPUT_DIR: fichier converti arrive bien dans output_dir" {
