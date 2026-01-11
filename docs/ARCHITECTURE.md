@@ -61,10 +61,13 @@ Le chargement est orchestré par [../nascode](../nascode). Les responsabilités 
   - `lib/audio_params.sh` : construit les paramètres FFmpeg audio (codec/layout/bitrate)
   - `lib/video_params.sh` : pix_fmt, downscale, bitrate, suffixe effectif
   - `lib/stream_mapping.sh` : mapping streams (ex: sous-titres)
+  - `lib/skip_decision.sh` : logique skip/passthrough/full (décision de conversion)
 
 - **Conversion & pipeline FFmpeg**
+  - `lib/conversion_prep.sh` : préparation fichiers, chemins, espace disque, transfert temporaire
+  - `lib/adaptive_mode.sh` : analyse complexité pour mode film-adaptive
   - `lib/transcode_video.sh` : exécution FFmpeg (passthrough / CRF / two-pass)
-  - `lib/conversion.sh` : orchestration par fichier (décision skip/passthrough/encode, temporaires, logs)
+  - `lib/conversion.sh` : orchestration par fichier (appelle les modules ci-dessus)
 
 - **Qualité / analyse**
   - `lib/vmaf.sh` : calcul VMAF (optionnel)

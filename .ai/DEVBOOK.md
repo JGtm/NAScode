@@ -15,6 +15,19 @@ Objectifs :
 
 ### 2026-01-11
 
+#### Refactorisation : split de conversion.sh en 4 modules
+- **Quoi** : extraction de `conversion.sh` (958 lignes) en modules spécialisés pour améliorer la maintenabilité et la testabilité.
+- **Où** :
+  - `lib/skip_decision.sh` (206 lignes) : logique de décision skip/passthrough/full (`_determine_conversion_mode`, `should_skip_conversion*`), variables `CONVERSION_ACTION`, `EFFECTIVE_VIDEO_*`, `SKIP_THRESHOLD_*`.
+  - `lib/conversion_prep.sh` (216 lignes) : préparation fichiers (`_prepare_file_paths`, `_check_output_exists`, `_get_temp_filename`, `_setup_temp_files_and_logs`, `_check_disk_space`, `_copy_to_temp_storage`).
+  - `lib/adaptive_mode.sh` (146 lignes) : mode film-adaptive (`_convert_run_adaptive_analysis_and_export`, `_convert_handle_adaptive_mode`).
+  - `lib/ui.sh` (+327 lignes) : fonctions d'affichage conversion (`_get_counter_prefix`, `print_skip_message`, `print_conversion_required`, `print_conversion_not_required`, `print_conversion_info` + helpers).
+  - `lib/counters.sh` (+13 lignes) : variables `CURRENT_FILE_NUMBER`, `LIMIT_DISPLAY_SLOT`.
+  - `lib/conversion.sh` (178 lignes) : orchestration pure (`convert_file`, `_convert_get_full_metadata`).
+  - `nascode` : ajout des sources pour les nouveaux modules.
+- **Pourquoi** : conversion.sh était devenu trop long (958 lignes) avec des responsabilités mélangées (décision, préparation, UI, adaptatif). La séparation permet des tests unitaires ciblés et une meilleure lisibilité.
+- **Impact** : aucun changement de comportement ; doc ARCHITECTURE.md mise à jour.
+
 #### Vidéo : seuil de skip codec-aware + politique "no downgrade" (dont `film-adaptive`)
 - **Quoi** :
   - Traduction du seuil de skip dans l’espace du codec source quand celui-ci est **meilleur/plus efficace** (ex: AV1 vs cible HEVC), via les facteurs d’efficacité codec.
