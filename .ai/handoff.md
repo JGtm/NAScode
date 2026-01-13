@@ -12,6 +12,11 @@
 
 - Le webhook Discord doit rester un secret (ne pas le commiter). En cas de fuite, régénérer le webhook côté Discord.
 
+### Suivi (13/01/2026 - Notifs Discord : debug + fix JSON + format)
+
+- [lib/notify.sh](lib/notify.sh) : ajout `NASCODE_DISCORD_NOTIFY_DEBUG=true` (log codes HTTP + extrait de réponse), envoi JSON via `curl --data-binary @file` (évite les 400 “invalid JSON”), et amélioration du rendu (vrais sauts de ligne, liste Markdown, fin avec heure).
+- [tests/test_notify.bats](tests/test_notify.bats) : tests mis à jour pour le nouveau mode d’envoi.
+
 ## Dernière session (13/01/2026 - Logs SVT-AV1 sans spam terminal)
 
 ### Contexte

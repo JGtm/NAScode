@@ -21,6 +21,14 @@ Objectifs :
 - **Pourquoi** : disposer d’un canal de suivi “hands-off” pour les runs longs et faciliter l’extension à d’autres événements sans surcharger les modules existants.
 - **Impact** : aucun impact si `NASCODE_DISCORD_WEBHOOK_URL` n’est pas défini ; envoi best-effort (aucune erreur de notif ne doit arrêter NAScode). Secret webhook non versionné (variable d’env ; `.env` local ignoré à sourcer manuellement).
 
+#### Notifications Discord : debug + robustesse payload + format
+- **Quoi** :
+  - ajout d’un mode debug opt-in (`NASCODE_DISCORD_NOTIFY_DEBUG=true`) qui loggue le code HTTP (et un extrait de réponse en cas d’erreur) dans `logs/discord_notify_<timestamp>.log`.
+  - correctif “400 invalid JSON” : envoi du JSON via fichier temporaire + `curl --data-binary @file`.
+  - amélioration UX : vrais retours à la ligne et “paramètres actifs” en liste Markdown ; message de fin avec heure de fin, exit code affiché seulement en cas d’erreur.
+- **Où** : `lib/notify.sh`, tests dans `tests/test_notify.bats`.
+- **Pourquoi** : diagnostiquer les erreurs Discord sans exposer le webhook, fiabiliser l’envoi sur Git Bash/Windows et améliorer la lisibilité des messages.
+
 ### 2026-01-13
 
 #### Fix : `film-adaptive` applique réellement les budgets à l'encodage (AV1 + HEVC/x265)
