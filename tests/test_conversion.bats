@@ -17,6 +17,42 @@ teardown() {
 }
 
 ###########################################################
+# Tests non-régression : mode FIFO ne doit pas se bloquer
+###########################################################
+
+@test "convert_file: incrémente processed_count si fichier introuvable (mode FIFO)" {
+    export LIMIT_FILES=1
+    export PROCESSED_COUNT_FILE="$LOG_DIR/processed_count_test"
+    echo "0" > "$PROCESSED_COUNT_FILE"
+
+    export OUTPUT_DIR="$TEST_TEMP_DIR/out"
+    mkdir -p "$OUTPUT_DIR"
+
+    run convert_file "$TEST_TEMP_DIR/does_not_exist.mkv" "$OUTPUT_DIR"
+    [ "$status" -eq 0 ]
+
+    local count
+    count=$(cat "$PROCESSED_COUNT_FILE")
+    [ "$count" -eq 1 ]
+}
+
+@test "convert_file: incrémente processed_count si entrée vide dans la queue (mode FIFO)" {
+    export LIMIT_FILES=1
+    export PROCESSED_COUNT_FILE="$LOG_DIR/processed_count_test_empty"
+    echo "0" > "$PROCESSED_COUNT_FILE"
+
+    export OUTPUT_DIR="$TEST_TEMP_DIR/out"
+    mkdir -p "$OUTPUT_DIR"
+
+    run convert_file "" "$OUTPUT_DIR"
+    [ "$status" -eq 0 ]
+
+    local count
+    count=$(cat "$PROCESSED_COUNT_FILE")
+    [ "$count" -eq 1 ]
+}
+
+###########################################################
 # Tests de _prepare_file_paths()
 ###########################################################
 

@@ -132,8 +132,7 @@ analyze_video_complexity() {
     local duration="$2"
     local show_progress="${3:-false}"
 
-    # Label utilisé par la progression (utile quand plusieurs jobs s'entrelacent)
-    ANALYSIS_PROGRESS_LABEL=$(basename "$file")
+    # Note: ancien label de progression supprimé (variable inutilisée).
     
     # Validation des entrées
     if [[ -z "$file" ]] || [[ ! -f "$file" ]]; then
@@ -222,7 +221,6 @@ analyze_video_complexity() {
     # car printf dans un sous-shell ($()) ne peut pas effacer correctement
     
     _compute_normalized_stddev "$all_frames"
-    unset ANALYSIS_PROGRESS_LABEL
 }
 
 # Affiche une barre de progression pour l'analyse de complexité
@@ -238,10 +236,6 @@ _show_analysis_progress() {
     else
         status_label="⚡ Calcul en cours"
     fi
-
-    local left
-    # Aligner avec la progression FFmpeg : champ fixe 25 caractères avant la barre.
-    printf -v left "  %-25.25s" "$status_label"
 
         # Aligner avec la progression FFmpeg :
         # "  <emoji> <label sur 25 chars> <bar> ..."
@@ -393,8 +387,8 @@ get_adaptive_encoding_params() {
     local metadata
     metadata=$(get_full_media_metadata "$file")
     
-    local video_bitrate video_codec duration width height pix_fmt audio_codec audio_bitrate
-    IFS='|' read -r video_bitrate video_codec duration width height pix_fmt audio_codec audio_bitrate <<< "$metadata"
+    local video_bitrate _video_codec duration width height _pix_fmt _audio_codec _audio_bitrate
+    IFS='|' read -r video_bitrate _video_codec duration width height _pix_fmt _audio_codec _audio_bitrate <<< "$metadata"
     
     # Récupérer le FPS
     local fps

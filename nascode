@@ -115,13 +115,13 @@ main() {
         # Convertir en chemin absolu (robuste aux espaces)
         local single_file_input="$SINGLE_FILE"
         if ! SINGLE_FILE="$(abspath_path "$single_file_input")"; then
-            echo -e "${RED}❌ ERREUR: Chemin de fichier invalide : $single_file_input${NOCOLOR}"
+            print_error "ERREUR: Chemin de fichier invalide : $single_file_input"
             exit 1
         fi
 
         # Valider l'entrée
         if [[ ! -f "$SINGLE_FILE" ]]; then
-            echo -e "${RED}❌ ERREUR: Le fichier source n'existe pas : $SINGLE_FILE${NOCOLOR}"
+            print_error "ERREUR: Le fichier source n'existe pas : $SINGLE_FILE"
             exit 1
         fi
 
@@ -158,10 +158,17 @@ main() {
     
     # Vérifier que SOURCE existe avant de convertir en chemin absolu
     if [[ ! -d "$SOURCE" ]]; then
-        echo -e "${RED}❌ ERREUR: Le répertoire source n'existe pas : $SOURCE${NOCOLOR}"
+        print_error "ERREUR: Le répertoire source n'existe pas : $SOURCE"
         exit 1
     fi
     SOURCE=$(cd "$SOURCE" && pwd)
+
+    # Protection : si la source est elle-même dans les exclusions, le run ne peut pas produire de fichiers.
+    # On sort explicitement pour éviter un comportement perçu comme un blocage.
+    if is_excluded "$SOURCE"; then
+        print_error "ERREUR: Le répertoire source est exclu par la configuration (EXCLUDES) : $SOURCE"
+        exit 1
+    fi
     
     # Vérifications initiales
     check_lock
@@ -193,7 +200,7 @@ main() {
     
     # Si mode heures creuses, attendre le début des heures creuses avant de continuer
     if ! check_off_peak_before_processing; then
-        echo -e "${RED}Arrêt demandé avant le début du traitement.${NOCOLOR}"
+        print_warning "Arrêt demandé avant le début du traitement."
         exit 0
     fi
 

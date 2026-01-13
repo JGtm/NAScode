@@ -64,57 +64,100 @@ convert_file() {
     # Windows/Git Bash : normaliser les CRLF
     file_original="${file_original//$'\r'/}"
     local output_dir="$2"
+
+    local _processed_marked=false
+    _mark_processed_once() {
+        if [[ "$_processed_marked" == true ]]; then
+            return 0
+        fi
+        _processed_marked=true
+        call_if_exists increment_processed_count || true
+    }
+
+    # Protection : entrée vide ou fichier absent -> ne doit jamais bloquer le FIFO.
+    if [[ -z "$file_original" ]]; then
+        print_warning "Entrée vide détectée dans la queue, skip."
+        [[ "${LIMIT_FILES:-0}" -gt 0 ]] && call_if_exists update_queue || true
+        _mark_processed_once
+        return 0
+    fi
+    if [[ ! -f "$file_original" ]]; then
+        print_warning "Fichier introuvable, skip : $file_original"
+        [[ "${LIMIT_FILES:-0}" -gt 0 ]] && call_if_exists update_queue || true
+        _mark_processed_once
+        return 0
+    fi
     
     # Compteurs initiaux (variables définies dans counters.sh)
+    # shellcheck disable=SC2034
     CURRENT_FILE_NUMBER=$(call_if_exists increment_starting_counter) || CURRENT_FILE_NUMBER=0
+    # shellcheck disable=SC2034
     LIMIT_DISPLAY_SLOT=0
+    # shellcheck disable=SC2034
     VIDEO_PRECONVERSION_VIDEOINFO_SHOWN=false
     
     # 1. Récupérer TOUTES les métadonnées en un seul appel
     local full_metadata
-    full_metadata=$(_convert_get_full_metadata "$file_original")
+    if ! full_metadata=$(_convert_get_full_metadata "$file_original"); then
+        print_warning "Impossible de lire les métadonnées, skip : $file_original"
+        [[ "${LIMIT_FILES:-0}" -gt 0 ]] && call_if_exists update_queue || true
+        _mark_processed_once
+        return 0
+    fi
     
     local v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate
     IFS='|' read -r v_bitrate v_codec duration_secs v_width v_height v_pix_fmt a_codec a_bitrate <<< "$full_metadata"
 
     # Exposer les métadonnées source pour les modules d'encodage.
+    # shellcheck disable=SC2034
     SOURCE_VIDEO_CODEC="$v_codec"
+    # shellcheck disable=SC2034
     SOURCE_VIDEO_BITRATE_BITS="$v_bitrate"
     
     # 2. Préparation des chemins (fonction dans conversion_prep.sh)
     local path_info
-    path_info=$(_prepare_file_paths "$file_original" "$output_dir" "$v_width" "$v_height" "$a_codec" "$a_bitrate" "$v_codec") || return 1
+    if ! path_info=$(_prepare_file_paths "$file_original" "$output_dir" "$v_width" "$v_height" "$a_codec" "$a_bitrate" "$v_codec"); then
+        print_error "Préparation des chemins impossible : $file_original"
+        _mark_processed_once
+        return 1
+    fi
     
-    IFS='|' read -r filename final_dir base_name effective_suffix final_output <<< "$path_info"
+    IFS='|' read -r filename final_dir base_name _effective_suffix final_output <<< "$path_info"
     
     # 3. Vérifications standard (skip rapide) - fonctions dans conversion_prep.sh
     if _check_output_exists "$file_original" "$filename" "$final_output"; then
-        call_if_exists increment_processed_count || true
+        _mark_processed_once
         return 0
     fi
     
     if _handle_dryrun_mode "$final_dir" "$final_output"; then
-        call_if_exists increment_processed_count || true
+        _mark_processed_once
         return 0
     fi
     
-    local tmp_input=$(_get_temp_filename "$file_original" ".in")
-    local tmp_output=$(_get_temp_filename "$file_original" ".out.mkv")
-    local ffmpeg_log_temp=$(_get_temp_filename "$file_original" "_err.log")
+    local tmp_input
+    tmp_input=$(_get_temp_filename "$file_original" ".in")
+    local tmp_output
+    tmp_output=$(_get_temp_filename "$file_original" ".out.mkv")
+    local ffmpeg_log_temp
+    ffmpeg_log_temp=$(_get_temp_filename "$file_original" "_err.log")
     
     # 4. Décision de conversion
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]]; then
         # Mode standard : skip possible ici (fonctions dans skip_decision.sh)
         if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" ""; then
             [[ "$LIMIT_FILES" -gt 0 ]] && call_if_exists update_queue || true
-            call_if_exists increment_processed_count || true
+            _mark_processed_once
             return 0
         fi
         # Réserver le slot limite
         if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
             local _slot
             _slot=$(call_if_exists increment_converted_count) || _slot="0"
-            [[ "$_slot" =~ ^[0-9]+$ && "$_slot" -gt 0 ]] && LIMIT_DISPLAY_SLOT="$_slot"
+            if [[ "$_slot" =~ ^[0-9]+$ && "$_slot" -gt 0 ]]; then
+                # shellcheck disable=SC2034
+                LIMIT_DISPLAY_SLOT="$_slot"
+            fi
         fi
         _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
     else
@@ -125,8 +168,8 @@ convert_file() {
         adaptive_info=$(_convert_run_adaptive_analysis_and_export "$file_original" "$v_codec")
 
         local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
-        local complexity_c complexity_desc stddev_val
-        IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
+        local _complexity_c _complexity_desc _stddev_val
+        IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps _complexity_c _complexity_desc _stddev_val <<< "$adaptive_info"
 
         # IMPORTANT (bash) : l'appel via "$(...)" exécute la fonction dans un subshell,
         # donc les exports faits dans _convert_run_adaptive_analysis_and_export ne remontent pas.
@@ -144,7 +187,7 @@ convert_file() {
         if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
             print_conversion_not_required
             [[ "$LIMIT_FILES" -gt 0 ]] && call_if_exists update_queue || true
-            call_if_exists increment_processed_count || true
+            _mark_processed_once
             return 0
         fi
 
@@ -154,19 +197,29 @@ convert_file() {
         if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
             local _slot
             _slot=$(call_if_exists increment_converted_count) || _slot="0"
-            [[ "$_slot" =~ ^[0-9]+$ && "$_slot" -gt 0 ]] && LIMIT_DISPLAY_SLOT="$_slot"
+            if [[ "$_slot" =~ ^[0-9]+$ && "$_slot" -gt 0 ]]; then
+                # shellcheck disable=SC2034
+                LIMIT_DISPLAY_SLOT="$_slot"
+            fi
         fi
 
         # Maintenant qu'on sait qu'on ne skip pas : démarrage + log START
         _setup_temp_files_and_logs "$filename" "$file_original" "$final_dir"
     fi
 
-    _check_disk_space "$file_original" || return 1
+    if ! _check_disk_space "$file_original"; then
+        _mark_processed_once
+        return 1
+    fi
     
-    local size_before_mb=$(du -m "$file_original" | awk '{print $1}')
+    local size_before_mb
+    size_before_mb=$(du -m "$file_original" | awk '{print $1}')
     
     # 5. Téléchargement vers stockage temporaire (fonction dans conversion_prep.sh)
-    _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp" || return 1
+    if ! _copy_to_temp_storage "$file_original" "$filename" "$tmp_input" "$ffmpeg_log_temp"; then
+        _mark_processed_once
+        return 1
+    fi
     
     # 6. Messages informatifs (fonction dans ui.sh)
     print_conversion_info "$v_codec" "$tmp_input" "$v_width" "$v_height" "$v_pix_fmt" "$a_codec" "$a_bitrate"
@@ -186,5 +239,5 @@ convert_file() {
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
     fi
     
-    call_if_exists increment_processed_count || true
+    _mark_processed_once
 }

@@ -59,11 +59,11 @@ translate_error() {
     error="${error//\`\$output\' to contain/la sortie devrait contenir}"
     error="${error//but got/mais obtenu}"
     error="${error//assertion failed/assertion échouée}"
-    error="${error//file does not exist/le fichier n'existe pas}"
+    error="${error//file does not exist/$'le fichier n\x27existe pas'}"
     error="${error//command not found/commande introuvable}"
     error="${error//No such file or directory/Fichier ou dossier introuvable}"
     error="${error//Permission denied/Permission refusée}"
-    error="${error//is not defined/n'est pas défini(e)}"
+    error="${error//is not defined/$'n\x27est pas défini(e)'}"
     error="${error//unbound variable/variable non définie}"
     
     echo "$error"
@@ -206,15 +206,24 @@ START_TIME=$(date +%s)
 cd "$TESTS_DIR"
 
 # Collecter les fichiers de test
-if [[ -n "$FILTER" ]]; then
-    # Filtrer par nom de fichier ou pattern
-    mapfile -t TEST_FILES < <(ls -1 *.bats 2>/dev/null | grep -i "$FILTER" || true)
-    if [[ ${#TEST_FILES[@]} -eq 0 ]]; then
-        print_and_log "${YELLOW}Aucun fichier de test correspondant à '$FILTER'${NC}"
-        exit 1
+TEST_FILES=()
+shopt -s nullglob
+for test_file in *.bats; do
+    if [[ -z "$FILTER" ]]; then
+        TEST_FILES+=("$test_file")
+        continue
     fi
-else
-    mapfile -t TEST_FILES < <(ls -1 *.bats 2>/dev/null)
+
+    # Filtrage simple (insensible à la casse) sur le nom de fichier
+    if [[ "${test_file,,}" == *"${FILTER,,}"* ]]; then
+        TEST_FILES+=("$test_file")
+    fi
+done
+shopt -u nullglob
+
+if [[ -n "$FILTER" && ${#TEST_FILES[@]} -eq 0 ]]; then
+    print_and_log "${YELLOW}Aucun fichier de test correspondant à '$FILTER'${NC}"
+    exit 1
 fi
 
 TOTAL_FILES=${#TEST_FILES[@]}
@@ -238,8 +247,10 @@ for test_file in "${TEST_FILES[@]}"; do
         print_and_log "${BOLD}[$FILE_NUM/$TOTAL_FILES] $test_file${NC} ($test_count tests)"
         print_and_log "${DIM}────────────────────────────────────────${NC}"
     else
-        # Mode condensé : afficher le fichier en cours (colonnes alignées)
-        printf "${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" 0 "$test_count" >/dev/tty
+        if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
+            # Mode condensé : afficher le fichier en cours (colonnes alignées)
+            printf "${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" 0 "$test_count" >/dev/tty
+        fi
     fi
     
     # Variables pour le parsing en streaming
@@ -278,9 +289,11 @@ for test_file in "${TEST_FILES[@]}"; do
                 echo -e "  ${GREEN}✓${NC} $test_name"
                 echo "  ✓ $test_name" >> "$LOG_FILE"
             else
-                # Mettre à jour le compteur en temps réel
-                done_count=$((local_passed + local_failed + local_skipped))
-                printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
+                    # Mettre à jour le compteur en temps réel
+                    done_count=$((local_passed + local_failed + local_skipped))
+                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                fi
             fi
             
         elif [[ "$line" =~ ^not\ ok\ [0-9]+\ (.*)$ ]]; then
@@ -296,9 +309,11 @@ for test_file in "${TEST_FILES[@]}"; do
                 echo -e "  ${RED}✗${NC} ${BASH_REMATCH[1]}"
                 echo "  ✗ ${BASH_REMATCH[1]}" >> "$LOG_FILE"
             else
-                # Mettre à jour le compteur
-                done_count=$((local_passed + local_failed + local_skipped))
-                printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
+                    # Mettre à jour le compteur
+                    done_count=$((local_passed + local_failed + local_skipped))
+                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                fi
             fi
             
         elif [[ "$in_error" == true && "$line" =~ ^#\ (.*)$ ]]; then
@@ -312,7 +327,6 @@ for test_file in "${TEST_FILES[@]}"; do
             fi
         fi
     done < <(bats --tap "$test_file" 2>&1)
-    bats_exit=$?
     set -e
     
     # Ajouter la dernière erreur si elle existe
@@ -340,8 +354,10 @@ for test_file in "${TEST_FILES[@]}"; do
         fi
         
         if [[ $local_failed -eq 0 ]]; then
-            printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-45s ${DIM}(%2d/%-2d)${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator" >/dev/tty
-            printf "✓  [%2d/%-2d] %-45s (%2d/%-2d)%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
+            if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
+                printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-45s ${DIM}(%2d/%-2d)${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator" >/dev/tty
+                printf "✓  [%2d/%-2d] %-45s (%2d/%-2d)%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
+            fi
         else
             printf "\r${RED}✗${NC}  [%2d/%-2d] %-45s ${RED}%2d échec(s)${NC} ${DIM}/ %-2d${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator" >/dev/tty
             printf "✗  [%2d/%-2d] %-45s %2d échec(s) / %-2d%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"

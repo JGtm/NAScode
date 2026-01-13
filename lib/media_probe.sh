@@ -126,13 +126,18 @@ get_video_metadata() {
         "$file" 2>/dev/null || true)
     
     # Parsing des résultats stream (format: key=value)
-    local bitrate_stream=$(echo "$metadata_output" | awk -F= '/^bit_rate=/{print $2; exit}')
-    local bitrate_bps=$(echo "$metadata_output" | awk -F= '/^TAG:BPS=/{print $2}')
-    local codec=$(echo "$metadata_output" | awk -F= '/^codec_name=/{print $2}')
+    local bitrate_stream
+    bitrate_stream=$(echo "$metadata_output" | awk -F= '/^bit_rate=/{print $2; exit}')
+    local bitrate_bps
+    bitrate_bps=$(echo "$metadata_output" | awk -F= '/^TAG:BPS=/{print $2}')
+    local codec
+    codec=$(echo "$metadata_output" | awk -F= '/^codec_name=/{print $2}')
     
     # Parsing des résultats format (container)
-    local bitrate_container=$(echo "$format_output" | awk -F= '/^bit_rate=/{print $2}')
-    local duration=$(echo "$format_output" | awk -F= '/^duration=/{print $2}')
+    local bitrate_container
+    bitrate_container=$(echo "$format_output" | awk -F= '/^bit_rate=/{print $2}')
+    local duration
+    duration=$(echo "$format_output" | awk -F= '/^duration=/{print $2}')
     
     # Nettoyage des valeurs
     bitrate_stream=$(clean_number "$bitrate_stream")
@@ -298,12 +303,15 @@ get_video_stream_props() {
 # Détecte et définit la variable HWACCEL utilisée pour le décodage matériel.
 # Appelée une fois au démarrage pour configurer le décodeur.
 detect_hwaccel() {
+    # shellcheck disable=SC2034
     HWACCEL=""
 
     # macOS -> videotoolbox
     if [[ "$(uname -s)" == "Darwin" ]]; then
+        # shellcheck disable=SC2034
         HWACCEL="videotoolbox"
     else
+        # shellcheck disable=SC2034
         HWACCEL="cuda"
     fi
 }

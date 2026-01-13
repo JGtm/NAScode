@@ -1,5 +1,76 @@
 # Handoff
 
+## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
+
+### Contexte
+
+- Symptôme rapporté : la conversion peut “se bloquer” quand aucun fichier n’est réellement traitable (ex: entrée vide, fichier introuvable, ou source passée dans les exclusions).
+
+### Changements
+
+- [lib/conversion.sh](lib/conversion.sh) : `convert_file()`
+  - skip explicite si chemin vide ou fichier introuvable (et incrémente toujours `processed_count` en mode FIFO).
+  - si lecture des métadonnées ou préparation des chemins échoue tôt, incrémente `processed_count` avant de sortir.
+- [lib/processing.sh](lib/processing.sh) : ignore les entrées vides dans les consumers (`read -d ''`).
+- [lib/queue.sh](lib/queue.sh) : durcit `_validate_queue_not_empty()` :
+  - queue vide → sortie 0 avec message.
+  - queue non-vide mais sans séparateurs NUL → erreur (évite un mode FIFO qui attendrait indéfiniment).
+- [nascode](nascode) : garde-fou : si `SOURCE` matche `EXCLUDES`, sortie explicite avec erreur.
+  - Harmonisation UI : remplace les `echo -e` d'erreurs early par `print_error` / `print_warning` (fichier unique, source inexistante, source exclue, arrêt avant traitement).
+
+- [lib/notify.sh](lib/notify.sh) : enrichit la notification Discord “run_started” avec les paramètres actifs liés au tri de la queue (`SORT_MODE` / `--random`) et à la limitation (`--limit`).
+
+- [.ai/TODO.md](.ai/TODO.md) : consigne précisément les modules restant à harmoniser côté UI (bannières/progress/printf).
+
+### Documentation
+
+- [README.md](README.md) et [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) : ajoute un dépannage rapide/détaillé sur les cas “source exclue”, “aucun fichier à traiter” et “queue invalide (NUL)”.
+
+### Tests
+
+- [tests/test_conversion.bats](tests/test_conversion.bats) : non-régression sur `processed_count` (entrée vide + fichier introuvable).
+- [tests/test_queue.bats](tests/test_queue.bats) : non-régression sur la validation queue vide vs format invalide.
+
+### Dev tooling (ShellCheck)
+
+- [Makefile](Makefile) : `make lint`
+  - Options par défaut : `-f gcc` (évite un crash d'encodage Windows) + sévérité `error` (utilisable sur une base avec warnings legacy).
+  - Durcissement possible : `make lint SHELLCHECK_SEVERITY=warning`.
+- [run_tests.sh](run_tests.sh) : remplacements de messages d'erreur via `$'...'` pour éviter un faux positif ShellCheck sur les apostrophes.
+
+#### 2026-01-13 — Nettoyage ShellCheck (warnings)
+
+- Objectif : faire passer `make lint SHELLCHECK_SEVERITY=warning` sur tout le dépôt.
+- [run_tests.sh](run_tests.sh)
+  - Corrige SC2010 (supprime `ls | grep`), collecte via glob + filtrage en Bash.
+  - Rend `--errors-only` effectif (évite variable inutilisée + réduit le bruit en CI).
+- Directives SC2034 (variables globales cross-modules)
+  - Ajout au niveau fichier : [lib/args.sh](lib/args.sh), [lib/counters.sh](lib/counters.sh), [lib/detect.sh](lib/detect.sh), [lib/logging.sh](lib/logging.sh), [lib/skip_decision.sh](lib/skip_decision.sh).
+  - Ajouts ciblés / renommage variables ignorées : [lib/conversion.sh](lib/conversion.sh), [lib/transcode_video.sh](lib/transcode_video.sh), [lib/ffmpeg_pipeline.sh](lib/ffmpeg_pipeline.sh), [lib/media_probe.sh](lib/media_probe.sh), [lib/utils.sh](lib/utils.sh), [lib/ui.sh](lib/ui.sh), [lib/audio_params.sh](lib/audio_params.sh), [lib/video_params.sh](lib/video_params.sh), [lib/complexity.sh](lib/complexity.sh), [lib/adaptive_mode.sh](lib/adaptive_mode.sh).
+- Résultat : `make lint SHELLCHECK_SEVERITY=warning` OK (0 warnings restants).
+
+### Notes (anti-spam Discord en tests)
+
+- [lib/notify.sh](lib/notify.sh) : pendant les tests Bats, les notifications Discord sont désactivées par défaut (évite de spammer le vrai webhook via l’environnement utilisateur).
+- [tests/test_notify.bats](tests/test_notify.bats) : opt-in explicite via `NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true` pour les tests qui valident l’envoi (avec `curl` mock).
+
+### Dernier prompt
+
+- "Vas y pour les warnings mais sur tout le projet"
+- "Oui vas y commit comme tu as dit"
+- "Option A pour le moment, tu mettras le reste précisément dans le fichier TODO.md. D'ailleurs tant que tu es sur l'UI dans les messages à envoyer sur discord, il manque les paramètres actifs liés à ordre de tri et limitation"
+
+### 2026-01-13 — Backlog : audio “traduction qualité équivalente” (mini-spéc)
+
+- [.ai/TODO.md](.ai/TODO.md) : ajout d’une mini-spéc pour un futur helper de traduction de bitrate audio (invariants, activation par mode, stratégie de tests).
+- [.ai/DEVBOOK.md](.ai/DEVBOOK.md) : entrée DEVBOOK correspondante (doc/backlog uniquement).
+
+### Dernier prompt
+
+- "Ouais j'aime bien tes recommandations pragmatiques, propose moi une mini spec et mets tout ça dans le todo"
+- "Dans mes tests j'ai 3 skips, c'est normal non ?"
+- "ok commit et puis merge dans main"
+
 ## Dernière session (13/01/2026 - Doc : notifications Discord + secrets)
 
 ### Changements

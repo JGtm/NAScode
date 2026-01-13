@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034
 ###########################################################
 # LOGIQUE DE DÉCISION SKIP / PASSTHROUGH / FULL
 # Détermine si un fichier doit être converti ou ignoré

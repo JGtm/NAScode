@@ -10,6 +10,12 @@
 ###########################################################
 
 _notify_discord_is_enabled() {
+    # Anti-spam tests: en environnement Bats, on désactive par défaut.
+    # Opt-in explicite possible pour les tests unitaires de notify.
+    if [[ -n "${BATS_TEST_FILENAME:-}" ]] || [[ -n "${BATS_RUN_TMPDIR:-}" ]] || [[ -n "${BATS_VERSION:-}" ]]; then
+        [[ "${NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS:-false}" == "true" ]] || return 1
+    fi
+
     local url="${NASCODE_DISCORD_WEBHOOK_URL:-}"
     [[ -z "$url" ]] && return 1
 
@@ -176,18 +182,50 @@ notify_event_run_started() {
     [[ -n "$now" ]] && body+=$'\n\n'"**Début**: ${now}"
 
     body+=$'\n\n'"**Paramètres actifs**"$'\n'
-    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **Mode**: ${CONVERSION_MODE}"
-    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **Source**: ${SOURCE}"
-    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **Destination**: ${OUTPUT_DIR}"
-    body+=$'\n'"- **Codec vidéo**: ${VIDEO_CODEC:-hevc}"
-    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **Codec audio**: ${AUDIO_CODEC}"
+    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **📊  Mode**: ${CONVERSION_MODE}"
+    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **📂  Source**: ${SOURCE}"
+    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **📂  Destination**: ${OUTPUT_DIR}"
+    body+=$'\n'"- **🎬  Codec vidéo**: ${VIDEO_CODEC:-hevc}"
+    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio**: ${AUDIO_CODEC}"
 
-    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **Dry-run**: true"
-    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **Sample**: true"
-    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **VMAF**: true"
+    # Tri / limitation (queue)
+    local sort_mode="${SORT_MODE:-size_desc}"
+    local sort_label
+    if [[ "${RANDOM_MODE:-false}" == true ]]; then
+        sort_label="aléatoire (sélection)"
+    else
+        case "$sort_mode" in
+            size_desc)
+                sort_label="taille décroissante"
+                ;;
+            size_asc)
+                sort_label="taille croissante"
+                ;;
+            name_asc)
+                sort_label="nom ascendant"
+                ;;
+            name_desc)
+                sort_label="nom descendant"
+                ;;
+            *)
+                sort_label="$sort_mode"
+                ;;
+        esac
+    fi
+    body+=$'\n'"- **↕️  Tri de la queue**: ${sort_label}"
+
+    if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
+        local limit_icon="🔒"
+        [[ "${RANDOM_MODE:-false}" == true ]] && limit_icon="🎲"
+        body+=$'\n'"- **${limit_icon}  Limitation**: ${LIMIT_FILES} fichiers"
+    fi
+
+    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**: true"
+    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  Échantillon**: true"
+    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **ℹ   VMAF**: true"
 
     if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
-        body+=$'\n'"- **Heures creuses**: ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
+        body+=$'\n'"- **⏰  Heures creuses**: ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
     fi
     [[ -n "${PARALLEL_JOBS:-}" ]] && body+=$'\n'"- **Jobs**: ${PARALLEL_JOBS}"
 
@@ -254,9 +292,9 @@ notify_event_script_exit() {
 
     local body="NAScode — fin (${status})"
     [[ -n "$now" ]] && body+=$'\n\n'"**Fin**: ${now}"
-    if [[ "$exit_code" != "0" ]]; then
-        body+=$'\n'"**Exit code**: ${exit_code}"
-    fi
+    # if [[ "$exit_code" != "0" ]]; then
+    #     body+=$'\n'"**Exit code**: ${exit_code}"
+    # fi
 
     if [[ -n "$summary_snippet" ]]; then
         body+=$'\n\n'"**Résumé**"$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"

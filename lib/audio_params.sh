@@ -95,9 +95,9 @@ _build_audio_params() {
     fi
     [[ -z "$channels" || "$channels" == "N/A" ]] && channels="2"
     
-    local decision action effective_codec target_bitrate reason
+    local decision action effective_codec target_bitrate _reason
     decision=$(_get_smart_audio_decision "$input_file" "$opt_source_codec" "$opt_source_bitrate_kbps" "$channels")
-    IFS='|' read -r action effective_codec target_bitrate reason <<< "$decision"
+    IFS='|' read -r action effective_codec target_bitrate _reason <<< "$decision"
     
     case "$action" in
         "copy")

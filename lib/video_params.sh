@@ -375,8 +375,8 @@ compute_video_params_adaptive() {
     local metadata
     metadata=$(get_full_media_metadata "$input_file")
     
-    local video_bitrate_bps video_codec duration input_width input_height input_pix_fmt audio_codec audio_bitrate
-    IFS='|' read -r video_bitrate_bps video_codec duration input_width input_height input_pix_fmt audio_codec audio_bitrate <<< "$metadata"
+    local video_bitrate_bps _video_codec duration input_width input_height input_pix_fmt audio_codec _audio_bitrate
+    IFS='|' read -r video_bitrate_bps _video_codec duration input_width input_height input_pix_fmt audio_codec _audio_bitrate <<< "$metadata"
     
     # Pixel format de sortie
     local output_pix_fmt

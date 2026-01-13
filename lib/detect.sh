@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034
 ###########################################################
 # DÉTECTION SYSTÈME ET OUTILS
 # Module chargé en premier pour détecter l'environnement

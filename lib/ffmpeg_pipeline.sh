@@ -78,13 +78,15 @@ _setup_sample_mode_params() {
     SAMPLE_SEEK_PARAMS="-ss $keyframe_pos"
     SAMPLE_DURATION_PARAMS="-t $sample_len"
     EFFECTIVE_DURATION="$sample_len"
+    # shellcheck disable=SC2034
     SAMPLE_KEYFRAME_POS="$keyframe_pos"
 
     # Formater pour affichage
     local seek_h=$((keyframe_int / 3600))
     local seek_m=$(((keyframe_int % 3600) / 60))
     local seek_s=$((keyframe_int % 60))
-    local seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
+    local seek_formatted
+    seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
 
     if [[ "$available_range" -gt 0 ]]; then
         echo -e "${YELLOW}  🎯 Segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"

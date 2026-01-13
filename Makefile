@@ -2,12 +2,13 @@
 
 SHELL := bash
 
-.PHONY: help test doctor msys2-update msys2-install msys2-install-dev msys2-install-vmaf
+.PHONY: help test lint doctor msys2-update msys2-install msys2-install-dev msys2-install-vmaf
 
 help:
 	@echo "Targets:" 
 	@echo "  make help              Affiche cette aide"
 	@echo "  make test [ARGS='...'] Lance les tests (wrapper de ./run_tests.sh)"
+	@echo "  make lint              Lance ShellCheck (nécessite shellcheck)"
 	@echo "  make doctor            Vérifie les dépendances (binaires + capacités FFmpeg)"
 	@echo "  make msys2-update       (MSYS2) Met à jour les paquets via pacman"
 	@echo "  make msys2-install      (MSYS2) Installe les dépendances via pacman"
@@ -27,6 +28,36 @@ ARGS ?=
 test:
 	@set -euo pipefail; \
 	bash ./run_tests.sh $(ARGS)
+
+# Lint Bash via ShellCheck.
+# Notes:
+# - Utilise -x pour suivre les "source" internes (architecture modulaire).
+# - Exclut les dossiers runtime (logs/, Converted/).
+SHELLCHECK ?= shellcheck
+SHELLCHECK_SEVERITY ?= error
+SHELLCHECK_FORMAT ?= gcc
+# Notes Windows/MSYS2:
+# - Le format par défaut (avec extrait de code) peut faire échouer ShellCheck si la console/locale ne supporte pas certains caractères.
+#   Le format "gcc" évite l'extrait et contourne ce problème.
+# - Par défaut, on ne remonte que les erreurs (base legacy avec beaucoup de warnings). Pour durcir:
+#   make lint SHELLCHECK_SEVERITY=warning
+SHELLCHECK_OPTS ?= -x -f $(SHELLCHECK_FORMAT) -S $(SHELLCHECK_SEVERITY)
+
+lint:
+	@set -euo pipefail; \
+	if ! command -v "$(SHELLCHECK)" >/dev/null 2>&1; then \
+		echo "shellcheck introuvable."; \
+		echo "Sur MSYS2: make msys2-install-dev"; \
+		echo "Sur macOS: brew install shellcheck"; \
+		echo "Sur Ubuntu: sudo apt install shellcheck"; \
+		exit 1; \
+	fi; \
+	files=$$(find . -type f \
+		\( -name "*.sh" -o -name "nascode" -o -name "run_tests.sh" \) \
+		-not -path "./logs/*" \
+		-not -path "./Converted/*" \
+	); \
+	"$(SHELLCHECK)" $(SHELLCHECK_OPTS) $$files
 
 # Vérifie les dépendances réellement utilisées par le script et les tests.
 # - Échoue si des requis "hard" manquent
@@ -133,7 +164,47 @@ msys2-install-dev:
 		exit 1; \
 	fi; \
 	echo "MSYS2: installation outils dev (lint/format)"; \
-	pacman -S --needed shellcheck shfmt
+	# shfmt : le nom dépend de l'environnement (mingw64/ucrt64/clang64/msys). \
+	shfmt_pkg=""; \
+	for p in mingw-w64-x86_64-shfmt mingw-w64-ucrt-x86_64-shfmt mingw-w64-clang-x86_64-shfmt shfmt; do \
+		if pacman -Si "$$p" >/dev/null 2>&1; then shfmt_pkg="$$p"; break; fi; \
+	done; \
+	if [[ -z "$$shfmt_pkg" ]]; then \
+		echo "Impossible de trouver un paquet shfmt dans les dépôts pacman."; \
+		exit 1; \
+	fi; \
+	if ! pacman -S --needed "$$shfmt_pkg"; then \
+		echo "Impossible d'installer $$shfmt_pkg via pacman."; \
+		exit 1; \
+	fi; \
+	\
+	# shellcheck: selon les snapshots MSYS2, le paquet peut être absent. \
+	# On tente pacman, sinon fallback en install local depuis le binaire officiel. \
+	# shellcheck : on tente quelques noms de paquets, sinon fallback download. \
+	sc_pkg=""; \
+	for p in shellcheck mingw-w64-x86_64-shellcheck mingw-w64-ucrt-x86_64-shellcheck mingw-w64-clang-x86_64-shellcheck; do \
+		if pacman -Si "$$p" >/dev/null 2>&1; then sc_pkg="$$p"; break; fi; \
+	done; \
+	if [[ -n "$$sc_pkg" ]]; then \
+		pacman -S --needed "$$sc_pkg"; \
+	else \
+		echo "WARN: shellcheck non trouvé dans les dépôts pacman (snapshot MSYS2)."; \
+		echo "      Installation locale via GitHub release (dans $$HOME/.local/bin)."; \
+		ver="v0.10.0"; \
+		url="https://github.com/koalaman/shellcheck/releases/download/$$ver/shellcheck-$$ver.zip"; \
+		tmp=$$(mktemp -d 2>/dev/null || echo ""); \
+		if [[ -z "$$tmp" ]]; then tmp="/tmp/nascode_shellcheck_$$"; mkdir -p "$$tmp"; fi; \
+		curl -fsSL -o "$$tmp/shellcheck.zip" "$$url"; \
+		unzip -qo "$$tmp/shellcheck.zip" -d "$$tmp"; \
+		mkdir -p "$$HOME/.local/bin"; \
+		# L'archive contient un dossier shellcheck-<ver>/shellcheck.exe \
+		exe=$$(find "$$tmp" -type f -iname 'shellcheck.exe' | head -n 1); \
+		if [[ -z "$$exe" ]]; then echo "ERREUR: shellcheck.exe introuvable après extraction"; exit 1; fi; \
+		cp -f "$$exe" "$$HOME/.local/bin/shellcheck.exe"; \
+		rm -rf "$$tmp" 2>/dev/null || true; \
+		echo "OK: shellcheck installé dans $$HOME/.local/bin/shellcheck.exe"; \
+		echo "NB: assure-toi que $$HOME/.local/bin est dans ton PATH."; \
+	fi
 
 msys2-install-vmaf:
 	@set -euo pipefail; \

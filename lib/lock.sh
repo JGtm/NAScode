@@ -63,7 +63,11 @@ cleanup() {
     exec 2>/dev/null
     
     # Envoyer SIGTERM aux jobs en arrière-plan
-    kill $(jobs -p) 2>/dev/null || true
+    local -a job_pids=()
+    mapfile -t job_pids < <(jobs -p 2>/dev/null || true)
+    if (( ${#job_pids[@]} > 0 )); then
+        kill "${job_pids[@]}" 2>/dev/null || true
+    fi
     
     # Tuer tous les processus enfants du process group (inclut les sous-processus
     # lancés par des pipes/subshells qui échappent à jobs -p)

@@ -15,6 +15,44 @@ Fichiers typiques :
 - `Queue` / `Queue.full` : file d’attente (généralement temporaire)
 - `DryRun_Comparison_*.log` : comparaison des noms (dry-run)
 
+## Aucun fichier à traiter / queue invalide / source exclue
+
+### 1) Message “Aucun fichier à traiter”
+
+Ça arrive typiquement quand **aucun fichier ne passe les filtres** (ex: `--min-size`) ou quand la **source** (`-s`) ne pointe pas sur le bon dossier.
+
+Actions rapides :
+
+```bash
+# Régénérer index + queue depuis la source
+bash nascode -R -s "/chemin/source"
+
+# Si tu avais un filtre taille, essaye sans
+bash nascode -R -s "/chemin/source"  # sans --min-size
+```
+
+### 2) Message “Format du fichier queue invalide (séparateur NUL attendu)”
+
+NAScode utilise des fichiers `logs/Index`/`logs/Queue` au format **null-separated**.
+Si tu fournis un fichier queue personnalisé (option `-q`), il doit respecter ce format.
+
+Actions rapides :
+
+```bash
+# Supprimer la queue et régénérer
+rm -f logs/Queue logs/Queue.full 2>/dev/null || true
+bash nascode -R -s "/chemin/source"
+```
+
+### 3) Erreur “Le répertoire source est exclu par la configuration (EXCLUDES)”
+
+La config contient une liste d’exclusions (`EXCLUDES`). Si ta `SOURCE` (après normalisation) matche une exclusion, NAScode s’arrête explicitement.
+
+Actions rapides :
+
+- Vérifie que tu passes bien le bon `-s`.
+- Ajuste `EXCLUDES` (dans la config) si tu veux autoriser ce chemin.
+
 ## Lockfile / Stop flag
 
 En cas de crash, le script peut laisser :

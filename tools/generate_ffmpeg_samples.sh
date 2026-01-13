@@ -134,7 +134,7 @@ _make_h264_yuv444p() {
 		return 0
 	fi
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "sine=frequency=1000:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -154,7 +154,7 @@ _make_hevc_10bit_bt2020_pq() {
 	fi
 
 	# HDR "soft" : on pose surtout les metadata colorimétriques + 10-bit.
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1920x1080:rate=24" \
 		-f lavfi -i "sine=frequency=440:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -174,7 +174,7 @@ _make_av1_low_bitrate() {
 		return 0
 	fi
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "sine=frequency=500:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -193,7 +193,7 @@ _make_vp9_input() {
 		return 0
 	fi
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=30" \
 		-f lavfi -i "sine=frequency=600:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -212,7 +212,7 @@ _make_mpeg4_input() {
 		return 0
 	fi
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=640x360:rate=25" \
 		-f lavfi -i "sine=frequency=700:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -232,7 +232,7 @@ _make_hevc_high_bitrate() {
 	fi
 
 	# But: un HEVC volontairement "trop lourd" pour forcer un ré-encodage selon les seuils.
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1920x1080:rate=24" \
 		-f lavfi -i "sine=frequency=440:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -251,7 +251,7 @@ _make_h264_odd_dimensions() {
 		return 0
 	fi
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=853x479:rate=30" \
 		-f lavfi -i "sine=frequency=880:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -271,7 +271,7 @@ _make_h264_rotate90() {
 		return 0
 	fi
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=30" \
 		-f lavfi -i "sine=frequency=660:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -292,7 +292,7 @@ _make_h264_interlaced_meta() {
 		return 0
 	fi
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1440x1080:rate=25" \
 		-f lavfi -i "sine=frequency=330:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -319,13 +319,13 @@ _make_vfr_concat() {
 	# de type /c/... (peut finir en C:/c/...). On travaille donc avec des chemins relatifs.
 	pushd "$tmp" >/dev/null
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-t 3 \
 		-c:v libx264 -pix_fmt yuv420p -crf 20 \
 		"seg1.mkv"
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=30" \
 		-t 3 \
 		-c:v libx264 -pix_fmt yuv420p -crf 20 \
@@ -336,7 +336,7 @@ _make_vfr_concat() {
 		echo "file 'seg2.mkv'"
 	} >"concat.txt"
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f concat -safe 0 -i "concat.txt" \
 		-f lavfi -i "sine=frequency=500:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -359,7 +359,7 @@ _make_aac_high_bitrate_stereo() {
 	fi
 
 	# But: AAC stéréo à bitrate élevé (cas downscale vers la cible AAC).
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "sine=frequency=880:sample_rate=48000" \
 		-t "$DURATION_SECONDS" \
@@ -383,7 +383,7 @@ _make_eac3_high_bitrate_5_1() {
 	fi
 
 	# But: EAC3 5.1 trop haut (ex: 640k) -> downscale attendu vers 384k en mode film.
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.08*sin(2*PI*220*t)|0.08*sin(2*PI*330*t)|0.08*sin(2*PI*440*t)|0.08*sin(2*PI*550*t)|0.08*sin(2*PI*660*t)|0.08*sin(2*PI*770*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -407,7 +407,7 @@ _make_flac_lossless_5_1() {
 	fi
 
 	# But: piste lossless (FLAC) qui devrait être conservée en smart audio (sauf --no-lossless).
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.08*sin(2*PI*220*t)|0.08*sin(2*PI*330*t)|0.08*sin(2*PI*440*t)|0.08*sin(2*PI*550*t)|0.08*sin(2*PI*660*t)|0.08*sin(2*PI*770*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -431,7 +431,7 @@ _make_pcm_7_1() {
 	fi
 
 	# But: 7.1 (8 canaux) pour valider la logique de réduction (serie: -> stéréo, film: -> 5.1) lors d'une conversion.
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.06*sin(2*PI*220*t)|0.06*sin(2*PI*330*t)|0.06*sin(2*PI*440*t)|0.06*sin(2*PI*550*t)|0.06*sin(2*PI*660*t)|0.06*sin(2*PI*770*t)|0.06*sin(2*PI*880*t)|0.06*sin(2*PI*990*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -455,7 +455,7 @@ _make_opus_5_1() {
 	fi
 
 	# But: Opus 5.1 à 224k (codec efficace multicanal, souvent à copier en smart audio).
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.08*sin(2*PI*220*t)|0.08*sin(2*PI*330*t)|0.08*sin(2*PI*440*t)|0.08*sin(2*PI*550*t)|0.08*sin(2*PI*660*t)|0.08*sin(2*PI*770*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -480,7 +480,7 @@ _make_dts_5_1() {
 
 	# But: DTS 5.1 (premium) -> devrait être passthrough en smart audio (sauf --no-lossless / règles premium).
 	# Note: -strict est une option de sortie: elle doit être placée avant le fichier de sortie.
-	if ! ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	if ! ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.08*sin(2*PI*220*t)|0.08*sin(2*PI*330*t)|0.08*sin(2*PI*440*t)|0.08*sin(2*PI*550*t)|0.08*sin(2*PI*660*t)|0.08*sin(2*PI*770*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -516,7 +516,7 @@ _make_dts_7_1() {
 
 	# But: DTS 7.1 (8 canaux) -> en mode film devrait être réduit vers 5.1 lors d'une conversion.
 	# Note: selon la build ffmpeg, l'encodeur DTS peut refuser 7.1; on ne bloque pas le script.
-	if ! ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	if ! ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.06*sin(2*PI*220*t)|0.06*sin(2*PI*330*t)|0.06*sin(2*PI*440*t)|0.06*sin(2*PI*550*t)|0.06*sin(2*PI*660*t)|0.06*sin(2*PI*770*t)|0.06*sin(2*PI*880*t)|0.06*sin(2*PI*990*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -545,7 +545,7 @@ _make_truehd_5_1() {
 	fi
 
 	# But: TrueHD 5.1 (premium/lossless) -> devrait être conservé par défaut.
-	if ! ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	if ! ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.08*sin(2*PI*220*t)|0.08*sin(2*PI*330*t)|0.08*sin(2*PI*440*t)|0.08*sin(2*PI*550*t)|0.08*sin(2*PI*660*t)|0.08*sin(2*PI*770*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -580,7 +580,7 @@ _make_truehd_7_1() {
 	fi
 
 	# But: TrueHD 7.1 (premium) -> cas réduction 7.1 -> 5.1 en mode film lors d'une conversion.
-	if ! ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	if ! ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.06*sin(2*PI*220*t)|0.06*sin(2*PI*330*t)|0.06*sin(2*PI*440*t)|0.06*sin(2*PI*550*t)|0.06*sin(2*PI*660*t)|0.06*sin(2*PI*770*t)|0.06*sin(2*PI*880*t)|0.06*sin(2*PI*990*t):s=48000" \
 		-t "$DURATION_SECONDS" \
@@ -607,7 +607,7 @@ _make_multiaudio_aac_ac3() {
 	# Piste 1: stéréo AAC (fra)
 	# Piste 2: 5.1 AC3 (eng)
 	# Aevalsrc: 6 canaux séparés par '|'
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "aevalsrc=0.08*sin(2*PI*440*t)|0.08*sin(2*PI*550*t):s=48000" \
 		-f lavfi -i "aevalsrc=0.08*sin(2*PI*220*t)|0.08*sin(2*PI*330*t)|0.08*sin(2*PI*440*t)|0.08*sin(2*PI*550*t)|0.08*sin(2*PI*660*t)|0.08*sin(2*PI*770*t):s=48000" \
@@ -642,7 +642,7 @@ Hello NAScode
 Sous-titres SRT intégrés
 EOF
 
-	ffmpeg -hide_banner -loglevel error $(_ffmpeg_overwrite_flag) \
+	ffmpeg -hide_banner -loglevel error "$(_ffmpeg_overwrite_flag)" \
 		-f lavfi -i "testsrc2=size=1280x720:rate=24" \
 		-f lavfi -i "sine=frequency=440:sample_rate=48000" \
 		-i "$srt" \

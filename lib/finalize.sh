@@ -45,7 +45,8 @@ _finalize_try_move() {
     # Repli local : dossier fallback
     local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
     mkdir -p "$local_fallback_dir" 2>/dev/null || true
-    local fallback_target="$local_fallback_dir/$(basename "$final_output")"
+    local fallback_target
+    fallback_target="$local_fallback_dir/$(basename "$final_output")"
     if mv "$tmp_output" "$fallback_target" 2>/dev/null; then
         printf "%s" "$fallback_target"
         return 1
@@ -221,14 +222,13 @@ _finalize_conversion_success() {
 
     if [[ "$NO_PROGRESS" != true ]]; then
         # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
-        local elapsed_str="N/A"
         local elapsed_display="N/A"
         local start_for_file="${FILE_START_TS:-${START_TS:-}}"
         if [[ -n "${start_for_file:-}" ]] && [[ "${start_for_file}" =~ ^[0-9]+$ ]]; then
             local end_ts
             end_ts=$(date +%s)
-            local elapsed=$((end_ts - start_for_file))
-            elapsed_str=$(format_duration_seconds "$elapsed")
+            local elapsed
+            elapsed=$((end_ts - start_for_file))
             elapsed_display=$(format_duration_compact "$elapsed")
         fi
 
@@ -348,18 +348,22 @@ dry_run_compare_names() {
                 print_header "SIMULATION DES NOMS DE FICHIERS"
             } | tee -a "$LOG_FILE"
             
-            local total_files=$(count_null_separated "$QUEUE")
+            local total_files
+            total_files=$(count_null_separated "$QUEUE")
             local count=0
             local anomaly_count=0
             
             while IFS= read -r -d $'\0' file_original; do
-                local filename_raw=$(basename "$file_original")
-                local filename=$(echo "$filename_raw" | tr -d '\r\n')
+                local filename_raw
+                filename_raw=$(basename "$file_original")
+                local filename
+                filename=$(echo "$filename_raw" | tr -d '\r\n')
                 local base_name="${filename%.*}"
                 
                 local relative_path="${file_original#$SOURCE}"
                 relative_path="${relative_path#/}"
-                local relative_dir=$(dirname "$relative_path")
+                local relative_dir
+                relative_dir=$(dirname "$relative_path")
                 local final_dir="$OUTPUT_DIR/$relative_dir"
 
                 # Suffixe effectif (par fichier) : inclut bitrate adapté + résolution.
@@ -378,7 +382,8 @@ dry_run_compare_names() {
                 fi
 
                 local final_output="$final_dir/${base_name}${effective_suffix}.mkv"
-                local final_output_basename=$(basename "$final_output")
+                local final_output_basename
+                final_output_basename=$(basename "$final_output")
 
                 # --- PRÉPARATION POUR LA VÉRIFICATION D'ANOMALIE ---
                 local generated_base_name="${final_output_basename%.mkv}"
