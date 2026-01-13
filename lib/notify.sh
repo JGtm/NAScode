@@ -217,7 +217,7 @@ notify_event_run_started() {
     if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
         local limit_icon="🔒"
         [[ "${RANDOM_MODE:-false}" == true ]] && limit_icon="🎲"
-        body+=$'\n'"- **${limit_icon}  Limitation**: ${LIMIT_FILES} fichiers"
+        body+=$'\n'"- **${limit_icon}  Limitation**: ${LIMIT_FILES} fichier(s) maximum"
     fi
 
     [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**: true"
