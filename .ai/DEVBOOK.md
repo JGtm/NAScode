@@ -15,6 +15,12 @@ Objectifs :
 
 ### 2026-01-13
 
+#### Docs : mini-spéc “traduction qualité équivalente” (audio)
+- **Quoi** : ajout d’une mini-spéc dans le backlog pour cadrer un futur helper de traduction de bitrate audio “qualité équivalente” + stratégie d’activation par mode + invariants + stratégie de tests.
+- **Où** : `.ai/TODO.md`.
+- **Pourquoi** : aligner l’approche audio sur la logique vidéo existante (sans activer globalement par défaut) et rendre l’implémentation future plus sûre via des tests ciblés.
+- **Impact** : doc/backlog uniquement (aucun changement de comportement).
+
 #### Notifications Discord (démarrage / heures creuses / fin)
 - **Quoi** : ajout d’un module de notifications externes pour envoyer des messages Discord en Markdown (démarrage avec paramètres actifs, pause/reprise en heures creuses, fin avec résumé).
 - **Où** : `lib/notify.sh` (nouveau), `nascode` (chargement + hook démarrage), `lib/off_peak.sh` (hooks pause/reprise), `lib/lock.sh` (hook fin via `cleanup()`), `tests/test_notify.bats`.

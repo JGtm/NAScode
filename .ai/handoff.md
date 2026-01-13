@@ -60,6 +60,17 @@
 - "Oui vas y commit comme tu as dit"
 - "Option A pour le moment, tu mettras le reste précisément dans le fichier TODO.md. D'ailleurs tant que tu es sur l'UI dans les messages à envoyer sur discord, il manque les paramètres actifs liés à ordre de tri et limitation"
 
+### 2026-01-13 — Backlog : audio “traduction qualité équivalente” (mini-spéc)
+
+- [.ai/TODO.md](.ai/TODO.md) : ajout d’une mini-spéc pour un futur helper de traduction de bitrate audio (invariants, activation par mode, stratégie de tests).
+- [.ai/DEVBOOK.md](.ai/DEVBOOK.md) : entrée DEVBOOK correspondante (doc/backlog uniquement).
+
+### Dernier prompt
+
+- "Ouais j'aime bien tes recommandations pragmatiques, propose moi une mini spec et mets tout ça dans le todo"
+- "Dans mes tests j'ai 3 skips, c'est normal non ?"
+- "ok commit et puis merge dans main"
+
 ## Dernière session (13/01/2026 - Doc : notifications Discord + secrets)
 
 ### Changements
