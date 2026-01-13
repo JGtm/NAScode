@@ -135,6 +135,12 @@ Référence code (audio) :
 
 Détails : [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
+### Dépannage rapide (cas fréquents)
+
+- **Aucun fichier à traiter** : tes filtres/exclusions ont probablement tout éliminé (ex: `--min-size`, `EXCLUDES`, mauvaise `-s`). Réessaie sans filtre, ou force une régénération : `bash nascode -R -s "..."`.
+- **Queue invalide (séparateur NUL)** : si tu fournis une queue custom, elle doit être *null-separated*. Sinon, supprime `logs/Queue` et relance avec `-R`.
+- **Source exclue par la config** : si tu vois une erreur indiquant que `SOURCE` est dans `EXCLUDES`, change `-s` ou retire l’exclusion (dans la config).
+
 ## Notifications Discord (optionnel)
 
 NAScode peut envoyer des notifications via un **webhook Discord** (format Markdown) :
