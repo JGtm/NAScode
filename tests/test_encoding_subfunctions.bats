@@ -93,6 +93,30 @@ teardown() {
     [[ "$X265_VBV_STRING" =~ "vbv-bufsize=" ]]
 }
 
+@test "_setup_video_encoding_params: film-adaptive applique ADAPTIVE_* en HEVC/x265" {
+    # Simuler une source 720p
+    get_video_stream_props() { echo "1280|720|yuv420p"; }
+    export -f get_video_stream_props
+
+    CONVERSION_MODE="film-adaptive"
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="libx265"
+    set_conversion_mode_parameters
+
+    # Forcer les paramètres adaptatifs (ceux-ci doivent prendre le dessus)
+    ADAPTIVE_COMPLEXITY_MODE=true
+    ADAPTIVE_TARGET_KBPS=571
+    ADAPTIVE_MAXRATE_KBPS=799
+    ADAPTIVE_BUFSIZE_KBPS=1998
+
+    _setup_video_encoding_params "/fake/file.mkv"
+
+    [ "$VIDEO_BITRATE" = "571k" ]
+    [ "$VIDEO_MAXRATE" = "799k" ]
+    [ "$VIDEO_BUFSIZE" = "1998k" ]
+    [ "$X265_VBV_STRING" = "vbv-maxrate=799:vbv-bufsize=1998" ]
+}
+
 @test "_setup_video_encoding_params: SVT-AV1 ajoute keyint dans ENCODER_BASE_PARAMS" {
     # Skip si libsvtav1 n'est pas disponible dans FFmpeg
     if ! ffmpeg -encoders 2>/dev/null | grep -q libsvtav1; then

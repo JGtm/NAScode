@@ -251,6 +251,82 @@ teardown() {
 }
 
 ###########################################################
+# Tests de non-régression : export des paramètres adaptatifs
+###########################################################
+
+@test "convert_file: film-adaptive exporte ADAPTIVE_* (AV1)" {
+    source "$LIB_DIR/conversion.sh"
+
+    ADAPTIVE_COMPLEXITY_MODE=true
+    LIMIT_FILES=0
+    UI_QUIET=true
+
+    get_full_media_metadata() { echo "1000000|h264|60|1280|720|yuv420p|aac|128000"; }
+    export -f get_full_media_metadata
+
+    _prepare_file_paths() { echo "input.mp4|$BATS_TEST_TMPDIR/out|base|_suf|$BATS_TEST_TMPDIR/out/out.mkv"; }
+    export -f _prepare_file_paths
+    _check_output_exists() { return 1; }
+    export -f _check_output_exists
+    _handle_dryrun_mode() { return 1; }
+    export -f _handle_dryrun_mode
+    _get_temp_filename() { echo "$BATS_TEST_TMPDIR/tmp$2"; }
+    export -f _get_temp_filename
+    _setup_temp_files_and_logs() { return 0; }
+    export -f _setup_temp_files_and_logs
+
+    _convert_run_adaptive_analysis_and_export() { echo "571|799|2000|1.25|complexe|1.0083"; }
+    export -f _convert_run_adaptive_analysis_and_export
+    should_skip_conversion_adaptive() { return 0; }
+    export -f should_skip_conversion_adaptive
+    print_conversion_not_required() { return 0; }
+    export -f print_conversion_not_required
+
+    VIDEO_CODEC="av1"
+    convert_file "$BATS_TEST_TMPDIR/input.mp4" "$BATS_TEST_TMPDIR/out"
+
+    [ "$ADAPTIVE_TARGET_KBPS" = "571" ]
+    [ "$ADAPTIVE_MAXRATE_KBPS" = "799" ]
+    [ "$ADAPTIVE_BUFSIZE_KBPS" = "2000" ]
+}
+
+@test "convert_file: film-adaptive exporte ADAPTIVE_* (HEVC/x265)" {
+    source "$LIB_DIR/conversion.sh"
+
+    ADAPTIVE_COMPLEXITY_MODE=true
+    LIMIT_FILES=0
+    UI_QUIET=true
+
+    get_full_media_metadata() { echo "1000000|h264|60|1280|720|yuv420p|aac|128000"; }
+    export -f get_full_media_metadata
+
+    _prepare_file_paths() { echo "input.mp4|$BATS_TEST_TMPDIR/out|base|_suf|$BATS_TEST_TMPDIR/out/out.mkv"; }
+    export -f _prepare_file_paths
+    _check_output_exists() { return 1; }
+    export -f _check_output_exists
+    _handle_dryrun_mode() { return 1; }
+    export -f _handle_dryrun_mode
+    _get_temp_filename() { echo "$BATS_TEST_TMPDIR/tmp$2"; }
+    export -f _get_temp_filename
+    _setup_temp_files_and_logs() { return 0; }
+    export -f _setup_temp_files_and_logs
+
+    _convert_run_adaptive_analysis_and_export() { echo "650|910|2275|1.16|complexe|0.3936"; }
+    export -f _convert_run_adaptive_analysis_and_export
+    should_skip_conversion_adaptive() { return 0; }
+    export -f should_skip_conversion_adaptive
+    print_conversion_not_required() { return 0; }
+    export -f print_conversion_not_required
+
+    VIDEO_CODEC="hevc"
+    convert_file "$BATS_TEST_TMPDIR/input.mp4" "$BATS_TEST_TMPDIR/out"
+
+    [ "$ADAPTIVE_TARGET_KBPS" = "650" ]
+    [ "$ADAPTIVE_MAXRATE_KBPS" = "910" ]
+    [ "$ADAPTIVE_BUFSIZE_KBPS" = "2275" ]
+}
+
+###########################################################
 # Tests d'intégration skip logic
 ###########################################################
 

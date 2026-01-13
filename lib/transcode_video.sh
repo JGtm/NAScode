@@ -186,15 +186,25 @@ _setup_video_encoding_params() {
             fi
         fi
         
-        # MBR (Maximum BitRate) : plafonne le bitrate en mode CRF pour éviter
-        # les fichiers plus gros que la source sur du contenu complexe.
-        # Utilise effective_maxrate comme limite (plus permissif que effective_target).
-        if [[ "${SINGLE_PASS_MODE:-false}" == true ]] && [[ "$ENCODER_BASE_PARAMS" != *"mbr="* ]]; then
-            if [[ "$effective_maxrate" =~ ^[0-9]+$ ]] && [[ "$effective_maxrate" -gt 0 ]]; then
+        # CRF plafonné : SVT-AV1 (via FFmpeg) n'accepte pas forcément les clés
+        # "max-bitrate" / "buffer-size" dans -svtav1-params (selon build).
+        # En pratique, le couple rc=0 + mbr=<kbps> déclenche bien le mode "capped CRF".
+        if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
+            if [[ "$ENCODER_BASE_PARAMS" != *"rc="* ]]; then
                 if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
-                    ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:mbr=${effective_maxrate}"
+                    ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:rc=0"
                 else
-                    ENCODER_BASE_PARAMS="mbr=${effective_maxrate}"
+                    ENCODER_BASE_PARAMS="rc=0"
+                fi
+            fi
+
+            if [[ "$ENCODER_BASE_PARAMS" != *"mbr="* ]]; then
+                if [[ "$effective_maxrate" =~ ^[0-9]+$ ]] && [[ "$effective_maxrate" -gt 0 ]]; then
+                    if [[ -n "$ENCODER_BASE_PARAMS" ]]; then
+                        ENCODER_BASE_PARAMS="${ENCODER_BASE_PARAMS}:mbr=${effective_maxrate}"
+                    else
+                        ENCODER_BASE_PARAMS="mbr=${effective_maxrate}"
+                    fi
                 fi
             fi
         fi
@@ -362,6 +372,75 @@ _get_bitrate_option() {
     fi
 }
 
+###########################################################
+# Debug optionnel : capture SVT-AV1 "capped CRF" sans spam terminal
+###########################################################
+
+_nascode_is_truthy() {
+    local v="${1:-}"
+    [[ "$v" == "1" || "$v" == "true" || "$v" == "TRUE" || "$v" == "yes" || "$v" == "YES" ]]
+}
+
+_nascode_get_ffmpeg_loglevel_for_encoder() {
+    local enc="${1:-}"
+
+    # Par défaut, on garde un niveau bas pour ne pas noyer l'utilisateur.
+    # NB: la sortie FFmpeg est redirigée vers un fichier, donc même 'info' ne spamme pas le terminal.
+    if _nascode_is_truthy "${NASCODE_LOG_SVT_CONFIG:-0}" && [[ "$enc" == "libsvtav1" ]]; then
+        echo "info"
+        return 0
+    fi
+
+    echo "warning"
+}
+
+_nascode_maybe_write_svt_config_log() {
+    local enc="${1:-}"
+    local ffmpeg_stderr_log="${2:-}"
+    local base="${3:-}"
+    local input="${4:-}"
+    local output="${5:-}"
+    local encoder_specific="${6:-}"
+
+    if ! _nascode_is_truthy "${NASCODE_LOG_SVT_CONFIG:-0}"; then
+        return 0
+    fi
+    if [[ "$enc" != "libsvtav1" ]]; then
+        return 0
+    fi
+    if [[ -z "$ffmpeg_stderr_log" || ! -f "$ffmpeg_stderr_log" ]]; then
+        return 0
+    fi
+
+    local safe_name
+    safe_name=$(printf "%s" "$base" | tr -c 'A-Za-z0-9._-' '_')
+    safe_name=${safe_name:0:80}
+
+    local log_dir="${LOG_DIR:-./logs}"
+    mkdir -p "$log_dir" 2>/dev/null || true
+
+    local out_log="$log_dir/SVT_${EXECUTION_TIMESTAMP}_${safe_name}.log"
+
+    {
+        echo "# NAScode - SVT-AV1 config extract"
+        echo "# date: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "# input: $input"
+        echo "# output: $output"
+        echo "# encoder_specific_opts: ${encoder_specific:-<empty>}"
+        echo
+        grep -E 'Svt\[info\]: SVT \[config\]|capped CRF|max bitrate|BRC mode' "$ffmpeg_stderr_log" 2>/dev/null || true
+    } > "$out_log" 2>/dev/null || true
+
+    if [[ ! -s "$out_log" ]] || ! grep -qE 'Svt\[info\]: SVT \[config\]|capped CRF|max bitrate|BRC mode' "$out_log" 2>/dev/null; then
+        rm -f "$out_log" 2>/dev/null || true
+        return 0
+    fi
+
+    if [[ -n "${LOG_SESSION:-}" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | SVT_CONFIG_LOG | $out_log" >> "$LOG_SESSION" 2>/dev/null || true
+    fi
+}
+
 # Exécute un encodage ffmpeg avec le mode spécifié.
 # Usage: _run_ffmpeg_encode <mode> <input_file> <output_file> <ffmpeg_log> <base_name> 
 #                           <encoder_base_params> <audio_params> <stream_mapping>
@@ -442,6 +521,7 @@ _run_ffmpeg_encode() {
     tune_opt=$(_get_tune_option "$encoder")
     preset_opt=$(_get_preset_option "$encoder" "$ENCODER_PRESET")
     bitrate_opt=$(_get_bitrate_option "$encoder" "$mode")
+
     
     # Construire les paramètres encodeur spécifiques
     local encoder_params_flag encoder_full_params
@@ -463,7 +543,9 @@ _run_ffmpeg_encode() {
         _cmd_append_words cmd "$IO_PRIORITY_CMD"
     fi
 
-    cmd+=(ffmpeg -y -loglevel warning)
+    local ffmpeg_loglevel
+    ffmpeg_loglevel=$(_nascode_get_ffmpeg_loglevel_for_encoder "$encoder")
+    cmd+=(ffmpeg -y -loglevel "$ffmpeg_loglevel")
 
     # Ces variables sont historiquement des strings contenant plusieurs options.
     # On les split volontairement en mots (contrôlé en interne) pour éviter les expansions non-quotées.
@@ -512,6 +594,9 @@ _run_ffmpeg_encode() {
     local awk_rc=${PIPESTATUS[1]:-0}
 
     if [[ "$ffmpeg_rc" -eq 0 && "$awk_rc" -eq 0 ]]; then
+        # Option debug: extraire la config SVT-AV1 sans spammer le terminal.
+        # NB: si NASCODE_LOG_SVT_CONFIG=1, on a utilisé -loglevel info pour rendre ces lignes disponibles.
+        _nascode_maybe_write_svt_config_log "$encoder" "${ffmpeg_log}${log_suffix}" "$base_name" "$input_file" "${output_file:-}" "$encoder_specific_opts"
         return 0
     fi
     

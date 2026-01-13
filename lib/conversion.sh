@@ -128,6 +128,18 @@ convert_file() {
         local complexity_c complexity_desc stddev_val
         IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
 
+        # IMPORTANT (bash) : l'appel via "$(...)" exécute la fonction dans un subshell,
+        # donc les exports faits dans _convert_run_adaptive_analysis_and_export ne remontent pas.
+        # On exporte ici dans le shell parent pour que l'encodage (transcode_video.sh)
+        # utilise bien les budgets adaptatifs (AV1 comme HEVC/x265).
+        if [[ "$adaptive_target_kbps" =~ ^[0-9]+$ ]] && [[ "$adaptive_maxrate_kbps" =~ ^[0-9]+$ ]] && [[ "$adaptive_bufsize_kbps" =~ ^[0-9]+$ ]]; then
+            export ADAPTIVE_TARGET_KBPS="$adaptive_target_kbps"
+            export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
+            export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
+        else
+            unset ADAPTIVE_TARGET_KBPS ADAPTIVE_MAXRATE_KBPS ADAPTIVE_BUFSIZE_KBPS
+        fi
+
         # Skip avec seuil adaptatif (avant transfert)
         if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
             print_conversion_not_required
