@@ -176,18 +176,18 @@ notify_event_run_started() {
     [[ -n "$now" ]] && body+=$'\n\n'"**Début**: ${now}"
 
     body+=$'\n\n'"**Paramètres actifs**"$'\n'
-    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **Mode**: ${CONVERSION_MODE}"
-    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **Source**: ${SOURCE}"
-    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **Destination**: ${OUTPUT_DIR}"
-    body+=$'\n'"- **Codec vidéo**: ${VIDEO_CODEC:-hevc}"
-    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **Codec audio**: ${AUDIO_CODEC}"
+    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **📊  Mode**: ${CONVERSION_MODE}"
+    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **📂  Source**: ${SOURCE}"
+    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **📂  Destination**: ${OUTPUT_DIR}"
+    body+=$'\n'"- **🎬  Codec vidéo**: ${VIDEO_CODEC:-hevc}"
+    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio**: ${AUDIO_CODEC}"
 
-    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **Dry-run**: true"
-    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **Sample**: true"
-    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **VMAF**: true"
+    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**: true"
+    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  Échantillon**: true"
+    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **ℹ   VMAF**: true"
 
     if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
-        body+=$'\n'"- **Heures creuses**: ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
+        body+=$'\n'"- **⏰  Heures creuses**: ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
     fi
     [[ -n "${PARALLEL_JOBS:-}" ]] && body+=$'\n'"- **Jobs**: ${PARALLEL_JOBS}"
 
