@@ -294,6 +294,7 @@ parse_human_size_to_bytes() {
 # Variables requises : DURATION, CURRENT_FILE_NAME, NOPROG, START, SLOT, PARALLEL, MAX_SLOTS, EMOJI, END_MSG
 # Fonction get_time() doit être injectée selon HAS_GAWK
 # Usage: awk -v DURATION=... -v ... "$AWK_TIME_FUNC $AWK_FFMPEG_PROGRESS_SCRIPT"
+# shellcheck disable=SC2034
 readonly AWK_FFMPEG_PROGRESS_SCRIPT='
 function format_time(ts,   cmd,result,h,m,s) {
     # Formater un timestamp Unix en HH:MM:SS

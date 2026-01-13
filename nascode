@@ -162,6 +162,13 @@ main() {
         exit 1
     fi
     SOURCE=$(cd "$SOURCE" && pwd)
+
+    # Protection : si la source est elle-même dans les exclusions, le run ne peut pas produire de fichiers.
+    # On sort explicitement pour éviter un comportement perçu comme un blocage.
+    if is_excluded "$SOURCE"; then
+        echo -e "${RED}❌ ERREUR: Le répertoire source est exclu par la configuration (EXCLUDES) : $SOURCE${NOCOLOR}"
+        exit 1
+    fi
     
     # Vérifications initiales
     check_lock

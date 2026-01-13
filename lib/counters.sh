@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2034
 ###########################################################
 # GESTION DES COMPTEURS
 # Compteurs persistants pour le mode FIFO et les limitations

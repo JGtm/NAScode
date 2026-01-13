@@ -13,12 +13,16 @@ readonly CYAN=$'\033[0;36m'
 readonly BLUE=$'\033[0;34m'
 readonly MAGENTA=$'\033[0;35m'
 readonly WHITE=$'\033[0;37m'
+# shellcheck disable=SC2034
 readonly ORANGE=$'\033[1;33m'
 
 # === STYLES SUPPLÉMENTAIRES ===
+# shellcheck disable=SC2034
 readonly BOLD=$'\033[1m'
 readonly DIM=$'\033[2m'
+# shellcheck disable=SC2034
 readonly ITALIC=$'\033[3m'
+# shellcheck disable=SC2034
 readonly UNDERLINE=$'\033[4m'
 
 # === CARACTÈRES DE DESSIN DE BOÎTE (Unicode) ===
@@ -34,6 +38,7 @@ readonly BOX_CHECK="✔"
 readonly BOX_CROSS="✖"
 readonly BOX_WARN="⚠"
 readonly BOX_INFO="ℹ"
+# shellcheck disable=SC2034
 readonly BOX_QUESTION="?"
 
 ###########################################################
@@ -299,7 +304,8 @@ print_index_kept() {
     # Compenser les caractères UTF-8 multi-octets (accentués)
     # strlen compte les octets, wc -m compte les caractères visuels
     local byte_len=${#message}
-    local char_len=$(printf '%s' "$message" | wc -m)
+    local char_len
+    char_len=$(printf '%s' "$message" | wc -m)
     local extra=$((byte_len - char_len + 2))
     local width=$((44 + extra))
     
@@ -390,8 +396,10 @@ print_summary_section_title() {
     local left_pad=$((total_padding / 2))
     local right_pad=$((total_padding - left_pad))
     
-    local left_spaces=$(printf '%*s' "$left_pad" '')
-    local right_spaces=$(printf '%*s' "$right_pad" '')
+    local left_spaces
+    left_spaces=$(printf '%*s' "$left_pad" '')
+    local right_spaces
+    right_spaces=$(printf '%*s' "$right_pad" '')
     
     echo -e "${GREEN}  ║${NOCOLOR}${YELLOW}${left_spaces}${title}${right_spaces}${NOCOLOR}${GREEN}║${NOCOLOR}"
 }
@@ -538,7 +546,8 @@ print_skip_message() {
     local filename="$2"
     local file_original="$3"
     
-    local counter_prefix=$(_get_counter_prefix)
+    local counter_prefix
+    counter_prefix=$(_get_counter_prefix)
     case "$CONVERSION_ACTION" in
         "skip")
             if [[ -z "$codec" ]]; then
@@ -730,9 +739,9 @@ _print_audio_conversion_summary() {
         return 1
     fi
 
-    local audio_decision action effective_codec target_bitrate reason
+    local audio_decision action effective_codec target_bitrate _reason
     audio_decision=$(_get_smart_audio_decision "$tmp_input" "$a_codec" "$a_bitrate" "$channels")
-    IFS='|' read -r action effective_codec target_bitrate reason <<< "$audio_decision"
+    IFS='|' read -r action effective_codec target_bitrate _reason <<< "$audio_decision"
 
     local show_audio_summary=false
     if [[ "$action" != "copy" ]]; then
@@ -796,7 +805,9 @@ print_conversion_info() {
 
     # Affichage downscale + 10-bit (uniquement si on encode la vidéo)
     if [[ "${CONVERSION_ACTION:-full}" != "video_passthrough" ]]; then
+        # shellcheck disable=SC2034
         _print_downscale_info "$v_width" "$v_height" && VIDEO_PRECONVERSION_VIDEOINFO_SHOWN=true
+        # shellcheck disable=SC2034
         _print_10bit_info "$v_pix_fmt" && VIDEO_PRECONVERSION_VIDEOINFO_SHOWN=true
     fi
 

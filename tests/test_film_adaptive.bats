@@ -283,6 +283,7 @@ teardown() {
     export -f print_conversion_not_required
 
     VIDEO_CODEC="av1"
+    touch "$BATS_TEST_TMPDIR/input.mp4"
     convert_file "$BATS_TEST_TMPDIR/input.mp4" "$BATS_TEST_TMPDIR/out"
 
     [ "$ADAPTIVE_TARGET_KBPS" = "571" ]
@@ -319,6 +320,7 @@ teardown() {
     export -f print_conversion_not_required
 
     VIDEO_CODEC="hevc"
+    touch "$BATS_TEST_TMPDIR/input.mp4"
     convert_file "$BATS_TEST_TMPDIR/input.mp4" "$BATS_TEST_TMPDIR/out"
 
     [ "$ADAPTIVE_TARGET_KBPS" = "650" ]

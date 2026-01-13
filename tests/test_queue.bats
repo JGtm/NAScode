@@ -88,6 +88,48 @@ teardown() {
 }
 
 ###########################################################
+# Tests non-régression : validation queue interne (évite blocage FIFO)
+###########################################################
+
+@test "_validate_queue_not_empty: queue vide -> sortie 0" {
+    run bash -lc '
+        set -euo pipefail
+        source "$PROJECT_ROOT/lib/ui.sh"
+        source "$PROJECT_ROOT/lib/ui_options.sh"
+        source "$PROJECT_ROOT/lib/config.sh"
+        source "$PROJECT_ROOT/lib/utils.sh"
+        source "$PROJECT_ROOT/lib/index.sh"
+        source "$PROJECT_ROOT/lib/counters.sh"
+        source "$PROJECT_ROOT/lib/queue.sh"
+        export LOG_DIR="'$LOG_DIR'"
+        export QUEUE="'$LOG_DIR'/Queue_empty_test"
+        : > "$QUEUE"
+        _validate_queue_not_empty
+    '
+    [ "$status" -eq 0 ]
+    [[ "$output" =~ "Aucun fichier à traiter" ]]
+}
+
+@test "_validate_queue_not_empty: format invalide (pas de NUL) -> erreur 1" {
+    run bash -lc '
+        set -euo pipefail
+        source "$PROJECT_ROOT/lib/ui.sh"
+        source "$PROJECT_ROOT/lib/ui_options.sh"
+        source "$PROJECT_ROOT/lib/config.sh"
+        source "$PROJECT_ROOT/lib/utils.sh"
+        source "$PROJECT_ROOT/lib/index.sh"
+        source "$PROJECT_ROOT/lib/counters.sh"
+        source "$PROJECT_ROOT/lib/queue.sh"
+        export LOG_DIR="'$LOG_DIR'"
+        export QUEUE="'$LOG_DIR'/Queue_invalid_test"
+        printf "a\nb\n" > "$QUEUE"
+        _validate_queue_not_empty
+    '
+    [ "$status" -eq 1 ]
+    [[ "$output" =~ "Format du fichier queue invalide" ]]
+}
+
+###########################################################
 # Tests de _normalize_source_path()
 ###########################################################
 

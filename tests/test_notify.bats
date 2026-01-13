@@ -36,6 +36,7 @@ EOF
   export PATH="$tmp/bin:$PATH"
   export NASCODE_TEST_PAYLOAD_FILE="$tmp/payload.json"
   export NASCODE_DISCORD_WEBHOOK_URL="https://discord.invalid/webhook"
+  export NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true
 
   run bash -c 'source "$LIB_DIR/notify.sh"; notify_discord_send_markdown "hello"; test -s "$NASCODE_TEST_PAYLOAD_FILE"'
   [ "$status" -eq 0 ]
@@ -59,6 +60,7 @@ EOF
   export NASCODE_DISCORD_WEBHOOK_URL="https://discord.invalid/webhook"
   export NASCODE_DISCORD_NOTIFY=true
   export NASCODE_DISCORD_NOTIFY_DEBUG=true
+  export NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true
   export EXECUTION_TIMESTAMP="test"
 
   run bash -c 'source "$LIB_DIR/notify.sh"; notify_discord_send_markdown "hello" "run_started"; test -s "$LOG_DIR/discord_notify_${EXECUTION_TIMESTAMP}.log"'

@@ -29,13 +29,15 @@ validate_queue_file() {
         return 1
     fi
     
-    local file_count=$(count_null_separated "$queue_file")
+    local file_count
+    file_count=$(count_null_separated "$queue_file")
     if [[ $file_count -eq 0 ]]; then
         print_error "Format du fichier queue invalide (séparateur NUL attendu)"
         return 1
     fi
     
-    local test_read=$(head -c 100 "$queue_file" | tr '\0' '\n' | head -1)
+    local test_read
+    test_read=$(head -c 100 "$queue_file" | tr '\0' '\n' | head -1)
     if [[ -z "$test_read" ]] && [[ $file_count -gt 0 ]]; then
         print_info "Le fichier queue semble valide ($file_count fichiers détectés)."
     else
@@ -131,6 +133,13 @@ _validate_queue_not_empty() {
         echo "Aucun fichier à traiter trouvé (vérifiez les filtres ou la source)."
         exit 0
     fi
+
+    local file_count
+    file_count=$(count_null_separated "$QUEUE")
+    if [[ "$file_count" -eq 0 ]]; then
+        print_error "Format du fichier queue invalide (séparateur NUL attendu)"
+        exit 1
+    fi
 }
 
 _display_random_mode_selection() {													
@@ -164,7 +173,8 @@ _show_active_options() {
     
     # Nombre de fichiers à traiter (seulement sans limite, car compteur actif)
     if [[ "${LIMIT_FILES:-0}" -eq 0 ]] && [[ -f "$QUEUE" ]]; then
-        local file_count=$(count_null_separated "$QUEUE")
+        local file_count
+        file_count=$(count_null_separated "$QUEUE")
         if [[ "$file_count" -gt 0 ]]; then
             options+=("$(format_option_file_count "$file_count")")
         fi

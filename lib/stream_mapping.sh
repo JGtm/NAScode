@@ -44,8 +44,7 @@ find_french_subtitle_stream() {
 # Usage: find_english_subtitle_stream <input_file>
 # Retourne: index du flux (ex: "0:s:0") ou chaîne vide si non trouvé
 find_english_subtitle_stream() {
-    local input_file
-    input_file=$("$1")
+    local input_file="$1"
     
     # Liste tous les flux de sous-titres avec leurs tags language
     local streams_info
@@ -133,8 +132,7 @@ build_subtitle_mapping() {
 # Usage: list_subtitle_streams <input_file>
 # Retourne: liste au format "index|language|codec|title" par ligne
 list_subtitle_streams() {
-    local input_file
-    input_file=$("$1")
+    local input_file="$1"
     
     ffprobe_safe -v error \
         -select_streams s \
@@ -150,8 +148,7 @@ list_subtitle_streams() {
 # Usage: count_subtitle_streams <input_file>
 # Retourne: nombre de flux
 count_subtitle_streams() {
-    local input_file
-    input_file=$("$1")
+    local input_file="$1"
     
     local count
     count=$(ffprobe_safe -v error \

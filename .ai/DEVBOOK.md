@@ -29,6 +29,30 @@ Objectifs :
 - **Où** : `lib/notify.sh`, tests dans `tests/test_notify.bats`.
 - **Pourquoi** : diagnostiquer les erreurs Discord sans exposer le webhook, fiabiliser l’envoi sur Git Bash/Windows et améliorer la lisibilité des messages.
 
+#### Tests : anti-spam notifications Discord
+- **Quoi** : désactivation par défaut des notifications Discord quand NAScode est exécuté sous Bats, avec un opt-in explicite pour les tests unitaires.
+- **Où** : `lib/notify.sh` (garde-fou Bats), `tests/test_notify.bats` (opt-in `NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true`).
+- **Pourquoi** : éviter de spammer un vrai webhook via l’environnement utilisateur pendant les tests E2E.
+- **Impact** : aucun impact en run normal ; les tests notifs continuent de valider le payload via `curl` mock.
+
+#### Fix : éviter les blocages quand la queue ne produit aucun fichier traitable
+- **Quoi** : sécurise le mode FIFO/limite pour qu’un run ne puisse plus “attendre indéfiniment” si aucun fichier n’est effectivement traité (entrée vide, fichier introuvable, ou échec très tôt dans `convert_file`).
+- **Où** :
+  - `lib/conversion.sh` : `convert_file()` marque toujours un fichier comme “traité” en mode FIFO (via `increment_processed_count`) même en cas de skip/erreur précoce.
+  - `lib/processing.sh` : ignore les entrées vides lues depuis la queue/FIFO.
+  - `lib/queue.sh` : `_validate_queue_not_empty()` détecte le format invalide (pas de séparateurs NUL) et échoue explicitement.
+  - `nascode` : sortie explicite si `SOURCE` matche `EXCLUDES`.
+- **Pourquoi** : empêcher les deadlocks FIFO (writer qui attend `processed>=target`) et rendre les cas “0 fichier” explicites.
+- **Tests** : `tests/test_conversion.bats`, `tests/test_queue.bats`, ajustement non-régression `tests/test_film_adaptive.bats` (fichier factice créé).
+
+#### Dev : cible Makefile `make lint` (ShellCheck)
+- **Quoi** : ajout d’une cible `lint` pour exécuter ShellCheck sur les scripts Bash du repo (avec message d’aide si ShellCheck n’est pas installé).
+- **Où** : `Makefile`.
+- **Pourquoi** : standardiser le lint local et réduire les régressions Bash.
+- **Notes Windows/MSYS2** :
+  - ShellCheck peut échouer avec `commitBuffer: invalid argument (invalid character)` quand il tente d’afficher des extraits de code contenant des caractères non-ASCII (accents) selon la console/locale.
+  - Le lint utilise désormais le format `gcc` (pas d’extraits) + une sévérité par défaut `error` pour être exploitable sur une base legacy (opt-in strict via `make lint SHELLCHECK_SEVERITY=warning`).
+
 ### 2026-01-13
 
 #### Fix : `film-adaptive` applique réellement les budgets à l'encodage (AV1 + HEVC/x265)

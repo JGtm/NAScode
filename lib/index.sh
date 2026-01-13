@@ -53,8 +53,10 @@ _validate_index_source() {
     fi
     
     # Normaliser les deux chemins pour comparaison
-    local current_source_normalized=$(_normalize_source_path "$SOURCE")
-    local stored_source_normalized=$(_normalize_source_path "$stored_source")
+    local current_source_normalized
+    current_source_normalized=$(_normalize_source_path "$SOURCE")
+    local stored_source_normalized
+    stored_source_normalized=$(_normalize_source_path "$stored_source")
     
     if [[ "$current_source_normalized" != "$stored_source_normalized" ]]; then
         if [[ "${UI_QUIET:-false}" == true ]]; then
@@ -137,7 +139,8 @@ _handle_existing_index() {
         return 1
     fi
     
-    local index_date=$(stat -c '%y' "$INDEX" | cut -d'.' -f1)
+    local index_date
+    index_date=$(stat -c '%y' "$INDEX" | cut -d'.' -f1)
     # Si l'utilisateur a demandé de conserver l'index, on l'accepte sans demander
     if [[ "$KEEP_INDEX" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
@@ -222,7 +225,8 @@ _index_video_files() {
         fi
 
         # Incrémenter le compteur APRÈS le filtre (sinon progression incorrecte)
-        local count=$(($(cat "$count_file") + 1))
+        local count
+        count=$(($(cat "$count_file") + 1))
         echo "$count" > "$count_file"
         
         # Affichage de progression
@@ -239,7 +243,8 @@ _generate_index() {
     local exclude_dir_name=$OUTPUT_DIR
     
     # Première passe : compter le nombre total de fichiers vidéo candidats
-    local total_files=$(_count_total_video_files "$exclude_dir_name")
+    local total_files
+    total_files=$(_count_total_video_files "$exclude_dir_name")
 
     # Afficher l'en-tête du bloc d'indexation
     if [[ "$NO_PROGRESS" != true ]]; then
@@ -254,7 +259,8 @@ _generate_index() {
     local index_tmp="$INDEX.tmp"
     _index_video_files "$exclude_dir_name" "$total_files" "$index_tmp" "$count_file"
     
-    local final_count=$(cat "$count_file")
+    local final_count
+    final_count=$(cat "$count_file")
     rm -f "$count_file"
     
     # Afficher la fin du bloc d'indexation

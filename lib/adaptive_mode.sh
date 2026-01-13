@@ -115,8 +115,8 @@ _convert_handle_adaptive_mode() {
     adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input" "$v_codec")
 
     local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
-    local complexity_c complexity_desc stddev_val
-    IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps complexity_c complexity_desc stddev_val <<< "$adaptive_info"
+    local _complexity_c _complexity_desc _stddev_val
+    IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps _complexity_c _complexity_desc _stddev_val <<< "$adaptive_info"
 
     # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
     if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then
@@ -136,6 +136,7 @@ _convert_handle_adaptive_mode() {
         local _slot
         _slot=$(call_if_exists increment_converted_count) || _slot="0"
         if [[ "$_slot" =~ ^[0-9]+$ ]] && [[ "$_slot" -gt 0 ]]; then
+            # shellcheck disable=SC2034
             LIMIT_DISPLAY_SLOT="$_slot"
         fi
     fi

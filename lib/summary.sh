@@ -99,14 +99,18 @@ _calculate_space_savings() {
         return
     fi
     
-    local space_saved=$((total_before - total_after))
-    local before_fmt=$(_format_size_bytes "$total_before")
-    local after_fmt=$(_format_size_bytes "$total_after")
+    local space_saved
+    space_saved=$((total_before - total_after))
+    local before_fmt
+    before_fmt=$(_format_size_bytes "$total_before")
+    local after_fmt
+    after_fmt=$(_format_size_bytes "$total_after")
     local line1="${before_fmt} → ${after_fmt}"
     local line2=""
     
     if [[ "$space_saved" -ge 0 ]]; then
-        local saved_fmt=$(_format_size_bytes "$space_saved")
+        local saved_fmt
+        saved_fmt=$(_format_size_bytes "$space_saved")
         local savings_percent=""
         if [[ "$total_before" -gt 0 ]]; then
             savings_percent=$(awk "BEGIN {printf \"%.1f\", ($space_saved / $total_before) * 100}")
@@ -114,7 +118,8 @@ _calculate_space_savings() {
         line2="(−${saved_fmt}, ${savings_percent}%)"
     else
         # Cas rare : fichiers plus gros après conversion
-        local increase_fmt=$(_format_size_bytes "$((-space_saved))")
+        local increase_fmt
+        increase_fmt=$(_format_size_bytes "$((-space_saved))")
         line2="(+${increase_fmt})"
     fi
     
@@ -134,17 +139,24 @@ show_summary() {
     if [[ -n "${START_TS_TOTAL:-}" ]] && [[ "${START_TS_TOTAL}" =~ ^[0-9]+$ ]]; then
         local end_ts
         end_ts=$(date +%s)
-        local elapsed=$((end_ts - START_TS_TOTAL))
+        local elapsed
+        elapsed=$((end_ts - START_TS_TOTAL))
         total_elapsed_str=$(format_duration_seconds "$elapsed")
     fi
     
     # Comptage des statistiques depuis le log de session
-    local succ=$(_count_log_pattern ' | SUCCESS')
-    local skip=$(_count_log_pattern ' | SKIPPED')
-    local err=$(_count_log_pattern ' | ERROR ')
-    local size_anomalies=$(_count_log_pattern 'WARNING: FICHIER PLUS LOURD')
-    local checksum_anomalies=$(_count_log_pattern ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' 'E')
-    local vmaf_anomalies=$(_count_log_pattern ' | VMAF | .* | quality:DEGRADE')
+    local succ
+    succ=$(_count_log_pattern ' | SUCCESS')
+    local skip
+    skip=$(_count_log_pattern ' | SKIPPED')
+    local err
+    err=$(_count_log_pattern ' | ERROR ')
+    local size_anomalies
+    size_anomalies=$(_count_log_pattern 'WARNING: FICHIER PLUS LOURD')
+    local checksum_anomalies
+    checksum_anomalies=$(_count_log_pattern ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' 'E')
+    local vmaf_anomalies
+    vmaf_anomalies=$(_count_log_pattern ' | VMAF | .* | quality:DEGRADE')
     
     # Calcul du gain de place total
     local savings_data line1 line2 show_space_savings
@@ -152,7 +164,8 @@ show_summary() {
     IFS='|' read -r show_space_savings line1 line2 <<< "$savings_data"
     
     # Afficher message si aucun fichier traité (queue vide ou tout skippé)
-    local total_processed=$((succ + err))
+    local total_processed
+    total_processed=$((succ + err))
     if [[ "$total_processed" -eq 0 ]]; then
         print_empty_state "Aucun fichier à traiter"
     fi

@@ -211,6 +211,7 @@ _setup_video_encoding_params() {
     fi
     
     # Rétro-compatibilité : garder X265_VBV_STRING pour les tests existants
+    # shellcheck disable=SC2034
     X265_VBV_STRING="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
 }
 
@@ -472,13 +473,12 @@ _run_ffmpeg_encode() {
     fi
 
     # Configuration selon le mode
-    local output_dest audio_opt stream_opt log_suffix emoji end_msg
+    local audio_opt stream_opt log_suffix emoji end_msg
     
     case "$mode" in
         "pass1")
             audio_opt="-an"
             stream_opt=""
-            output_dest="-f null /dev/null"
             log_suffix=".pass1"
             emoji="🔍"
             end_msg="Analyse OK"
@@ -486,7 +486,6 @@ _run_ffmpeg_encode() {
         "pass2")
             audio_opt="$audio_params"
             stream_opt="$stream_mapping -f matroska"
-            output_dest="$output_file"
             log_suffix=""
             emoji="🎬"
             end_msg="Terminé ✅"
@@ -494,7 +493,6 @@ _run_ffmpeg_encode() {
         "crf")
             audio_opt="$audio_params"
             stream_opt="$stream_mapping -f matroska"
-            output_dest="$output_file"
             log_suffix=""
             emoji="⚡"
             end_msg="Terminé ✅"

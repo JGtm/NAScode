@@ -33,6 +33,7 @@ _process_queue_simple() {
     local file
     local -a _pids=()
     while IFS= read -r -d '' file; do
+        [[ -z "$file" ]] && continue
         # Vérifier les heures creuses avant de lancer une nouvelle conversion
         if ! check_off_peak_before_processing; then
             print_warning "Traitement interrompu (arrêt demandé pendant l'attente)"
@@ -173,6 +174,7 @@ _process_queue_with_fifo() {
         local file
         local -a _pids=()
         while IFS= read -r -d '' file; do
+            [[ -z "$file" ]] && continue
             # Vérifier les heures creuses avant de lancer une nouvelle conversion
             if ! check_off_peak_before_processing; then
                 print_warning "Traitement interrompu (arrêt demandé pendant l'attente)"

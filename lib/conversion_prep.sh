@@ -17,8 +17,10 @@ _prepare_file_paths() {
     local opt_audio_bitrate="${6:-}"
     local source_video_codec="${7:-}"
     
-    local filename_raw=$(basename "$file_original")
-    local filename=$(echo "$filename_raw" | tr -d '\r\n')
+    local filename_raw
+    filename_raw=$(basename "$file_original")
+    local filename
+    filename=$(echo "$filename_raw" | tr -d '\r\n')
     
     if [[ -z "$filename" ]]; then
         if [[ -n "$LOG_SESSION" ]]; then
@@ -29,7 +31,8 @@ _prepare_file_paths() {
 
     local relative_path="${file_original#$SOURCE}"
     relative_path="${relative_path#/}"
-    local relative_dir=$(dirname "$relative_path")
+    local relative_dir
+    relative_dir=$(dirname "$relative_path")
     # Éviter le ./ quand le fichier est à la racine de SOURCE
     [[ "$relative_dir" == "." ]] && relative_dir=""
     local final_dir="$output_dir"
@@ -83,7 +86,8 @@ _check_output_exists() {
     local final_output="$3"
     
     if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
-        local counter_prefix=$(_get_counter_prefix)
+        local counter_prefix
+        counter_prefix=$(_get_counter_prefix)
         echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
@@ -132,7 +136,8 @@ _setup_temp_files_and_logs() {
     mkdir -p "$final_dir" 2>/dev/null || true
     if [[ "$print_start" == true ]] && [[ "$NO_PROGRESS" != true ]] && [[ "${UI_QUIET:-false}" != true ]]; then
         echo ""
-        local counter_str=$(_get_counter_prefix)
+        local counter_str
+        counter_str=$(_get_counter_prefix)
         echo -e "${counter_str}▶️ Démarrage du fichier : $filename"
     fi
     if [[ "$log_start" == true ]] && [[ -n "$LOG_PROGRESS" ]]; then
@@ -147,7 +152,8 @@ _setup_temp_files_and_logs() {
 _check_disk_space() {
     local file_original="$1"
     
-    local free_space_mb=$(df -m "$TMP_DIR" | awk 'NR==2 {print $4}' 2>/dev/null) || return 0
+    local free_space_mb
+    free_space_mb=$(df -m "$TMP_DIR" | awk 'NR==2 {print $4}' 2>/dev/null) || return 0
     if [[ "$free_space_mb" -lt "$MIN_TMP_FREE_MB" ]]; then
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR Espace disque insuffisant dans $TMP_DIR ($free_space_mb MB libres) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true

@@ -1,5 +1,55 @@
 # Handoff
 
+## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
+
+### Contexte
+
+- Symptôme rapporté : la conversion peut “se bloquer” quand aucun fichier n’est réellement traitable (ex: entrée vide, fichier introuvable, ou source passée dans les exclusions).
+
+### Changements
+
+- [lib/conversion.sh](lib/conversion.sh) : `convert_file()`
+  - skip explicite si chemin vide ou fichier introuvable (et incrémente toujours `processed_count` en mode FIFO).
+  - si lecture des métadonnées ou préparation des chemins échoue tôt, incrémente `processed_count` avant de sortir.
+- [lib/processing.sh](lib/processing.sh) : ignore les entrées vides dans les consumers (`read -d ''`).
+- [lib/queue.sh](lib/queue.sh) : durcit `_validate_queue_not_empty()` :
+  - queue vide → sortie 0 avec message.
+  - queue non-vide mais sans séparateurs NUL → erreur (évite un mode FIFO qui attendrait indéfiniment).
+- [nascode](nascode) : garde-fou : si `SOURCE` matche `EXCLUDES`, sortie explicite avec erreur.
+
+### Tests
+
+- [tests/test_conversion.bats](tests/test_conversion.bats) : non-régression sur `processed_count` (entrée vide + fichier introuvable).
+- [tests/test_queue.bats](tests/test_queue.bats) : non-régression sur la validation queue vide vs format invalide.
+
+### Dev tooling (ShellCheck)
+
+- [Makefile](Makefile) : `make lint`
+  - Options par défaut : `-f gcc` (évite un crash d'encodage Windows) + sévérité `error` (utilisable sur une base avec warnings legacy).
+  - Durcissement possible : `make lint SHELLCHECK_SEVERITY=warning`.
+- [run_tests.sh](run_tests.sh) : remplacements de messages d'erreur via `$'...'` pour éviter un faux positif ShellCheck sur les apostrophes.
+
+#### 2026-01-13 — Nettoyage ShellCheck (warnings)
+
+- Objectif : faire passer `make lint SHELLCHECK_SEVERITY=warning` sur tout le dépôt.
+- [run_tests.sh](run_tests.sh)
+  - Corrige SC2010 (supprime `ls | grep`), collecte via glob + filtrage en Bash.
+  - Rend `--errors-only` effectif (évite variable inutilisée + réduit le bruit en CI).
+- Directives SC2034 (variables globales cross-modules)
+  - Ajout au niveau fichier : [lib/args.sh](lib/args.sh), [lib/counters.sh](lib/counters.sh), [lib/detect.sh](lib/detect.sh), [lib/logging.sh](lib/logging.sh), [lib/skip_decision.sh](lib/skip_decision.sh).
+  - Ajouts ciblés / renommage variables ignorées : [lib/conversion.sh](lib/conversion.sh), [lib/transcode_video.sh](lib/transcode_video.sh), [lib/ffmpeg_pipeline.sh](lib/ffmpeg_pipeline.sh), [lib/media_probe.sh](lib/media_probe.sh), [lib/utils.sh](lib/utils.sh), [lib/ui.sh](lib/ui.sh), [lib/audio_params.sh](lib/audio_params.sh), [lib/video_params.sh](lib/video_params.sh), [lib/complexity.sh](lib/complexity.sh), [lib/adaptive_mode.sh](lib/adaptive_mode.sh).
+- Résultat : `make lint SHELLCHECK_SEVERITY=warning` OK (0 warnings restants).
+
+### Notes (anti-spam Discord en tests)
+
+- [lib/notify.sh](lib/notify.sh) : pendant les tests Bats, les notifications Discord sont désactivées par défaut (évite de spammer le vrai webhook via l’environnement utilisateur).
+- [tests/test_notify.bats](tests/test_notify.bats) : opt-in explicite via `NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true` pour les tests qui valident l’envoi (avec `curl` mock).
+
+### Dernier prompt
+
+- "Vas y pour les warnings mais sur tout le projet"
+- "Oui vas y commit comme tu as dit"
+
 ## Dernière session (13/01/2026 - Doc : notifications Discord + secrets)
 
 ### Changements

@@ -10,6 +10,12 @@
 ###########################################################
 
 _notify_discord_is_enabled() {
+    # Anti-spam tests: en environnement Bats, on désactive par défaut.
+    # Opt-in explicite possible pour les tests unitaires de notify.
+    if [[ -n "${BATS_TEST_FILENAME:-}" ]] || [[ -n "${BATS_RUN_TMPDIR:-}" ]] || [[ -n "${BATS_VERSION:-}" ]]; then
+        [[ "${NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS:-false}" == "true" ]] || return 1
+    fi
+
     local url="${NASCODE_DISCORD_WEBHOOK_URL:-}"
     [[ -z "$url" ]] && return 1
 
@@ -254,9 +260,9 @@ notify_event_script_exit() {
 
     local body="NAScode — fin (${status})"
     [[ -n "$now" ]] && body+=$'\n\n'"**Fin**: ${now}"
-    if [[ "$exit_code" != "0" ]]; then
-        body+=$'\n'"**Exit code**: ${exit_code}"
-    fi
+    # if [[ "$exit_code" != "0" ]]; then
+    #     body+=$'\n'"**Exit code**: ${exit_code}"
+    # fi
 
     if [[ -n "$summary_snippet" ]]; then
         body+=$'\n\n'"**Résumé**"$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"

@@ -1,11 +1,13 @@
 #!/bin/bash
+# shellcheck disable=SC2034
 ###########################################################
 # CONFIGURATION GLOBALE
 ###########################################################
 
 # ----- Horodatage et chemins de base -----
 # Note: SCRIPT_DIR est défini dans le script principal avant le chargement des modules
-readonly EXECUTION_TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
+EXECUTION_TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
+readonly EXECUTION_TIMESTAMP
 readonly LOCKFILE="/tmp/conversion_video.lock"
 readonly STOP_FLAG="/tmp/conversion_stop_flag"
 # SCRIPT_DIR est déjà défini par le script principal
