@@ -1,5 +1,15 @@
 # Changelog
 
+## v2.7
+
+- ✅ **Robustesse queue / FIFO** : évite les blocages quand aucun fichier n’est traitable (entrées vides, fichiers introuvables, queue invalide) + sortie explicite si la source est exclue.
+- ✅ **Notifications Discord (optionnel)** : messages démarrage/pause(off-peak)/fin, payload plus robuste + mode debug opt-in, docs + tests dédiés.
+- ✅ **Film-adaptive fiabilisé** : les budgets calculés sont réellement appliqués à l’encodage (exports) + cap SVT-AV1 en CRF (`mbr=`) et logs debug SVT opt-in.
+- ✅ **Vidéo “smart codec”** : seuil de skip codec-aware + politique “no downgrade” (source AV1 ré-encodée en AV1 si nécessaire) + cap “qualité équivalente” sur sources moins efficaces.
+- ✅ **UX/CLI** : meilleure cohérence des messages (skip/erreurs early) et option `--quiet` documentée dans les guides.
+- ✅ **Dev tooling** : `make lint` (ShellCheck) + nettoyage des warnings, améliore la maintenabilité.
+- ✅ **Tests & docs** : ajouts/renforcements Bats (queue, conversion, notifs) + dépannage et guides alignés.
+
 ## v2.6
 
 - ✅ **Audio lossless/premium** : option `--no-lossless` pour forcer la conversion des pistes DTS/DTS-HD, TrueHD, FLAC (désactive le passthrough “premium”)
