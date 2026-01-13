@@ -13,6 +13,23 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-13
+
+#### Fix : `film-adaptive` applique réellement les budgets à l'encodage (AV1 + HEVC/x265)
+- **Quoi** : en mode `film-adaptive`, les budgets calculés (`ADAPTIVE_TARGET_KBPS`, `ADAPTIVE_MAXRATE_KBPS`, `ADAPTIVE_BUFSIZE_KBPS`) sont maintenant effectivement utilisés par l'encodage.
+- **Où** :
+  - `lib/conversion.sh` : export explicite des `ADAPTIVE_*` après parsing des valeurs retournées par l'analyse.
+  - Tests : `tests/test_film_adaptive.bats`, `tests/test_encoding_subfunctions.bats`.
+- **Pourquoi** : l'analyse était appelée via `$(...)` (subshell Bash), donc les `export` réalisés dans la fonction d'analyse ne remontaient pas au shell parent ; l'encodage retombait sur les paramètres "standard" (symptôme observé : cap SVT `mbr` trop haut vs le `bitrate cible`).
+- **Impact** :
+  - AV1/SVT-AV1 : le cap "capped CRF" (`mbr`) suit désormais bien le budget adaptatif (au lieu du budget standard 720p).
+  - HEVC/x265 : le VBV (maxrate/bufsize) suit le budget adaptatif.
+  - Tests Bats : ajout de non-régressions, exécution locale OK (filtres `test_film_adaptive` et `test_encoding_subfunctions`).
+
+#### Backlog (interne)
+- **Quoi** : création d'une liste TODO structurée.
+- **Où** : `.ai/TODO.md`.
+
 ### 2026-01-11
 
 #### Refactorisation : split de conversion.sh en 4 modules
