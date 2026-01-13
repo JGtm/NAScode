@@ -1,5 +1,50 @@
 # Handoff
 
+## Dernière session (13/01/2026 - Logs SVT-AV1 sans spam terminal)
+
+### Contexte
+
+- Besoin de vérifier en vrai run si SVT-AV1 est bien en mode "capped CRF" (via `mbr=`) et de retrouver les lignes `Svt[info]: SVT [config] ...`.
+- Problème : NAScode lance FFmpeg avec `-loglevel warning`, ce qui masque les logs `info` de SVT sur les runs réussis.
+
+### Changements
+
+- [lib/transcode_video.sh](lib/transcode_video.sh) : ajout d’un mode debug opt-in `NASCODE_LOG_SVT_CONFIG=1`.
+  - Pour `libsvtav1`, passe FFmpeg en `-loglevel info` (toujours redirigé vers un fichier, donc pas de spam terminal).
+  - Extrait uniquement les lignes utiles (`Svt[info]: SVT [config]`, `capped CRF`, `max bitrate`, `BRC mode`) vers `logs/SVT_<timestamp>_*.log`.
+
+### Tests
+
+- [tests/test_transcode_video.bats](tests/test_transcode_video.bats) : tests unitaires sur le choix du loglevel et l’écriture du log SVT.
+
+### Doc
+
+- [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) : section “Debug SVT-AV1 : vérifier capped CRF / mbr”.
+
+## Dernière session (12/01/2026 - SVT-AV1 : cap CRF (rc=0 + mbr))
+
+### Contexte
+
+- Des sorties AV1 (SVT-AV1) pouvaient devenir plus grosses que la source en mode CRF (ex: film-adaptive affichait un bitrate cible faible, mais l'encodage CRF restait trop "généreux").
+- Le build local (SVT-AV1 v3.1.2 via FFmpeg) n'accepte pas les clés `max-bitrate` et `buffer-size` dans `-svtav1-params` (erreurs de parsing observées).
+
+### Changements
+
+- [lib/transcode_video.sh](lib/transcode_video.sh) : en single-pass (CRF) + encodeur `libsvtav1`, cappe via `rc=0` + `mbr=<effective_maxrate>` (mode "capped CRF").
+
+### Tests
+
+- [tests/test_transcode_video.bats](tests/test_transcode_video.bats) : assertions SVT ajustées pour `rc=0` + `mbr=` (avec mock `get_video_stream_props()` pour éviter `ffprobe`).
+
+### Branche
+
+- `fix/svtav1-cap-crf`
+
+### Derniers prompts
+
+- "Oui vasy fait comme ça"
+- "Nan ça marche pas, d'autres pistes ?"
+
 ## Dernière session (11/01/2026 - Debug blocage post-téléchargement)
 
 ### Symptôme

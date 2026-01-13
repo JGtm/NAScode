@@ -263,10 +263,10 @@ teardown() {
 }
 
 ###########################################################
-# Tests MBR (Maximum BitRate) pour SVT-AV1 CRF contraint
+# Tests cap CRF pour SVT-AV1 (rc + mbr)
 ###########################################################
 
-@test "_setup_video_encoding_params: SVT-AV1 ajoute mbr en mode single-pass" {
+@test "_setup_video_encoding_params: SVT-AV1 ajoute rc/mbr en mode single-pass" {
     # Setup minimal pour SVT-AV1 en mode single-pass CRF
     SINGLE_PASS_MODE=true
     VIDEO_ENCODER="libsvtav1"
@@ -279,10 +279,13 @@ teardown() {
     FILM_KEYINT=240
     ENCODER_MODE_PROFILE="film"
     NO_PROGRESS=true
+
+    # Éviter un ffprobe réel: mock des propriétés vidéo
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
     
-    _setup_video_encoding_params 1920 1080 "yuv420p"
+    _setup_video_encoding_params "/fake/file.mkv"
     
-    # Vérifier que mbr est dans ENCODER_BASE_PARAMS
+    [[ "$ENCODER_BASE_PARAMS" =~ "rc=0" ]]
     [[ "$ENCODER_BASE_PARAMS" =~ "mbr=" ]]
 }
 
@@ -298,16 +301,65 @@ teardown() {
     FILM_KEYINT=240
     ENCODER_MODE_PROFILE="film"
     NO_PROGRESS=true
+
+    # Mock des propriétés vidéo (720p)
+    get_video_stream_props() { echo "1280|720|yuv420p"; }
     
-    _setup_video_encoding_params 1280 720 "yuv420p"
+    _setup_video_encoding_params "/fake/file.mkv"
     
-    # mbr doit être présent avec une valeur (effective_maxrate après ajustement 720p)
     [[ "$ENCODER_BASE_PARAMS" =~ "mbr=" ]]
     # Vérifier qu'on a bien une valeur numérique
     local mbr_value
     mbr_value=$(echo "$ENCODER_BASE_PARAMS" | grep -oP 'mbr=\K[0-9]+')
     [[ -n "$mbr_value" ]]
     [[ "$mbr_value" -gt 0 ]]
+}
+
+###########################################################
+# Tests debug SVT (loglevel + extraction config)
+###########################################################
+
+@test "_nascode_get_ffmpeg_loglevel_for_encoder: warning par défaut" {
+    unset NASCODE_LOG_SVT_CONFIG
+    result=$(_nascode_get_ffmpeg_loglevel_for_encoder "libsvtav1")
+    [ "$result" = "warning" ]
+}
+
+@test "_nascode_get_ffmpeg_loglevel_for_encoder: info pour libsvtav1 quand activé" {
+    NASCODE_LOG_SVT_CONFIG=1
+    result=$(_nascode_get_ffmpeg_loglevel_for_encoder "libsvtav1")
+    [ "$result" = "info" ]
+    unset NASCODE_LOG_SVT_CONFIG
+}
+
+@test "_nascode_get_ffmpeg_loglevel_for_encoder: reste warning pour autres encodeurs" {
+    NASCODE_LOG_SVT_CONFIG=1
+    result=$(_nascode_get_ffmpeg_loglevel_for_encoder "libx265")
+    [ "$result" = "warning" ]
+    unset NASCODE_LOG_SVT_CONFIG
+}
+
+@test "_nascode_maybe_write_svt_config_log: écrit un log SVT si lignes présentes" {
+    NASCODE_LOG_SVT_CONFIG=1
+
+    local ffmpeg_stderr="$TMP_DIR/ffmpeg_stderr.log"
+    cat > "$ffmpeg_stderr" <<'EOF'
+Svt[info]: SVT [config]: width / height / fps numerator / fps denominator : 1920 / 1080 / 24 / 1
+Svt[info]: SVT [config]: BRC mode / rate factor / max bitrate (kbps) : capped CRF / 32 / 1800
+EOF
+
+    # base_name contient des espaces -> doit être sanitizé dans le nom de fichier
+    _nascode_maybe_write_svt_config_log "libsvtav1" "$ffmpeg_stderr" "My File Name" "/in.mkv" "/out.mkv" "-svtav1-params rc=0:mbr=1800"
+
+    assert_glob_exists "$LOG_DIR/SVT_${EXECUTION_TIMESTAMP}_*.log"
+
+    # Le contenu doit contenir au moins la ligne capped CRF et l'opt encoder
+    local out_log
+    out_log=$(ls "$LOG_DIR"/SVT_${EXECUTION_TIMESTAMP}_*.log | head -1)
+    grep -q "capped CRF" "$out_log"
+    grep -q "encoder_specific_opts: -svtav1-params rc=0:mbr=1800" "$out_log"
+
+    unset NASCODE_LOG_SVT_CONFIG
 }
 
 ###########################################################

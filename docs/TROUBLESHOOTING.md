@@ -9,6 +9,7 @@ Fichiers typiques :
 - `Summary_*.log` : résumé de fin de conversion
 - `Progress_*.log` : progression détaillée
 - `Success_*.log` / `Error_*.log` / `Skipped_*.log`
+- `SVT_*.log` : extrait de config SVT-AV1 (option debug, voir ci-dessous)
 - `Index` : index des fichiers à traiter (null-separated)
 - `Index_readable_*.txt` : index lisible (liste)
 - `Queue` / `Queue.full` : file d’attente (généralement temporaire)
@@ -62,6 +63,18 @@ ffmpeg -encoders 2>/dev/null | grep libsvtav1
 ```
 
 Note : sans MSYS2, il est possible d'utiliser un FFmpeg "full" depuis https://www.gyan.dev/ffmpeg/builds/.
+
+## Debug SVT-AV1 : vérifier "capped CRF" / `mbr`
+
+Si tu veux confirmer que SVT-AV1 a bien activé le mode "capped CRF" et pris en compte `mbr=<kbps>`, tu peux activer un mode debug qui écrit un petit log dédié **sans spammer le terminal** :
+
+```bash
+NASCODE_LOG_SVT_CONFIG=1 bash nascode [options]
+```
+
+Résultat :
+- Un fichier `logs/SVT_<timestamp>_*.log` est créé par conversion AV1 (SVT-AV1) et contient les lignes `Svt[info]: SVT [config] ...` incluant notamment `BRC mode ... capped CRF ... max bitrate`.
+- Le terminal reste inchangé (la sortie FFmpeg est déjà redirigée, on n’affiche pas ces lignes en direct).
 
 ## VMAF
 
