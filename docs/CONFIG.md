@@ -67,6 +67,26 @@ Quand `-p/--off-peak` est activé :
 - Le script ne démarre de nouvelles conversions **que** pendant la plage définie.
 - Si un fichier est en cours quand les heures pleines reviennent, il **termine**, puis attend le retour des heures creuses.
 
+## Notifications Discord (optionnel)
+
+NAScode peut envoyer des notifications Discord via un webhook (Markdown). C’est volontairement **best-effort** : si Discord est indisponible, la conversion continue.
+
+Variables d’environnement :
+
+- `NASCODE_DISCORD_WEBHOOK_URL` (secret) : URL du webhook Discord
+- `NASCODE_DISCORD_NOTIFY` : `true` / `false` (optionnel ; défaut `true` si l’URL est définie)
+
+Recommandé : utiliser un fichier local `.env.local` (ignoré par Git) basé sur [.env.example](../.env.example).
+
+```bash
+cp .env.example .env.local
+set -a
+source ./.env.local
+set +a
+```
+
+Sécurité : ne commit jamais le webhook. Si l’URL a été partagée publiquement, régénère-le côté Discord.
+
 ## Variables modifiables (extrait)
 
 Dans [lib/config.sh](../lib/config.sh), on retrouve notamment :

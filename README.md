@@ -135,6 +135,34 @@ Référence code (audio) :
 
 Détails : [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
+## Notifications Discord (optionnel)
+
+NAScode peut envoyer des notifications via un **webhook Discord** (format Markdown) :
+
+- au démarrage (avec les paramètres actifs)
+- en entrée/sortie des heures pleines quand `--off-peak` est actif
+- à la fin (avec code de sortie + extrait du résumé si disponible)
+
+Configuration (via variables d’environnement) :
+
+- `NASCODE_DISCORD_WEBHOOK_URL` (obligatoire) : URL du webhook (secret)
+- `NASCODE_DISCORD_NOTIFY` (optionnel) : `true/false` (par défaut `true` si l’URL est définie)
+
+Recommandé (local, non versionné) :
+
+```bash
+cp .env.example .env.local
+# puis édite .env.local (NE PAS commiter)
+
+set -a
+source ./.env.local
+set +a
+
+bash nascode -s "/chemin/vers/series"
+```
+
+Sécurité : ne commit jamais le webhook. Si tu l’as posté dans un chat/log/issue, considère-le compromis et régénère-le côté Discord.
+
 ## Documentation
 
 - Index docs : [docs/DOCS.md](docs/DOCS.md)

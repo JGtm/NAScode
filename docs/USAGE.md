@@ -67,3 +67,32 @@ Le script évolue : la table ci-dessous est un rappel, l’autorité reste `bash
 - `--force-audio` / `--force-video` / `--force` : bypass de certaines décisions smart
 
 Pour comprendre les décisions audio/vidéo (skip/passthrough/convert), voir [SMART_CODEC.md](SMART_CODEC.md).
+
+## Notifications Discord (optionnel)
+
+NAScode supporte des notifications via webhook Discord (Markdown). Elles sont **best-effort** : une erreur réseau ne doit pas interrompre la conversion.
+
+Variables d’environnement :
+
+- `NASCODE_DISCORD_WEBHOOK_URL` : URL du webhook (secret)
+- `NASCODE_DISCORD_NOTIFY` : `true` / `false` (optionnel)
+
+### Exemple (Git Bash / WSL)
+
+	# Recommandé : fichier local ignoré par Git
+	cp .env.example .env.local
+
+	set -a
+	source ./.env.local
+	set +a
+
+	bash nascode -p -s "/chemin/vers/series"
+
+### Exemple (PowerShell)
+
+	$env:NASCODE_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/<id>/<token>"
+	$env:NASCODE_DISCORD_NOTIFY = "true"
+
+	bash .\nascode -s "C:\\chemin\\vers\\series"
+
+Bonnes pratiques : ne mets jamais le webhook dans le repo. Si l’URL a été partagée publiquement, régénère le webhook.

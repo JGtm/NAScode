@@ -1,5 +1,17 @@
 # Handoff
 
+## Dernière session (13/01/2026 - Doc : notifications Discord + secrets)
+
+### Changements
+
+- [README.md](README.md) : ajout d’une section “Notifications Discord (optionnel)” (variables d’environnement, `.env.local`, exemple d’exécution).
+- [docs/USAGE.md](docs/USAGE.md) : ajout d’une section “Notifications Discord (optionnel)” avec exemples Git Bash/WSL et PowerShell.
+- [docs/CONFIG.md](docs/CONFIG.md) : ajout d’une section “Notifications Discord (optionnel)” (best-effort + sécurité).
+
+### Notes
+
+- Le webhook Discord doit rester un secret (ne pas le commiter). En cas de fuite, régénérer le webhook côté Discord.
+
 ## Dernière session (13/01/2026 - Logs SVT-AV1 sans spam terminal)
 
 ### Contexte
