@@ -173,6 +173,11 @@ wait_for_off_peak() {
     print_info "⏸️  Heures pleines détectées (${OFF_PEAK_START}-${OFF_PEAK_END} = heures creuses)"
     print_info "Attente estimée : ${wait_formatted} (reprise à ${OFF_PEAK_START})"
     print_info "Vérification toutes les ${OFF_PEAK_CHECK_INTERVAL}s... (Ctrl+C pour annuler)"
+
+    # Notification externe (Discord) — best-effort
+    if declare -f notify_event_peak_pause &>/dev/null; then
+        notify_event_peak_pause "${OFF_PEAK_START}-${OFF_PEAK_END}" "${wait_formatted}" "${OFF_PEAK_START}" "${OFF_PEAK_CHECK_INTERVAL}" || true
+    fi
     
     # Compteur pour l'affichage périodique
     local check_count=0
@@ -208,6 +213,11 @@ wait_for_off_peak() {
     local actual_wait_fmt
     actual_wait_fmt=$(format_wait_time "$actual_wait")
     print_info "▶️  Heures creuses ! Reprise du traitement (attendu ${actual_wait_fmt})"
+
+    # Notification externe (Discord) — best-effort
+    if declare -f notify_event_peak_resume &>/dev/null; then
+        notify_event_peak_resume "${OFF_PEAK_START}-${OFF_PEAK_END}" "${actual_wait_fmt}" || true
+    fi
     
     return 0
 }

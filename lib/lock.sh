@@ -45,6 +45,11 @@ cleanup() {
         echo ""
         print_warning "Interruption détectée, arrêt en cours..."
     fi
+
+    # Notification externe (Discord) — best-effort
+    if declare -f notify_event_script_exit &>/dev/null; then
+        notify_event_script_exit "$exit_code" || true
+    fi
     
     # IMPORTANT: Ne créer le STOP_FLAG que lors d'une vraie interruption (Ctrl+C, kill, etc.)
     # En fin normale, le flag ne doit PAS être créé pour éviter de bloquer les transferts asynchrones

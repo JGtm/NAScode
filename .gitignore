@@ -24,6 +24,10 @@ Thumbs.db
 # Captures d'écran locales
 Capture*.PNG
 
+# Variables d'environnement locales (ne pas commiter de secrets)
+.env
+.env.local
+
 # Fichiers temporaires
 *.tmp
 *.temp

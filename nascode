@@ -57,6 +57,7 @@ source "$LIB_DIR/config.sh"       # Configuration (dépend de colors pour erreur
 source "$LIB_DIR/codec_profiles.sh" # Profils codecs (dépend de config pour VIDEO_CODEC)
 source "$LIB_DIR/utils.sh"        # Utilitaires (dépend de detect pour HAS_*)
 source "$LIB_DIR/logging.sh"      # Logs (dépend de config pour EXECUTION_TIMESTAMP)
+source "$LIB_DIR/notify.sh"       # Notifications externes (Discord, etc.) — best-effort
 source "$LIB_DIR/progress.sh"     # Slots progression (dépend de config pour EXECUTION_TIMESTAMP)
 source "$LIB_DIR/lock.sh"         # Verrous (dépend de colors, config)
 source "$LIB_DIR/system.sh"       # Système (dépend de colors, config, utils)
@@ -103,6 +104,11 @@ main() {
     
     # Configurer les paramètres selon le mode de conversion
     set_conversion_mode_parameters
+
+    # Notification de démarrage (Discord) — best-effort, ne doit jamais interrompre.
+    if declare -f notify_event_run_started &>/dev/null; then
+        notify_event_run_started || true
+    fi
     
     # Mode fichier unique : traiter directement sans index/queue
     if [[ -n "${SINGLE_FILE:-}" ]]; then

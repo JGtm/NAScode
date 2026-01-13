@@ -13,7 +13,8 @@
 
 ## Gestion des sorties plus lourdes
 
-- Définir une stratégie quand le fichier converti est **plus lourd que l’original** :
+- Définir une stratégie quand le fichier converti est **plus lourd que l’original** (ou quand le gain est **< 10%** vs l’original).
+  - Le seuil (ex: `10%`) doit être **configurable dans la config** pour ajustement manuel facile.
   - Option A : ne pas transférer et marquer l’item comme “heavy”.
   - Option B : déclencher une re-conversion avec paramètres plus stricts.
   - Option C : transférer vers un dossier séparé (ex: `Converted_Heavier/`) **en conservant obligatoirement l’architecture de répertoires cible**.

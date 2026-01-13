@@ -15,6 +15,14 @@ Objectifs :
 
 ### 2026-01-13
 
+#### Notifications Discord (démarrage / heures creuses / fin)
+- **Quoi** : ajout d’un module de notifications externes pour envoyer des messages Discord en Markdown (démarrage avec paramètres actifs, pause/reprise en heures creuses, fin avec résumé).
+- **Où** : `lib/notify.sh` (nouveau), `nascode` (chargement + hook démarrage), `lib/off_peak.sh` (hooks pause/reprise), `lib/lock.sh` (hook fin via `cleanup()`), `tests/test_notify.bats`.
+- **Pourquoi** : disposer d’un canal de suivi “hands-off” pour les runs longs et faciliter l’extension à d’autres événements sans surcharger les modules existants.
+- **Impact** : aucun impact si `NASCODE_DISCORD_WEBHOOK_URL` n’est pas défini ; envoi best-effort (aucune erreur de notif ne doit arrêter NAScode). Secret webhook non versionné (variable d’env ; `.env` local ignoré à sourcer manuellement).
+
+### 2026-01-13
+
 #### Fix : `film-adaptive` applique réellement les budgets à l'encodage (AV1 + HEVC/x265)
 - **Quoi** : en mode `film-adaptive`, les budgets calculés (`ADAPTIVE_TARGET_KBPS`, `ADAPTIVE_MAXRATE_KBPS`, `ADAPTIVE_BUFSIZE_KBPS`) sont maintenant effectivement utilisés par l'encodage.
 - **Où** :
