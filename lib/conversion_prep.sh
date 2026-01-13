@@ -165,6 +165,11 @@ _setup_temp_files_and_logs() {
         counter_str=$(_get_counter_prefix)
         echo -e "${counter_str}▶️ Démarrage du fichier : $filename"
     fi
+
+    # Notification Discord (best-effort) : démarrage fichier
+    if declare -f notify_event &>/dev/null; then
+        notify_event file_started "$filename" || true
+    fi
     if [[ "$log_start" == true ]] && [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
     fi

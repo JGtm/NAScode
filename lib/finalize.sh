@@ -250,6 +250,15 @@ _finalize_conversion_success() {
             size_part=" | ${before_fmt} → ${after_fmt}"
         fi
 
+        # Notification Discord (best-effort) : fin fichier
+        if declare -f notify_event &>/dev/null; then
+            if [[ "${SAMPLE_MODE:-false}" == true ]]; then
+                notify_event file_completed "${elapsed_display}" "" "" || true
+            else
+                notify_event file_completed "${elapsed_display}" "${before_fmt:-}" "${after_fmt:-}" || true
+            fi
+        fi
+
         print_success "Conversion terminée en ${elapsed_display}${size_part}"
     fi
 

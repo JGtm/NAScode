@@ -47,6 +47,23 @@ Objectifs :
 - **Pourquoi** : éviter de spammer un vrai webhook via l’environnement utilisateur pendant les tests E2E.
 - **Impact** : aucun impact en run normal ; les tests notifs continuent de valider le payload via `curl` mock.
 
+#### Notifications Discord : messages “mobiles” + événements détaillés
+- **Quoi** : refonte des notifications Discord pour être plus lisibles sur petit écran et refléter le cycle de vie du run.
+  - Aperçu de la queue au démarrage (format `[i/N]`, troncature déterministe)
+  - Messages par fichier : début + fin (durée, tailles `avant → après`)
+  - Statut transferts : en attente puis terminés (si applicable)
+  - VMAF (si activé) : annonce globale + résultat par fichier (note/qualité) + fin globale
+  - Fin : résumé (si dispo) puis message final avec horodatage
+- **Où** : `lib/notify.sh` (entrypoint), `lib/notify_discord.sh`, `lib/notify_format.sh`, `lib/notify_events.sh`, hooks dans `nascode`, `lib/conversion_prep.sh`, `lib/finalize.sh`, `lib/processing.sh`, `lib/transfer.sh`, `lib/vmaf.sh` ; tests `tests/test_notify.bats`.
+- **Pourquoi** : réduire le bruit, améliorer le suivi “hands-off”, et aligner les messages Discord sur les lignes clés déjà affichées dans le terminal.
+- **Impact** : changement UX uniquement quand les notifs Discord sont activées ; envoi best-effort inchangé ; documentation mise à jour (README + docs).
+
+#### Tests E2E : isolement des logs + compatibilité "Heavier"
+- **Quoi** : les tests E2E/régression forcent désormais `LOG_DIR="$WORKDIR/logs"` pour isoler index/logs par test et éviter de polluer le repo ; le test stream mapping accepte que la sortie soit redirigée en dossier `_Heavier` si le fichier final est plus lourd / gain insuffisant.
+- **Où** : `lib/logging.sh` (LOG_DIR override possible), `tests/test_e2e_full_workflow.bats`, `tests/test_e2e_stream_mapping.bats`, `tests/test_regression_non_interactive.bats`, `tests/test_regression_smoke_dryrun.bats`.
+- **Pourquoi** : fiabiliser les assertions E2E (artefacts logs) et éviter des flakes liés à l’index persistant ; rendre le test sous-titres robuste face au mécanisme “Heavier”.
+- **Impact** : aucun en run normal (LOG_DIR par défaut inchangé) ; améliore la stabilité des tests.
+
 #### Fix : éviter les blocages quand la queue ne produit aucun fichier traitable
 - **Quoi** : sécurise le mode FIFO/limite pour qu’un run ne puisse plus “attendre indéfiniment” si aucun fichier n’est effectivement traité (entrée vide, fichier introuvable, ou échec très tôt dans `convert_file`).
 - **Où** :

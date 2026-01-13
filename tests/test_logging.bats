@@ -32,7 +32,7 @@ teardown() {
 
 @test "logging: LOG_DIR est ancré sur SCRIPT_DIR" {
     # Vérifier que la valeur par défaut est correcte dans le fichier
-    grep -q 'readonly LOG_DIR="$SCRIPT_DIR/logs"' "$LIB_DIR/logging.sh"
+    grep -q 'readonly LOG_DIR="${LOG_DIR:-"$SCRIPT_DIR/logs"}"' "$LIB_DIR/logging.sh"
 }
 
 @test "logging: LOG_SESSION contient le timestamp" {

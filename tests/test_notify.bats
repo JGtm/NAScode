@@ -67,3 +67,31 @@ EOF
   [ "$status" -eq 0 ]
   grep -q "http=204" "$LOG_DIR/discord_notify_${EXECUTION_TIMESTAMP}.log"
 }
+
+@test "notify_format: jobs parallèles désactivé si =1" {
+  run bash -c 'source "$LIB_DIR/notify.sh"; PARALLEL_JOBS=1; _notify_format_parallel_jobs_label'
+  [ "$status" -eq 0 ]
+  [ "$output" = "désactivé" ]
+}
+
+@test "notify_format: aperçu queue max 20 avec ... et 3 derniers" {
+  tmp="$BATS_TEST_TMPDIR"
+  q="$tmp/queue.bin"
+
+  # Construire une queue NUL-separated de 30 fichiers
+  : > "$q"
+  for i in $(seq 1 30); do
+    printf 'file%02d.mp4\0' "$i" >> "$q"
+  done
+
+  run bash -c 'source "$LIB_DIR/notify.sh"; _notify_format_queue_preview "$1"' bash "$q"
+  [ "$status" -eq 0 ]
+
+  # 20 lignes exactement : 16 + ... + 3
+  [ "$(printf "%s\n" "$output" | wc -l | tr -d " ")" -eq 20 ]
+  echo "$output" | grep -q "^\\[1/30\\] file01.mp4$"
+  echo "$output" | grep -q "^\\.\\.\\.$"
+  echo "$output" | grep -q "^\\[28/30\\] file28.mp4$"
+  echo "$output" | grep -q "^\\[29/30\\] file29.mp4$"
+  echo "$output" | grep -q "^\\[30/30\\] file30.mp4$"
+}

@@ -87,6 +87,14 @@ Voir aussi : [CONFIG.md](CONFIG.md)
 
 NAScode supporte des notifications via webhook Discord (Markdown). Elles sont **best-effort** : une erreur réseau ne doit pas interrompre la conversion.
 
+Contenu typique des notifications :
+
+- Démarrage : paramètres actifs + aperçu de la queue (format `[i/N]`, jusqu’à 20 éléments)
+- Par fichier : démarrage puis fin (durée + tailles `avant → après`)
+- Transferts : en attente puis terminés (si applicable)
+- VMAF (si activé) : démarrage + résultat par fichier (note/qualité) + fin globale
+- Fin : résumé (si disponible) puis message final avec horodatage
+
 Variables d’environnement :
 
 - `NASCODE_DISCORD_WEBHOOK_URL` : URL du webhook (secret)

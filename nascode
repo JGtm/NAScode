@@ -105,11 +105,6 @@ main() {
     # Configurer les paramètres selon le mode de conversion
     set_conversion_mode_parameters
 
-    # Notification de démarrage (Discord) — best-effort, ne doit jamais interrompre.
-    if declare -f notify_event_run_started &>/dev/null; then
-        notify_event_run_started || true
-    fi
-    
     # Mode fichier unique : traiter directement sans index/queue
     if [[ -n "${SINGLE_FILE:-}" ]]; then
         # Convertir en chemin absolu (robuste aux espaces)
@@ -140,6 +135,13 @@ main() {
         detect_hwaccel
         check_vmaf
         export_variables
+
+        # Notification de démarrage (Discord) — best-effort.
+        if declare -f notify_event &>/dev/null; then
+            notify_event run_started || true
+        elif declare -f notify_event_run_started &>/dev/null; then
+            notify_event_run_started || true
+        fi
         
         # Conversion directe du fichier unique
         if [[ "$NO_PROGRESS" != true ]]; then
@@ -190,6 +192,14 @@ main() {
 
     # Construire la file d'attente (peut poser des questions sur l'index)
     build_queue
+
+    # Notification de démarrage (Discord) — best-effort.
+    # Placée ici pour inclure l'aperçu de la file (après les paramètres actifs).
+    if declare -f notify_event &>/dev/null; then
+        notify_event run_started || true
+    elif declare -f notify_event_run_started &>/dev/null; then
+        notify_event_run_started || true
+    fi
     
     # Exporter les variables et fonctions pour les sous-shells
     export_variables

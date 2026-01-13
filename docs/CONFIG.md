@@ -86,6 +86,12 @@ Variables :
 
 NAScode peut envoyer des notifications Discord via un webhook (Markdown). C’est volontairement **best-effort** : si Discord est indisponible, la conversion continue.
 
+Notes :
+
+- Le message de démarrage inclut les paramètres actifs, et un aperçu de la queue quand elle existe.
+- Si `PARALLEL_JOBS=1`, l’UI indique « Jobs parallèles : désactivé ».
+- Des messages “début/fin” sont envoyés pour chaque fichier, et des notifications spécifiques existent pour les transferts et VMAF (si activé).
+
 Variables d’environnement :
 
 - `NASCODE_DISCORD_WEBHOOK_URL` (secret) : URL du webhook Discord

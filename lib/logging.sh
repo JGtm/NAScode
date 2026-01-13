@@ -59,7 +59,7 @@ cleanup_old_logs() {
 # CHEMINS DES LOGS
 ###########################################################
 
-readonly LOG_DIR="$SCRIPT_DIR/logs"
+readonly LOG_DIR="${LOG_DIR:-"$SCRIPT_DIR/logs"}"
 readonly LOG_SESSION="$LOG_DIR/Session_${EXECUTION_TIMESTAMP}.log"
 readonly SUMMARY_FILE="$LOG_DIR/Summary_${EXECUTION_TIMESTAMP}.log"
 readonly LOG_PROGRESS="$LOG_DIR/Progress_${EXECUTION_TIMESTAMP}.log"

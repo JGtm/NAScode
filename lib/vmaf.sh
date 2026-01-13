@@ -251,6 +251,15 @@ process_vmaf_queue() {
     if [[ "$vmaf_count" -eq 0 ]]; then
         return 0
     fi
+
+    # Notif Discord (best-effort) : début VMAF
+    local _vmaf_total_start_ts
+    _vmaf_total_start_ts=$(date +%s 2>/dev/null || echo "")
+    if declare -f notify_event &>/dev/null; then
+        local _vmaf_mode="normal"
+        [[ "${SAMPLE_MODE:-false}" == true ]] && _vmaf_mode="sample"
+        notify_event vmaf_started "$vmaf_count" "${_vmaf_mode}" || true
+    fi
     
     if [[ "$NO_PROGRESS" != true ]]; then
         print_vmaf_start "$vmaf_count"
@@ -258,6 +267,68 @@ process_vmaf_queue() {
     fi
     
     local current=0
+
+    # Stats pour résumé Discord
+    local ok_count=0 na_count=0 degraded_count=0
+    local sum_scores="0" min_score="" max_score=""
+    local -a worst_lines=()
+
+    _vmaf_is_number() {
+        [[ "${1:-}" =~ ^[0-9]+([.][0-9]+)?$ ]]
+    }
+
+    _vmaf_float_lt() {
+        local a="${1:-}" b="${2:-}"
+        awk -v a="$a" -v b="$b" 'BEGIN{exit !(a<b)}'
+    }
+
+    _vmaf_float_gt() {
+        local a="${1:-}" b="${2:-}"
+        awk -v a="$a" -v b="$b" 'BEGIN{exit !(a>b)}'
+    }
+
+    _vmaf_trunc_name() {
+        local s="${1:-}"
+        if [[ ${#s} -gt 60 ]]; then
+            printf '%s' "${s:0:57}..."
+        else
+            printf '%s' "$s"
+        fi
+    }
+
+    _vmaf_maybe_add_worst() {
+        local file="${1:-}"
+        local score="${2:-}"
+        local quality="${3:-NA}"
+
+        _vmaf_is_number "$score" || return 0
+
+        local line
+        line="- $(_vmaf_trunc_name "$file") : ${score} (${quality})"
+
+        # Insertion triée (3 pires scores, ordre croissant)
+        local i
+        for i in 0 1 2; do
+            local cur_score=""
+            if [[ -n "${worst_lines[$i]:-}" ]]; then
+                cur_score=$(printf '%s' "${worst_lines[$i]}" | grep -oE ':[[:space:]]*[0-9]+(\.[0-9]+)?' | head -1 | grep -oE '[0-9]+(\.[0-9]+)?' || true)
+            fi
+
+            if [[ -z "${worst_lines[$i]:-}" ]]; then
+                worst_lines[$i]="$line"
+                return 0
+            fi
+
+            if [[ -n "$cur_score" ]] && _vmaf_float_lt "$score" "$cur_score"; then
+                # shift down
+                worst_lines[2]="${worst_lines[1]:-}"
+                worst_lines[1]="${worst_lines[0]:-}"
+                worst_lines[$i]="$line"
+                return 0
+            fi
+        done
+        return 0
+    }
     while IFS='|' read -r file_original final_actual keyframe_pos; do
         ((current++)) || true
         
@@ -286,6 +357,11 @@ process_vmaf_queue() {
             fi
             continue
         fi
+
+        # Notif Discord (best-effort) : début VMAF par fichier
+        if declare -f notify_event &>/dev/null; then
+            notify_event vmaf_file_started "$current" "$vmaf_count" "$filename" || true
+        fi
         
         # Mesurer le temps d'analyse VMAF
         local vmaf_start_time vmaf_end_time vmaf_duration vmaf_duration_str
@@ -310,6 +386,30 @@ process_vmaf_queue() {
             else
                 vmaf_quality="DEGRADE"
             fi
+        fi
+
+        # Notif Discord (best-effort) : résultat VMAF par fichier
+        if declare -f notify_event &>/dev/null; then
+            notify_event vmaf_file_completed "$current" "$vmaf_count" "$filename" "$vmaf_score" "${vmaf_quality:-NA}" || true
+        fi
+
+        # Stats (pour notif Discord)
+        if [[ "$vmaf_score" == "NA" ]]; then
+            na_count=$((na_count + 1))
+        elif _vmaf_is_number "$vmaf_score"; then
+            ok_count=$((ok_count + 1))
+            sum_scores=$(awk -v s="$sum_scores" -v v="$vmaf_score" 'BEGIN{printf "%.6f", s+v}')
+
+            if [[ -z "$min_score" ]]; then
+                min_score="$vmaf_score"
+                max_score="$vmaf_score"
+            else
+                _vmaf_float_lt "$vmaf_score" "$min_score" && min_score="$vmaf_score"
+                _vmaf_float_gt "$vmaf_score" "$max_score" && max_score="$vmaf_score"
+            fi
+
+            [[ "$vmaf_quality" == "DEGRADE" ]] && degraded_count=$((degraded_count + 1))
+            _vmaf_maybe_add_worst "$filename" "$vmaf_score" "${vmaf_quality:-NA}"
         fi
         
         # Logger le score VMAF
@@ -337,6 +437,36 @@ process_vmaf_queue() {
     
     if [[ "$NO_PROGRESS" != true ]]; then
         print_vmaf_complete
+    fi
+
+    # Notif Discord (best-effort) : fin VMAF + scores
+    if declare -f notify_event &>/dev/null; then
+        local _vmaf_total_end_ts _vmaf_total_secs _vmaf_total_fmt
+        _vmaf_total_end_ts=$(date +%s 2>/dev/null || echo "")
+        _vmaf_total_secs=0
+        if [[ -n "${_vmaf_total_start_ts:-}" ]] && [[ -n "${_vmaf_total_end_ts:-}" ]] && [[ "${_vmaf_total_start_ts}" =~ ^[0-9]+$ ]] && [[ "${_vmaf_total_end_ts}" =~ ^[0-9]+$ ]]; then
+            _vmaf_total_secs=$((_vmaf_total_end_ts - _vmaf_total_start_ts))
+        fi
+        printf -v _vmaf_total_fmt '%02d:%02d:%02d' $((_vmaf_total_secs/3600)) $((_vmaf_total_secs%3600/60)) $((_vmaf_total_secs%60))
+
+        local avg_score="NA"
+        if [[ "$ok_count" -gt 0 ]]; then
+            avg_score=$(awk -v s="$sum_scores" -v n="$ok_count" 'BEGIN{printf "%.2f", s/n}')
+        fi
+
+        local min_out="${min_score:-NA}"
+        local max_out="${max_score:-NA}"
+        if _vmaf_is_number "$min_out"; then min_out=$(awk -v v="$min_out" 'BEGIN{printf "%.2f", v}'); fi
+        if _vmaf_is_number "$max_out"; then max_out=$(awk -v v="$max_out" 'BEGIN{printf "%.2f", v}'); fi
+
+        # Nettoyer les lignes worst (retirer les vides)
+        local -a worst_nonempty=()
+        local w
+        for w in "${worst_lines[@]:-}"; do
+            [[ -n "$w" ]] && worst_nonempty+=("$w")
+        done
+
+        notify_event vmaf_completed "$vmaf_count" "$ok_count" "$na_count" "$avg_score" "$min_out" "$max_out" "$degraded_count" "${_vmaf_total_fmt}" "${worst_nonempty[@]}" || true
     fi
     
     # Nettoyer le fichier de queue

@@ -67,6 +67,11 @@ _process_queue_simple() {
     if [[ "$NO_PROGRESS" != true ]] && [[ "$nb_files" -gt 0 ]]; then
         print_conversion_complete
     fi
+
+    # Notification Discord (best-effort) : toutes conversions terminées
+    if [[ "$nb_files" -gt 0 ]] && declare -f notify_event &>/dev/null; then
+        notify_event conversions_completed "$nb_files" || true
+    fi
 }
 
 ###########################################################
@@ -264,6 +269,11 @@ _process_queue_with_fifo() {
     
     if [[ "$NO_PROGRESS" != true ]] && [[ "$nb_files" -gt 0 ]]; then
         print_conversion_complete
+    fi
+
+    # Notification Discord (best-effort) : toutes conversions terminées
+    if [[ "$nb_files" -gt 0 ]] && declare -f notify_event &>/dev/null; then
+        notify_event conversions_completed "$nb_files" || true
     fi
 }
 

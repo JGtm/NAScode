@@ -35,6 +35,9 @@ setup() {
     export SRC_DIR="$TEST_TEMP_DIR/src"
     export OUT_DIR="$TEST_TEMP_DIR/out"
 
+    # Forcer les logs dans le WORKDIR (isolement, pas de pollution du repo)
+    export LOG_DIR="$WORKDIR/logs"
+
     mkdir -p "$WORKDIR" "$SRC_DIR" "$OUT_DIR"
 }
 
@@ -121,7 +124,9 @@ EOF
     [ "$status" -eq 0 ]
 
     local out_file
-    out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
+    local heavy_dir
+    heavy_dir="${OUT_DIR}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
+    out_file=$(find "$OUT_DIR" "$heavy_dir" -type f -name "*.mkv" 2>/dev/null | head -1)
     [ -n "$out_file" ]
 
     local out_sub_count
@@ -169,7 +174,9 @@ EOF
     [ "$status" -eq 0 ]
 
     local out_file
-    out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
+    local heavy_dir
+    heavy_dir="${OUT_DIR}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
+    out_file=$(find "$OUT_DIR" "$heavy_dir" -type f -name "*.mkv" 2>/dev/null | head -1)
     [ -n "$out_file" ]
 
     local out_sub_count

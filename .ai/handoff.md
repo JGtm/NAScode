@@ -2,6 +2,52 @@
 
 ## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
 
+### 2026-01-13 — Notifications Discord : refactor Option B + messages “petit écran”
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- Refactor des notifications en modules (Option B) :
+  - [lib/notify.sh](lib/notify.sh) : point d’entrée qui source les modules.
+  - [lib/notify_discord.sh](lib/notify_discord.sh) : transport webhook + debug.
+  - [lib/notify_format.sh](lib/notify_format.sh) : formatage pur (préfixes, aperçu queue, labels).
+  - [lib/notify_events.sh](lib/notify_events.sh) : événements (run/file/transfers/vmaf/exit).
+- [nascode](nascode) : la notif `run_started` est envoyée **après** `build_queue` pour inclure l’aperçu de la file (et en mode fichier unique après `export_variables`).
+- Notifications demandées :
+  - Aperçu de file après paramètres actifs (max 20 lignes, garde les 3 derniers, `...` au milieu).
+  - Démarrage fichier : `▶️ Démarrage du fichier : ...` avec préfixe `[i/N]`.
+  - Fin fichier : `✅ Conversion terminée en ... | before → after` avec préfixe `[i/N]`.
+  - Fin conversions : `✅ Toutes les conversions terminées`.
+  - Transferts : `📤 Transferts en attente : N` puis `✅ Transferts terminés` (anti-spam via garde-fous).
+  - VMAF : début global + début/fin par fichier (score + qualité) + fin globale.
+  - Fin de run : envoi du résumé, puis un second message avec l’heure de fin.
+  - Ajustement UX : suppression du préfixe “NAScode —” (channel dédié) et suppression du statut (OK/ERROR) sur le message final ; l’heure de fin suffit.
+  - Paramètres actifs : `Jobs parallèles : désactivé` si `PARALLEL_JOBS=1`.
+- Points d’accroche :
+  - [lib/conversion_prep.sh](lib/conversion_prep.sh) : notif démarrage fichier.
+  - [lib/finalize.sh](lib/finalize.sh) : notif fin fichier (durée + tailles).
+  - [lib/processing.sh](lib/processing.sh) : notif fin conversions (simple + FIFO).
+  - [lib/transfer.sh](lib/transfer.sh) : notifs transferts en attente/terminés.
+  - [lib/vmaf.sh](lib/vmaf.sh) : notifs VMAF par fichier.
+
+Tests :
+
+- [tests/test_notify.bats](tests/test_notify.bats) : ajout de tests pour `jobs parallèles : désactivé` et aperçu de queue (max 20 + `...` + 3 derniers).
+
+Correctifs tests (suite Bats) :
+
+- [lib/logging.sh](lib/logging.sh) : `LOG_DIR` reste ancré sur `$SCRIPT_DIR/logs` **par défaut**, mais accepte maintenant un override via variable d’environnement (utile pour l’isolement des runs de tests).
+- E2E/régression : forcent `LOG_DIR="$WORKDIR/logs"` pour éviter de polluer le repo et stabiliser les assertions.
+- [tests/test_e2e_stream_mapping.bats](tests/test_e2e_stream_mapping.bats) : accepte une sortie redirigée en dossier `_Heavier` (gain insuffisant / fichier plus lourd).
+- Validation : `bash run_tests.sh` OK (suite complète).
+
+Derniers prompts :
+
+- "On va travailler sur les notifications dans discord... (Option B)"
+- "ok pour option B"
+- "PAs besoin d'afficher ce genre de message..." / "Oui retire..." / "Il y a eu des erreurs dans les tests... continue sans t'arreter"
+
 ### 2026-01-13 — Robustesse Git Bash : workdir par job + "Heavier" + logs ancrés
 
 Branche : `feature/robustness-heavy-outputs`

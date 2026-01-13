@@ -146,9 +146,12 @@ Détails : [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
 NAScode peut envoyer des notifications via un **webhook Discord** (format Markdown) :
 
-- au démarrage (avec les paramètres actifs)
+- au démarrage : **paramètres actifs** + aperçu de la queue (jusqu’à 20 éléments, avec troncature)
+- pendant le run : **début/fin de chaque fichier** (préfixe `[i/N]`, durée, tailles `avant → après`)
+- transferts : **en attente** puis **terminés** (si applicable)
+- VMAF (si activé) : démarrage + **résultat par fichier** (note/qualité) + fin globale
 - en entrée/sortie des heures pleines quand `--off-peak` est actif
-- à la fin (avec code de sortie + extrait du résumé si disponible)
+- à la fin : résumé (si disponible) puis un message de **fin avec horodatage**
 
 Configuration (via variables d’environnement) :
 
