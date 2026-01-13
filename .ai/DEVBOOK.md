@@ -15,6 +15,12 @@ Objectifs :
 
 ### 2026-01-13
 
+#### Release : préparation v2.7 (changelog + docs)
+- **Quoi** : ajout d’une entrée `v2.7` au changelog + doc index enrichie avec les commandes dev (tests/lint).
+- **Où** : `docs/CHANGELOG.md`, `docs/DOCS.md`.
+- **Pourquoi** : publier une release cohérente (notes lisibles + chemins doc à jour).
+- **Impact** : documentation uniquement (aucun changement de comportement).
+
 #### Docs : mini-spéc “traduction qualité équivalente” (audio)
 - **Quoi** : ajout d’une mini-spéc dans le backlog pour cadrer un futur helper de traduction de bitrate audio “qualité équivalente” + stratégie d’activation par mode + invariants + stratégie de tests.
 - **Où** : `.ai/TODO.md`.

@@ -71,6 +71,18 @@
 - "Dans mes tests j'ai 3 skips, c'est normal non ?"
 - "ok commit et puis merge dans main"
 
+### 2026-01-13 — Release : changelog + doc + tag
+
+- [docs/CHANGELOG.md](docs/CHANGELOG.md) : ajout d’une section `v2.7` (notes de release).
+- [docs/DOCS.md](docs/DOCS.md) : ajout d’un rappel des commandes dev (`bash run_tests.sh`, `make lint`).
+- [.ai/DEVBOOK.md](.ai/DEVBOOK.md) : entrée “préparation v2.7”.
+
+### Dernier prompt
+
+- "tu peux faire un tag pour une nouvelle release ?"
+- "ok oui faut sans dout emettre le changelog à jour et la doc"
+- "Oui ok vas y"
+
 ## Dernière session (13/01/2026 - Doc : notifications Discord + secrets)
 
 ### Changements

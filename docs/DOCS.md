@@ -15,6 +15,11 @@ Référence code (audio) :
 - Dépannage (FFmpeg, Windows/macOS, VMAF, logs) : [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Changelog : [CHANGELOG.md](CHANGELOG.md)
 
+## Dev (contrib)
+
+- Tests (Bats) : `bash run_tests.sh`
+- Lint (ShellCheck) : `make lint`
+
 ## Docs existantes
 
 - Ajouter un codec : [ADDING_NEW_CODEC.md](ADDING_NEW_CODEC.md)
