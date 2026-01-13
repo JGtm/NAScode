@@ -172,33 +172,24 @@ notify_event_run_started() {
     local now
     now=$(date +"%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "")
 
-    # Construire un mini-résumé stable (évite de dépendre du wording terminal)
-    local -a lines
-    lines=()
-
-    [[ -n "${CONVERSION_MODE:-}" ]] && lines+=("mode=${CONVERSION_MODE}")
-    [[ -n "${SOURCE:-}" ]] && lines+=("source=${SOURCE}")
-    [[ -n "${OUTPUT_DIR:-}" ]] && lines+=("dest=${OUTPUT_DIR}")
-
-    lines+=("video_codec=${VIDEO_CODEC:-hevc}")
-    [[ -n "${AUDIO_CODEC:-}" ]] && lines+=("audio_codec=${AUDIO_CODEC}")
-
-    [[ "${DRYRUN:-false}" == true ]] && lines+=("dry_run=true")
-    [[ "${SAMPLE_MODE:-false}" == true ]] && lines+=("sample_mode=true")
-    [[ "${VMAF_ENABLED:-false}" == true ]] && lines+=("vmaf=true")
-
-    [[ "${OFF_PEAK_ENABLED:-false}" == true ]] && lines+=("off_peak=${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}")
-    [[ -n "${PARALLEL_JOBS:-}" ]] && lines+=("parallel_jobs=${PARALLEL_JOBS}")
-
     local body="NAScode — démarrage"
-    [[ -n "$now" ]] && body+=$'\n\n'"**Date**: ${now}"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Début**: ${now}"
 
-    body+=$'\n\n'"**Paramètres actifs**"$'\n\n'"\`\`\`text"$'\n'
-    local line
-    for line in "${lines[@]}"; do
-        body+="${line}"$'\n'
-    done
-    body+="\`\`\`"
+    body+=$'\n\n'"**Paramètres actifs**"$'\n'
+    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **Mode**: ${CONVERSION_MODE}"
+    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **Source**: ${SOURCE}"
+    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **Destination**: ${OUTPUT_DIR}"
+    body+=$'\n'"- **Codec vidéo**: ${VIDEO_CODEC:-hevc}"
+    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **Codec audio**: ${AUDIO_CODEC}"
+
+    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **Dry-run**: true"
+    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **Sample**: true"
+    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **VMAF**: true"
+
+    if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
+        body+=$'\n'"- **Heures creuses**: ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
+    fi
+    [[ -n "${PARALLEL_JOBS:-}" ]] && body+=$'\n'"- **Jobs**: ${PARALLEL_JOBS}"
 
     notify_discord_send_markdown "$body" "run_started"
     return 0
@@ -248,6 +239,9 @@ notify_event_script_exit() {
 
     local exit_code="${1-0}"
 
+    local now
+    now=$(date +"%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "")
+
     # Si un résumé texte existe, l’inclure (déjà sans ANSI via _strip_ansi_stream)
     local summary_snippet=""
     if [[ -n "${SUMMARY_FILE:-}" ]] && [[ -f "${SUMMARY_FILE}" ]]; then
@@ -258,7 +252,11 @@ notify_event_script_exit() {
     local status="OK"
     [[ "$exit_code" != "0" ]] && status="ERROR"
 
-    local body="NAScode — fin (${status})"$'\n\n'"**Exit code**: ${exit_code}"
+    local body="NAScode — fin (${status})"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Fin**: ${now}"
+    if [[ "$exit_code" != "0" ]]; then
+        body+=$'\n'"**Exit code**: ${exit_code}"
+    fi
 
     if [[ -n "$summary_snippet" ]]; then
         body+=$'\n\n'"**Résumé**"$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"
