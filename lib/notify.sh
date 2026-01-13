@@ -188,6 +188,38 @@ notify_event_run_started() {
     body+=$'\n'"- **🎬  Codec vidéo**: ${VIDEO_CODEC:-hevc}"
     [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio**: ${AUDIO_CODEC}"
 
+    # Tri / limitation (queue)
+    local sort_mode="${SORT_MODE:-size_desc}"
+    local sort_label
+    if [[ "${RANDOM_MODE:-false}" == true ]]; then
+        sort_label="aléatoire (sélection)"
+    else
+        case "$sort_mode" in
+            size_desc)
+                sort_label="taille décroissante"
+                ;;
+            size_asc)
+                sort_label="taille croissante"
+                ;;
+            name_asc)
+                sort_label="nom ascendant"
+                ;;
+            name_desc)
+                sort_label="nom descendant"
+                ;;
+            *)
+                sort_label="$sort_mode"
+                ;;
+        esac
+    fi
+    body+=$'\n'"- **↕️  Tri de la queue**: ${sort_label}"
+
+    if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
+        local limit_icon="🔒"
+        [[ "${RANDOM_MODE:-false}" == true ]] && limit_icon="🎲"
+        body+=$'\n'"- **${limit_icon}  Limitation**: ${LIMIT_FILES} fichiers"
+    fi
+
     [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**: true"
     [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  Échantillon**: true"
     [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **ℹ   VMAF**: true"

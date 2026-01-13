@@ -18,3 +18,16 @@
   - Option A : ne pas transférer et marquer l’item comme “heavy”.
   - Option B : déclencher une re-conversion avec paramètres plus stricts.
   - Option C : transférer vers un dossier séparé (ex: `Converted_Heavier/`) **en conservant obligatoirement l’architecture de répertoires cible**.
+
+## UI (audit messages non centralisés)
+
+- Harmoniser les messages « décoratifs »/bannières qui utilisent encore `echo -e`/`printf` en dehors de `lib/ui*.sh`.
+  - `lib/off_peak.sh` : bannières / infos “heures creuses” (mise en forme).
+  - `lib/index.sh` : messages d’information sur l’index (ex: source changée, détails affichés).
+  - `lib/queue.sh` : entêtes “sélection aléatoire”, messages “Aucun fichier…” et affichage contextuel de la queue.
+  - `lib/video_params.sh` + `lib/transcode_video.sh` : messages vidéo (downscale 1080p, 10-bit/pix_fmt, etc.).
+- Décider si on centralise aussi la **progress UI** (plus risqué car dépend de TTY / rafraîchissement en place).
+  - `lib/progress.sh` : barres/compteurs en `printf`.
+  - `lib/vmaf.sh` : progression + affichage des stats.
+  - `lib/finalize.sh` : récap / progress/printf.
+

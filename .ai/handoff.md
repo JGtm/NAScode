@@ -16,6 +16,15 @@
   - queue vide → sortie 0 avec message.
   - queue non-vide mais sans séparateurs NUL → erreur (évite un mode FIFO qui attendrait indéfiniment).
 - [nascode](nascode) : garde-fou : si `SOURCE` matche `EXCLUDES`, sortie explicite avec erreur.
+  - Harmonisation UI : remplace les `echo -e` d'erreurs early par `print_error` / `print_warning` (fichier unique, source inexistante, source exclue, arrêt avant traitement).
+
+- [lib/notify.sh](lib/notify.sh) : enrichit la notification Discord “run_started” avec les paramètres actifs liés au tri de la queue (`SORT_MODE` / `--random`) et à la limitation (`--limit`).
+
+- [.ai/TODO.md](.ai/TODO.md) : consigne précisément les modules restant à harmoniser côté UI (bannières/progress/printf).
+
+### Documentation
+
+- [README.md](README.md) et [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) : ajoute un dépannage rapide/détaillé sur les cas “source exclue”, “aucun fichier à traiter” et “queue invalide (NUL)”.
 
 ### Tests
 
@@ -49,6 +58,7 @@
 
 - "Vas y pour les warnings mais sur tout le projet"
 - "Oui vas y commit comme tu as dit"
+- "Option A pour le moment, tu mettras le reste précisément dans le fichier TODO.md. D'ailleurs tant que tu es sur l'UI dans les messages à envoyer sur discord, il manque les paramètres actifs liés à ordre de tri et limitation"
 
 ## Dernière session (13/01/2026 - Doc : notifications Discord + secrets)
 
