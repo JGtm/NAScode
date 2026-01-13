@@ -20,6 +20,40 @@ _notify_discord_is_enabled() {
     return 0
 }
 
+_notify_discord_debug_enabled() {
+    [[ "${NASCODE_DISCORD_NOTIFY_DEBUG:-false}" == "true" ]]
+}
+
+_notify_discord_debug_log_file() {
+    local log_dir="${LOG_DIR:-./logs}"
+    mkdir -p "$log_dir" 2>/dev/null || true
+
+    local ts="${EXECUTION_TIMESTAMP:-}"
+    if [[ -z "$ts" ]]; then
+        ts=$(date +'%Y%m%d_%H%M%S' 2>/dev/null || echo "")
+    fi
+    [[ -z "$ts" ]] && ts="unknown"
+
+    printf '%s' "${log_dir}/discord_notify_${ts}.log"
+}
+
+_notify_discord_debug_log() {
+    _notify_discord_debug_enabled || return 0
+
+    local msg="${1-}"
+    [[ -z "$msg" ]] && return 0
+
+    local now
+    now=$(date +"%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "")
+
+    {
+        [[ -n "$now" ]] && printf '[%s] ' "$now"
+        printf '%s\n' "$msg"
+    } >> "$(_notify_discord_debug_log_file)" 2>/dev/null || true
+
+    return 0
+}
+
 _notify_json_escape() {
     # Escape minimal JSON pour une string (suffisant pour content Discord)
     # - backslash, double quote, newlines, CR, tab
@@ -43,23 +77,64 @@ notify_discord_send_markdown() {
     _notify_discord_is_enabled || return 0
 
     local content="${1-}"
+    local event_name="${2-}"  # optionnel, uniquement pour debug
     [[ -z "$content" ]] && return 0
 
     # Discord limite content à 2000 chars. On coupe à ~1900 pour marge.
     if [[ ${#content} -gt 1900 ]]; then
-        content="${content:0:1900}\n..."
+        content="${content:0:1900}"$'\n...'
     fi
 
     local payload
     payload="{\"content\":\"$(_notify_json_escape "$content")\"}"
 
-    # Ne jamais afficher le webhook (secret). Silencieux.
-    curl -sS -m 10 --retry 2 --retry-delay 1 \
-        -H "Content-Type: application/json" \
-        -X POST \
-        -d "$payload" \
-        "${NASCODE_DISCORD_WEBHOOK_URL}" \
-        >/dev/null 2>&1 || true
+    # Écrire le payload dans un fichier temporaire et utiliser --data-binary.
+    # Cela évite les surprises de parsing/encodage quand le JSON contient des caractères spéciaux.
+    local payload_file
+    payload_file="$(mktemp 2>/dev/null || echo "")"
+    if [[ -z "$payload_file" ]]; then
+        payload_file="/tmp/nascode_discord_payload_$$.json"
+    fi
+    printf '%s' "$payload" > "$payload_file" 2>/dev/null || true
+
+    # Ne jamais afficher le webhook (secret).
+    # En debug: log le code HTTP et un extrait de la réponse (sans URL).
+    if _notify_discord_debug_enabled; then
+        local resp_file
+        resp_file="$(mktemp 2>/dev/null || echo "")"
+
+        local http_code="000"
+        http_code=$(curl -sS -m 10 --retry 2 --retry-delay 1 \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -X POST \
+            --data-binary "@${payload_file}" \
+            -o "${resp_file:-/dev/null}" -w '%{http_code}' \
+            "${NASCODE_DISCORD_WEBHOOK_URL}" \
+            2>/dev/null || echo "000")
+
+        local curl_exit=$?
+
+        local payload_len=${#payload}
+        _notify_discord_debug_log "event=${event_name:-unknown} http=${http_code} curl_exit=${curl_exit} payload_len=${payload_len}"
+
+        # Si la requête est rejetée, log un extrait de la réponse (utile pour 400 Invalid Form Body)
+        if [[ -n "${resp_file:-}" ]] && [[ -f "${resp_file}" ]] && [[ "${http_code}" =~ ^[45] ]]; then
+            local resp_snippet
+            resp_snippet=$(head -c 400 "${resp_file}" 2>/dev/null | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g' || true)
+            [[ -n "${resp_snippet}" ]] && _notify_discord_debug_log "event=${event_name:-unknown} resp=${resp_snippet}"
+        fi
+
+        [[ -n "${resp_file:-}" ]] && rm -f "${resp_file}" 2>/dev/null || true
+    else
+        curl -sS -m 10 --retry 2 --retry-delay 1 \
+            -H "Content-Type: application/json; charset=utf-8" \
+            -X POST \
+            --data-binary "@${payload_file}" \
+            "${NASCODE_DISCORD_WEBHOOK_URL}" \
+            >/dev/null 2>&1 || true
+    fi
+
+    rm -f "$payload_file" 2>/dev/null || true
 
     return 0
 }
@@ -116,16 +191,16 @@ notify_event_run_started() {
     [[ -n "${PARALLEL_JOBS:-}" ]] && lines+=("parallel_jobs=${PARALLEL_JOBS}")
 
     local body="NAScode — démarrage"
-    [[ -n "$now" ]] && body+="\n\n**Date**: ${now}"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Date**: ${now}"
 
-    body+="\n\n**Paramètres actifs**\n\n\`\`\`text\n"
+    body+=$'\n\n'"**Paramètres actifs**"$'\n\n'"\`\`\`text"$'\n'
     local line
     for line in "${lines[@]}"; do
-        body+="${line}\n"
+        body+="${line}"$'\n'
     done
     body+="\`\`\`"
 
-    notify_discord_send_markdown "$body"
+    notify_discord_send_markdown "$body" "run_started"
     return 0
 }
 
@@ -139,12 +214,12 @@ notify_event_peak_pause() {
     local interval="${4-}"
 
     local body="NAScode — pause (heures pleines)"
-    [[ -n "$range" ]] && body+="\n\n**Plage heures creuses**: ${range}"
-    [[ -n "$wait_fmt" ]] && body+="\n**Attente estimée**: ${wait_fmt}"
-    [[ -n "$resume_time" ]] && body+="\n**Reprise prévue**: ${resume_time}"
-    [[ -n "$interval" ]] && body+="\n**Vérification**: toutes les ${interval}s"
+    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses**: ${range}"
+    [[ -n "$wait_fmt" ]] && body+=$'\n'"**Attente estimée**: ${wait_fmt}"
+    [[ -n "$resume_time" ]] && body+=$'\n'"**Reprise prévue**: ${resume_time}"
+    [[ -n "$interval" ]] && body+=$'\n'"**Vérification**: toutes les ${interval}s"
 
-    notify_discord_send_markdown "$body"
+    notify_discord_send_markdown "$body" "peak_pause"
     return 0
 }
 
@@ -156,10 +231,10 @@ notify_event_peak_resume() {
     local actual_wait="${2-}"
 
     local body="NAScode — reprise (heures creuses)"
-    [[ -n "$range" ]] && body+="\n\n**Plage heures creuses**: ${range}"
-    [[ -n "$actual_wait" ]] && body+="\n**Attente réelle**: ${actual_wait}"
+    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses**: ${range}"
+    [[ -n "$actual_wait" ]] && body+=$'\n'"**Attente réelle**: ${actual_wait}"
 
-    notify_discord_send_markdown "$body"
+    notify_discord_send_markdown "$body" "peak_resume"
     return 0
 }
 
@@ -183,12 +258,12 @@ notify_event_script_exit() {
     local status="OK"
     [[ "$exit_code" != "0" ]] && status="ERROR"
 
-    local body="NAScode — fin (${status})\n\n**Exit code**: ${exit_code}"
+    local body="NAScode — fin (${status})"$'\n\n'"**Exit code**: ${exit_code}"
 
     if [[ -n "$summary_snippet" ]]; then
-        body+="\n\n**Résumé**\n\n\`\`\`text\n${summary_snippet}\n\`\`\`"
+        body+=$'\n\n'"**Résumé**"$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"
     fi
 
-    notify_discord_send_markdown "$body"
+    notify_discord_send_markdown "$body" "script_exit"
     return 0
 }
