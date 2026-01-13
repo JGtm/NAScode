@@ -26,6 +26,13 @@
 ### Contexte
 
 - Des sorties AV1 (SVT-AV1) pouvaient devenir plus grosses que la source en mode CRF (ex: film-adaptive affichait un bitrate cible faible, mais l'encodage CRF restait trop "généreux").
+
+## 2026-01-13 — Fix film-adaptive : paramètres appliqués à l'encodage (AV1 + HEVC)
+
+- Problème : en mode `film-adaptive`, l'analyse affichait un `Bitrate cible (encodage)` faible mais l'encodage utilisait parfois les paramètres "standard" (symptôme : `mbr=1750` au lieu de ~`target×1.4`).
+- Cause : appel `adaptive_info=$(_convert_run_adaptive_analysis_and_export ...)` via `$(...)` ⇒ subshell ⇒ les `export ADAPTIVE_*` internes ne remontaient pas au shell parent.
+- Fix : export explicite des `ADAPTIVE_TARGET_KBPS/ADAPTIVE_MAXRATE_KBPS/ADAPTIVE_BUFSIZE_KBPS` dans `convert_file()` après parsing, pour que `lib/transcode_video.sh` utilise bien les budgets adaptatifs.
+- Tests : ajout non-régression dans `tests/test_film_adaptive.bats` + test ciblé HEVC/x265 dans `tests/test_encoding_subfunctions.bats`.
 - Le build local (SVT-AV1 v3.1.2 via FFmpeg) n'accepte pas les clés `max-bitrate` et `buffer-size` dans `-svtav1-params` (erreurs de parsing observées).
 
 ### Changements
