@@ -99,6 +99,24 @@ _check_output_exists() {
         fi
         return 0
     fi
+
+    # Anti-boucle : si une sortie "Heavier" existe déjà pour ce fichier, ne pas re-traiter.
+    if [[ "$DRYRUN" != true ]] && [[ "${HEAVY_OUTPUT_ENABLED:-true}" == true ]] && declare -f compute_heavy_output_path &>/dev/null; then
+        local heavy_output
+        heavy_output=$(compute_heavy_output_path "$final_output" "$OUTPUT_DIR" 2>/dev/null || echo "")
+        if [[ -n "$heavy_output" ]] && [[ -f "$heavy_output" ]]; then
+            local counter_prefix
+            counter_prefix=$(_get_counter_prefix)
+            echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Sortie 'Heavier' déjà existante) : $filename${NOCOLOR}" >&2
+            if [[ -n "$LOG_SESSION" ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Heavier output exists) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+            fi
+            if [[ "$LIMIT_FILES" -gt 0 ]]; then
+                update_queue || true
+            fi
+            return 0
+        fi
+    fi
     return 1
 }
 
@@ -124,6 +142,13 @@ _get_temp_filename() {
     local md5p
     md5p=$(compute_md5_prefix "$file_original")
     echo "$TMP_DIR/tmp_${md5p}_${RANDOM}${suffix}"
+}
+
+_get_temp_workdir() {
+    local file_original="$1"
+    local md5p
+    md5p=$(compute_md5_prefix "$file_original")
+    echo "$TMP_DIR/work_${md5p}_${EXECUTION_TIMESTAMP}_$$_${RANDOM}"
 }
 
 _setup_temp_files_and_logs() {

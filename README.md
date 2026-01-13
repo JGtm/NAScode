@@ -130,8 +130,9 @@ Référence code (audio) :
 
 ## Logs & sortie
 
-- Sortie par défaut : `Converted/`
-- Logs : `logs/` (session, erreurs, skipped, index/queue)
+- Sortie par défaut : `Converted/` (dans le dossier du script)
+- Logs : `logs/` (dans le dossier du script)
+- Si une conversion produit un fichier plus lourd (ou un gain < seuil), la sortie est redirigée vers `Converted_Heavier/` (configurable) pour éviter les boucles de re-traitement.
 
 Détails : [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 

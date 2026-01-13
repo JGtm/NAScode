@@ -30,12 +30,9 @@ teardown() {
 # Tests des chemins de logs
 ###########################################################
 
-@test "logging: LOG_DIR par défaut est ./logs" {
-    # Simuler le chargement avec les valeurs par défaut
-    local expected_log_dir="./logs"
-    
+@test "logging: LOG_DIR est ancré sur SCRIPT_DIR" {
     # Vérifier que la valeur par défaut est correcte dans le fichier
-    grep -q 'readonly LOG_DIR="./logs"' "$LIB_DIR/logging.sh"
+    grep -q 'readonly LOG_DIR="$SCRIPT_DIR/logs"' "$LIB_DIR/logging.sh"
 }
 
 @test "logging: LOG_SESSION contient le timestamp" {
@@ -97,23 +94,24 @@ teardown() {
 
 @test "cleanup_old_logs: supprime les vieux fichiers" {
     cd "$TEST_TEMP_DIR"
-    mkdir -p logs
+    export SCRIPT_DIR="$TEST_TEMP_DIR"
+    mkdir -p "$TEST_TEMP_DIR/logs"
     
     # Créer un fichier vieux (35 jours)
-    touch -d "35 days ago" logs/old_file.log
+    touch -d "35 days ago" "$TEST_TEMP_DIR/logs/old_file.log"
     # Créer un fichier récent
-    touch logs/recent_file.log
+    touch "$TEST_TEMP_DIR/logs/recent_file.log"
     # Créer un fichier Index (ne doit pas être supprimé)
-    touch -d "35 days ago" logs/Index
+    touch -d "35 days ago" "$TEST_TEMP_DIR/logs/Index"
     
-    # Charger logging.sh (LOG_DIR sera ./logs dans TEST_TEMP_DIR)
+    # Charger logging.sh (LOG_DIR sera "$SCRIPT_DIR/logs")
     source "$LIB_DIR/logging.sh"
     
     cleanup_old_logs 30
     
-    [ ! -f "logs/old_file.log" ]
-    [ -f "logs/recent_file.log" ]
-    [ -f "logs/Index" ]
+    [ ! -f "$TEST_TEMP_DIR/logs/old_file.log" ]
+    [ -f "$TEST_TEMP_DIR/logs/recent_file.log" ]
+    [ -f "$TEST_TEMP_DIR/logs/Index" ]
 }
 
 @test "initialize_directories: crée les fichiers de log vides" {

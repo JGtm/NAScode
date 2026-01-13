@@ -196,6 +196,58 @@ teardown() {
 }
 
 ###########################################################
+# Tests de shuffle_lines()
+###########################################################
+
+@test "shuffle_lines: conserve l'ensemble des lignes" {
+    local input
+    input=$(printf "a\nb\nc\n")
+    local out_sorted expected_sorted
+    out_sorted=$(printf "%s" "$input" | shuffle_lines | sort)
+    expected_sorted=$(printf "%s" "$input" | sort)
+    [ "$out_sorted" = "$expected_sorted" ]
+}
+
+###########################################################
+# Tests de atomic_add_int_to_file()
+###########################################################
+
+@test "atomic_add_int_to_file: incrémente un compteur" {
+    local f="$TEST_TEMP_DIR/counter.txt"
+    echo "0" > "$f"
+
+    atomic_add_int_to_file "$f" 5
+    [ "$(cat "$f")" -eq 5 ]
+
+    atomic_add_int_to_file "$f" -2
+    [ "$(cat "$f")" -eq 3 ]
+}
+
+###########################################################
+# Tests de compute_heavy_output_path()
+###########################################################
+
+@test "compute_heavy_output_path: préserve l'arborescence sous OUTPUT_DIR" {
+    export OUTPUT_DIR="$TEST_TEMP_DIR/Converted"
+    export HEAVY_OUTPUT_DIR_SUFFIX="_Heavier"
+
+    local final_output="$OUTPUT_DIR/Show/S01/E01.mkv"
+    local expected="$TEST_TEMP_DIR/Converted_Heavier/Show/S01/E01.mkv"
+    result=$(compute_heavy_output_path "$final_output" "$OUTPUT_DIR")
+    [ "$result" = "$expected" ]
+}
+
+@test "compute_heavy_output_path: fallback si final_output hors OUTPUT_DIR" {
+    export OUTPUT_DIR="$TEST_TEMP_DIR/Converted"
+    export HEAVY_OUTPUT_DIR_SUFFIX="_Heavier"
+
+    local final_output="$TEST_TEMP_DIR/other/E01.mkv"
+    result=$(compute_heavy_output_path "$final_output" "$OUTPUT_DIR")
+    [[ "$result" == "$TEST_TEMP_DIR/Converted_Heavier/"* ]]
+    [[ "$result" == *"E01.mkv" ]]
+}
+
+###########################################################
 # Tests de format_duration_seconds()
 ###########################################################
 

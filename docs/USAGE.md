@@ -68,6 +68,21 @@ Le script évolue : la table ci-dessous est un rappel, l’autorité reste `bash
 
 Pour comprendre les décisions audio/vidéo (skip/passthrough/convert), voir [SMART_CODEC.md](SMART_CODEC.md).
 
+## Sorties plus lourdes / gain faible ("Heavier")
+
+Si une conversion produit un fichier **plus lourd** (ou un gain inférieur à un seuil), NAScode peut rediriger la sortie vers un dossier séparé afin d’éviter les boucles de re-traitement.
+
+- Dossier par défaut : `Converted_Heavier/` (à côté de `Converted/`), en conservant l'arborescence.
+- Anti-boucle : si une sortie "Heavier" existe déjà pour un fichier, NAScode **skip** ce fichier.
+
+Réglages (dans la config) :
+
+- `HEAVY_OUTPUT_ENABLED` : `true`/`false`
+- `HEAVY_MIN_SAVINGS_PERCENT` : gain minimum en %
+- `HEAVY_OUTPUT_DIR_SUFFIX` : suffixe de dossier (défaut `_Heavier`)
+
+Voir aussi : [CONFIG.md](CONFIG.md)
+
 ## Notifications Discord (optionnel)
 
 NAScode supporte des notifications via webhook Discord (Markdown). Elles sont **best-effort** : une erreur réseau ne doit pas interrompre la conversion.

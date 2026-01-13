@@ -67,6 +67,21 @@ Quand `-p/--off-peak` est activé :
 - Le script ne démarre de nouvelles conversions **que** pendant la plage définie.
 - Si un fichier est en cours quand les heures pleines reviennent, il **termine**, puis attend le retour des heures creuses.
 
+## Sorties plus lourdes / gain faible ("Heavier")
+
+Objectif : éviter la boucle "re-encode" quand une conversion produit un fichier **plus lourd** (ou un gain trop faible). Dans ce cas, NAScode peut rediriger la sortie vers un dossier alternatif (par défaut `Converted_Heavier/`) en conservant l'arborescence.
+
+Comportement (si activé) :
+
+- Si `taille_sortie >= taille_source` **ou** si le gain est inférieur à un seuil, la sortie est déplacée vers `OUTPUT_DIR` + suffixe (`_Heavier` par défaut).
+- Anti-boucle : si une sortie "Heavier" existe déjà pour le fichier, NAScode **skip** le fichier (pour éviter de reconvertir indéfiniment).
+
+Variables :
+
+- `HEAVY_OUTPUT_ENABLED` : `true`/`false` (défaut `true`).
+- `HEAVY_MIN_SAVINGS_PERCENT` : gain minimum en % (défaut `10`).
+- `HEAVY_OUTPUT_DIR_SUFFIX` : suffixe ajouté au dossier `OUTPUT_DIR` (défaut `_Heavier`).
+
 ## Notifications Discord (optionnel)
 
 NAScode peut envoyer des notifications Discord via un webhook (Markdown). C’est volontairement **best-effort** : si Discord est indisponible, la conversion continue.

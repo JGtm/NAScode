@@ -227,6 +227,97 @@ _cmd_append_words() {
 }
 
 ###########################################################
+# SHUFFLE PORTABLE (SANS PYTHON)
+###########################################################
+
+# Mélange des lignes sur stdin.
+# Utilise shuf si disponible, sinon fallback awk+sort (portable GNU/BSD).
+shuffle_lines() {
+    if command -v shuf >/dev/null 2>&1; then
+        shuf
+        return
+    fi
+
+    # Fallback : préfixer chaque ligne par un nombre pseudo-aléatoire puis trier.
+    # Note : rand() n'est pas cryptographiquement sûr, mais suffisant pour la sélection random.
+    awk 'BEGIN{srand()} {printf("%f\t%s\n", rand(), $0)}' | sort -k1,1n | cut -f2-
+}
+
+###########################################################
+# COMPTEURS FICHIER (LOCK PORTABLE)
+###########################################################
+
+# Ajoute delta (entier) au contenu (entier) d'un fichier compteur.
+# - flock si dispo
+# - sinon lock via mkdir (portable)
+# - sinon best-effort sans lock
+atomic_add_int_to_file() {
+    local file="$1"
+    local delta="$2"
+
+    [[ -z "$file" ]] && return 0
+    [[ ! -f "$file" ]] && return 0
+    [[ ! "$delta" =~ ^-?[0-9]+$ ]] && return 0
+
+    _atomic_add_internal() {
+        local current
+        current=$(cat "$file" 2>/dev/null || echo 0)
+        [[ -z "$current" ]] && current=0
+        [[ ! "$current" =~ ^-?[0-9]+$ ]] && current=0
+        echo $((current + delta)) > "$file"
+    }
+
+    local lock_file="${file}.lock"
+
+    if command -v flock >/dev/null 2>&1; then
+        ( flock -x 200; _atomic_add_internal ) 200>"$lock_file" 2>/dev/null && return 0
+        # si flock existe mais échoue (FS exotiques), repli mkdir.
+    fi
+
+    local lock_dir="${file}.lockdir"
+    local i=0
+    while ! mkdir "$lock_dir" 2>/dev/null; do
+        i=$((i + 1))
+        [[ "$i" -ge 50 ]] && break
+        sleep 0.02
+    done
+
+    if [[ -d "$lock_dir" ]]; then
+        _atomic_add_internal
+        rmdir "$lock_dir" 2>/dev/null || true
+        return 0
+    fi
+
+    # Ultime repli : best-effort (non atomique)
+    _atomic_add_internal 2>/dev/null || true
+    return 0
+}
+
+###########################################################
+# SORTIES "HEAVY" (PLUS LOURDES / GAIN FAIBLE)
+###########################################################
+
+# Calcule un chemin de sortie alternatif "Heavier" en conservant l'arborescence.
+# Usage: compute_heavy_output_path <final_output> [output_dir]
+compute_heavy_output_path() {
+    local final_output="$1"
+    local output_dir="${2:-${OUTPUT_DIR:-}}"
+
+    [[ -z "$final_output" ]] && return 1
+    [[ -z "$output_dir" ]] && return 1
+
+    local out_root="${output_dir%/}"
+    local heavy_root="${out_root}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
+
+    if [[ "$final_output" == "$out_root"* ]]; then
+        printf '%s' "${heavy_root}${final_output#${out_root}}"
+        return 0
+    fi
+
+    printf '%s' "${heavy_root}/$(basename "$final_output")"
+}
+
+###########################################################
 # TAILLES DE FICHIERS / PARSING
 ###########################################################
 

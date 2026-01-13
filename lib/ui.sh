@@ -200,6 +200,14 @@ print_warning_box() {
     echo -e "${YELLOW}  └${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${NOCOLOR}"
 }
 
+# Sortie "heavy" (plus lourde / gain faible) : la conversion est conservée mais redirigée.
+# Usage: print_heavy_output_redirect "Converted_Heavier/..."
+print_heavy_output_redirect() {
+    _ui_is_quiet && return 0
+    local target="$1"
+    print_warning_box "Sortie redirigée" "Gain insuffisant : fichier déplacé vers ${target}"
+}
+
 # Affiche un encadré d'information
 # Usage: print_info_box "Titre" "Message"
 print_info_box() {

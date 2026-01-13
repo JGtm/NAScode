@@ -179,15 +179,14 @@ notify_event_run_started() {
     now=$(date +"%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "")
 
     local body="NAScode — démarrage"
-    [[ -n "$now" ]] && body+=$'\n\n'"**Début**: ${now}"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
 
     body+=$'\n\n'"**Paramètres actifs**"$'\n'
-    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **📊  Mode**: ${CONVERSION_MODE}"
-    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **📂  Source**: ${SOURCE}"
-    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **📂  Destination**: ${OUTPUT_DIR}"
-    body+=$'\n'"- **🎬  Codec vidéo**: ${VIDEO_CODEC:-hevc}"
-    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio**: ${AUDIO_CODEC}"
-
+    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **📊  Mode** : ${CONVERSION_MODE}"
+    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **📂  Source** : ${SOURCE}"
+    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **📂  Destination** : ${OUTPUT_DIR}"
+    body+=$'\n'"- **🎬  Codec vidéo** : ${VIDEO_CODEC:-hevc}"
+    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio** : ${AUDIO_CODEC}"
     # Tri / limitation (queue)
     local sort_mode="${SORT_MODE:-size_desc}"
     local sort_label
@@ -212,22 +211,22 @@ notify_event_run_started() {
                 ;;
         esac
     fi
-    body+=$'\n'"- **↕️  Tri de la queue**: ${sort_label}"
+    body+=$'\n'"- **↕️  Tri de la queue** : ${sort_label}"
 
     if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
         local limit_icon="🔒"
         [[ "${RANDOM_MODE:-false}" == true ]] && limit_icon="🎲"
-        body+=$'\n'"- **${limit_icon}  Limitation**: ${LIMIT_FILES} fichier(s) maximum"
+        body+=$'\n'"- **${limit_icon}  Limitation** : ${LIMIT_FILES} fichier(s) maximum"
     fi
 
-    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**: true"
-    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  Échantillon**: true"
-    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **ℹ   VMAF**: true"
+    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**"
+    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  Échantillon**"
+    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- ** ℹ    VMAF**"
 
     if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
-        body+=$'\n'"- **⏰  Heures creuses**: ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
+        body+=$'\n'"- **⏰  Heures creuses** : ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
     fi
-    [[ -n "${PARALLEL_JOBS:-}" ]] && body+=$'\n'"- **Jobs**: ${PARALLEL_JOBS}"
+    [[ -n "${PARALLEL_JOBS:-}" ]] && body+=$'\n'"- **⏭️  Jobs parallèles** : ${PARALLEL_JOBS}"
 
     notify_discord_send_markdown "$body" "run_started"
     return 0
@@ -243,10 +242,10 @@ notify_event_peak_pause() {
     local interval="${4-}"
 
     local body="NAScode — pause (heures pleines)"
-    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses**: ${range}"
-    [[ -n "$wait_fmt" ]] && body+=$'\n'"**Attente estimée**: ${wait_fmt}"
-    [[ -n "$resume_time" ]] && body+=$'\n'"**Reprise prévue**: ${resume_time}"
-    [[ -n "$interval" ]] && body+=$'\n'"**Vérification**: toutes les ${interval}s"
+    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses** : ${range}"
+    [[ -n "$wait_fmt" ]] && body+=$'\n'"**Attente estimée** : ${wait_fmt}"
+    [[ -n "$resume_time" ]] && body+=$'\n'"**Reprise prévue** : ${resume_time}"
+    [[ -n "$interval" ]] && body+=$'\n'"**Vérification** : toutes les ${interval}s"
 
     notify_discord_send_markdown "$body" "peak_pause"
     return 0
@@ -260,8 +259,8 @@ notify_event_peak_resume() {
     local actual_wait="${2-}"
 
     local body="NAScode — reprise (heures creuses)"
-    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses**: ${range}"
-    [[ -n "$actual_wait" ]] && body+=$'\n'"**Attente réelle**: ${actual_wait}"
+    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses** : ${range}"
+    [[ -n "$actual_wait" ]] && body+=$'\n'"**Attente réelle** : ${actual_wait}"
 
     notify_discord_send_markdown "$body" "peak_resume"
     return 0
@@ -291,7 +290,7 @@ notify_event_script_exit() {
     [[ "$exit_code" != "0" ]] && status="ERROR"
 
     local body="NAScode — fin (${status})"
-    [[ -n "$now" ]] && body+=$'\n\n'"**Fin**: ${now}"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Fin** : ${now}"
     # if [[ "$exit_code" != "0" ]]; then
     #     body+=$'\n'"**Exit code**: ${exit_code}"
     # fi

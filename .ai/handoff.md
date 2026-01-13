@@ -2,6 +2,30 @@
 
 ## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
 
+### 2026-01-13 — Robustesse Git Bash : workdir par job + "Heavier" + logs ancrés
+
+Branche : `feature/robustness-heavy-outputs`
+
+Changements principaux :
+
+- Isolation des encodages (two-pass) par job via un répertoire de travail temporaire dédié (`NASCODE_WORKDIR`) pour éviter les collisions de logs two-pass en parallèle.
+- Random queue portable sans Python : remplacement `sort -R` par un shuffle best-effort (`shuf` si dispo, sinon `awk`+`sort`).
+- Logs ancrés au dossier du script (`$SCRIPT_DIR/logs`) au lieu de dépendre du `cwd`.
+- Guardrails Git Bash : fallback si `mkfifo` indisponible/échoue ; compteurs atomiques sans dépendre strictement de `flock`.
+- Sorties "plus lourdes" / gain faible : redirection vers `Converted_Heavier/` (suffix configurable) + anti-boucle (skip si une sortie Heavier existe déjà).
+
+Docs/tests :
+
+- [docs/CONFIG.md](docs/CONFIG.md) : nouvelle section sur `HEAVY_OUTPUT_ENABLED`, `HEAVY_MIN_SAVINGS_PERCENT`, `HEAVY_OUTPUT_DIR_SUFFIX` + comportement/anti-boucle.
+- [README.md](README.md) : mention de la redirection `Converted_Heavier/` + précision que logs/sortie sont ancrés au dossier du script.
+- [tests/test_heavy_outputs.bats](tests/test_heavy_outputs.bats) : test anti-boucle via `_check_output_exists`.
+
+Derniers prompts :
+
+- "Fais une revue globale du code et dis moi ce que tu en penses"
+- "Vas y pour la revue plus chirurgicale… (pas de fallback Python)"
+- "ok tout est bon go" / "continue"
+
 ### Contexte
 
 - Symptôme rapporté : la conversion peut “se bloquer” quand aucun fichier n’est réellement traitable (ex: entrée vide, fichier introuvable, ou source passée dans les exclusions).

@@ -119,10 +119,10 @@ _apply_queue_limitations() {
     # Appliquer le tri (aléatoire si random) et la limite
     if [[ "$RANDOM_MODE" == true ]]; then
         # Mode RANDOM : Tri aléatoire puis limitation
-        echo "$queue_content" | sort -R | head -n "$limit_count" | tr '\n' '\0' > "$tmp_limit"
+        printf '%s\n' "$queue_content" | shuffle_lines | head -n "$limit_count" | tr '\n' '\0' > "$tmp_limit"
     else
         # Mode Normal : Limitation du haut de la liste (déjà triée par taille décroissante)
-        echo "$queue_content" | head -n "$limit_count" | tr '\n' '\0' > "$tmp_limit"
+        printf '%s\n' "$queue_content" | head -n "$limit_count" | tr '\n' '\0' > "$tmp_limit"
     fi
     
     mv "$tmp_limit" "$QUEUE"

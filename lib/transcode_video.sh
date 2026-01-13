@@ -581,11 +581,19 @@ _run_ffmpeg_encode() {
     # Garder l'ordre historique (output puis progress) pour minimiser le risque de régression.
     cmd+=(-progress pipe:1 -nostats)
 
-    "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}" | \
-        awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
-            -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-            -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
-            "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    if [[ -n "${NASCODE_WORKDIR:-}" ]] && [[ -d "${NASCODE_WORKDIR}" ]]; then
+        (cd "${NASCODE_WORKDIR}" && "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}") | \
+            awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
+                -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+                -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+                "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    else
+        "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}" | \
+            awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
+                -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
+                -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+                "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
+    fi
 
     # CRITIQUE : capturer PIPESTATUS immédiatement après le pipeline
     local ffmpeg_rc=${PIPESTATUS[0]:-0}
