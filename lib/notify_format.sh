@@ -47,6 +47,12 @@ _notify_truncate_label() {
     fi
 }
 
+_notify_strip_ansi() {
+    # Retire les séquences ANSI (couleurs, etc.)
+    # Remarque: GNU sed (Git Bash) supporte \x1B.
+    sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g'
+}
+
 _notify_kv_get() {
     # Usage: _notify_kv_get <file> <key>
     local file="${1-}"
@@ -85,6 +91,7 @@ _notify_format_run_summary_markdown() {
     space_line2=$(_notify_kv_get "$metrics_file" "space_line2")
 
     local body="🧾 Résumé"
+    [[ -n "$now" ]] && body+=$'\n'"**Fin** : ${now}"
     [[ -n "$duration_total" ]] && body+=$'\n'"**Durée** : ${duration_total}"
 
     body+=$'\n\n'"**Résultats**"
@@ -118,8 +125,300 @@ _notify_format_run_summary_markdown() {
         fi
     fi
 
-    body+=$'\n\n'"✅ Session terminée"
+    body+=$'\n\n'"✅ Session terminée (code ${exit_code})"
 
+    printf '%s' "$body"
+}
+
+_notify_format_event_file_skipped() {
+    # Usage: _notify_format_event_file_skipped <filename> [reason]
+    local filename="${1-}"
+    local reason="${2-}"
+    [[ -z "$filename" ]] && filename="(inconnu)"
+
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    local body="${prefix}⏭️ Ignoré : $(_notify_truncate_label "$filename" 120)"
+    [[ -n "$reason" ]] && body+=$'\n'"**Raison** : ${reason}"
+    printf '%s' "$body"
+}
+
+_notify_format_event_run_started() {
+    # Usage: _notify_format_event_run_started <now>
+    local now="${1-}"
+
+    local body="Démarrage"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
+
+    body+=$'\n\n'"**Paramètres actifs**"$'\n'
+    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **📊  Mode** : ${CONVERSION_MODE}"
+    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **📂  Source** : ${SOURCE}"
+    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **📂  Destination** : ${OUTPUT_DIR}"
+    body+=$'\n'"- **🎬  Codec vidéo** : ${VIDEO_CODEC:-hevc}"
+    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio** : ${AUDIO_CODEC}"
+
+    # Tri / limitation (queue)
+    local sort_mode="${SORT_MODE:-size_desc}"
+    local sort_label
+    if [[ "${RANDOM_MODE:-false}" == true ]]; then
+        sort_label="aléatoire (sélection)"
+    else
+        case "$sort_mode" in
+            size_desc) sort_label="taille décroissante" ;;
+            size_asc)  sort_label="taille croissante" ;;
+            name_asc)  sort_label="nom ascendant" ;;
+            name_desc) sort_label="nom descendant" ;;
+            *)         sort_label="$sort_mode" ;;
+        esac
+    fi
+    body+=$'\n'"- **↕️  Tri de la queue** : ${sort_label}"
+
+    if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
+        local limit_icon="🔒"
+        [[ "${RANDOM_MODE:-false}" == true ]] && limit_icon="🎲"
+        body+=$'\n'"- **${limit_icon}  Limitation** : ${LIMIT_FILES} fichier(s) maximum"
+    fi
+
+    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**"
+    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  Échantillon**"
+    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **🎞️  VMAF**"
+
+    if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
+        body+=$'\n'"- **⏰  Heures creuses** : ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
+    fi
+
+    local jobs_label
+    jobs_label=$(_notify_format_parallel_jobs_label)
+    [[ -n "${jobs_label:-}" ]] && body+=$'\n'"- **⏭️  Jobs parallèles** : ${jobs_label}"
+
+    # Aperçu de la queue (si disponible)
+    if [[ -n "${QUEUE:-}" ]] && [[ -f "${QUEUE}" ]]; then
+        local preview
+        preview=$(_notify_format_queue_preview "${QUEUE}")
+        if [[ -n "$preview" ]]; then
+            body+=$'\n\n'"**📋 File d’attente**"$'\n'
+            body+=$'\n'"\`\`\`text"$'\n'"${preview}"$'\n'"\`\`\`"
+            body+=$'\n\n'
+        fi
+    fi
+
+    printf '%s' "$body"
+}
+
+_notify_format_event_file_started() {
+    # Usage: _notify_format_event_file_started <filename>
+    local filename="${1-}"
+    [[ -z "$filename" ]] && filename="(inconnu)"
+
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    printf '%s' "${prefix}▶️ Démarrage du fichier : $(_notify_truncate_label "$filename" 120)"
+}
+
+_notify_format_event_file_completed() {
+    # Usage: _notify_format_event_file_completed <elapsed> <before> <after>
+    local elapsed="${1-}"
+    local before_fmt="${2-}"
+    local after_fmt="${3-}"
+
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    local size_part=""
+    if [[ -n "$before_fmt" ]] && [[ -n "$after_fmt" ]]; then
+        size_part=" | ${before_fmt} → ${after_fmt}"
+    fi
+
+    local elapsed_part="${elapsed:-N/A}"
+    printf '%s' "${prefix}✅ Conversion terminée en ${elapsed_part}${size_part}"
+}
+
+_notify_format_event_conversions_completed() {
+    # Usage: _notify_format_event_conversions_completed <total>
+    local total="${1-}"
+
+    local body="✅ Toutes les conversions terminées"
+    if [[ -n "$total" ]] && [[ "$total" =~ ^[0-9]+$ ]] && [[ "$total" -gt 0 ]]; then
+        body+=" (${total} fichier(s))"
+    fi
+
+    # UX Discord: laisser une ligne vide après les étapes “macro”
+    body+=$'\n\n'
+    printf '%s' "$body"
+}
+
+_notify_format_event_transfers_pending() {
+    # Usage: _notify_format_event_transfers_pending <count>
+    local count="${1-}"
+    local body="📤 Transferts en attente"
+    if [[ -n "$count" ]] && [[ "$count" =~ ^[0-9]+$ ]]; then
+        body+=" : ${count}"
+    fi
+    printf '%s' "$body"
+}
+
+_notify_format_event_transfers_done() {
+    # UX Discord: laisser une ligne vide après l'étape transferts
+    printf '%s' $'✅ Transferts terminés\n\n'
+}
+
+_notify_format_event_vmaf_started() {
+    # Usage: _notify_format_event_vmaf_started <now> <count> [mode]
+    local now="${1-}"
+    local count="${2-0}"
+    local mode="${3-}"
+
+    local body="🎞️ Analyse VMAF — début"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
+    [[ -n "$count" ]] && body+=$'\n'"**Fichiers** : ${count}"
+    [[ -n "$mode" ]] && body+=$'\n'"**Mode** : ${mode}"
+
+    # UX Discord: laisser une ligne vide après l'annonce de début
+    body+=$'\n\n'
+    printf '%s' "$body"
+}
+
+_notify_format_event_vmaf_file_started() {
+    # Usage: _notify_format_event_vmaf_file_started <current> <total> <filename>
+    local cur="${1-}"
+    local total="${2-}"
+    local filename="${3-}"
+
+    local prefix=""
+    if [[ "$cur" =~ ^[0-9]+$ ]] && [[ "$total" =~ ^[0-9]+$ ]] && [[ "$cur" -gt 0 ]] && [[ "$total" -gt 0 ]]; then
+        prefix="[${cur}/${total}] "
+    fi
+
+    printf '%s' "${prefix}🎞️ Début VMAF : $(_notify_truncate_label "$filename" 30)"
+}
+
+_notify_format_vmaf_quality_badge() {
+    local quality="${1-NA}"
+    case "$quality" in
+        EXCELLENT) printf '%s' "✅" ;;
+        TRES_BON)  printf '%s' "✅" ;;
+        BON)       printf '%s' "🟡" ;;
+        DEGRADE)   printf '%s' "❌" ;;
+        *)         printf '%s' "ℹ️" ;;
+    esac
+}
+
+_notify_format_event_vmaf_file_completed() {
+    # Usage: _notify_format_event_vmaf_file_completed <current> <total> <filename> <score> <quality>
+    local cur="${1-}"
+    local total="${2-}"
+    local _filename="${3-}"
+    local score="${4-NA}"
+    local quality="${5-NA}"
+
+    local prefix=""
+    if [[ "$cur" =~ ^[0-9]+$ ]] && [[ "$total" =~ ^[0-9]+$ ]] && [[ "$cur" -gt 0 ]] && [[ "$total" -gt 0 ]]; then
+        prefix="[${cur}/${total}] "
+    fi
+
+    local badge
+    badge=$(_notify_format_vmaf_quality_badge "$quality")
+
+    printf '%s' "${prefix}${badge} VMAF : ${quality} — ${score}"
+}
+
+_notify_format_event_vmaf_completed() {
+    # Usage: _notify_format_event_vmaf_completed <now> <count> <ok> <na> <avg> <min> <max> <degraded> <duration> [worst_lines...]
+    local now="${1-}"
+    local count="${2-0}"
+    local ok="${3-0}"
+    local na="${4-0}"
+    local avg="${5-NA}"
+    local min="${6-NA}"
+    local max="${7-NA}"
+    local degraded="${8-0}"
+    local duration="${9-}"
+    shift 9 || true
+
+    local body="✅ Analyse VMAF — terminée"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Fin** : ${now}"
+    [[ -n "$duration" ]] && body+=$'\n'"**Durée** : ${duration}"
+
+    body+=$'\n\n'"**Résultats**"
+    body+=$'\n'"- Analysés : ${ok}/${count}"
+    body+=$'\n'"- NA : ${na}"
+    body+=$'\n'"- Moyenne : ${avg}"
+    body+=$'\n'"- Min / Max : ${min} / ${max}"
+    body+=$'\n'"- Dégradés : ${degraded}"
+
+    if [[ "$#" -gt 0 ]]; then
+        body+=$'\n\n'"**Pires scores**"
+        local line
+        for line in "$@"; do
+            [[ -n "$line" ]] && body+=$'\n'"$line"
+        done
+    fi
+
+    printf '%s' "$body"
+}
+
+_notify_format_event_peak_pause() {
+    # Usage: _notify_format_event_peak_pause <range> <wait_fmt> <resume_time> <interval>
+    local range="${1-}"
+    local wait_fmt="${2-}"
+    local resume_time="${3-}"
+    local interval="${4-}"
+
+    local body="⏸️ Pause (heures pleines)"
+    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses** : ${range}"
+    [[ -n "$wait_fmt" ]] && body+=$'\n'"**Attente estimée** : ${wait_fmt}"
+    [[ -n "$resume_time" ]] && body+=$'\n'"**Reprise prévue** : ${resume_time}"
+    [[ -n "$interval" ]] && body+=$'\n'"**Vérification** : toutes les ${interval}s"
+    printf '%s' "$body"
+}
+
+_notify_format_event_peak_resume() {
+    # Usage: _notify_format_event_peak_resume <range> <actual_wait>
+    local range="${1-}"
+    local actual_wait="${2-}"
+
+    local body="▶️ Reprise (heures creuses)"
+    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses** : ${range}"
+    [[ -n "$actual_wait" ]] && body+=$'\n'"**Attente réelle** : ${actual_wait}"
+    printf '%s' "$body"
+}
+
+_notify_format_event_script_exit_summary() {
+    # Usage: _notify_format_event_script_exit_summary <now> <exit_code>
+    local now="${1-}"
+    local exit_code="${2-0}"
+
+    # 1) Résumé (markdown si possible)
+    if [[ -n "${SUMMARY_METRICS_FILE:-}" ]] && [[ -f "${SUMMARY_METRICS_FILE}" ]]; then
+        _notify_format_run_summary_markdown "${SUMMARY_METRICS_FILE}" "${now}" "${exit_code}"
+        return 0
+    fi
+
+    # 2) Fallback: snippet texte (format terminal) si métriques absentes
+    if [[ -n "${SUMMARY_FILE:-}" ]] && [[ -f "${SUMMARY_FILE}" ]]; then
+        local summary_snippet
+        summary_snippet=$(head -n 40 "${SUMMARY_FILE}" 2>/dev/null | _notify_strip_ansi | sed 's/[[:space:]]*$//' || true)
+        if [[ -n "$summary_snippet" ]]; then
+            local body="🧾 Résumé"
+            body+=$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"$'\n\n'
+            printf '%s' "$body"
+            return 0
+        fi
+    fi
+
+    return 0
+}
+
+_notify_format_event_script_exit_end() {
+    # Usage: _notify_format_event_script_exit_end <now>
+    local now="${1-}"
+    local body="🏁 Fin"
+    [[ -n "$now" ]] && body+=" : ${now}"
     printf '%s' "$body"
 }
 

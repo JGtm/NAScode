@@ -28,6 +28,16 @@ Changements principaux :
   - corrige un envoi en double sur l’événement `transfers_done` (un seul message, avec `\n\n` de respiration).
   - rétablit la ligne `**Mode**` dans `vmaf_started` (et garde l’espacement après l’annonce).
 
+### 2026-01-14 — Refactor option 2 : formatage centralisé par événement
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_format.sh](lib/notify_format.sh) : ajoute des helpers `_notify_format_event_*` (un par événement) + améliore `_notify_format_run_summary_markdown` (ligne **Fin** + code de sortie).
+- [lib/notify_events.sh](lib/notify_events.sh) : devient un routeur/enveloppe (garde-fous + envoi), et délègue le contenu Markdown à `notify_format`.
+- [lib/notify_discord.sh](lib/notify_discord.sh) : retire `_notify_strip_ansi` (déplacé côté formatage).
+
 ### 2026-01-14 — Natif : autoload de `.env.local` (plus besoin d’export)
 
 Branche : `feature/discord-notify-styled`

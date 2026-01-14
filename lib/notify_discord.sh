@@ -67,12 +67,6 @@ _notify_json_escape() {
     printf '%s' "$s"
 }
 
-_notify_strip_ansi() {
-    # Retire les séquences ANSI (couleurs, etc.)
-    # Remarque: GNU sed (Git Bash) supporte \x1B.
-    sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g'
-}
-
 notify_discord_send_markdown() {
     # Best-effort: ne jamais échouer (set -e safe)
     _notify_discord_is_enabled || return 0
