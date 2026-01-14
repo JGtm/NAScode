@@ -168,5 +168,28 @@ EOF
   echo "$output" | grep -q "Intégrité : 2"
   echo "$output" | grep -q "\*\*Espace économisé\*\*"
   echo "$output" | grep -q "120 MB (12%)"
-  echo "$output" | grep -q "Session terminée (code 0)"
+  # Le message final varie selon le code de sortie (0 = succès, 130 = Ctrl+C, autre = erreur)
+  echo "$output" | grep -q "Session terminée"
+}
+
+@test "notify_format: message fin distingue succès/interruption/erreur" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+
+  # Fin normale (code 0)
+  run _notify_format_event_script_exit_end "2026-01-14 12:00:00" 0
+  echo "$output" | grep -q "Fin : 2026-01-14"
+  [[ "$output" != *"Interrompu"* ]]
+  [[ "$output" != *"Erreur"* ]]
+
+  # Interruption Ctrl+C (code 130)
+  run _notify_format_event_script_exit_end "2026-01-14 12:00:00" 130
+  echo "$output" | grep -q "Interrompu : 2026-01-14"
+  [[ "$output" != *"Fin :"* ]]
+
+  # Erreur générique (code 1)
+  run _notify_format_event_script_exit_end "2026-01-14 12:00:00" 1
+  echo "$output" | grep -q "Erreur (code 1) : 2026-01-14"
+  [[ "$output" != *"Fin :"* ]]
+  [[ "$output" != *"Interrompu"* ]]
 }

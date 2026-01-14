@@ -142,7 +142,14 @@ _notify_format_run_summary_markdown() {
         fi
     fi
 
-    body+=$'\n\n'"✅ Session terminée (code ${exit_code})"
+    # Message final selon le code de sortie
+    if [[ "$exit_code" -eq 0 ]]; then
+        body+=$'\n\n'"✅ Session terminée"
+    elif [[ "$exit_code" -eq 130 ]]; then
+        body+=$'\n\n'"⚠️ Session interrompue (Ctrl+C)"
+    else
+        body+=$'\n\n'"❌ Session terminée avec erreur (code ${exit_code})"
+    fi
 
     printf '%s' "$body"$(_notify_discord_pad)
 }
@@ -441,11 +448,21 @@ _notify_format_event_script_exit_summary() {
 }
 
 _notify_format_event_script_exit_end() {
-    # Usage: _notify_format_event_script_exit_end <now>
+    # Usage: _notify_format_event_script_exit_end <now> [exit_code]
     local now="${1-}"
-    local body="🏁 Fin"
+    local exit_code="${2-0}"
+
+    local body
+    if [[ "$exit_code" -eq 0 ]]; then
+        body="🏁 Fin"
+    elif [[ "$exit_code" -eq 130 ]]; then
+        body="🛑 Interrompu"
+    else
+        body="❌ Erreur (code ${exit_code})"
+    fi
+
     [[ -n "$now" ]] && body+=" : ${now}"
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_basename_any() {

@@ -220,9 +220,9 @@ notify_event_script_exit() {
     summary_body=$(_notify_format_event_script_exit_summary "$now" "$exit_code" || true)
     [[ -n "$summary_body" ]] && notify_discord_send_markdown "$summary_body" "summary"
 
-    # 2) Message final
+    # 2) Message final (inclut le code de sortie pour distinguer interruption/erreur)
     local end_body
-    end_body=$(_notify_format_event_script_exit_end "$now")
+    end_body=$(_notify_format_event_script_exit_end "$now" "$exit_code")
     [[ -n "$end_body" ]] && notify_discord_send_markdown "$end_body" "script_exit"
     return 0
 }
