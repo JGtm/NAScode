@@ -109,6 +109,49 @@ get_codec_rank() {
     esac
 }
 
+###########################################################
+# TRADUCTION DE BITRATE PAR EFFICACITÉ
+###########################################################
+
+# Traduit un bitrate entre deux efficacités de codec.
+# Formule : bitrate_out = bitrate_in * (eff_to / eff_from)
+#
+# Usage: _translate_bitrate_by_efficiency <kbps> <from_eff> <to_eff> [fallback]
+# Args:
+#   kbps     - Bitrate source (entier positif)
+#   from_eff - Efficacité du codec source (entier positif, ex: 100 pour H.264)
+#   to_eff   - Efficacité du codec cible (entier positif, ex: 70 pour HEVC)
+#   fallback - Valeur retournée si entrées invalides (défaut: chaîne vide)
+#
+# Retourne: bitrate traduit (entier arrondi) ou fallback si invalide.
+#
+# Exemple: _translate_bitrate_by_efficiency 2520 100 70 → 1764 (H.264→HEVC)
+_translate_bitrate_by_efficiency() {
+    local kbps="${1:-}"
+    local from_eff="${2:-0}"
+    local to_eff="${3:-0}"
+    local fallback="${4:-}"
+
+    # Validation du bitrate
+    if [[ -z "$kbps" ]] || ! [[ "$kbps" =~ ^[0-9]+$ ]] || [[ "$kbps" -le 0 ]]; then
+        echo "$fallback"
+        return 0
+    fi
+
+    # Validation des efficacités
+    if ! [[ "$from_eff" =~ ^[0-9]+$ ]] || [[ "$from_eff" -le 0 ]]; then
+        echo "$fallback"
+        return 0
+    fi
+    if ! [[ "$to_eff" =~ ^[0-9]+$ ]] || [[ "$to_eff" -le 0 ]]; then
+        echo "$fallback"
+        return 0
+    fi
+
+    # Calcul : arrondi au plus proche, déterministe en entier
+    awk -v b="$kbps" -v f="$from_eff" -v t="$to_eff" 'BEGIN { printf "%.0f\n", (b * t) / f }'
+}
+
 # Retourne le facteur d'efficacité d'un codec (en pourcentage)
 # Référence : H.264 = 100 (baseline)
 # Plus le facteur est bas, plus le codec est efficace.
@@ -151,26 +194,19 @@ translate_bitrate_kbps_between_codecs() {
     local from_codec="${2:-hevc}"
     local to_codec="${3:-hevc}"
 
+    # Validation précoce du bitrate
     if [[ -z "$kbps" ]] || ! [[ "$kbps" =~ ^[0-9]+$ ]]; then
         echo "$kbps"
         return 0
     fi
 
+    # Récupération des efficacités
     local from_eff to_eff
     from_eff=$(get_codec_efficiency "$from_codec")
     to_eff=$(get_codec_efficiency "$to_codec")
 
-    if [[ -z "$from_eff" ]] || ! [[ "$from_eff" =~ ^[0-9]+$ ]] || [[ "$from_eff" -le 0 ]]; then
-        echo "$kbps"
-        return 0
-    fi
-    if [[ -z "$to_eff" ]] || ! [[ "$to_eff" =~ ^[0-9]+$ ]] || [[ "$to_eff" -le 0 ]]; then
-        echo "$kbps"
-        return 0
-    fi
-
-    # Arrondi au plus proche, mais reste déterministe en entier.
-    awk -v b="$kbps" -v f="$from_eff" -v t="$to_eff" 'BEGIN { printf "%.0f\n", (b * t) / f }'
+    # Délégation au helper générique (fallback = bitrate original pour vidéo)
+    _translate_bitrate_by_efficiency "$kbps" "$from_eff" "$to_eff" "$kbps"
 }
 
 # Vérifie si un codec source est "meilleur ou égal" au codec cible

@@ -176,11 +176,13 @@ translate_audio_bitrate_kbps_between_codecs() {
     # Paramètres optionnels non utilisés (v1) : garder pour compatibilité future.
     : "${channels}" "${sample_rate}"
 
+    # Validation précoce du bitrate
     if [[ -z "$src_kbps" ]] || ! [[ "$src_kbps" =~ ^[0-9]+$ ]] || [[ "$src_kbps" -le 0 ]]; then
         echo ""
         return 0
     fi
 
+    # Normalisation des codecs audio
     local src_codec dst_codec
     src_codec=$(_normalize_audio_codec "$src_codec_raw")
     dst_codec=$(_normalize_audio_codec "$dst_codec_raw")
@@ -190,21 +192,13 @@ translate_audio_bitrate_kbps_between_codecs() {
         return 0
     fi
 
+    # Récupération des efficacités
     local src_eff dst_eff
     src_eff=$(get_audio_codec_efficiency "$src_codec")
     dst_eff=$(get_audio_codec_efficiency "$dst_codec")
 
-    if [[ -z "$src_eff" ]] || ! [[ "$src_eff" =~ ^[0-9]+$ ]] || [[ "$src_eff" -le 0 ]]; then
-        echo ""
-        return 0
-    fi
-    if [[ -z "$dst_eff" ]] || ! [[ "$dst_eff" =~ ^[0-9]+$ ]] || [[ "$dst_eff" -le 0 ]]; then
-        echo ""
-        return 0
-    fi
-
-    # Arrondi au plus proche, déterministe en entier.
-    awk -v b="$src_kbps" -v f="$src_eff" -v t="$dst_eff" 'BEGIN { printf "%.0f\n", (b * t) / f }'
+    # Délégation au helper générique (fallback = "" pour audio)
+    _translate_bitrate_by_efficiency "$src_kbps" "$src_eff" "$dst_eff" ""
 }
 
 _clamp_min() {

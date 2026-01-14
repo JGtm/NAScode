@@ -17,6 +17,58 @@ teardown() {
 }
 
 ###########################################################
+# Tests _translate_bitrate_by_efficiency()
+###########################################################
+
+@test "_translate_bitrate_by_efficiency: H.264→HEVC (100→70)" {
+    # 2520 kbps H.264 → HEVC = 2520 * 70/100 = 1764
+    result=$(_translate_bitrate_by_efficiency 2520 100 70)
+    [ "$result" = "1764" ]
+}
+
+@test "_translate_bitrate_by_efficiency: HEVC→AV1 (70→50)" {
+    # 2520 kbps HEVC → AV1 = 2520 * 50/70 = 1800
+    result=$(_translate_bitrate_by_efficiency 2520 70 50)
+    [ "$result" = "1800" ]
+}
+
+@test "_translate_bitrate_by_efficiency: même efficacité = même bitrate" {
+    result=$(_translate_bitrate_by_efficiency 2000 100 100)
+    [ "$result" = "2000" ]
+}
+
+@test "_translate_bitrate_by_efficiency: bitrate invalide retourne fallback" {
+    result=$(_translate_bitrate_by_efficiency "" 100 70 "fallback")
+    [ "$result" = "fallback" ]
+}
+
+@test "_translate_bitrate_by_efficiency: bitrate non-numérique retourne fallback" {
+    result=$(_translate_bitrate_by_efficiency "abc" 100 70 "999")
+    [ "$result" = "999" ]
+}
+
+@test "_translate_bitrate_by_efficiency: efficacité source 0 retourne fallback" {
+    result=$(_translate_bitrate_by_efficiency 2520 0 70 "default")
+    [ "$result" = "default" ]
+}
+
+@test "_translate_bitrate_by_efficiency: efficacité cible 0 retourne fallback" {
+    result=$(_translate_bitrate_by_efficiency 2520 100 0 "default")
+    [ "$result" = "default" ]
+}
+
+@test "_translate_bitrate_by_efficiency: fallback vide par défaut" {
+    result=$(_translate_bitrate_by_efficiency "" 100 70)
+    [ "$result" = "" ]
+}
+
+@test "_translate_bitrate_by_efficiency: arrondi correct (1764.0 → 1764)" {
+    # Vérifie que le résultat est un entier sans décimales
+    result=$(_translate_bitrate_by_efficiency 2520 100 70)
+    [[ "$result" =~ ^[0-9]+$ ]]
+}
+
+###########################################################
 # Tests get_codec_encoder()
 ###########################################################
 

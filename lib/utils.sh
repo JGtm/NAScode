@@ -9,6 +9,12 @@
 # 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
+# Protection contre le double chargement (variables readonly)
+if [[ -n "${_UTILS_SH_LOADED:-}" ]]; then
+    return 0
+fi
+_UTILS_SH_LOADED=1
+
 ###########################################################
 # FORMATAGE DURÉE
 ###########################################################
