@@ -1,6 +1,6 @@
 # Handoff
 
-## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
+## Session en cours (14/01/2026 - Audit clean code : documentation et tests)
 
 ### 2026-01-14 — Audio : traduction “qualité équivalente” (option 1) + UI : messages décoratifs (hors progress)
 

@@ -2,6 +2,12 @@
 # shellcheck disable=SC2034
 ###########################################################
 # PARSING DES ARGUMENTS
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Le parsing peut utiliser des variables non définies
+#    avec des valeurs par défaut (${2:-})
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 _args_require_value() {

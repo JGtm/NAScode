@@ -2,6 +2,11 @@
 ###########################################################
 # MODE ADAPTATIF (FILM-ADAPTIVE)
 # Analyse de complexité et export des paramètres adaptatifs
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. L'analyse peut échouer (fallback aux valeurs par défaut)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Variables exportées pour les modules d'encodage

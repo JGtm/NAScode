@@ -1,6 +1,12 @@
 #!/bin/bash
 ###########################################################
 # ANALYSE DES MÉTADONNÉES VIDÉO
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. ffprobe peut retourner des codes non-zéro pour des
+#    fichiers corrompus (comportement géré par le code)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Récupère TOUTES les métadonnées nécessaires en un seul appel ffprobe.

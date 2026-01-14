@@ -2,6 +2,12 @@
 ###########################################################
 # COULEURS ANSI & STYLES D'AFFICHAGE
 # Définition des codes couleurs et formatage pour le terminal
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Certaines fonctions utilisent des codes retour non-zéro
+#    intentionnels (ex: fonctions `_ui_is_*` retournent 1 pour false)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # === COULEURS DE BASE ===

@@ -1,5 +1,20 @@
-#!/bin/bash
-
+#!/bin/bash###########################################################
+# LOGIQUE DE DÉCISION AUDIO "SMART CODEC"
+#
+# Rôle: déterminer quoi faire avec l'audio (quoi faire)
+# Note: la construction des paramètres FFmpeg (comment le faire)
+#       reste dans audio_params.sh
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Certaines fonctions `is_*` retournent 1 pour false
+# 3. Les modules sont sourcés, pas exécutés directement
+#
+# EFFICACITÉS AUDIO (source: documentation publique codecs)
+# Les valeurs d'efficacité sont des approximations basées sur
+# les documentations officielles et benchmarks publics.
+# Plus la valeur est basse, plus le codec est efficace.
+###########################################################
 # Module: audio_decision.sh
 # Rôle: logique de décision “smart codec” audio (quoi faire) + helpers.
 # Note: la construction des paramètres FFmpeg (comment le faire) reste dans audio_params.sh.

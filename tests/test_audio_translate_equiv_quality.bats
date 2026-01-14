@@ -95,3 +95,57 @@ teardown() {
     [ "$bitrate" -eq 96 ]
     [ "$reason" = "force_convert" ]
 }
+
+###########################################################
+# Tests des helpers _clamp_min, _clamp_max, _min3
+###########################################################
+
+@test "_clamp_min: valeur inférieure au minimum → retourne minimum" {
+    result=$(_clamp_min 50 64)
+    [ "$result" -eq 64 ]
+}
+
+@test "_clamp_min: valeur supérieure au minimum → retourne valeur" {
+    result=$(_clamp_min 100 64)
+    [ "$result" -eq 100 ]
+}
+
+@test "_clamp_min: valeur égale au minimum → retourne valeur" {
+    result=$(_clamp_min 64 64)
+    [ "$result" -eq 64 ]
+}
+
+@test "_clamp_max: valeur supérieure au maximum → retourne maximum" {
+    result=$(_clamp_max 500 384)
+    [ "$result" -eq 384 ]
+}
+
+@test "_clamp_max: valeur inférieure au maximum → retourne valeur" {
+    result=$(_clamp_max 200 384)
+    [ "$result" -eq 200 ]
+}
+
+@test "_clamp_max: valeur égale au maximum → retourne valeur" {
+    result=$(_clamp_max 384 384)
+    [ "$result" -eq 384 ]
+}
+
+@test "_min3: retourne le minimum des trois valeurs (premier)" {
+    result=$(_min3 50 100 75)
+    [ "$result" -eq 50 ]
+}
+
+@test "_min3: retourne le minimum des trois valeurs (deuxième)" {
+    result=$(_min3 100 50 75)
+    [ "$result" -eq 50 ]
+}
+
+@test "_min3: retourne le minimum des trois valeurs (troisième)" {
+    result=$(_min3 75 100 50)
+    [ "$result" -eq 50 ]
+}
+
+@test "_min3: gère les valeurs égales" {
+    result=$(_min3 100 100 100)
+    [ "$result" -eq 100 ]
+}

@@ -2,6 +2,11 @@
 ###########################################################
 # NOTIFY — FORMATAGE (pur)
 # Helpers de formatage pour les messages Discord.
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Le formatage utilise des valeurs par défaut
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 _notify_counter_prefix_plain() {

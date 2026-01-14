@@ -4,6 +4,11 @@
 #
 # Module pour le mode film-adaptive : calcule un coefficient
 # de complexité basé sur l'analyse statistique des frames.
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. L'analyse peut échouer (fallback au mode normal)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # ----- Constantes du mode film-adaptive -----

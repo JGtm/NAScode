@@ -2,6 +2,11 @@
 ###########################################################
 # NOTIFY — TRANSPORT DISCORD (webhook)
 # Best-effort: aucune erreur réseau ne doit arrêter NAScode.
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les appels réseau sont best-effort (ne doivent jamais bloquer)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 _notify_discord_is_enabled() {

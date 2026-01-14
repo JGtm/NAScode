@@ -2,6 +2,12 @@
 ###########################################################
 # GESTION DU VERROUILLAGE
 # Verrous pour éviter les exécutions multiples
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Le cleanup() doit continuer même si des commandes
+#    échouent (kill, rm sur fichiers absents, etc.)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

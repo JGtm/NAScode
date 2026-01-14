@@ -3,6 +3,11 @@
 # RÉSUMÉ FINAL
 # Affichage du résumé de conversion et calculs de statistiques
 # Extrait de finalize.sh pour modularité
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Le résumé est informatif (ne doit pas bloquer la sortie)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

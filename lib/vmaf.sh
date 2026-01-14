@@ -1,6 +1,12 @@
 #!/bin/bash
 ###########################################################
 # CALCUL DU SCORE VMAF
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Le calcul VMAF est best-effort (peut échouer sans
+#    bloquer la conversion)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Calcul du score VMAF (qualité vidéo perceptuelle)

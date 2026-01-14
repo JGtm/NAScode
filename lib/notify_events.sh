@@ -1,6 +1,11 @@
 #!/bin/bash
 ###########################################################
 # NOTIFY — ÉVÉNEMENTS (routage + envoi)
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les notifications sont best-effort
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 notify_event() {

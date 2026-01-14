@@ -365,6 +365,129 @@ EOF
 }
 
 ###########################################################
+# Tests VIDEO_EQUIV_QUALITY_CAP
+# Cap du bitrate vidéo basé sur l'efficacité du codec source
+###########################################################
+
+@test "VIDEO_EQUIV_QUALITY_CAP: H.264 source → HEVC plafonné au bitrate équivalent" {
+    VIDEO_EQUIV_QUALITY_CAP=true
+    ADAPTIVE_COMPLEXITY_MODE=false
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="libx265"
+    TARGET_BITRATE_KBPS=2070
+    MAXRATE_KBPS=2520
+    BUFSIZE_KBPS=3780
+    SOURCE_VIDEO_CODEC="h264"
+    # H.264 à 1500 kbps → équivalent HEVC ~1050k (1500 * 70/100)
+    SOURCE_VIDEO_BITRATE_BITS=$((1500 * 1000))
+    NO_PROGRESS=true
+    
+    # Mock get_video_stream_props pour retourner 1920x1080
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    
+    _setup_video_encoding_params "/fake.mkv"
+    
+    # Le bitrate doit être capé (inférieur au target par défaut)
+    local bitrate_num="${VIDEO_BITRATE%k}"
+    [[ "$bitrate_num" -lt 2070 ]]
+    # Le cap traduit depuis H.264 1500k → HEVC ~1050k, donc <= 1500
+    [[ "$bitrate_num" -le 1500 ]]
+}
+
+@test "VIDEO_EQUIV_QUALITY_CAP: pas de cap si source déjà HEVC" {
+    VIDEO_EQUIV_QUALITY_CAP=true
+    ADAPTIVE_COMPLEXITY_MODE=false
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="libx265"
+    TARGET_BITRATE_KBPS=2070
+    MAXRATE_KBPS=2520
+    BUFSIZE_KBPS=3780
+    # Source déjà en HEVC → pas de cap (codec source = codec cible)
+    SOURCE_VIDEO_CODEC="hevc"
+    SOURCE_VIDEO_BITRATE_BITS=$((1000 * 1000))
+    NO_PROGRESS=true
+    
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    
+    _setup_video_encoding_params "/fake.mkv"
+    
+    # Pas de cap appliqué : le bitrate reste au target
+    [[ "${VIDEO_BITRATE}" == "2070k" ]]
+}
+
+@test "VIDEO_EQUIV_QUALITY_CAP: désactivé quand VIDEO_EQUIV_QUALITY_CAP=false" {
+    VIDEO_EQUIV_QUALITY_CAP=false
+    ADAPTIVE_COMPLEXITY_MODE=false
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="libx265"
+    TARGET_BITRATE_KBPS=2070
+    MAXRATE_KBPS=2520
+    BUFSIZE_KBPS=3780
+    SOURCE_VIDEO_CODEC="h264"
+    SOURCE_VIDEO_BITRATE_BITS=$((1500 * 1000))
+    NO_PROGRESS=true
+    
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    
+    _setup_video_encoding_params "/fake.mkv"
+    
+    # Cap désactivé : le bitrate reste au target
+    [[ "${VIDEO_BITRATE}" == "2070k" ]]
+}
+
+@test "VIDEO_EQUIV_QUALITY_CAP: pas de cap en mode ADAPTIVE_COMPLEXITY_MODE" {
+    VIDEO_EQUIV_QUALITY_CAP=true
+    ADAPTIVE_COMPLEXITY_MODE=true
+    ADAPTIVE_TARGET_KBPS=1800
+    ADAPTIVE_MAXRATE_KBPS=2500
+    ADAPTIVE_BUFSIZE_KBPS=4500
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="libx265"
+    TARGET_BITRATE_KBPS=2070
+    MAXRATE_KBPS=2520
+    BUFSIZE_KBPS=3780
+    SOURCE_VIDEO_CODEC="h264"
+    SOURCE_VIDEO_BITRATE_BITS=$((1500 * 1000))
+    NO_PROGRESS=true
+    
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    
+    _setup_video_encoding_params "/fake.mkv"
+    
+    # En mode adaptatif, les valeurs adaptatives sont utilisées (pas de cap additionnel)
+    [[ "${VIDEO_BITRATE}" == "1800k" ]]
+}
+
+@test "VIDEO_EQUIV_QUALITY_CAP: maxrate et bufsize proportionnellement réduits" {
+    VIDEO_EQUIV_QUALITY_CAP=true
+    ADAPTIVE_COMPLEXITY_MODE=false
+    VIDEO_CODEC="hevc"
+    VIDEO_ENCODER="libx265"
+    TARGET_BITRATE_KBPS=2070
+    MAXRATE_KBPS=2520
+    BUFSIZE_KBPS=3780
+    SOURCE_VIDEO_CODEC="h264"
+    SOURCE_VIDEO_BITRATE_BITS=$((1500 * 1000))
+    NO_PROGRESS=true
+    
+    get_video_stream_props() { echo "1920|1080|yuv420p"; }
+    
+    _setup_video_encoding_params "/fake.mkv"
+    
+    # Vérifier que maxrate et bufsize sont aussi réduits
+    local maxrate_num="${VIDEO_MAXRATE%k}"
+    local bufsize_num="${VIDEO_BUFSIZE%k}"
+    
+    # Les valeurs doivent être réduites proportionnellement
+    [[ "$maxrate_num" -lt 2520 ]]
+    [[ "$bufsize_num" -lt 3780 ]]
+    # Mais toujours cohérentes (maxrate >= target, bufsize >= maxrate)
+    local bitrate_num="${VIDEO_BITRATE%k}"
+    [[ "$maxrate_num" -ge "$bitrate_num" ]]
+    [[ "$bufsize_num" -ge "$maxrate_num" ]]
+}
+
+###########################################################
 # Note: _get_encoder_params_flag_internal() a été supprimée (duplication).
 # Utiliser get_encoder_params_flag() de codec_profiles.sh à la place.
 # Les tests correspondants sont dans test_codec_profiles.bats.

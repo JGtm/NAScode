@@ -3,6 +3,11 @@
 # PIPELINE FFMPEG
 # Exécution unifiée des commandes FFmpeg (passthrough, CRF, two-pass)
 # Extrait de transcode_video.sh pour modularité
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. FFmpeg peut retourner des codes non-zéro gérés
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

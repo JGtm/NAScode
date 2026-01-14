@@ -4,6 +4,12 @@
 # - Centralisé, modulaire, best-effort (ne doit jamais casser le script)
 # - Secret: le webhook NE DOIT PAS être commité
 #
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les notifications sont best-effort (ne doivent jamais
+#    bloquer le script en cas d'échec réseau/webhook)
+# 3. Les modules sont sourcés, pas exécutés directement
+#
 # Modules:
 # - notify_discord.sh : transport webhook + robustesse
 # - notify_format.sh  : helpers de formatage (pur)

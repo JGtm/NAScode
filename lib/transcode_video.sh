@@ -1,6 +1,12 @@
 #!/bin/bash
 ###########################################################
 # ENCODAGE VIDÉO
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. L'encodage FFmpeg peut retourner des codes non-zéro
+#    dans des cas gérés (interruption propre, etc.)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Texte affiché dans la barre de progression FFmpeg

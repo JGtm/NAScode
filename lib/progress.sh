@@ -2,6 +2,11 @@
 ###########################################################
 # SYSTÈME DE SLOTS POUR PROGRESSION PARALLÈLE
 # Gestion de l'affichage multi-workers
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. L'acquisition/libération de slots est best-effort
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Répertoire pour les fichiers de verrouillage des slots

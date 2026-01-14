@@ -4,6 +4,12 @@
 # 
 # Fonctions pures pour la sélection des flux vidéo,
 # audio et sous-titres.
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les recherches de flux peuvent ne rien trouver
+#    (retour vide = comportement attendu)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

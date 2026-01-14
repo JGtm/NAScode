@@ -3,6 +3,12 @@
 ###########################################################
 # DÉTECTION SYSTÈME ET OUTILS
 # Module chargé en premier pour détecter l'environnement
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les tests de détection (command -v, etc.) peuvent
+#    retourner des codes non-zéro (absence d'outil)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # ----- Aides de compatibilité pour macOS / Homebrew -----

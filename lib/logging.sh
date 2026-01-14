@@ -2,6 +2,12 @@
 # shellcheck disable=SC2034
 ###########################################################
 # GESTION DES LOGS
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les opérations de log sont best-effort (ne doivent pas
+#    bloquer le script en cas d'échec d'écriture)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

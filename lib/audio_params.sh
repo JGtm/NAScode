@@ -5,6 +5,12 @@
 # Fonctions pures qui retournent des valeurs via echo,
 # sans muter de variables globales.
 #
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les fonctions retournent des chaînes vides en cas
+#    d'entrée invalide (comportement attendu)
+# 3. Les modules sont sourcés, pas exécutés directement
+#
 # Logique "Smart Codec" (optimisation taille) :
 #   - Opus et AAC sont très efficaces → on les garde si bitrate OK
 #   - E-AC3 et AC3 sont inefficaces → on convertit vers cible

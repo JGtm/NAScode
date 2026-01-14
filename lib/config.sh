@@ -2,6 +2,12 @@
 # shellcheck disable=SC2034
 ###########################################################
 # CONFIGURATION GLOBALE
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les modules sont sourcés, pas exécutés directement
+# 3. Certaines initialisations utilisent des valeurs par défaut
+#    qui déclencheraient une erreur avec -u (ex: ${VAR:-default})
 ###########################################################
 
 # ----- Horodatage et chemins de base -----
@@ -322,7 +328,11 @@ set_conversion_mode_parameters() {
     esac
 
     # Override CLI du mode "qualité équivalente" (audio + cap vidéo).
-    # Non compatible pour l'instant avec film-adaptive : on ignore l'override.
+    #
+    # EXCEPTION film-adaptive : l'override est ignoré car ce mode calcule
+    # un bitrate adaptatif PAR FICHIER via l'analyse de complexité.
+    # La traduction "qualité équivalente" est donc intrinsèque au mode et n'a
+    # pas de sens à désactiver — sans elle, film-adaptive perd sa raison d'être.
     if [[ "$CONVERSION_MODE" != "film-adaptive" ]]; then
         if [[ "${EQUIV_QUALITY_OVERRIDE:-}" == true ]]; then
             AUDIO_TRANSLATE_EQUIV_QUALITY=true

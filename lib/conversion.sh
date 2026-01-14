@@ -8,6 +8,12 @@
 # - conversion_prep.sh : préparation chemins, fichiers temp
 # - adaptive_mode.sh : mode film-adaptive
 # - ui.sh : messages (print_skip_message, print_conversion_info, etc.)
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. convert_file() gère ses propres codes retour pour
+#    signaler skip/succès/échec sans interrompre le batch
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Métadonnées source (par fichier) utiles au calcul des paramètres d'encodage.

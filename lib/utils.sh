@@ -1,5 +1,15 @@
 #!/bin/bash
 ###########################################################
+# FONCTIONS UTILITAIRES
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Certaines fonctions retournent des chaînes vides ou des
+#    codes non-zéro en fonctionnement normal (ex: fallbacks)
+# 3. Les modules sont sourcés, pas exécutés directement
+###########################################################
+
+###########################################################
 # FORMATAGE DURÉE
 ###########################################################
 

@@ -2,6 +2,12 @@
 ###########################################################
 # TRAITEMENT DE LA FILE D'ATTENTE
 # Gestion du traitement parallèle et FIFO
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Certaines commandes (wait, kill) peuvent retourner
+#    des codes non-zéro en fonctionnement normal
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

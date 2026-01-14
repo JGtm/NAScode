@@ -3,6 +3,11 @@
 # FORMATAGE DES OPTIONS UI
 # Fonctions pour formater les options actives et print_active_options
 # Extrait de ui.sh pour modularité
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. L'affichage UI est best-effort
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

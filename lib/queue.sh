@@ -4,6 +4,12 @@
 # Construction, tri et traitement de la queue de fichiers
 # Note: Les fonctions d'index sont dans lib/index.sh
 # Note: Les fonctions de compteurs sont dans lib/counters.sh
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Certaines fonctions utilisent des codes retour non-zéro
+#    intentionnels pour indiquer des états (ex: queue vide)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Variables pour stocker les options actives (affichage groupé)

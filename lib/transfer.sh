@@ -2,6 +2,12 @@
 ###########################################################
 # GESTION DES TRANSFERTS ASYNCHRONES
 # Transfert des fichiers convertis en arrière-plan
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les opérations de transfert peuvent échouer
+#    partiellement (comportement géré par le code)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

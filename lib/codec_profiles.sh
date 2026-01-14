@@ -8,6 +8,11 @@
 # Note: Utilise des fonctions case au lieu de tableaux associatifs
 # pour compatibilité avec Git Bash (subshells).
 #
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Certaines fonctions `is_*` retournent 1 pour false
+# 3. Les modules sont sourcés, pas exécutés directement
+#
 # Usage:
 #   get_codec_encoder "$VIDEO_CODEC"     -> encodeur par défaut
 #   get_codec_ffmpeg_name "$VIDEO_CODEC" -> nom ffmpeg du codec

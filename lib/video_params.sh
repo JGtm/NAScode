@@ -4,6 +4,12 @@
 # 
 # Fonctions pures qui retournent des valeurs via echo,
 # sans muter de variables globales.
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les fonctions retournent des chaînes vides ou des
+#    valeurs par défaut en cas d'entrée invalide
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

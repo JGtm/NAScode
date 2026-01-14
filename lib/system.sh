@@ -1,6 +1,12 @@
 #!/bin/bash
 ###########################################################
 # VÉRIFICATION DES DÉPENDANCES
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les vérifications peuvent retourner des codes non-zéro
+#    (dépendance manquante = comportement attendu)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 check_dependencies() {

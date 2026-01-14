@@ -3,6 +3,12 @@
 # GESTION DE L'INDEX
 # Construction et validation de l'index des fichiers vidéo
 # Extrait de queue.sh pour modularité
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les opérations sur l'index peuvent retourner des
+#    codes non-zéro (fichier absent, etc.)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

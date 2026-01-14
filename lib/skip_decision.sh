@@ -3,6 +3,11 @@
 ###########################################################
 # LOGIQUE DE DÉCISION SKIP / PASSTHROUGH / FULL
 # Détermine si un fichier doit être converti ou ignoré
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Certaines fonctions retournent 1 pour "skip"
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 # Modes de conversion possibles (retournés par _determine_conversion_mode)

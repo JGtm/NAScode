@@ -2,6 +2,12 @@
 ###########################################################
 # FINALISATION ET RÉSULTATS
 # Note: Les fonctions de résumé (show_summary, etc.) sont dans lib/summary.sh
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les opérations de déplacement/nettoyage peuvent échouer
+#    partiellement (comportement géré par le code)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

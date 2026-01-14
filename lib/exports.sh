@@ -4,6 +4,12 @@
 #
 # Note: Les exports sont nécessaires pour que les fonctions
 # soient accessibles dans les sous-processus (parallel, etc.)
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les exports peuvent échouer si une fonction n'existe pas
+#    (comportement géré par le contexte appelant)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 export_variables() {

@@ -2,6 +2,12 @@
 ###########################################################
 # PRÉPARATION DE LA CONVERSION
 # Chemins, fichiers temporaires, espace disque, transfert
+#
+# NOTE: Ce module n'active pas `set -euo pipefail` car :
+# 1. Le point d'entrée (nascode) l'active globalement
+# 2. Les opérations de préparation peuvent échouer
+#    partiellement (comportement géré par le code)
+# 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
 ###########################################################

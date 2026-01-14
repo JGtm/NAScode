@@ -15,6 +15,21 @@ Objectifs :
 
 ### 2026-01-14
 
+#### Audit clean code : documentation et tests
+
+- **Quoi** : implémentation des recommandations d'un audit de code complet (maintenabilité, robustesse, documentation).
+- **Où** :
+  - Tous les 38 modules `lib/*.sh` : ajout d'en-têtes expliquant pourquoi `set -euo pipefail` n'est pas utilisé localement.
+  - `lib/config.sh` : documentation enrichie du verrouillage equiv-quality en mode film-adaptive.
+  - `tests/test_transcode_video.bats` : 5 nouveaux tests pour `VIDEO_EQUIV_QUALITY_CAP`.
+  - `tests/test_audio_translate_equiv_quality.bats` : 10 nouveaux tests pour `_clamp_min`, `_clamp_max`, `_min3`.
+  - `tests/test_helper.bash` : refactorisation en API unifiée `load_modules()` avec modes (`base`, `base_fast`, `minimal`, `minimal_fast`).
+- **Pourquoi** : améliorer la maintenabilité, documenter les choix d'architecture, augmenter la couverture de tests des fonctions utilitaires critiques.
+- **Impact** :
+  - Tests : 15 nouveaux tests ajoutés (tous passent).
+  - Documentation : clarification du comportement `set -euo pipefail` pour les contributeurs.
+  - Compatibilité : rétrocompatibilité totale via wrappers `load_base_modules()`, `load_minimal()`, etc.
+
 #### UX : fin de tâches en mode limite/random (n < limite)
 - **Quoi** : évite l’affichage non logique “Tous les fichiers restants sont déjà optimisés.” quand le dossier source contient moins de fichiers que la limite (ex: 9 fichiers avec limite implicite 10).
 - **Où** : `lib/processing.sh`.
