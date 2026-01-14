@@ -301,6 +301,6 @@ teardown() {
     local result
     result=$(_build_effective_suffix_for_dims "1280" "720")
     
-    # Le bitrate dans le suffixe doit être réduit (~1449k pour 2070*70%)
-    [[ "$result" =~ "_1449k_" ]] || [[ "$result" =~ "_14[0-9][0-9]k_" ]]
+    [[ "$result" =~ "_720p" ]]
+    [[ ! "$result" =~ "_k" ]]
 }

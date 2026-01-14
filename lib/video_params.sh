@@ -147,9 +147,7 @@ _compute_effective_bitrate_kbps_for_height() {
 }
 
 # Construit le suffixe effectif par fichier à partir des dimensions source.
-# Inclut : bitrate effectif ou CRF + hauteur de sortie estimée (ex: 720p) + preset.
-# Format two-pass: _<codec>_<bitrate>k_<height>p_<preset>[_<audio_codec>][_sample]
-# Format single-pass: _<codec>_crf<value>_<height>p_<preset>[_<audio_codec>][_sample]
+# Format (Option A): _<codec>_<height>p[_<AUDIO>][_sample]
 # Usage: _build_effective_suffix_for_dims <width> <height> [input_file] [opt_audio_codec] [opt_audio_bitrate] [source_video_codec]
 
 _suffix_select_video_codec_suffix() {
@@ -237,12 +235,7 @@ _suffix_build_audio_part() {
 
     case "$audio_codec" in
         copy|unknown|"")  echo "" ;;
-        aac)   echo "_aac" ;;
-        ac3)   echo "_ac3" ;;
-        eac3)  echo "_eac3" ;;
-        opus)  echo "_opus" ;;
-        flac)  echo "_flac" ;;
-        *)     echo "_${audio_codec}" ;;
+        *)     echo "_${audio_codec^^}" ;;
     esac
 }
 
@@ -271,11 +264,7 @@ _build_effective_suffix_for_dims() {
     local output_height
     output_height=$(_compute_output_height_for_bitrate "$src_width" "$src_height")
 
-    suffix="${suffix}$(_suffix_build_quality_part "$output_height")"
-
     suffix="${suffix}$(_suffix_build_resolution_part "$output_height")"
-
-    suffix="${suffix}_${ENCODER_PRESET}"
 
     local audio_codec
     audio_codec=$(_suffix_get_audio_codec "$input_file" "$opt_audio_codec" "$opt_audio_bitrate")

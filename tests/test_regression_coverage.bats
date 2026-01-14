@@ -396,11 +396,11 @@ STUB
     result=$(_build_effective_suffix_for_dims 3840 2160)
     
     # Doit inclure 1080p (pas 2160p)
-    [[ "$result" =~ "_1080p_" ]]
-    [[ ! "$result" =~ "_2160p_" ]]
+    [[ "$result" =~ "_1080p" ]]
+    [[ ! "$result" =~ "_2160p" ]]
 }
 
-@test "DOWNSCALE: suffixe inclut bitrate adapté pour 720p" {
+@test "DOWNSCALE: suffixe inclut résolution de sortie correcte (720p)" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=false
     set_conversion_mode_parameters
@@ -408,7 +408,6 @@ STUB
     local result
     result=$(_build_effective_suffix_for_dims 1280 720)
     
-    # Bitrate série 720p = 2070 * 70% = 1449k
-    [[ "$result" =~ "_1449k_" ]]
-    [[ "$result" =~ "_720p_" ]]
+    [[ "$result" =~ "_720p" ]]
+    [[ ! "$result" =~ "_1449k" ]]
 }

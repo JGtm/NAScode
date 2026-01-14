@@ -15,6 +15,19 @@ Objectifs :
 
 ### 2026-01-14
 
+#### UX : fin de tâches en mode limite/random (n < limite)
+- **Quoi** : évite l’affichage non logique “Tous les fichiers restants sont déjà optimisés.” quand le dossier source contient moins de fichiers que la limite (ex: 9 fichiers avec limite implicite 10).
+- **Où** : `lib/processing.sh`.
+- **Pourquoi** : la comparaison se faisait contre `LIMIT_FILES` brut, alors que la limite effective doit être `min(LIMIT_FILES, total disponible)`.
+- **Impact** : UX uniquement (message de fin plus juste) ; aucune modification de conversion.
+
+#### Suffixe : format simplifié (Option A)
+- **Quoi** : simplifie le suffixe de sortie pour s’aligner sur des conventions courantes (suppression des valeurs CRF/bitrate/preset).
+- **Format** : `_<codec>_<height>p[_<AUDIO>][_sample]` (audio en majuscules : `AAC`, `AC3`, `OPUS`, etc.).
+- **Où** : `lib/video_params.sh` (suffixe effectif), `lib/config.sh` (preview), `lib/system.sh` (hint interactif).
+- **Pourquoi** : éviter un suffixe trop verbeux/instable et réduire le bruit dans les noms de fichiers.
+- **Tests** : mise à jour des assertions suffixe dans plusieurs suites Bats (dont `tests/test_transcode_video.bats`, `tests/test_audio_codec.bats`, `tests/test_config.bats`).
+
 #### Discord : titre “Exécution” en header Markdown
 - **Quoi** : le titre “Exécution” du message `run_started` passe de texte en gras à un header Markdown (`##`) pour être visuellement plus grand dans Discord.
 - **Où** : `lib/notify_format.sh`.

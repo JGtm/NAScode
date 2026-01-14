@@ -81,8 +81,8 @@ teardown() {
     [ "$result" -eq 2070 ]
 }
 
-@test "_build_effective_suffix_for_dims: inclut bitrate+résolution+preset (720p)" {
-    # 1280x720 => out_height=720 => scale 70% => 1449k
+@test "_build_effective_suffix_for_dims: suffixe Option A (720p)" {
+    # 1280x720 => out_height=720
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=false
     VIDEO_CODEC="hevc"
@@ -90,12 +90,13 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
-    # Vérifier le pattern : _<codec>_<bitrate>k_<height>p_<preset>
-    [[ "$result" =~ ^_x265_[0-9]+k_720p_medium$ ]]
-    [[ "$result" =~ "_1449k_" ]]
+    [[ "$result" = "_x265_720p" ]]
+    [[ ! "$result" =~ "_crf" ]]
+    [[ ! "$result" =~ "_k" ]]
+    [[ ! "$result" =~ "_medium" ]]
 }
 
-@test "_build_effective_suffix_for_dims: reflète 1080p quand hauteur 1080" {
+@test "_build_effective_suffix_for_dims: suffixe Option A (1080p)" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=false
     VIDEO_CODEC="hevc"
@@ -103,16 +104,17 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
-    # Vérifier le pattern : _<codec>_<bitrate>k_<height>p_<preset>
-    [[ "$result" =~ ^_x265_[0-9]+k_1080p_medium$ ]]
-    [[ "$result" =~ "_2070k_" ]]
+    [[ "$result" = "_x265_1080p" ]]
+    [[ ! "$result" =~ "_crf" ]]
+    [[ ! "$result" =~ "_k" ]]
+    [[ ! "$result" =~ "_medium" ]]
 }
 
 ###########################################################
 # Tests du mode single-pass CRF
 ###########################################################
 
-@test "_build_effective_suffix_for_dims: affiche CRF en mode single-pass (1080p)" {
+@test "_build_effective_suffix_for_dims: suffixe Option A en mode single-pass (1080p)" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     VIDEO_CODEC="hevc"
@@ -120,11 +122,11 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
-    # Vérifier le pattern CRF : _<codec>_crf<N>_<height>p_<preset>
-    [[ "$result" =~ ^_x265_crf[0-9]+_1080p_medium$ ]]
+    [[ "$result" = "_x265_1080p" ]]
+    [[ ! "$result" =~ "_crf" ]]
 }
 
-@test "_build_effective_suffix_for_dims: affiche CRF en mode single-pass (720p)" {
+@test "_build_effective_suffix_for_dims: suffixe Option A en mode single-pass (720p)" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     VIDEO_CODEC="hevc"
@@ -132,12 +134,11 @@ teardown() {
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1280 720)
-    # Vérifier le pattern CRF : _<codec>_crf<N>_<height>p_<preset>
-    [[ "$result" =~ ^_x265_crf[0-9]+_720p_medium$ ]]
+    [[ "$result" = "_x265_720p" ]]
+    [[ ! "$result" =~ "_crf" ]]
 }
 
-@test "_build_effective_suffix_for_dims: CRF identique quelle que soit la résolution" {
-    # En mode CRF, la valeur CRF est constante (pas d'adaptation par résolution)
+@test "_build_effective_suffix_for_dims: suffixe dépend de la résolution" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     VIDEO_CODEC="hevc"
@@ -146,8 +147,7 @@ teardown() {
     result_720=$(_build_effective_suffix_for_dims 1280 720)
     result_1080=$(_build_effective_suffix_for_dims 1920 1080)
     
-    [[ "$result_720" =~ "_crf" ]]
-    [[ "$result_1080" =~ "_crf" ]]
+    [ "$result_720" != "$result_1080" ]
 }
 
 ###########################################################
@@ -164,11 +164,12 @@ teardown() {
     SINGLE_PASS_MODE=false
     VIDEO_CODEC="av1"
     VIDEO_ENCODER="libsvtav1"
+    AUDIO_CODEC="copy"  # Suffixe prévisible
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
     [[ "$result" =~ ^_av1_ ]]
-    [[ "$result" =~ "_1080p_" ]]
+    [[ "$result" =~ "_1080p" ]]
 }
 
 @test "_build_effective_suffix_for_dims: AV1 CRF utilise suffixe _av1" {
@@ -181,10 +182,11 @@ teardown() {
     SINGLE_PASS_MODE=true
     VIDEO_CODEC="av1"
     VIDEO_ENCODER="libsvtav1"
+    AUDIO_CODEC="copy"  # Suffixe prévisible
     set_conversion_mode_parameters
 
     result=$(_build_effective_suffix_for_dims 1920 1080)
-    [[ "$result" =~ ^_av1_crf ]]
+    [ "$result" = "_av1_1080p" ]
 }
 
 ###########################################################

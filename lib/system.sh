@@ -131,15 +131,14 @@ check_output_suffix() {
                 suffix_example_720=$(_build_effective_suffix_for_dims 1280 720)
             fi
 
-            # Affichage succinct : garder seulement "<bitrate>_<height>" (ex: 2070k_1080p)
-            # Helper pour extraire bitrate_resolution depuis le suffixe complet
+            # Affichage succinct : garder seulement la partie après le codec (ex: 1080p / 720p)
+            # Helper pour extraire un hint depuis le suffixe complet
             _extract_suffix_hint() {
                 local suffix="$1"
                 if [[ "$suffix" == _x265_* || "$suffix" == _av1_* ]]; then
-                    local rest br res
+                    local rest
                     rest="${suffix#_*_}"  # Enlève _x265_ ou _av1_
-                    IFS='_' read -r br res _ <<< "$rest"
-                    [[ -n "$br" && -n "$res" ]] && echo "${br}_${res}" || echo "$suffix"
+                    [[ -n "$rest" ]] && echo "$rest" || echo "$suffix"
                 else
                     echo "$suffix"
                 fi

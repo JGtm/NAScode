@@ -317,23 +317,26 @@ teardown() {
     [[ "$ENCODER_PRESET" =~ ^(ultrafast|superfast|veryfast|faster|fast|medium|slow|slower|veryslow|placebo)$ ]]
 }
 
-@test "build_dynamic_suffix: affiche CRF en mode single-pass" {
+@test "build_dynamic_suffix: suffixe Option A (single-pass)" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=true
     set_conversion_mode_parameters
     
-    # Doit contenir _crf suivi d'un nombre
-    [[ "$SUFFIX_STRING" =~ _crf[0-9]+_ ]]
+    [[ "$SUFFIX_STRING" =~ _1080p ]]
+    [[ ! "$SUFFIX_STRING" =~ _crf ]]
+    [[ ! "$SUFFIX_STRING" =~ _[0-9]+k ]]
+    [[ ! "$SUFFIX_STRING" =~ _(ultrafast|superfast|veryfast|faster|fast|medium|slow|slower|veryslow|placebo) ]]
 }
 
-@test "build_dynamic_suffix: affiche bitrate en mode two-pass" {
+@test "build_dynamic_suffix: suffixe Option A (two-pass)" {
     CONVERSION_MODE="serie"
     SINGLE_PASS_MODE=false
     set_conversion_mode_parameters
     
-    # Doit contenir le bitrate suivi de k, pas de CRF
-    [[ "$SUFFIX_STRING" =~ _[0-9]+k_ ]]
-    [[ ! "$SUFFIX_STRING" =~ "_crf" ]]
+    [[ "$SUFFIX_STRING" =~ _1080p ]]
+    [[ ! "$SUFFIX_STRING" =~ _crf ]]
+    [[ ! "$SUFFIX_STRING" =~ _[0-9]+k ]]
+    [[ ! "$SUFFIX_STRING" =~ _(ultrafast|superfast|veryfast|faster|fast|medium|slow|slower|veryslow|placebo) ]]
 }
 
 ###########################################################
