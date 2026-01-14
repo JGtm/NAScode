@@ -559,6 +559,9 @@ print_skip_message() {
     case "$CONVERSION_ACTION" in
         "skip")
             if [[ -z "$codec" ]]; then
+                if declare -f notify_event &>/dev/null; then
+                    notify_event file_skipped "$filename" "Pas de flux vidéo" || true
+                fi
                 echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
@@ -570,6 +573,9 @@ print_skip_message() {
                 # En mode adaptatif, préciser que c'est par rapport au seuil adaptatif
                 if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
                     skip_msg="Déjà ${codec_display} & bitrate ≤ seuil adaptatif"
+                fi
+                if declare -f notify_event &>/dev/null; then
+                    notify_event file_skipped "$filename" "$skip_msg" || true
                 fi
                 echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (${skip_msg}) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then

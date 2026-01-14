@@ -2,6 +2,58 @@
 
 ## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
 
+### 2026-01-14 — Discord : espacement UX + résumé de fin markdown (metrics)
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_events.sh](lib/notify_events.sh) : ajoute un saut de ligne après les blocs de file d’attente (```text```) pour aérer le message, et améliore `script_exit`.
+- [lib/summary.sh](lib/summary.sh) : écrit un fichier metrics `key=value` (durée, compteurs, anomalies, espace économisé) dans `SUMMARY_METRICS_FILE`.
+- [lib/notify_format.sh](lib/notify_format.sh) : ajoute `_notify_kv_get` + `_notify_format_run_summary_markdown` pour générer un résumé Discord structuré (style proche VMAF) à partir des metrics.
+- [lib/logging.sh](lib/logging.sh) + [lib/exports.sh](lib/exports.sh) : introduit et exporte `SUMMARY_METRICS_FILE`.
+- [tests/test_notify.bats](tests/test_notify.bats) : ajoute un test unitaire sur le rendu markdown du résumé via metrics.
+
+Notes :
+
+- Fallback conservé : si `SUMMARY_METRICS_FILE` est absent, `script_exit` retombe sur l’ancien snippet `SUMMARY_FILE` en bloc code.
+
+### 2026-01-14 — Discord : aération des macro-étapes (correctif)
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_events.sh](lib/notify_events.sh) :
+  - corrige un envoi en double sur l’événement `transfers_done` (un seul message, avec `\n\n` de respiration).
+  - rétablit la ligne `**Mode**` dans `vmaf_started` (et garde l’espacement après l’annonce).
+
+### 2026-01-14 — Natif : autoload de `.env.local` (plus besoin d’export)
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/env.sh](lib/env.sh) : charge un fichier `.env` en mode sûr (sans `source`), uniquement pour les variables `NASCODE_*`.
+- [nascode](nascode) : auto-charge `./.env.local` au démarrage (si présent) avant le chargement des modules.
+  - Désactivation : `NASCODE_ENV_AUTOLOAD=false`
+  - Autre fichier : `NASCODE_ENV_FILE=/chemin/vers/mon.env`
+- Docs : [README.md](README.md), [docs/USAGE.md](docs/USAGE.md), [docs/CONFIG.md](docs/CONFIG.md) mis à jour.
+- Tests : [tests/test_env_autoload.bats](tests/test_env_autoload.bats) couvre le parsing et les flags.
+
+### 2026-01-14 — Discord : notification lors des skips
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_events.sh](lib/notify_events.sh) : nouvel événement `file_skipped` (fichier + raison optionnelle).
+- Points d’accroche :
+  - [lib/ui.sh](lib/ui.sh) : quand `print_skip_message` décide un skip (déjà X265 / pas de flux vidéo / seuil adaptatif).
+  - [lib/conversion_prep.sh](lib/conversion_prep.sh) : skip “sortie existe déjà” et “Heavier existe déjà”.
+- Tests : [tests/test_notify.bats](tests/test_notify.bats) ajoute un test d’envoi `file_skipped` via curl mock.
+- Docs : [README.md](README.md), [docs/USAGE.md](docs/USAGE.md), [docs/CONFIG.md](docs/CONFIG.md) mentionnent les notifs de skip.
+
 ### 2026-01-13 — Notifications Discord : refactor Option B + messages “petit écran”
 
 Branche : `feature/discord-notify-styled`

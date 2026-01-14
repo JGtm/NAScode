@@ -93,6 +93,10 @@ _check_output_exists() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
 
+        if declare -f notify_event &>/dev/null; then
+            notify_event file_skipped "$filename" "Fichier de sortie déjà existant" || true
+        fi
+
         # Alimenter la queue avec le prochain candidat si limite active
         if [[ "$LIMIT_FILES" -gt 0 ]]; then
             update_queue || true
@@ -110,6 +114,10 @@ _check_output_exists() {
             echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Sortie 'Heavier' déjà existante) : $filename${NOCOLOR}" >&2
             if [[ -n "$LOG_SESSION" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Heavier output exists) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+            fi
+
+            if declare -f notify_event &>/dev/null; then
+                notify_event file_skipped "$filename" "Sortie 'Heavier' déjà existante" || true
             fi
             if [[ "$LIMIT_FILES" -gt 0 ]]; then
                 update_queue || true

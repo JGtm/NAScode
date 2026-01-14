@@ -47,6 +47,82 @@ _notify_truncate_label() {
     fi
 }
 
+_notify_kv_get() {
+    # Usage: _notify_kv_get <file> <key>
+    local file="${1-}"
+    local key="${2-}"
+    [[ -z "$file" ]] && return 0
+    [[ -z "$key" ]] && return 0
+    [[ ! -f "$file" ]] && return 0
+
+    local line
+    line=$(grep -m 1 -E "^${key}=" "$file" 2>/dev/null || true)
+    [[ -z "$line" ]] && return 0
+    printf '%s' "${line#*=}"
+}
+
+_notify_format_run_summary_markdown() {
+    # Usage: _notify_format_run_summary_markdown <metrics_file> <now> <exit_code>
+    local metrics_file="${1-}"
+    local now="${2-}"
+    local exit_code="${3-0}"
+
+    [[ -z "$metrics_file" ]] && return 0
+    [[ ! -f "$metrics_file" ]] && return 0
+
+    local duration_total succ skip err size_anomalies checksum_anomalies vmaf_anomalies
+    local show_space_savings space_line1 space_line2
+
+    duration_total=$(_notify_kv_get "$metrics_file" "duration_total")
+    succ=$(_notify_kv_get "$metrics_file" "succ")
+    skip=$(_notify_kv_get "$metrics_file" "skip")
+    err=$(_notify_kv_get "$metrics_file" "err")
+    size_anomalies=$(_notify_kv_get "$metrics_file" "size_anomalies")
+    checksum_anomalies=$(_notify_kv_get "$metrics_file" "checksum_anomalies")
+    vmaf_anomalies=$(_notify_kv_get "$metrics_file" "vmaf_anomalies")
+    show_space_savings=$(_notify_kv_get "$metrics_file" "show_space_savings")
+    space_line1=$(_notify_kv_get "$metrics_file" "space_line1")
+    space_line2=$(_notify_kv_get "$metrics_file" "space_line2")
+
+    local body="🧾 Résumé"
+    [[ -n "$duration_total" ]] && body+=$'\n'"**Durée** : ${duration_total}"
+
+    body+=$'\n\n'"**Résultats**"
+    [[ -n "$succ" ]] && body+=$'\n'"- Succès : ${succ}"
+    [[ -n "$skip" ]] && body+=$'\n'"- Ignorés : ${skip}"
+    [[ -n "$err" ]] && body+=$'\n'"- Erreurs : ${err}"
+
+    local any_anomaly=false
+    if [[ "${size_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$size_anomalies" -gt 0 ]]; then any_anomaly=true; fi
+    if [[ "${checksum_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$checksum_anomalies" -gt 0 ]]; then any_anomaly=true; fi
+    if [[ "${vmaf_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$vmaf_anomalies" -gt 0 ]]; then any_anomaly=true; fi
+
+    if [[ "$any_anomaly" == true ]]; then
+        body+=$'\n\n'"**Anomalies**"
+        if [[ "${size_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$size_anomalies" -gt 0 ]]; then
+            body+=$'\n'"- ⚠️  Taille : ${size_anomalies}"
+        fi
+        if [[ "${checksum_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$checksum_anomalies" -gt 0 ]]; then
+            body+=$'\n'"- ❌ Intégrité : ${checksum_anomalies}"
+        fi
+        if [[ "${vmaf_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$vmaf_anomalies" -gt 0 ]]; then
+            body+=$'\n'"- 🎞️  VMAF dégradé : ${vmaf_anomalies}"
+        fi
+    fi
+
+    if [[ "$show_space_savings" == "true" ]]; then
+        if [[ -n "$space_line1" ]] || [[ -n "$space_line2" ]]; then
+            body+=$'\n\n'"**Espace économisé**"
+            [[ -n "$space_line1" ]] && body+=$'\n'"${space_line1}"
+            [[ -n "$space_line2" ]] && body+=$'\n'"${space_line2}"
+        fi
+    fi
+
+    body+=$'\n\n'"✅ Session terminée"
+
+    printf '%s' "$body"
+}
+
 _notify_basename_any() {
     # basename robuste (support / et \\)
     local p="${1-}"

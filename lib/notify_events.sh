@@ -17,6 +17,9 @@ notify_event() {
         file_completed)
             notify_event_file_completed "$@"
             ;;
+        file_skipped)
+            notify_event_file_skipped "$@"
+            ;;
         conversions_completed)
             notify_event_conversions_completed "$@"
             ;;
@@ -51,6 +54,27 @@ notify_event() {
             return 0
             ;;
     esac
+}
+
+notify_event_file_skipped() {
+    # Usage: notify_event_file_skipped <filename> [reason]
+    _notify_discord_is_enabled || return 0
+
+    local filename="${1-}"
+    local reason="${2-}"
+    [[ -z "$filename" ]] && filename="(inconnu)"
+
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    local body="${prefix}⏭️ Ignoré : $(_notify_truncate_label "$filename" 120)"
+    if [[ -n "$reason" ]]; then
+        body+=$'\n'"**Raison** : ${reason}"
+    fi
+
+    notify_discord_send_markdown "$body" "file_skipped"
+    return 0
 }
 
 notify_event_run_started() {
@@ -114,6 +138,7 @@ notify_event_run_started() {
         if [[ -n "$preview" ]]; then
             body+=$'\n\n'"**📋 File d’attente**"$'\n'
             body+=$'\n'"\`\`\`text"$'\n'"${preview}"$'\n'"\`\`\`"
+            body+=$'\n\n'
         fi
     fi
 
@@ -168,6 +193,9 @@ notify_event_conversions_completed() {
     if [[ -n "$total" ]] && [[ "$total" =~ ^[0-9]+$ ]] && [[ "$total" -gt 0 ]]; then
         body+=" (${total} fichier(s))"
     fi
+    
+        # UX Discord: laisser une ligne vide après les étapes “macro”
+        body+=$'\n\n'
 
     notify_discord_send_markdown "$body" "conversions_completed"
     return 0
@@ -189,7 +217,8 @@ notify_event_transfers_pending() {
 notify_event_transfers_done() {
     _notify_discord_is_enabled || return 0
 
-    notify_discord_send_markdown "✅ Transferts terminés" "transfers_done"
+    # UX Discord: laisser une ligne vide après l'étape transferts
+    notify_discord_send_markdown $'✅ Transferts terminés\n\n' "transfers_done"
     return 0
 }
 
@@ -207,6 +236,9 @@ notify_event_vmaf_started() {
     [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
     [[ -n "$count" ]] && body+=$'\n'"**Fichiers** : ${count}"
     [[ -n "$mode" ]] && body+=$'\n'"**Mode** : ${mode}"
+    
+        # UX Discord: laisser une ligne vide après l'annonce de début
+        body+=$'\n\n'
 
     notify_discord_send_markdown "$body" "vmaf_started"
     return 0
@@ -225,7 +257,7 @@ notify_event_vmaf_file_started() {
         prefix="[${cur}/${total}] "
     fi
 
-    local body="${prefix}🎞️ Début VMAF : $(_notify_truncate_label "$filename" 120)"
+    local body="${prefix}🎞️ Début VMAF : $(_notify_truncate_label "$filename" 30)"
     notify_discord_send_markdown "$body" "vmaf_file_started"
     return 0
 }
@@ -255,7 +287,6 @@ notify_event_vmaf_file_completed() {
     esac
 
     local body="${prefix}${badge} VMAF : ${quality} — ${score}"
-    body+=$'\n'"$(_notify_truncate_label "$filename" 140)"
 
     notify_discord_send_markdown "$body" "vmaf_file_completed"
     return 0
@@ -297,8 +328,6 @@ notify_event_vmaf_completed() {
             [[ -n "$line" ]] && body+=$'\n'"$line"
         done
     fi
-
-    body+=$'\n\n'"✅ Toutes les analyses VMAF sont terminées"
 
     notify_discord_send_markdown "$body" "vmaf_completed"
     return 0
@@ -350,22 +379,29 @@ notify_event_script_exit() {
     local now
     now=$(date +"%Y-%m-%d %H:%M:%S" 2>/dev/null || echo "")
 
-    # Si un résumé texte existe, l’inclure (sans ANSI)
-    local summary_snippet=""
-    if [[ -n "${SUMMARY_FILE:-}" ]] && [[ -f "${SUMMARY_FILE}" ]]; then
-        summary_snippet=$(head -n 40 "${SUMMARY_FILE}" 2>/dev/null | _notify_strip_ansi | sed 's/[[:space:]]*$//' || true)
+    # 1) Résumé (markdown si possible)
+    local summary_body=""
+    if [[ -n "${SUMMARY_METRICS_FILE:-}" ]] && [[ -f "${SUMMARY_METRICS_FILE}" ]]; then
+        summary_body=$(_notify_format_run_summary_markdown "${SUMMARY_METRICS_FILE}" "${now}" "${exit_code}")
     fi
 
-    # 1) Résumé (comme avant)
-    if [[ -n "$summary_snippet" ]]; then
-        local summary_body="🧾 Résumé"
-        summary_body+=$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"
-        notify_discord_send_markdown "$summary_body" "summary"
+    # Fallback: snippet texte (format terminal) si métriques absentes
+    if [[ -z "$summary_body" ]]; then
+        local summary_snippet=""
+        if [[ -n "${SUMMARY_FILE:-}" ]] && [[ -f "${SUMMARY_FILE}" ]]; then
+            summary_snippet=$(head -n 40 "${SUMMARY_FILE}" 2>/dev/null | _notify_strip_ansi | sed 's/[[:space:]]*$//' || true)
+        fi
+
+        if [[ -n "$summary_snippet" ]]; then
+            summary_body="🧾 Résumé"
+            summary_body+=$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"$'\n\n'
+        fi
     fi
+
+    [[ -n "$summary_body" ]] && notify_discord_send_markdown "$summary_body" "summary"
 
     # 2) Message final (heure de fin)
-    local end_body="🏁 Fin"
-    [[ -n "$now" ]] && end_body+=$'\n\n'"**Fin** : ${now}"
+    [[ -n "$now" ]] && local end_body+=$'\n\n'"🏁 Fin : ${now}"
 
     notify_discord_send_markdown "$end_body" "script_exit"
     return 0

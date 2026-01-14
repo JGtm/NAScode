@@ -239,6 +239,26 @@ show_summary() {
     local end_date
     end_date=$(date +"%Y-%m-%d %H:%M:%S")
 
+    # Écrire des métriques machine-readable (pour notifications Discord)
+    # Format: key=value (une ligne par clé)
+    if [[ -n "${SUMMARY_METRICS_FILE:-}" ]]; then
+        {
+            printf 'end_date=%s\n' "$end_date"
+            printf 'duration_total=%s\n' "${total_elapsed_str:-}"
+            printf 'succ=%s\n' "$succ"
+            printf 'skip=%s\n' "$skip"
+            printf 'err=%s\n' "$err"
+            printf 'size_anomalies=%s\n' "$size_anomalies"
+            printf 'checksum_anomalies=%s\n' "$checksum_anomalies"
+            printf 'vmaf_anomalies=%s\n' "$vmaf_anomalies"
+            printf 'show_vmaf_anomaly=%s\n' "$show_vmaf_anomaly"
+            printf 'has_any_anomaly=%s\n' "$has_any_anomaly"
+            printf 'show_space_savings=%s\n' "$show_space_savings"
+            printf 'space_line1=%s\n' "${line1:-}"
+            printf 'space_line2=%s\n' "${line2:-}"
+        } > "${SUMMARY_METRICS_FILE}" 2>/dev/null || true
+    fi
+
     local cols
     cols=$(_get_term_cols)
     local compact=false

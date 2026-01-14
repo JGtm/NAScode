@@ -148,6 +148,7 @@ NAScode peut envoyer des notifications via un **webhook Discord** (format Markdo
 
 - au démarrage : **paramètres actifs** + aperçu de la queue (jusqu’à 20 éléments, avec troncature)
 - pendant le run : **début/fin de chaque fichier** (préfixe `[i/N]`, durée, tailles `avant → après`)
+- pendant le run : **skip d’un fichier** (ignoré + raison)
 - transferts : **en attente** puis **terminés** (si applicable)
 - VMAF (si activé) : démarrage + **résultat par fichier** (note/qualité) + fin globale
 - en entrée/sortie des heures pleines quand `--off-peak` est actif
@@ -163,13 +164,13 @@ Recommandé (local, non versionné) :
 ```bash
 cp .env.example .env.local
 # puis édite .env.local (NE PAS commiter)
-
-set -a
-source ./.env.local
-set +a
-
 bash nascode -s "/chemin/vers/series"
 ```
+
+Par défaut, `nascode` charge automatiquement `./.env.local` (si présent) au démarrage.
+
+- Désactiver : `NASCODE_ENV_AUTOLOAD=false`
+- Utiliser un autre fichier : `NASCODE_ENV_FILE=/chemin/vers/mon.env`
 
 Sécurité : ne commit jamais le webhook. Si tu l’as posté dans un chat/log/issue, considère-le compromis et régénère-le côté Discord.
 

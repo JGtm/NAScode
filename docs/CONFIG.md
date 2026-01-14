@@ -91,6 +91,7 @@ Notes :
 - Le message de démarrage inclut les paramètres actifs, et un aperçu de la queue quand elle existe.
 - Si `PARALLEL_JOBS=1`, l’UI indique « Jobs parallèles : désactivé ».
 - Des messages “début/fin” sont envoyés pour chaque fichier, et des notifications spécifiques existent pour les transferts et VMAF (si activé).
+- Des messages “ignoré” (skip) peuvent être envoyés avec la raison.
 
 Variables d’environnement :
 
@@ -101,10 +102,12 @@ Recommandé : utiliser un fichier local `.env.local` (ignoré par Git) basé sur
 
 ```bash
 cp .env.example .env.local
-set -a
-source ./.env.local
-set +a
 ```
+
+Par défaut, `nascode` charge automatiquement `./.env.local` (si présent) au démarrage.
+
+- Désactiver : `NASCODE_ENV_AUTOLOAD=false`
+- Utiliser un autre fichier : `NASCODE_ENV_FILE=/chemin/vers/mon.env`
 
 Sécurité : ne commit jamais le webhook. Si l’URL a été partagée publiquement, régénère-le côté Discord.
 

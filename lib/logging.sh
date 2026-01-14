@@ -62,6 +62,7 @@ cleanup_old_logs() {
 readonly LOG_DIR="${LOG_DIR:-"$SCRIPT_DIR/logs"}"
 readonly LOG_SESSION="$LOG_DIR/Session_${EXECUTION_TIMESTAMP}.log"
 readonly SUMMARY_FILE="$LOG_DIR/Summary_${EXECUTION_TIMESTAMP}.log"
+readonly SUMMARY_METRICS_FILE="$LOG_DIR/SummaryMetrics_${EXECUTION_TIMESTAMP}.kv"
 readonly LOG_PROGRESS="$LOG_DIR/Progress_${EXECUTION_TIMESTAMP}.log"
 readonly INDEX="$LOG_DIR/Index"
 readonly INDEX_META="$LOG_DIR/Index.meta"
@@ -87,7 +88,7 @@ initialize_directories() {
     cleanup_old_logs 30
     
     # Créer les fichiers de log
-    for log_file in "$LOG_SESSION" "$SUMMARY_FILE" "$LOG_PROGRESS"; do
+    for log_file in "$LOG_SESSION" "$SUMMARY_FILE" "$SUMMARY_METRICS_FILE" "$LOG_PROGRESS"; do
         touch "$log_file"
     done
     # Le log de comparaison dry-run n'est créé que si on est en mode dry-run
