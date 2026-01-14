@@ -208,7 +208,9 @@ show_summary() {
     local checksum_anomalies
     checksum_anomalies=$(_count_log_pattern ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' 'E')
     local vmaf_anomalies
-    vmaf_anomalies=$(_count_log_pattern ' | VMAF | .* | quality:DEGRADE')
+    # VMAF : considérer comme anomalie les scores "DEGRADE" ET les NA.
+    # Exemple ligne log: "... | VMAF | ... | score:NA | quality:NA"
+    vmaf_anomalies=$(_count_log_pattern ' \| VMAF \| .* \| (score:NA|quality:DEGRADE)' 'E')
     
     # Calcul du gain de place total
     local savings_data line1 line2 show_space_savings

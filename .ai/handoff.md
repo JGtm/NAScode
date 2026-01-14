@@ -2,6 +2,44 @@
 
 ## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
 
+### 2026-01-14 — VMAF : compter les NA comme anomalies
+
+Branche : `feature/robustness-heavy-outputs`
+
+Contexte : VMAF renvoie "NA" sur les derniers runs (probablement suite aux changements `SCRIPT_DIR`/`LOG_DIR`). Décision : considérer les NA comme des anomalies dans le résumé.
+
+Changements principaux :
+
+- [lib/summary.sh](lib/summary.sh) : `vmaf_anomalies` compte désormais `score:NA` **ou** `quality:DEGRADE` (regex `grep -E`).
+- [lib/notify_format.sh](lib/notify_format.sh) : le résumé Discord affiche `VMAF (NA/dégradé)` dans la section anomalies.
+
+Tests :
+
+- [tests/test_finalize_transfer_errors.bats](tests/test_finalize_transfer_errors.bats) : ajoute un test de régression `show_summary: VMAF NA est compté comme anomalie`.
+- Validation locale : `bash run_tests.sh -f notify` et `bash run_tests.sh -f finalize_transfer_errors`.
+
+Dernier prompt :
+
+- "VMAF echoue sur topus mes derniers runs, je n'ai que des NA (...) Du coup je relève que les NA doivent être considérées comme des anomalies"
+
+### 2026-01-14 — VMAF : cause racine des NA (Windows/MSYS + ffmpeg.exe externe)
+
+Branche : `feature/robustness-heavy-outputs`
+
+Diagnostic confirmé :
+
+- `lib/detect.sh` sélectionne un `ffmpeg.exe` externe (Winget BtbN) pour VMAF car le FFmpeg MSYS principal n’a pas `libvmaf`.
+- Dans `lib/vmaf.sh`, `log_path=$vmaf_log_file` était un chemin absolu de type MSYS (`/c/...`) **intégré dans la chaîne `-lavfi`**.
+- La conversion de chemins MSYS→Windows ne s’applique pas à l’intérieur des sous-chaînes; `libvmaf` ne pouvait donc pas créer le JSON → `compute_vmaf_score()` retournait `NA` systématiquement.
+
+Correctif :
+
+- [lib/vmaf.sh](lib/vmaf.sh) : `log_path` devient **relatif** (basename), et FFmpeg est exécuté avec `cd "$LOG_DIR/vmaf"` pour que le JSON soit créé au bon endroit, quel que soit le binaire FFmpeg.
+
+Validation :
+
+- `bash run_tests.sh -f vmaf` OK.
+
 ### 2026-01-14 — Discord : espacement UX + résumé de fin markdown (metrics)
 
 Branche : `feature/discord-notify-styled`

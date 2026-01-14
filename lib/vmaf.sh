@@ -36,14 +36,57 @@ compute_vmaf_score() {
         echo "NA"
         return 0
     fi
+
+    # Choisir le flux vidéo principal (éviter les posters / attached_pic qui peuvent être en v:0)
+    # et faire en sorte que les deux inputs pointent sur un flux vidéo comparable.
+    _vmaf_pick_main_video_stream_index() {
+        local file="${1:-}"
+        local lines
+        # Format attendu: "index,attached_pic" (ex: "0,0" ou "1,1")
+        lines=$(ffprobe_safe -v error -select_streams v -show_entries stream=index:stream_disposition=attached_pic -of csv=p=0 "$file" 2>/dev/null || true)
+        local idx attached
+        while IFS=',' read -r idx attached; do
+            [[ -z "${idx:-}" ]] && continue
+            attached="${attached:-0}"
+            if [[ "$attached" == "0" ]]; then
+                echo "$idx"
+                return 0
+            fi
+        done <<< "$lines"
+
+        # Fallback
+        echo "0"
+        return 0
+    }
+
+    local dist_stream_index ref_stream_index
+    dist_stream_index=$(_vmaf_pick_main_video_stream_index "$converted")
+    ref_stream_index=$(_vmaf_pick_main_video_stream_index "$original")
+
+    # Sous MSYS/Git Bash, un ffmpeg.exe externe peut ne pas recevoir la conversion /c/... -> C:/...
+    # (notamment avec certains noms contenant accents/apostrophes). Pour fiabiliser, on normalise
+    # explicitement les chemins d'inputs quand le binaire ciblé est un .exe.
+    local original_for_ffmpeg="$original"
+    local converted_for_ffmpeg="$converted"
+    local -a _ffmpeg_cmd_arr_probe
+    read -r -a _ffmpeg_cmd_arr_probe <<< "$ffmpeg_cmd"
+    if [[ "${IS_MSYS:-0}" -eq 1 ]] && [[ "${_ffmpeg_cmd_arr_probe[0]:-}" == *.exe ]] && declare -f normalize_path &>/dev/null; then
+        original_for_ffmpeg=$(normalize_path "$original")
+        converted_for_ffmpeg=$(normalize_path "$converted")
+    fi
     
     # Fichiers temporaires dans logs/vmaf/
+    # IMPORTANT (Windows/MSYS + ffmpeg.exe externe): le chemin contenu dans le filtre (log_path)
+    # n'est pas converti automatiquement (la path-conversion MSYS ne s'applique pas aux sous-chaînes).
+    # On utilise donc un log_path RELATIF et on exécute FFmpeg depuis $vmaf_dir.
     local vmaf_dir="${LOG_DIR}/vmaf"
     mkdir -p "$vmaf_dir" 2>/dev/null || true
     local file_hash
     file_hash=$(compute_md5_prefix "$filename_display")
-    local vmaf_log_file="${vmaf_dir}/vmaf_${file_hash}_${$}_${RANDOM}.json"
-    local progress_file="${vmaf_dir}/vmaf_progress_$$.txt"
+    local vmaf_log_basename="vmaf_${file_hash}_${$}_${RANDOM}.json"
+    local vmaf_log_file="${vmaf_dir}/${vmaf_log_basename}"
+    local progress_basename="vmaf_progress_$$.txt"
+    local progress_file="${vmaf_dir}/${progress_basename}"
     
     # Construire les options d'input et le filtre lavfi selon le mode (normal ou sample)
     # En mode sample : on utilise la position exacte du keyframe passée en paramètre
@@ -56,7 +99,7 @@ compute_vmaf_score() {
     # Or, la conversion peut downscaler automatiquement (>1080p). Dans ce cas,
     # on scale l'original à la résolution EXACTE du fichier converti.
     local conv_dims
-    conv_dims=$(ffprobe_safe -v error -select_streams v:0 -show_entries stream=width,height \
+    conv_dims=$(ffprobe_safe -v error -select_streams "v:${dist_stream_index}" -show_entries stream=width,height \
         -of csv=p=0:s=x "$converted" 2>/dev/null | head -1)
     local conv_w="" conv_h=""
     if [[ -n "$conv_dims" ]] && [[ "$conv_dims" =~ ^([0-9]+)x([0-9]+)$ ]]; then
@@ -84,11 +127,11 @@ compute_vmaf_score() {
         original_input_opts="-ss ${keyframe_pos} -t ${sample_duration}"
         # setpts remet les timestamps à 0 pour synchroniser les deux flux
         # On ajoute aussi un format commun et un scale éventuel pour garantir la compatibilité VMAF.
-        lavfi_filter="[0:v]setpts=PTS-STARTPTS,${dist_chain}[dist];[1:v]setpts=PTS-STARTPTS,${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=10:model=version=vmaf_v0.6.1neg"
+        lavfi_filter="[0:v:${dist_stream_index}]setpts=PTS-STARTPTS,${dist_chain}[dist];[1:v:${ref_stream_index}]setpts=PTS-STARTPTS,${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_basename:n_subsample=10:model=version=vmaf_v0.6.1neg"
     else
         # Mode normal : comparaison directe
         # On force un format commun et on scale l'original si besoin (downscale côté conversion).
-        lavfi_filter="[0:v]${dist_chain}[dist];[1:v]${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_file:n_subsample=5:model=version=vmaf_v0.6.1neg"
+        lavfi_filter="[0:v:${dist_stream_index}]${dist_chain}[dist];[1:v:${ref_stream_index}]${ref_chain}[ref];[dist][ref]libvmaf=log_fmt=json:log_path=$vmaf_log_basename:n_subsample=5:model=version=vmaf_v0.6.1neg"
     fi
 
     # Obtenir la durée totale de la vidéo en microsecondes pour la progression
@@ -119,18 +162,18 @@ compute_vmaf_score() {
     local -a ffmpeg_cmd_arr
     read -r -a ffmpeg_cmd_arr <<< "$ffmpeg_cmd"
     cmd+=("${ffmpeg_cmd_arr[@]}")
-    cmd+=(-hide_banner -nostdin -i "$converted")
+    cmd+=(-hide_banner -nostdin -i "$converted_for_ffmpeg")
     _cmd_append_words cmd "$hwaccel_opts"
     _cmd_append_words cmd "$original_input_opts"
-    cmd+=(-i "$original")
+    cmd+=(-i "$original_for_ffmpeg")
     cmd+=(-lavfi "$lavfi_filter")
     if [[ "$enable_progress" == true ]]; then
-        cmd+=(-progress "$progress_file")
+        cmd+=(-progress "$progress_basename")
     fi
     cmd+=(-f null -)
 
     if [[ "$enable_progress" == true ]]; then
-        "${cmd[@]}" >/dev/null 2>&1 &
+        (cd "$vmaf_dir" && "${cmd[@]}") >/dev/null 2>&1 &
         local ffmpeg_pid=$!
         
         local last_percent=-1
@@ -173,7 +216,7 @@ compute_vmaf_score() {
         wait "$ffmpeg_pid" 2>/dev/null
         printf "\r%100s\r" "" >&2  # Effacer la ligne de progression
     else
-        "${cmd[@]}" >/dev/null 2>&1
+        (cd "$vmaf_dir" && "${cmd[@]}") >/dev/null 2>&1
     fi
     
     # Nettoyer les fichiers temporaires

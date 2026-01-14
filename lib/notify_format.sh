@@ -125,7 +125,7 @@ _notify_format_run_summary_markdown() {
             body+=$'\n'"- ❌ Intégrité : ${checksum_anomalies}"
         fi
         if [[ "${vmaf_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$vmaf_anomalies" -gt 0 ]]; then
-            body+=$'\n'"- 🎞️  VMAF dégradé : ${vmaf_anomalies}"
+            body+=$'\n'"- 🎞️  VMAF (NA/dégradé) : ${vmaf_anomalies}"
         fi
     fi
 
@@ -137,7 +137,7 @@ _notify_format_run_summary_markdown() {
         fi
     fi
 
-    body+=$'\n\n'"✅ Session terminée"
+    body+=$'\n\n'"✅ Session terminée (code ${exit_code})"
 
     printf '%s' "$body"$(_notify_discord_pad)
 }

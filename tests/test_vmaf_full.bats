@@ -87,6 +87,128 @@ teardown() {
     [ "$result" = "NA" ]
 }
 
+@test "regression: ignore les streams attached_pic (poster)" {
+    HAS_LIBVMAF=1
+
+    # Stub ffprobe_safe pour simuler un fichier avec 2 streams vidéo :
+    # v:0 = poster (attached_pic=1), v:1 = vidéo (attached_pic=0)
+    ffprobe_safe() {
+        if [[ "$*" == *"-show_entries stream=index:stream_disposition=attached_pic"* ]]; then
+            printf '%s\n' '0,1' '1,0'
+            return 0
+        fi
+        if [[ "$*" == *"-show_entries stream=width,height"* ]]; then
+            echo '1920x1080'
+            return 0
+        fi
+        return 1
+    }
+
+        # Faux FFmpeg (utilisé via FFMPEG_VMAF) : capture -lavfi et crée un JSON VMAF minimal.
+        local capture_file="$TEST_TEMP_DIR/lavfi_capture.txt"
+        local fake_ffmpeg="$TEST_TEMP_DIR/fake_ffmpeg_vmaf.sh"
+        cat > "$fake_ffmpeg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+capture_file="${VMAF_CAPTURE_FILE:-/tmp/vmaf_capture.txt}"
+lavfi=""
+
+for ((i=1; i<=$#; i++)); do
+    if [[ "${!i}" == "-lavfi" ]]; then
+        j=$((i+1))
+        lavfi="${!j}"
+        break
+    fi
+done
+
+printf '%s\n' "$lavfi" > "$capture_file"
+
+# Extraire log_path (relatif) et créer le JSON correspondant dans le cwd.
+log_path=$(printf '%s' "$lavfi" | sed -n 's/.*log_path=\([^:]*\).*/\1/p' | head -1)
+if [[ -n "${log_path:-}" ]]; then
+    cat > "$log_path" <<JSON
+{ "pooled_metrics": { "vmaf": { "mean": 95.0 } } }
+JSON
+fi
+
+exit 0
+EOF
+        chmod +x "$fake_ffmpeg"
+
+        export VMAF_CAPTURE_FILE="$capture_file"
+        FFMPEG_VMAF="$fake_ffmpeg"
+
+    # Créer deux fichiers factices non vides
+    local orig="$TEST_TEMP_DIR/orig.mkv"
+    local conv="$TEST_TEMP_DIR/conv.mkv"
+    printf 'x' > "$orig"
+    printf 'y' > "$conv"
+
+    local result
+    result=$(compute_vmaf_score "$orig" "$conv" "dummy")
+
+    [ "$result" = "95.00" ]
+    grep -q "\[0:v:1\]" "$capture_file"
+    grep -q "\[1:v:1\]" "$capture_file"
+}
+
+@test "regression: normalise /c/... vers C:/... quand FFMPEG_VMAF est un .exe" {
+        if [[ "${IS_MSYS:-0}" -ne 1 ]]; then
+                skip "test spécifique MSYS/Git Bash"
+        fi
+
+        HAS_LIBVMAF=1
+
+        local capture_file="$TEST_TEMP_DIR/ffmpeg_args_capture.txt"
+        local fake_ffmpeg_exe="$TEST_TEMP_DIR/fake_ffmpeg_vmaf.exe"
+        cat > "$fake_ffmpeg_exe" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+
+capture_file="${VMAF_ARGS_CAPTURE_FILE:?}"
+
+printf '%s\n' "$@" > "$capture_file"
+
+# Créer un JSON minimal (log_path relatif) dans le cwd
+lavfi=""
+for ((i=1; i<=$#; i++)); do
+    if [[ "${!i}" == "-lavfi" ]]; then
+        j=$((i+1))
+        lavfi="${!j}"
+        break
+    fi
+done
+log_path=$(printf '%s' "$lavfi" | sed -n 's/.*log_path=\([^:]*\).*/\1/p' | head -1)
+if [[ -n "${log_path:-}" ]]; then
+    cat > "$log_path" <<JSON
+{ "pooled_metrics": { "vmaf": { "mean": 90.0 } } }
+JSON
+fi
+
+exit 0
+EOF
+        chmod +x "$fake_ffmpeg_exe"
+        export VMAF_ARGS_CAPTURE_FILE="$capture_file"
+        FFMPEG_VMAF="$fake_ffmpeg_exe"
+
+        # Créer des fichiers dans le repo (chemin /c/... garanti sous MSYS)
+        local orig="$PROJECT_ROOT/logs/_tmp_vmaf_orig_$$.mkv"
+        local conv="$PROJECT_ROOT/logs/_tmp_vmaf_conv_$$.mkv"
+        printf 'x' > "$orig"
+        printf 'y' > "$conv"
+
+        local result
+        result=$(compute_vmaf_score "$orig" "$conv" "dummy")
+        rm -f "$orig" "$conv" 2>/dev/null || true
+
+        [ "$result" = "90.00" ]
+        # Vérifier que les -i ont reçu des chemins Windows (C:/...) et non /c/...
+        grep -qE '^(-hide_banner|-nostdin|-i)$' "$capture_file" || true
+        grep -q "C:/" "$capture_file"
+        ! grep -q "^/c/" "$capture_file"
+}
+
 ###########################################################
 # Tests de _queue_vmaf_analysis()
 ###########################################################
@@ -345,6 +467,35 @@ teardown() {
     
     # Le résultat doit être un nombre ou NA
     [[ "$result" == "NA" ]] || [[ "$result" =~ ^[0-9]+\.?[0-9]*$ ]]
+}
+
+@test "regression: VMAF fonctionne via FFMPEG_VMAF (ffmpeg alternatif)" {
+    # Ce test cible le cas courant sous Windows/MSYS : le ffmpeg principal n'a pas libvmaf,
+    # et detect.sh sélectionne un ffmpeg.exe alternatif via FFMPEG_VMAF.
+    if [[ -z "${FFMPEG_VMAF:-}" ]]; then
+        skip "FFMPEG_VMAF non défini"
+    fi
+
+    if [[ ! -x "$FFMPEG_VMAF" ]]; then
+        skip "FFMPEG_VMAF non exécutable"
+    fi
+
+    if ! "$FFMPEG_VMAF" -hide_banner -filters 2>/dev/null | grep -q libvmaf; then
+        skip "libvmaf non disponible dans FFMPEG_VMAF"
+    fi
+
+    # Reproduire le cas où le ffmpeg principal (PATH) n'a pas libvmaf.
+    if ffmpeg -hide_banner -filters 2>/dev/null | grep -q libvmaf; then
+        skip "ffmpeg principal a déjà libvmaf (cas non ciblé)"
+    fi
+
+    HAS_LIBVMAF=1
+
+    local result
+    result=$(compute_vmaf_score "$FIXTURES_DIR/test_video_2s.mkv" "$FIXTURES_DIR/test_video_hevc_2s.mkv")
+
+    # Dans ce scénario, un NA indique généralement un problème d'écriture/parsing du JSON.
+    [[ "$result" =~ ^[0-9]+\.?[0-9]*$ ]]
 }
 
 ###########################################################
