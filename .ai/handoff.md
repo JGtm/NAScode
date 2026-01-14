@@ -11,6 +11,7 @@ Changements principaux :
 - [lib/notify_events.sh](lib/notify_events.sh) : ajoute un saut de ligne après les blocs de file d’attente (```text```) pour aérer le message, et améliore `script_exit`.
 - [lib/summary.sh](lib/summary.sh) : écrit un fichier metrics `key=value` (durée, compteurs, anomalies, espace économisé) dans `SUMMARY_METRICS_FILE`.
 - [lib/notify_format.sh](lib/notify_format.sh) : ajoute `_notify_kv_get` + `_notify_format_run_summary_markdown` pour générer un résumé Discord structuré (style proche VMAF) à partir des metrics.
+- [lib/notify_format.sh](lib/notify_format.sh) : ajuste le titre “Exécution” en header Markdown (`## Exécution`) pour un rendu plus “gros”.
 - [lib/logging.sh](lib/logging.sh) + [lib/exports.sh](lib/exports.sh) : introduit et exporte `SUMMARY_METRICS_FILE`.
 - [tests/test_notify.bats](tests/test_notify.bats) : ajoute un test unitaire sur le rendu markdown du résumé via metrics.
 

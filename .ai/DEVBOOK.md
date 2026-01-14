@@ -13,6 +13,14 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-14
+
+#### Discord : titre “Exécution” en header Markdown
+- **Quoi** : le titre “Exécution” du message `run_started` passe de texte en gras à un header Markdown (`##`) pour être visuellement plus grand dans Discord.
+- **Où** : `lib/notify_format.sh`.
+- **Pourquoi** : améliorer la hiérarchie visuelle du message d’intro (lisible sur mobile).
+- **Impact** : UX notifications uniquement (aucun impact si notifs Discord désactivées).
+
 ### 2026-01-13
 
 #### Release : préparation v2.7 (changelog + docs)
