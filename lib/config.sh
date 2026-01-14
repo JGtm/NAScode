@@ -341,14 +341,12 @@ set_conversion_mode_parameters() {
 # GÉNÉRATION DU SUFFIXE DYNAMIQUE
 ###########################################################
 
-# Construit un suffixe de fichier reflétant les paramètres de conversion.
-# IMPORTANT : le suffixe final est désormais calculé par fichier (bitrate effectif + résolution)
-# dans lib/transcode_video.sh. SUFFIX_STRING sert ici surtout de "preview" et d'interrupteur
-# (vide = suffixe désactivé).
+# Construit un suffixe de fichier (preview) selon les paramètres de conversion.
+# IMPORTANT : le suffixe final est calculé par fichier dans lib/video_params.sh.
+# SUFFIX_STRING sert ici surtout de "preview" et d'interrupteur (vide = suffixe désactivé).
 #
-# Format effectif: _<codec>_<bitrate>k_<height>p_<preset>[_tuned][_sample]
-# Exemples: _x265_1449k_720p_medium_tuned
-#           _av1_2070k_1080p_medium
+# Format effectif (Option A): _<codec>_<height>p[_<AUDIO>][_sample]
+# Exemple: _x265_1080p_AAC
 build_dynamic_suffix() {
     # Ne pas écraser si l'utilisateur a forcé --no-suffix
     if [[ "$SUFFIX_MODE" == "off" ]]; then
@@ -360,27 +358,12 @@ build_dynamic_suffix() {
     local codec_suffix
     codec_suffix=$(get_codec_suffix "$VIDEO_CODEC")
     
-    local suffix="_${codec_suffix}"
-    
-    # Mode single-pass CRF ou two-pass bitrate
-    if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-        suffix="${suffix}_crf${CRF_VALUE}"
-    else
-        # Bitrate cible (two-pass)
-        suffix="${suffix}_${TARGET_BITRATE_KBPS}k"
-    fi
-
-    # Résolution (preview) : la valeur réelle est déterminée par fichier.
-    suffix="${suffix}_1080p"
-    
-    # Preset d'encodage
-    suffix="${suffix}_${ENCODER_PRESET}"
+    local suffix="_${codec_suffix}_1080p"
     
     # Indicateur du codec audio (si différent de copy)
     case "${AUDIO_CODEC:-copy}" in
-        aac)  suffix="${suffix}_aac" ;;
-        ac3)  suffix="${suffix}_ac3" ;;
-        opus) suffix="${suffix}_opus" ;;
+        copy|unknown|"") : ;;
+        *) suffix="${suffix}_${AUDIO_CODEC^^}" ;;
     esac
     
     # Indicateur mode sample (segment de test)

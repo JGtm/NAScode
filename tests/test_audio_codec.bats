@@ -534,7 +534,7 @@ STUB
     local result
     result=$(_build_effective_suffix_for_dims 1920 1080)
     
-    [[ "$result" =~ "_aac" ]]
+    [[ "$result" =~ "_AAC" ]]
 }
 
 @test "_build_effective_suffix_for_dims: inclut _ac3 si AUDIO_CODEC=ac3" {
@@ -544,7 +544,7 @@ STUB
     local result
     result=$(_build_effective_suffix_for_dims 1920 1080)
     
-    [[ "$result" =~ "_ac3" ]]
+    [[ "$result" =~ "_AC3" ]]
 }
 
 @test "_build_effective_suffix_for_dims: inclut _opus si AUDIO_CODEC=opus" {
@@ -554,7 +554,7 @@ STUB
     local result
     result=$(_build_effective_suffix_for_dims 1920 1080)
     
-    [[ "$result" =~ "_opus" ]]
+    [[ "$result" =~ "_OPUS" ]]
 }
 
 @test "_build_effective_suffix_for_dims: n'inclut pas _aac/_ac3/_opus si copy" {
@@ -564,9 +564,9 @@ STUB
     local result
     result=$(_build_effective_suffix_for_dims 1920 1080)
     
-    [[ ! "$result" =~ "_aac" ]]
-    [[ ! "$result" =~ "_ac3" ]]
-    [[ ! "$result" =~ "_opus" ]]
+    [[ ! "$result" =~ "_AAC" ]]
+    [[ ! "$result" =~ "_AC3" ]]
+    [[ ! "$result" =~ "_OPUS" ]]
 }
 
 ###########################################################
@@ -580,7 +580,7 @@ STUB
     
     build_dynamic_suffix
     
-    [[ "$SUFFIX_STRING" =~ "_aac" ]]
+    [[ "$SUFFIX_STRING" =~ "_AAC" ]]
 }
 
 @test "config: AUDIO_BITRATE_AAC_DEFAULT est défini et valide" {

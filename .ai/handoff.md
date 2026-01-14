@@ -2,6 +2,43 @@
 
 ## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
 
+### 2026-01-14 — UX : fin de tâches quand n < limite (random)
+
+Branche : `fix/random-limit-suffix`
+
+Contexte : en mode random, une limite implicite (10) peut être supérieure au nombre de fichiers présents (ex: 9). Après traitement des 9 fichiers, un message non logique s’affichait : “Tous les fichiers restants sont déjà optimisés.”
+
+Correctif :
+
+- [lib/processing.sh](lib/processing.sh) : le message “Fin des tâches” compare désormais `converted_count` à une **limite effective** `min(LIMIT_FILES, total disponible)` (via `TOTAL_QUEUE_FILE`).
+
+Notes :
+
+- Le sujet “suffixe sans CRF/preset” est à discuter (options proposées) avant implémentation.
+
+Dernier prompt :
+
+- "Limite de 10 implicite en mode random... corriger cet écart..." + "enlever les valeurs crf et medium du suffixe... suggestions"
+
+### 2026-01-14 — Suffixe : alignement “web/scene” (Option A)
+
+Branche : `fix/random-limit-suffix`
+
+Décision : suffixe simplifié, sans CRF/bitrate/preset.
+
+- Format effectif : `_<codec>_<height>p[_<AUDIO>][_sample]`
+- Audio en majuscules (ex: `_AAC`, `_OPUS`).
+
+Changements principaux :
+
+- [lib/video_params.sh](lib/video_params.sh) : construit le suffixe effectif Option A.
+- [lib/config.sh](lib/config.sh) : `SUFFIX_STRING` (preview) aligné sur Option A.
+- [lib/system.sh](lib/system.sh) : hint d’exemple du prompt suffixe mis à jour.
+
+Tests :
+
+- Mise à jour des tests suffixe (Bats) impactés.
+
 ### 2026-01-14 — VMAF : compter les NA comme anomalies
 
 Branche : `feature/robustness-heavy-outputs`

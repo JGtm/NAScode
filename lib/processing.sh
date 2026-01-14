@@ -232,12 +232,23 @@ _process_queue_with_fifo() {
     fi
 
     # Message UX si la limite n'a pas été atteinte (tous les fichiers restants étaient déjà optimisés)
+    # Évite le cas non logique quand le dossier source contient moins de fichiers que la limite.
     if [[ "$NO_PROGRESS" != true ]] && [[ ! -f "$STOP_FLAG" ]]; then
         local converted_count=0
         if [[ -f "$CONVERTED_COUNT_FILE" ]]; then
             converted_count=$(cat "$CONVERTED_COUNT_FILE" 2>/dev/null || echo 0)
         fi
-        if [[ "$converted_count" -lt "$LIMIT_FILES" ]]; then
+
+        local effective_limit="$LIMIT_FILES"
+        local total_available=0
+        if [[ -f "$TOTAL_QUEUE_FILE" ]]; then
+            total_available=$(cat "$TOTAL_QUEUE_FILE" 2>/dev/null || echo 0)
+        fi
+        if [[ "$total_available" -gt 0 ]] && [[ "$effective_limit" -gt "$total_available" ]]; then
+            effective_limit="$total_available"
+        fi
+
+        if [[ "$effective_limit" -gt 0 ]] && [[ "$converted_count" -lt "$effective_limit" ]]; then
             print_warning_box "Fin des tâches" "Tous les fichiers restants sont déjà optimisés."
         fi
     fi

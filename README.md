@@ -42,7 +42,7 @@ Defaults importants (issus de la config) :
 - Convertit en **HEVC (x265)** ou **AV1** selon `--codec`.
 - Gère une **file d’attente** (index persistant) et peut **skip** les fichiers déjà “bons”.
 - Supporte un mode **video passthrough** (vidéo copiée, audio optimisé si pertinent).
-- Ajoute un **suffixe** (dynamique ou personnalisé) pour refléter les paramètres.
+- Ajoute un **suffixe** (dynamique ou personnalisé) pour refléter le codec vidéo, la résolution de sortie et (optionnellement) le codec audio.
 - Optionnel : **VMAF** et **sample** pour tester rapidement.
 - Limitation : les vidéos **en mode portrait** (vertical / rotation metadata) ne sont pas prises en charge de manière effective ; la logique d’estimation résolution/bitrate est principalement conçue pour des sources “paysage”, et peut produire des paramètres peu adaptés.
 
