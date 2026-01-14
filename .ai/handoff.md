@@ -2,6 +2,177 @@
 
 ## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
 
+### 2026-01-14 — VMAF : compter les NA comme anomalies
+
+Branche : `feature/robustness-heavy-outputs`
+
+Contexte : VMAF renvoie "NA" sur les derniers runs (probablement suite aux changements `SCRIPT_DIR`/`LOG_DIR`). Décision : considérer les NA comme des anomalies dans le résumé.
+
+Changements principaux :
+
+- [lib/summary.sh](lib/summary.sh) : `vmaf_anomalies` compte désormais `score:NA` **ou** `quality:DEGRADE` (regex `grep -E`).
+- [lib/notify_format.sh](lib/notify_format.sh) : le résumé Discord affiche `VMAF (NA/dégradé)` dans la section anomalies.
+
+Tests :
+
+- [tests/test_finalize_transfer_errors.bats](tests/test_finalize_transfer_errors.bats) : ajoute un test de régression `show_summary: VMAF NA est compté comme anomalie`.
+- Validation locale : `bash run_tests.sh -f notify` et `bash run_tests.sh -f finalize_transfer_errors`.
+
+Dernier prompt :
+
+- "VMAF echoue sur topus mes derniers runs, je n'ai que des NA (...) Du coup je relève que les NA doivent être considérées comme des anomalies"
+
+### 2026-01-14 — VMAF : cause racine des NA (Windows/MSYS + ffmpeg.exe externe)
+
+Branche : `feature/robustness-heavy-outputs`
+
+Diagnostic confirmé :
+
+- `lib/detect.sh` sélectionne un `ffmpeg.exe` externe (Winget BtbN) pour VMAF car le FFmpeg MSYS principal n’a pas `libvmaf`.
+- Dans `lib/vmaf.sh`, `log_path=$vmaf_log_file` était un chemin absolu de type MSYS (`/c/...`) **intégré dans la chaîne `-lavfi`**.
+- La conversion de chemins MSYS→Windows ne s’applique pas à l’intérieur des sous-chaînes; `libvmaf` ne pouvait donc pas créer le JSON → `compute_vmaf_score()` retournait `NA` systématiquement.
+
+Correctif :
+
+- [lib/vmaf.sh](lib/vmaf.sh) : `log_path` devient **relatif** (basename), et FFmpeg est exécuté avec `cd "$LOG_DIR/vmaf"` pour que le JSON soit créé au bon endroit, quel que soit le binaire FFmpeg.
+
+Validation :
+
+- `bash run_tests.sh -f vmaf` OK.
+
+### 2026-01-14 — Discord : espacement UX + résumé de fin markdown (metrics)
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_events.sh](lib/notify_events.sh) : ajoute un saut de ligne après les blocs de file d’attente (```text```) pour aérer le message, et améliore `script_exit`.
+- [lib/summary.sh](lib/summary.sh) : écrit un fichier metrics `key=value` (durée, compteurs, anomalies, espace économisé) dans `SUMMARY_METRICS_FILE`.
+- [lib/notify_format.sh](lib/notify_format.sh) : ajoute `_notify_kv_get` + `_notify_format_run_summary_markdown` pour générer un résumé Discord structuré (style proche VMAF) à partir des metrics.
+- [lib/notify_format.sh](lib/notify_format.sh) : ajuste le titre “Exécution” en header Markdown (`## Exécution`) pour un rendu plus “gros”.
+- [lib/logging.sh](lib/logging.sh) + [lib/exports.sh](lib/exports.sh) : introduit et exporte `SUMMARY_METRICS_FILE`.
+- [tests/test_notify.bats](tests/test_notify.bats) : ajoute un test unitaire sur le rendu markdown du résumé via metrics.
+
+Notes :
+
+- Fallback conservé : si `SUMMARY_METRICS_FILE` est absent, `script_exit` retombe sur l’ancien snippet `SUMMARY_FILE` en bloc code.
+
+### 2026-01-14 — Discord : aération des macro-étapes (correctif)
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_events.sh](lib/notify_events.sh) :
+  - corrige un envoi en double sur l’événement `transfers_done` (un seul message, avec `\n\n` de respiration).
+  - rétablit la ligne `**Mode**` dans `vmaf_started` (et garde l’espacement après l’annonce).
+
+### 2026-01-14 — Refactor option 2 : formatage centralisé par événement
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_format.sh](lib/notify_format.sh) : ajoute des helpers `_notify_format_event_*` (un par événement) + améliore `_notify_format_run_summary_markdown` (ligne **Fin** + code de sortie).
+- [lib/notify_events.sh](lib/notify_events.sh) : devient un routeur/enveloppe (garde-fous + envoi), et délègue le contenu Markdown à `notify_format`.
+- [lib/notify_discord.sh](lib/notify_discord.sh) : retire `_notify_strip_ansi` (déplacé côté formatage).
+
+### 2026-01-14 — Natif : autoload de `.env.local` (plus besoin d’export)
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/env.sh](lib/env.sh) : charge un fichier `.env` en mode sûr (sans `source`), uniquement pour les variables `NASCODE_*`.
+- [nascode](nascode) : auto-charge `./.env.local` au démarrage (si présent) avant le chargement des modules.
+  - Désactivation : `NASCODE_ENV_AUTOLOAD=false`
+  - Autre fichier : `NASCODE_ENV_FILE=/chemin/vers/mon.env`
+- Docs : [README.md](README.md), [docs/USAGE.md](docs/USAGE.md), [docs/CONFIG.md](docs/CONFIG.md) mis à jour.
+- Tests : [tests/test_env_autoload.bats](tests/test_env_autoload.bats) couvre le parsing et les flags.
+
+### 2026-01-14 — Discord : notification lors des skips
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- [lib/notify_events.sh](lib/notify_events.sh) : nouvel événement `file_skipped` (fichier + raison optionnelle).
+- Points d’accroche :
+  - [lib/ui.sh](lib/ui.sh) : quand `print_skip_message` décide un skip (déjà X265 / pas de flux vidéo / seuil adaptatif).
+  - [lib/conversion_prep.sh](lib/conversion_prep.sh) : skip “sortie existe déjà” et “Heavier existe déjà”.
+- Tests : [tests/test_notify.bats](tests/test_notify.bats) ajoute un test d’envoi `file_skipped` via curl mock.
+- Docs : [README.md](README.md), [docs/USAGE.md](docs/USAGE.md), [docs/CONFIG.md](docs/CONFIG.md) mentionnent les notifs de skip.
+
+### 2026-01-13 — Notifications Discord : refactor Option B + messages “petit écran”
+
+Branche : `feature/discord-notify-styled`
+
+Changements principaux :
+
+- Refactor des notifications en modules (Option B) :
+  - [lib/notify.sh](lib/notify.sh) : point d’entrée qui source les modules.
+  - [lib/notify_discord.sh](lib/notify_discord.sh) : transport webhook + debug.
+  - [lib/notify_format.sh](lib/notify_format.sh) : formatage pur (préfixes, aperçu queue, labels).
+  - [lib/notify_events.sh](lib/notify_events.sh) : événements (run/file/transfers/vmaf/exit).
+- [nascode](nascode) : la notif `run_started` est envoyée **après** `build_queue` pour inclure l’aperçu de la file (et en mode fichier unique après `export_variables`).
+- Notifications demandées :
+  - Aperçu de file après paramètres actifs (max 20 lignes, garde les 3 derniers, `...` au milieu).
+  - Démarrage fichier : `▶️ Démarrage du fichier : ...` avec préfixe `[i/N]`.
+  - Fin fichier : `✅ Conversion terminée en ... | before → after` avec préfixe `[i/N]`.
+  - Fin conversions : `✅ Toutes les conversions terminées`.
+  - Transferts : `📤 Transferts en attente : N` puis `✅ Transferts terminés` (anti-spam via garde-fous).
+  - VMAF : début global + début/fin par fichier (score + qualité) + fin globale.
+  - Fin de run : envoi du résumé, puis un second message avec l’heure de fin.
+  - Ajustement UX : suppression du préfixe “NAScode —” (channel dédié) et suppression du statut (OK/ERROR) sur le message final ; l’heure de fin suffit.
+  - Paramètres actifs : `Jobs parallèles : désactivé` si `PARALLEL_JOBS=1`.
+- Points d’accroche :
+  - [lib/conversion_prep.sh](lib/conversion_prep.sh) : notif démarrage fichier.
+  - [lib/finalize.sh](lib/finalize.sh) : notif fin fichier (durée + tailles).
+  - [lib/processing.sh](lib/processing.sh) : notif fin conversions (simple + FIFO).
+  - [lib/transfer.sh](lib/transfer.sh) : notifs transferts en attente/terminés.
+  - [lib/vmaf.sh](lib/vmaf.sh) : notifs VMAF par fichier.
+
+Tests :
+
+- [tests/test_notify.bats](tests/test_notify.bats) : ajout de tests pour `jobs parallèles : désactivé` et aperçu de queue (max 20 + `...` + 3 derniers).
+
+Correctifs tests (suite Bats) :
+
+- [lib/logging.sh](lib/logging.sh) : `LOG_DIR` reste ancré sur `$SCRIPT_DIR/logs` **par défaut**, mais accepte maintenant un override via variable d’environnement (utile pour l’isolement des runs de tests).
+- E2E/régression : forcent `LOG_DIR="$WORKDIR/logs"` pour éviter de polluer le repo et stabiliser les assertions.
+- [tests/test_e2e_stream_mapping.bats](tests/test_e2e_stream_mapping.bats) : accepte une sortie redirigée en dossier `_Heavier` (gain insuffisant / fichier plus lourd).
+- Validation : `bash run_tests.sh` OK (suite complète).
+
+Derniers prompts :
+
+- "On va travailler sur les notifications dans discord... (Option B)"
+- "ok pour option B"
+- "PAs besoin d'afficher ce genre de message..." / "Oui retire..." / "Il y a eu des erreurs dans les tests... continue sans t'arreter"
+
+### 2026-01-13 — Robustesse Git Bash : workdir par job + "Heavier" + logs ancrés
+
+Branche : `feature/robustness-heavy-outputs`
+
+Changements principaux :
+
+- Isolation des encodages (two-pass) par job via un répertoire de travail temporaire dédié (`NASCODE_WORKDIR`) pour éviter les collisions de logs two-pass en parallèle.
+- Random queue portable sans Python : remplacement `sort -R` par un shuffle best-effort (`shuf` si dispo, sinon `awk`+`sort`).
+- Logs ancrés au dossier du script (`$SCRIPT_DIR/logs`) au lieu de dépendre du `cwd`.
+- Guardrails Git Bash : fallback si `mkfifo` indisponible/échoue ; compteurs atomiques sans dépendre strictement de `flock`.
+- Sorties "plus lourdes" / gain faible : redirection vers `Converted_Heavier/` (suffix configurable) + anti-boucle (skip si une sortie Heavier existe déjà).
+
+Docs/tests :
+
+- [docs/CONFIG.md](docs/CONFIG.md) : nouvelle section sur `HEAVY_OUTPUT_ENABLED`, `HEAVY_MIN_SAVINGS_PERCENT`, `HEAVY_OUTPUT_DIR_SUFFIX` + comportement/anti-boucle.
+- [README.md](README.md) : mention de la redirection `Converted_Heavier/` + précision que logs/sortie sont ancrés au dossier du script.
+- [tests/test_heavy_outputs.bats](tests/test_heavy_outputs.bats) : test anti-boucle via `_check_output_exists`.
+
+Derniers prompts :
+
+- "Fais une revue globale du code et dis moi ce que tu en penses"
+- "Vas y pour la revue plus chirurgicale… (pas de fallback Python)"
+- "ok tout est bon go" / "continue"
+
 ### Contexte
 
 - Symptôme rapporté : la conversion peut “se bloquer” quand aucun fichier n’est réellement traitable (ex: entrée vide, fichier introuvable, ou source passée dans les exclusions).

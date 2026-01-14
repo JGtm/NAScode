@@ -14,6 +14,9 @@ setup() {
     export SRC_DIR="$TEST_TEMP_DIR/src"
     export OUT_DIR="$TEST_TEMP_DIR/out"
 
+    # Forcer les logs dans le WORKDIR (isolement, pas de pollution du repo)
+    export LOG_DIR="$WORKDIR/logs"
+
     mkdir -p "$WORKDIR" "$SRC_DIR" "$OUT_DIR"
     touch "$SRC_DIR/a.mkv"
 }

@@ -134,6 +134,58 @@ show_summary() {
     # Traiter toutes les analyses VMAF en attente
     process_vmaf_queue
 
+    _get_term_cols() {
+        local cols="${COLUMNS:-}"
+        if [[ -n "$cols" ]] && [[ "$cols" =~ ^[0-9]+$ ]]; then
+            echo "$cols"
+            return 0
+        fi
+        if command -v tput >/dev/null 2>&1 && [[ -t 1 ]]; then
+            cols=$(tput cols 2>/dev/null || echo "")
+        fi
+        [[ -z "$cols" || ! "$cols" =~ ^[0-9]+$ ]] && cols=999
+        echo "$cols"
+    }
+
+    _render_summary_compact() {
+        local end_date="$1"
+        local total_elapsed_str="$2"
+        local succ="$3"
+        local skip="$4"
+        local err="$5"
+        local size_anomalies="$6"
+        local checksum_anomalies="$7"
+        local vmaf_anomalies="$8"
+        local show_vmaf_anomaly="$9"
+        shift 9 || true
+        local show_space_savings="$1"
+        local line1="$2"
+        local line2="$3"
+
+        echo ""
+        echo -e "${GREEN}Résumé${NOCOLOR} ${DIM}(${end_date})${NOCOLOR}"
+        echo -e "${DIM}Durée:${NOCOLOR} ${CYAN}${total_elapsed_str}${NOCOLOR}"
+        echo -e "${DIM}Résultat:${NOCOLOR} ${GREEN}OK=${succ}${NOCOLOR}  ${YELLOW}SKIP=${skip}${NOCOLOR}  ${RED}ERR=${err}${NOCOLOR}"
+
+        local has_any_anomaly=false
+        if [[ "$size_anomalies" -gt 0 ]] || [[ "$checksum_anomalies" -gt 0 ]]; then
+            has_any_anomaly=true
+        fi
+        if [[ "${VMAF_ENABLED:-false}" == true ]] && [[ "$vmaf_anomalies" -gt 0 ]]; then
+            has_any_anomaly=true
+        fi
+
+        if [[ "$has_any_anomaly" == true ]]; then
+            echo -e "${YELLOW}Anomalies:${NOCOLOR} taille=${size_anomalies} intégrité=${checksum_anomalies}${NOCOLOR}"${show_vmaf_anomaly:+" vmaf=${vmaf_anomalies}"}
+        fi
+
+        if [[ "$show_space_savings" == true ]]; then
+            echo -e "${DIM}Espace:${NOCOLOR} ${GREEN}${line1}${NOCOLOR}"
+            [[ -n "$line2" ]] && echo -e "${GREEN}${line2}${NOCOLOR}"
+        fi
+        echo ""
+    }
+
     # Durée totale du traitement
     local total_elapsed_str="N/A"
     if [[ -n "${START_TS_TOTAL:-}" ]] && [[ "${START_TS_TOTAL}" =~ ^[0-9]+$ ]]; then
@@ -156,7 +208,9 @@ show_summary() {
     local checksum_anomalies
     checksum_anomalies=$(_count_log_pattern ' ERROR (MISMATCH|SIZE_MISMATCH|NO_CHECKSUM) ' 'E')
     local vmaf_anomalies
-    vmaf_anomalies=$(_count_log_pattern ' | VMAF | .* | quality:DEGRADE')
+    # VMAF : considérer comme anomalie les scores "DEGRADE" ET les NA.
+    # Exemple ligne log: "... | VMAF | ... | score:NA | quality:NA"
+    vmaf_anomalies=$(_count_log_pattern ' \| VMAF \| .* \| (score:NA|quality:DEGRADE)' 'E')
     
     # Calcul du gain de place total
     local savings_data line1 line2 show_space_savings
@@ -184,31 +238,64 @@ show_summary() {
         show_vmaf_anomaly=true
     fi
     
-    {
-        print_summary_header
-        print_summary_item "Date fin" "$(date +"%Y-%m-%d %H:%M:%S")"
-        print_summary_item "Durée totale" "${total_elapsed_str}" "$CYAN"
-        print_summary_separator
-        print_summary_item "Succès" "$succ" "$GREEN"
-        print_summary_item "Ignorés" "$skip" "$YELLOW"
-        print_summary_item "Erreurs" "$err" "$RED"
-        # Section anomalies : intégrée avec titre centré
-        if [[ "$has_any_anomaly" == true ]]; then
+    local end_date
+    end_date=$(date +"%Y-%m-%d %H:%M:%S")
+
+    # Écrire des métriques machine-readable (pour notifications Discord)
+    # Format: key=value (une ligne par clé)
+    if [[ -n "${SUMMARY_METRICS_FILE:-}" ]]; then
+        {
+            printf 'end_date=%s\n' "$end_date"
+            printf 'duration_total=%s\n' "${total_elapsed_str:-}"
+            printf 'succ=%s\n' "$succ"
+            printf 'skip=%s\n' "$skip"
+            printf 'err=%s\n' "$err"
+            printf 'size_anomalies=%s\n' "$size_anomalies"
+            printf 'checksum_anomalies=%s\n' "$checksum_anomalies"
+            printf 'vmaf_anomalies=%s\n' "$vmaf_anomalies"
+            printf 'show_vmaf_anomaly=%s\n' "$show_vmaf_anomaly"
+            printf 'has_any_anomaly=%s\n' "$has_any_anomaly"
+            printf 'show_space_savings=%s\n' "$show_space_savings"
+            printf 'space_line1=%s\n' "${line1:-}"
+            printf 'space_line2=%s\n' "${line2:-}"
+        } > "${SUMMARY_METRICS_FILE}" 2>/dev/null || true
+    fi
+
+    local cols
+    cols=$(_get_term_cols)
+    local compact=false
+    [[ "$cols" -lt 80 ]] && compact=true
+
+    if [[ "$compact" == true ]]; then
+        _render_summary_compact "$end_date" "$total_elapsed_str" "$succ" "$skip" "$err" "$size_anomalies" "$checksum_anomalies" "$vmaf_anomalies" "$show_vmaf_anomaly" "$show_space_savings" "$line1" "$line2" \
+            | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
+    else
+        {
+            print_summary_header
+            print_summary_item "Date fin" "$end_date"
+            print_summary_item "Durée totale" "${total_elapsed_str}" "$CYAN"
             print_summary_separator
-            print_summary_section_title "⚠  ANOMALIE(S)  ⚠"
-            print_summary_separator
-            [[ "$size_anomalies" -gt 0 ]] && print_summary_item "Taille" "$size_anomalies" "$YELLOW"
-            [[ "$checksum_anomalies" -gt 0 ]] && print_summary_item "Intégrité" "$checksum_anomalies" "$RED"
-            [[ "$show_vmaf_anomaly" == true ]] && print_summary_item "VMAF" "$vmaf_anomalies" "$YELLOW"
-        fi
-        # Afficher le gain de place si disponible (sur deux lignes)
-        if [[ "$show_space_savings" == true ]]; then
-            print_summary_separator
-            print_summary_item "Espace économisé" "$line1" "$GREEN"
-            print_summary_value_only "$line2" "$GREEN"
-        fi
-        print_summary_footer
-    } | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
+            print_summary_item "Succès" "$succ" "$GREEN"
+            print_summary_item "Ignorés" "$skip" "$YELLOW"
+            print_summary_item "Erreurs" "$err" "$RED"
+            # Section anomalies : intégrée avec titre centré
+            if [[ "$has_any_anomaly" == true ]]; then
+                print_summary_separator
+                print_summary_section_title "⚠  ANOMALIE(S)  ⚠"
+                print_summary_separator
+                [[ "$size_anomalies" -gt 0 ]] && print_summary_item "Taille" "$size_anomalies" "$YELLOW"
+                [[ "$checksum_anomalies" -gt 0 ]] && print_summary_item "Intégrité" "$checksum_anomalies" "$RED"
+                [[ "$show_vmaf_anomaly" == true ]] && print_summary_item "VMAF" "$vmaf_anomalies" "$YELLOW"
+            fi
+            # Afficher le gain de place si disponible (sur deux lignes)
+            if [[ "$show_space_savings" == true ]]; then
+                print_summary_separator
+                print_summary_item "Espace économisé" "$line1" "$GREEN"
+                print_summary_value_only "$line2" "$GREEN"
+            fi
+            print_summary_footer
+        } | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
+    fi
     
     # Note: Le statut heures creuses est déjà affiché au démarrage (show_off_peak_startup_info)
     # Pas besoin de le réafficher après le résumé final

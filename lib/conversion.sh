@@ -141,6 +141,16 @@ convert_file() {
     tmp_output=$(_get_temp_filename "$file_original" ".out.mkv")
     local ffmpeg_log_temp
     ffmpeg_log_temp=$(_get_temp_filename "$file_original" "_err.log")
+
+    # Isoler l'exécution FFmpeg (two-pass logs) dans un workdir dédié par fichier.
+    local job_workdir=""
+    if declare -f _get_temp_workdir &>/dev/null; then
+        job_workdir=$(_get_temp_workdir "$file_original")
+        if [[ -n "$job_workdir" ]]; then
+            mkdir -p "$job_workdir" 2>/dev/null || true
+            export NASCODE_WORKDIR="$job_workdir"
+        fi
+    fi
     
     # 4. Décision de conversion
     if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]]; then
@@ -237,6 +247,12 @@ convert_file() {
         _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$size_before_mb"
     else
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
+    fi
+
+    # Nettoyer le workdir dédié (best-effort)
+    if [[ -n "${NASCODE_WORKDIR:-}" ]] && [[ -n "$job_workdir" ]] && [[ "$job_workdir" == "$NASCODE_WORKDIR" ]]; then
+        rm -rf -- "$job_workdir" 2>/dev/null || true
+        unset NASCODE_WORKDIR
     fi
     
     _mark_processed_once

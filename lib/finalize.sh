@@ -166,23 +166,10 @@ _finalize_log_and_verify() {
             original_size_bytes=$((size_before_mb * 1024 * 1024))
         fi
         
-        # Incrémenter les compteurs atomiquement (flock pour éviter race conditions en parallèle)
-        if [[ -n "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && [[ -f "$TOTAL_SIZE_BEFORE_FILE" ]]; then
-            (
-                flock -x 200
-                local current
-                current=$(cat "$TOTAL_SIZE_BEFORE_FILE" 2>/dev/null || echo 0)
-                echo $((current + original_size_bytes)) > "$TOTAL_SIZE_BEFORE_FILE"
-            ) 200>"${TOTAL_SIZE_BEFORE_FILE}.lock" 2>/dev/null || true
-        fi
-        
-        if [[ -n "${TOTAL_SIZE_AFTER_FILE:-}" ]] && [[ -f "$TOTAL_SIZE_AFTER_FILE" ]]; then
-            (
-                flock -x 200
-                local current
-                current=$(cat "$TOTAL_SIZE_AFTER_FILE" 2>/dev/null || echo 0)
-                echo $((current + size_after_bytes)) > "$TOTAL_SIZE_AFTER_FILE"
-            ) 200>"${TOTAL_SIZE_AFTER_FILE}.lock" 2>/dev/null || true
+        # Incrémenter les compteurs de façon robuste (flock si dispo, sinon lock portable).
+        if declare -f atomic_add_int_to_file &>/dev/null; then
+            [[ -n "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && atomic_add_int_to_file "$TOTAL_SIZE_BEFORE_FILE" "$original_size_bytes"
+            [[ -n "${TOTAL_SIZE_AFTER_FILE:-}" ]] && atomic_add_int_to_file "$TOTAL_SIZE_AFTER_FILE" "$size_after_bytes"
         fi
     fi
     
@@ -263,6 +250,15 @@ _finalize_conversion_success() {
             size_part=" | ${before_fmt} → ${after_fmt}"
         fi
 
+        # Notification Discord (best-effort) : fin fichier
+        if declare -f notify_event &>/dev/null; then
+            if [[ "${SAMPLE_MODE:-false}" == true ]]; then
+                notify_event file_completed "${elapsed_display}" "" "" || true
+            else
+                notify_event file_completed "${elapsed_display}" "${before_fmt:-}" "${after_fmt:-}" || true
+            fi
+        fi
+
         print_success "Conversion terminée en ${elapsed_display}${size_part}"
     fi
 
@@ -281,6 +277,51 @@ _finalize_conversion_success() {
     checksum_before=$(compute_sha256 "$tmp_output" 2>/dev/null || echo "")
     size_before_bytes=$(get_file_size_bytes "$tmp_output")
 
+    # Gestion des sorties "lourdes" : si la sortie n'apporte pas assez de gain (ou grossit),
+    # rediriger vers un dossier séparé (OUTPUT_DIR + suffix) en conservant l'arborescence.
+    local final_output_target="$final_output"
+    if [[ "${HEAVY_OUTPUT_ENABLED:-true}" == true ]] && [[ "${SAMPLE_MODE:-false}" != true ]]; then
+        local original_bytes encoded_bytes
+        original_bytes=0
+        encoded_bytes=0
+
+        if [[ -e "$file_original" ]]; then
+            original_bytes=$(get_file_size_bytes "$file_original")
+        elif [[ -n "${size_before_mb:-}" ]] && [[ "${size_before_mb}" =~ ^[0-9]+$ ]]; then
+            original_bytes=$((size_before_mb * 1024 * 1024))
+        fi
+        if [[ -e "$tmp_output" ]]; then
+            encoded_bytes=$(get_file_size_bytes "$tmp_output")
+        fi
+
+        local min_savings="${HEAVY_MIN_SAVINGS_PERCENT:-10}"
+        if [[ "$min_savings" =~ ^[0-9]+$ ]] && [[ "$original_bytes" -gt 0 ]] && [[ "$encoded_bytes" -gt 0 ]]; then
+            local savings_percent
+            savings_percent=$(((original_bytes - encoded_bytes) * 100 / original_bytes))
+
+            if [[ "$encoded_bytes" -ge "$original_bytes" || "$savings_percent" -lt "$min_savings" ]]; then
+                if declare -f compute_heavy_output_path &>/dev/null; then
+                    local heavy_target
+                    heavy_target=$(compute_heavy_output_path "$final_output" "$OUTPUT_DIR" 2>/dev/null || echo "")
+                    if [[ -n "$heavy_target" ]]; then
+                        final_output_target="$heavy_target"
+                        mkdir -p "$(dirname "$final_output_target")" 2>/dev/null || true
+
+                        if declare -f print_heavy_output_redirect &>/dev/null; then
+                            print_heavy_output_redirect "$final_output_target"
+                        else
+                            print_warning "Gain insuffisant : sortie redirigée vers $final_output_target"
+                        fi
+
+                        if [[ -n "$LOG_SESSION" ]]; then
+                            echo "$(date '+%Y-%m-%d %H:%M:%S') | HEAVY_OUTPUT_REDIRECT | $file_original -> $final_output_target | savings:${savings_percent}% (threshold:${min_savings}%)" >> "$LOG_SESSION" 2>/dev/null || true
+                        fi
+                    fi
+                fi
+            fi
+        fi
+    fi
+
     # Vérifier si le système de transfert asynchrone est initialisé
     if [[ -n "${TRANSFER_PIDS_FILE:-}" ]] && declare -f start_async_transfer &>/dev/null; then
         # Attendre qu'un slot de transfert soit disponible (max 2 simultanés)
@@ -291,16 +332,16 @@ _finalize_conversion_success() {
         local callback_data="${checksum_before}|${size_before_mb}|${size_before_bytes}|${tmp_input}|${ffmpeg_log_temp}"
         
         # Lancer le transfert en arrière-plan
-        start_async_transfer "$tmp_output" "$final_output" "$file_original" "$callback_data"
+        start_async_transfer "$tmp_output" "$final_output_target" "$file_original" "$callback_data"
     else
         # Mode synchrone (fallback si transfert asynchrone non initialisé)
         # Déplacer / copier / fallback et récupérer le chemin réel
         local final_actual move_status
-        final_actual=$(_finalize_try_move "$tmp_output" "$final_output" "$file_original")
+        final_actual=$(_finalize_try_move "$tmp_output" "$final_output_target" "$file_original")
         move_status=$?
 
         # Nettoyage, logs et vérifications
-        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes" "$final_output" "$move_status"
+        _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "$checksum_before" "$size_before_mb" "$size_before_bytes" "$final_output_target" "$move_status"
     fi
 }
 

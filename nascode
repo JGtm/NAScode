@@ -49,6 +49,16 @@ if [[ ! -d "$LIB_DIR" ]]; then
     exit 1
 fi
 
+# Auto-charger un fichier d'environnement local (optionnel)
+# Remarque: implémentation dans lib/env.sh (sans `source` du .env)
+if [[ -f "$LIB_DIR/env.sh" ]]; then
+    # shellcheck disable=SC1090
+    source "$LIB_DIR/env.sh"
+    if declare -f _nascode_autoload_env >/dev/null 2>&1; then
+        _nascode_autoload_env "$SCRIPT_DIR"
+    fi
+fi
+
 # Charger les modules dans l'ordre des dépendances
 source "$LIB_DIR/ui.sh"           # Codes couleurs (pas de dépendances)
 source "$LIB_DIR/ui_options.sh"   # Formatage options UI (dépend de ui.sh)
@@ -105,11 +115,6 @@ main() {
     # Configurer les paramètres selon le mode de conversion
     set_conversion_mode_parameters
 
-    # Notification de démarrage (Discord) — best-effort, ne doit jamais interrompre.
-    if declare -f notify_event_run_started &>/dev/null; then
-        notify_event_run_started || true
-    fi
-    
     # Mode fichier unique : traiter directement sans index/queue
     if [[ -n "${SINGLE_FILE:-}" ]]; then
         # Convertir en chemin absolu (robuste aux espaces)
@@ -140,6 +145,13 @@ main() {
         detect_hwaccel
         check_vmaf
         export_variables
+
+        # Notification de démarrage (Discord) — best-effort.
+        if declare -f notify_event &>/dev/null; then
+            notify_event run_started || true
+        elif declare -f notify_event_run_started &>/dev/null; then
+            notify_event_run_started || true
+        fi
         
         # Conversion directe du fichier unique
         if [[ "$NO_PROGRESS" != true ]]; then
@@ -190,6 +202,14 @@ main() {
 
     # Construire la file d'attente (peut poser des questions sur l'index)
     build_queue
+
+    # Notification de démarrage (Discord) — best-effort.
+    # Placée ici pour inclure l'aperçu de la file (après les paramètres actifs).
+    if declare -f notify_event &>/dev/null; then
+        notify_event run_started || true
+    elif declare -f notify_event_run_started &>/dev/null; then
+        notify_event_run_started || true
+    fi
     
     # Exporter les variables et fonctions pour les sous-shells
     export_variables

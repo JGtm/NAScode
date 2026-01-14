@@ -93,11 +93,37 @@ _check_output_exists() {
             echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
 
+        if declare -f notify_event &>/dev/null; then
+            notify_event file_skipped "$filename" "Fichier de sortie déjà existant" || true
+        fi
+
         # Alimenter la queue avec le prochain candidat si limite active
         if [[ "$LIMIT_FILES" -gt 0 ]]; then
             update_queue || true
         fi
         return 0
+    fi
+
+    # Anti-boucle : si une sortie "Heavier" existe déjà pour ce fichier, ne pas re-traiter.
+    if [[ "$DRYRUN" != true ]] && [[ "${HEAVY_OUTPUT_ENABLED:-true}" == true ]] && declare -f compute_heavy_output_path &>/dev/null; then
+        local heavy_output
+        heavy_output=$(compute_heavy_output_path "$final_output" "$OUTPUT_DIR" 2>/dev/null || echo "")
+        if [[ -n "$heavy_output" ]] && [[ -f "$heavy_output" ]]; then
+            local counter_prefix
+            counter_prefix=$(_get_counter_prefix)
+            echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Sortie 'Heavier' déjà existante) : $filename${NOCOLOR}" >&2
+            if [[ -n "$LOG_SESSION" ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Heavier output exists) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+            fi
+
+            if declare -f notify_event &>/dev/null; then
+                notify_event file_skipped "$filename" "Sortie 'Heavier' déjà existante" || true
+            fi
+            if [[ "$LIMIT_FILES" -gt 0 ]]; then
+                update_queue || true
+            fi
+            return 0
+        fi
     fi
     return 1
 }
@@ -126,6 +152,13 @@ _get_temp_filename() {
     echo "$TMP_DIR/tmp_${md5p}_${RANDOM}${suffix}"
 }
 
+_get_temp_workdir() {
+    local file_original="$1"
+    local md5p
+    md5p=$(compute_md5_prefix "$file_original")
+    echo "$TMP_DIR/work_${md5p}_${EXECUTION_TIMESTAMP}_$$_${RANDOM}"
+}
+
 _setup_temp_files_and_logs() {
     local filename="$1"
     local file_original="$2"
@@ -139,6 +172,11 @@ _setup_temp_files_and_logs() {
         local counter_str
         counter_str=$(_get_counter_prefix)
         echo -e "${counter_str}▶️ Démarrage du fichier : $filename"
+    fi
+
+    # Notification Discord (best-effort) : démarrage fichier
+    if declare -f notify_event &>/dev/null; then
+        notify_event file_started "$filename" || true
     fi
     if [[ "$log_start" == true ]] && [[ -n "$LOG_PROGRESS" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | START | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true

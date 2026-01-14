@@ -67,6 +67,11 @@ _process_queue_simple() {
     if [[ "$NO_PROGRESS" != true ]] && [[ "$nb_files" -gt 0 ]]; then
         print_conversion_complete
     fi
+
+    # Notification Discord (best-effort) : toutes conversions terminées
+    if [[ "$nb_files" -gt 0 ]] && declare -f notify_event &>/dev/null; then
+        notify_event conversions_completed "$nb_files" || true
+    fi
 }
 
 ###########################################################
@@ -125,7 +130,12 @@ _process_queue_with_fifo() {
 
     # Créer le FIFO et lancer un writer de fond
     rm -f "$WORKFIFO" 2>/dev/null || true
-    mkfifo "$WORKFIFO"
+    if ! mkfifo "$WORKFIFO" 2>/dev/null; then
+        print_warning "Impossible de créer le FIFO (mkfifo). Bascule en mode --limit sans remplacement dynamique."
+        rm -f "$WORKFIFO" 2>/dev/null || true
+        _process_queue_simple
+        return 0
+    fi
     
     # Writer : écrit la queue initiale puis attend que tous les fichiers soient traités
     (
@@ -260,6 +270,11 @@ _process_queue_with_fifo() {
     if [[ "$NO_PROGRESS" != true ]] && [[ "$nb_files" -gt 0 ]]; then
         print_conversion_complete
     fi
+
+    # Notification Discord (best-effort) : toutes conversions terminées
+    if [[ "$nb_files" -gt 0 ]] && declare -f notify_event &>/dev/null; then
+        notify_event conversions_completed "$nb_files" || true
+    fi
 }
 
 ###########################################################
@@ -269,7 +284,14 @@ _process_queue_with_fifo() {
 # Point d'entrée : choisit le mode de traitement selon la présence d'une limite
 prepare_dynamic_queue() {
     if [[ "$LIMIT_FILES" -gt 0 ]]; then
-        # Mode FIFO : permet le remplacement dynamique des fichiers skippés
+        # Mode FIFO : permet le remplacement dynamique des fichiers skippés.
+        # Guardrail : mkfifo n'est pas toujours disponible (Git Bash minimal / environnements restreints).
+        # Fallback : traiter simplement la queue limitée, sans remplacement dynamique.
+        if ! command -v mkfifo >/dev/null 2>&1; then
+            print_warning "mkfifo introuvable : mode --limit sans remplacement dynamique."
+            _process_queue_simple
+            return 0
+        fi
         _process_queue_with_fifo
     else
         # Mode simple : traitement direct sans overhead FIFO

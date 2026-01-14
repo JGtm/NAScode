@@ -19,6 +19,11 @@ LIMIT_FILES=0
 CUSTOM_QUEUE=""
 SOURCE="../"
 OUTPUT_DIR="$SCRIPT_DIR/Converted"
+# Gestion des sorties "lourdes" : si le fichier converti est plus gros que l'original
+# ou si le gain est inférieur à un seuil, la sortie est redirigée vers un dossier séparé.
+HEAVY_OUTPUT_ENABLED=true
+HEAVY_MIN_SAVINGS_PERCENT=10
+HEAVY_OUTPUT_DIR_SUFFIX="_Heavier"
 # Mode suffixe : ask (défaut, question interactive), on (-S), off (-x), custom:xxx (-S "xxx")
 SUFFIX_MODE="ask"
 REGENERATE_INDEX=false    # Régénérer l'index via -R/--regenerate-index

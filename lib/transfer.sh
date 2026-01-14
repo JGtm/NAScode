@@ -129,6 +129,14 @@ wait_all_transfers() {
     
     local active_count
     active_count=$(_count_active_transfers)
+
+    # Notification Discord (best-effort) : transferts en attente
+    if [[ "$active_count" -gt 0 ]] && [[ "${NASCODE_NOTIFY_TRANSFERS_PENDING_SENT:-0}" != "1" ]]; then
+        NASCODE_NOTIFY_TRANSFERS_PENDING_SENT=1
+        if declare -f notify_event &>/dev/null; then
+            notify_event transfers_pending "$active_count" || true
+        fi
+    fi
     
     # Si aucun transfert actif ET aucun transfert lancé, sortir silencieusement
     if [[ "$active_count" -eq 0 ]] && [[ "$had_transfers" == false ]]; then
@@ -139,6 +147,14 @@ wait_all_transfers() {
     if [[ "$active_count" -eq 0 ]] && [[ "$had_transfers" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
             print_transfer_complete
+        fi
+
+        # Notification Discord (best-effort) : transferts terminés
+        if [[ "${NASCODE_NOTIFY_TRANSFERS_DONE_SENT:-0}" != "1" ]]; then
+            NASCODE_NOTIFY_TRANSFERS_DONE_SENT=1
+            if declare -f notify_event &>/dev/null; then
+                notify_event transfers_done || true
+            fi
         fi
         return 0
     fi
@@ -165,6 +181,14 @@ wait_all_transfers() {
     
     if [[ "$NO_PROGRESS" != true ]]; then
         print_transfer_complete
+    fi
+
+    # Notification Discord (best-effort) : transferts terminés
+    if [[ "${NASCODE_NOTIFY_TRANSFERS_DONE_SENT:-0}" != "1" ]]; then
+        NASCODE_NOTIFY_TRANSFERS_DONE_SENT=1
+        if declare -f notify_event &>/dev/null; then
+            notify_event transfers_done || true
+        fi
     fi
 }
 

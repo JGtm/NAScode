@@ -200,6 +200,14 @@ print_warning_box() {
     echo -e "${YELLOW}  └${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${BOX_H}${NOCOLOR}"
 }
 
+# Sortie "heavy" (plus lourde / gain faible) : la conversion est conservée mais redirigée.
+# Usage: print_heavy_output_redirect "Converted_Heavier/..."
+print_heavy_output_redirect() {
+    _ui_is_quiet && return 0
+    local target="$1"
+    print_warning_box "Sortie redirigée" "Gain insuffisant : fichier déplacé vers ${target}"
+}
+
 # Affiche un encadré d'information
 # Usage: print_info_box "Titre" "Message"
 print_info_box() {
@@ -551,6 +559,9 @@ print_skip_message() {
     case "$CONVERSION_ACTION" in
         "skip")
             if [[ -z "$codec" ]]; then
+                if declare -f notify_event &>/dev/null; then
+                    notify_event file_skipped "$filename" "Pas de flux vidéo" || true
+                fi
                 echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
                     echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
@@ -562,6 +573,9 @@ print_skip_message() {
                 # En mode adaptatif, préciser que c'est par rapport au seuil adaptatif
                 if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
                     skip_msg="Déjà ${codec_display} & bitrate ≤ seuil adaptatif"
+                fi
+                if declare -f notify_event &>/dev/null; then
+                    notify_event file_skipped "$filename" "$skip_msg" || true
                 fi
                 echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (${skip_msg}) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then

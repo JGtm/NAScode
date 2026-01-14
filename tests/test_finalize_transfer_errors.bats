@@ -210,3 +210,21 @@ teardown() {
     # Ne doit pas afficher "Espace économisé"
     [[ "$output" != *"Espace économisé"* ]]
 }
+
+@test "show_summary: VMAF NA est compté comme anomalie" {
+    # Forcer le rendu non-compact pour une vérification stable via SUMMARY_FILE
+    export COLUMNS=999
+    export VMAF_ENABLED=true
+
+    # Simuler deux lignes VMAF dans le log de session (LOG_SESSION=$LOG_ERROR dans setup)
+    echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | /src/a.mkv → /out/a.mkv | score:NA | quality:NA" >> "$LOG_SESSION"
+    echo "$(date '+%Y-%m-%d %H:%M:%S') | VMAF | /src/b.mkv → /out/b.mkv | score:65.00 | quality:DEGRADE" >> "$LOG_SESSION"
+
+    export START_TS_TOTAL=1
+    run show_summary
+    [ "$status" -eq 0 ]
+
+    # Doit afficher une anomalie VMAF=2
+    run grep -E "VMAF.*2" "$SUMMARY_FILE"
+    [ "$status" -eq 0 ]
+}

@@ -68,9 +68,33 @@ Le script évolue : la table ci-dessous est un rappel, l’autorité reste `bash
 
 Pour comprendre les décisions audio/vidéo (skip/passthrough/convert), voir [SMART_CODEC.md](SMART_CODEC.md).
 
+## Sorties plus lourdes / gain faible ("Heavier")
+
+Si une conversion produit un fichier **plus lourd** (ou un gain inférieur à un seuil), NAScode peut rediriger la sortie vers un dossier séparé afin d’éviter les boucles de re-traitement.
+
+- Dossier par défaut : `Converted_Heavier/` (à côté de `Converted/`), en conservant l'arborescence.
+- Anti-boucle : si une sortie "Heavier" existe déjà pour un fichier, NAScode **skip** ce fichier.
+
+Réglages (dans la config) :
+
+- `HEAVY_OUTPUT_ENABLED` : `true`/`false`
+- `HEAVY_MIN_SAVINGS_PERCENT` : gain minimum en %
+- `HEAVY_OUTPUT_DIR_SUFFIX` : suffixe de dossier (défaut `_Heavier`)
+
+Voir aussi : [CONFIG.md](CONFIG.md)
+
 ## Notifications Discord (optionnel)
 
 NAScode supporte des notifications via webhook Discord (Markdown). Elles sont **best-effort** : une erreur réseau ne doit pas interrompre la conversion.
+
+Contenu typique des notifications :
+
+- Démarrage : paramètres actifs + aperçu de la queue (format `[i/N]`, jusqu’à 20 éléments)
+- Par fichier : démarrage puis fin (durée + tailles `avant → après`)
+- Par fichier : skip (ignoré + raison)
+- Transferts : en attente puis terminés (si applicable)
+- VMAF (si activé) : démarrage + résultat par fichier (note/qualité) + fin globale
+- Fin : résumé (si disponible) puis message final avec horodatage
 
 Variables d’environnement :
 
@@ -82,11 +106,11 @@ Variables d’environnement :
 	# Recommandé : fichier local ignoré par Git
 	cp .env.example .env.local
 
-	set -a
-	source ./.env.local
-	set +a
-
 	bash nascode -p -s "/chemin/vers/series"
+
+	# Note : `nascode` charge automatiquement `./.env.local` (si présent).
+	# Désactiver : NASCODE_ENV_AUTOLOAD=false
+	# Autre fichier : NASCODE_ENV_FILE=/chemin/vers/mon.env
 
 ### Exemple (PowerShell)
 
