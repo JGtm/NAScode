@@ -53,6 +53,12 @@ _notify_strip_ansi() {
     sed -E 's/\x1B\[[0-9;]*[[:alpha:]]//g'
 }
 
+_notify_discord_pad() {
+    # Discord a tendance à ignorer les sauts de lignes en fin de message.
+    # On ajoute un caractère invisible (ZWSP) sur une nouvelle ligne pour forcer un padding visuel.
+    printf '%s' $'\n\n\u200B'
+}
+
 _notify_kv_get() {
     # Usage: _notify_kv_get <file> <key>
     local file="${1-}"
@@ -91,7 +97,7 @@ _notify_format_run_summary_markdown() {
     space_line2=$(_notify_kv_get "$metrics_file" "space_line2")
 
     local body="🧾 Résumé"
-    [[ -n "$now" ]] && body+=$'\n'"**Fin** : ${now}"
+    [[ -n "$now" ]] && body+=$'\n\n'"**Fin** : ${now}"
     [[ -n "$duration_total" ]] && body+=$'\n'"**Durée** : ${duration_total}"
 
     body+=$'\n\n'"**Résultats**"
@@ -127,7 +133,7 @@ _notify_format_run_summary_markdown() {
 
     body+=$'\n\n'"✅ Session terminée (code ${exit_code})"
 
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_format_event_file_skipped() {
@@ -149,7 +155,7 @@ _notify_format_event_run_started() {
     # Usage: _notify_format_event_run_started <now>
     local now="${1-}"
 
-    local body="Démarrage"
+    local body="Exécution"
     [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
 
     body+=$'\n\n'"**Paramètres actifs**"$'\n'
@@ -204,7 +210,7 @@ _notify_format_event_run_started() {
         fi
     fi
 
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_format_event_file_started() {
@@ -248,8 +254,7 @@ _notify_format_event_conversions_completed() {
     fi
 
     # UX Discord: laisser une ligne vide après les étapes “macro”
-    body+=$'\n\n'
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_format_event_transfers_pending() {
@@ -264,7 +269,7 @@ _notify_format_event_transfers_pending() {
 
 _notify_format_event_transfers_done() {
     # UX Discord: laisser une ligne vide après l'étape transferts
-    printf '%s' $'✅ Transferts terminés\n\n'
+    printf '%s' $'✅ Transferts terminés'$(_notify_discord_pad)
 }
 
 _notify_format_event_vmaf_started() {
@@ -279,8 +284,7 @@ _notify_format_event_vmaf_started() {
     [[ -n "$mode" ]] && body+=$'\n'"**Mode** : ${mode}"
 
     # UX Discord: laisser une ligne vide après l'annonce de début
-    body+=$'\n\n'
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_format_event_vmaf_file_started() {
@@ -294,7 +298,7 @@ _notify_format_event_vmaf_file_started() {
         prefix="[${cur}/${total}] "
     fi
 
-    printf '%s' "${prefix}🎞️ Début VMAF : $(_notify_truncate_label "$filename" 30)"
+    printf '%s' "${prefix}🎞️ Début d'analyse : $(_notify_truncate_label "$filename" 30)"
 }
 
 _notify_format_vmaf_quality_badge() {
@@ -359,7 +363,7 @@ _notify_format_event_vmaf_completed() {
         done
     fi
 
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_format_event_peak_pause() {
@@ -374,7 +378,7 @@ _notify_format_event_peak_pause() {
     [[ -n "$wait_fmt" ]] && body+=$'\n'"**Attente estimée** : ${wait_fmt}"
     [[ -n "$resume_time" ]] && body+=$'\n'"**Reprise prévue** : ${resume_time}"
     [[ -n "$interval" ]] && body+=$'\n'"**Vérification** : toutes les ${interval}s"
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_format_event_peak_resume() {
@@ -385,7 +389,7 @@ _notify_format_event_peak_resume() {
     local body="▶️ Reprise (heures creuses)"
     [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses** : ${range}"
     [[ -n "$actual_wait" ]] && body+=$'\n'"**Attente réelle** : ${actual_wait}"
-    printf '%s' "$body"
+    printf '%s' "$body"$(_notify_discord_pad)
 }
 
 _notify_format_event_script_exit_summary() {
@@ -406,7 +410,7 @@ _notify_format_event_script_exit_summary() {
         if [[ -n "$summary_snippet" ]]; then
             local body="🧾 Résumé"
             body+=$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"$'\n\n'
-            printf '%s' "$body"
+            printf '%s' "$body"$(_notify_discord_pad)
             return 0
         fi
     fi
