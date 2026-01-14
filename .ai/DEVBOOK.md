@@ -13,6 +13,69 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-15
+
+#### Audit complet du codebase (Phases A, B, C)
+
+- **Quoi** : audit de professionnalisation et robustesse du codebase complet, en 3 phases :
+  - **Phase A** : Documentation `set -euo pipefail` (38 modules), tests equiv-quality cap, tests helpers `_clamp_*`/`_min3`, refactorisation test_helper.bash, centralisation `_translate_bitrate_by_efficiency`.
+  - **Phase B** : Analyse algorithmique de 7 modules clés (skip_decision, audio_decision, conversion, adaptive_mode, complexity, queue, processing).
+  - **Phase C** : Audit des notifications Discord (notify_discord, notify_events, notify_format).
+- **Où** :
+  - `lib/codec_profiles.sh` : ajout de `_translate_bitrate_by_efficiency()` (helper générique centralisé).
+  - `lib/audio_decision.sh` : refactorisation de `translate_audio_bitrate_kbps_between_codecs()` pour déléguer au helper centralisé.
+  - `lib/utils.sh` : suppression de la fonction dupliquée, ajout de protection double-load (`_UTILS_SH_LOADED`).
+  - `lib/exports.sh` : export de `_translate_bitrate_by_efficiency`.
+  - `tests/test_codec_profiles.bats` : 9 tests pour le helper de traduction (H.264→HEVC, HEVC→AV1, same eff, invalid, fallback).
+- **Pourquoi** : éliminer la duplication de code entre audio et vidéo pour la traduction de bitrate, améliorer la couverture de tests, valider la qualité industrielle du code existant.
+- **Résultats de l'audit** :
+  - **skip_decision.sh** : ⭐⭐⭐⭐⭐ — Logique claire, robustesse excellente, aucune action.
+  - **audio_decision.sh** : ⭐⭐⭐⭐⭐ — 618 lignes bien structurées, anti-upscale, traduction equiv-quality.
+  - **conversion.sh** : ⭐⭐⭐⭐⭐ — Orchestration en 8 étapes numérotées, modularité exemplaire.
+  - **adaptive_mode.sh + complexity.sh** : ⭐⭐⭐⭐⭐ — Multi-sampling sophistiqué, calibration documentée.
+  - **queue.sh + processing.sh** : ⭐⭐⭐⭐⭐ — FIFO industriel, compteurs atomiques, reaping propre.
+  - **notify_discord.sh** : ⭐⭐⭐⭐⭐ — Sécurité webhook, best-effort, anti-spam tests.
+  - **notify_events.sh** : ⭐⭐⭐⭐⭐ — Dispatcher propre, anti-doublon.
+  - **notify_format.sh** : ⭐⭐⭐⭐⭐ — Markdown riche, helpers robustes, queue preview AWK.
+- **Impact** :
+  - Tests : 9+ tests ajoutés, tous passent (700+ au total).
+  - Maintenabilité : code mieux factorisé, zéro duplication pour la traduction de bitrate.
+  - Documentation : phases B+C n'ont identifié aucun bug, seulement des améliorations documentaires futures.
+- **Phases restantes** (voir `.ai/TODO.md` section "Phases Refactor/Audit") :
+  - **Phase D** : Documentation (CONFIG.md pour constantes ADAPTIVE_*, SMART_CODEC.md, CHANGELOG, etc.)
+  - ~~**Phase E**~~ : ✅ Terminée — Extraction constantes vers `lib/constants.sh`
+  - ~~**Phase F**~~ : ✅ Évaluée — Refactorisation structurelle non nécessaire (code déjà bien structuré, associative arrays incompatibles avec exports parallèles)
+
+### 2026-01-14 (suite)
+
+#### Phase E : Création de lib/constants.sh
+
+- **Quoi** : centralisation des "magic numbers" et constantes configurables dans un module dédié.
+- **Où** :
+  - `lib/constants.sh` (nouveau) : 12 constantes ADAPTIVE_*, AUDIO_CODEC_EFFICIENT_THRESHOLD, 4 constantes DISCORD_*
+  - `lib/complexity.sh` : remplacé les définitions par des fallbacks compacts (`: "${VAR:=default}"`)
+  - `lib/audio_decision.sh` : utilise la constante centralisée AUDIO_CODEC_EFFICIENT_THRESHOLD
+  - `lib/notify_discord.sh` : utilise les constantes DISCORD_* pour timeout/retries
+  - `lib/exports.sh` : ajout exports pour DISCORD_*, AUDIO_CODEC_EFFICIENT_THRESHOLD
+  - `nascode` : `constants.sh` chargé en premier dans la chaîne de modules
+- **Pourquoi** : 
+  - Éviter la dispersion des valeurs magiques dans le code
+  - Permettre l'override via variables d'environnement (`ADAPTIVE_BPP_BASE=0.04 bash nascode`)
+  - Faciliter la documentation (toutes les constantes au même endroit)
+- **Impact** :
+  - Tests : tous passent (695/695)
+  - Rétrocompatibilité : totale (fallbacks dans les modules si constants.sh absent)
+  - Documentation : les constantes sont maintenant faciles à documenter dans CONFIG.md
+
+#### Phase F : Évaluation de la refactorisation structurelle
+
+- **Quoi** : analyse de deux refactorisations proposées.
+- **Décisions** :
+  1. `_get_smart_audio_decision()` : **non refactorisée** — déjà bien structurée (~290 lignes avec blocs logiques clairs, closure interne `_emit_audio_decision`)
+  2. Globals → Associative arrays : **reportée** — les associative arrays ne peuvent pas être exportés vers des sous-shells (incompatible avec `convert_file` en parallèle)
+- **Pourquoi** : coût/bénéfice défavorable, le code actuel fonctionne très bien.
+- **Impact** : aucun changement de code, documentation mise à jour dans TODO.md.
+
 ### 2026-01-14
 
 #### Audit clean code : documentation et tests

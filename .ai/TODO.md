@@ -50,3 +50,40 @@
   - `lib/video_params.sh` + `lib/transcode_video.sh` : messages vidéo (downscale 1080p, 10-bit/pix_fmt, etc.).
 - Décision : **ne pas centraliser la progress UI** (inchangé).
 
+## Phases Refactor/Audit (2026-01-15)
+
+Améliorations identifiées lors de l'audit complet du codebase (Phases B+C).
+
+### Phase E : Extraction constantes (priorité haute)
+
+- [ ] Créer `lib/constants.sh` pour regrouper les constantes magiques :
+  - Constantes `ADAPTIVE_*` (actuellement dans `complexity.sh`)
+  - Seuils audio (`AUDIO_CODEC_EFFICIENT_THRESHOLD`, bitrates par défaut)
+  - Tolérances skip (`SKIP_TOLERANCE_PERCENT`)
+  - Limites Discord (1900 chars, timeout 10s)
+- [ ] Mettre à jour `nascode` pour sourcer `constants.sh` en premier.
+- [ ] Vérifier que les overrides utilisateur (`ADAPTIVE_BPP_BASE=...`) fonctionnent toujours.
+
+### Phase F : Refactorisation structurelle (priorité moyenne)
+
+- [x] **audio_decision.sh** : analysé, la fonction `_get_smart_audio_decision()` est déjà bien structurée avec des blocs logiques clairs et des `return 0` explicites. Décomposition en sous-fonctions non nécessaire (closure `_emit_audio_decision` dépend du contexte local).
+- [ ] **Globals → Associative arrays** : **REPORTÉ** (v3.0+)
+  - Raison : les associative arrays ne peuvent pas être exportés vers des sous-shells (`convert_file` en parallèle)
+  - Alternative : conserver les variables séparées, bien documentées dans `lib/constants.sh`
+  - Évaluation : le code actuel fonctionne bien, pas de gain majeur à refactoriser maintenant
+
+### Phase D : Documentation (priorité basse — en dernier)
+
+- [ ] **README.md** : vérifier que les options CLI sont à jour, exemples cohérents.
+- [ ] **docs/USAGE.md** : documenter les nouveaux paramètres (`--equiv-quality`, modes audio smart).
+- [ ] **docs/CONFIG.md** : documenter les constantes `ADAPTIVE_*` (film-adaptive) :
+  - `ADAPTIVE_BPP_BASE`, `ADAPTIVE_C_MIN`, `ADAPTIVE_C_MAX`
+  - `ADAPTIVE_STDDEV_LOW`, `ADAPTIVE_STDDEV_HIGH`
+  - `ADAPTIVE_SAMPLE_DURATION`, `ADAPTIVE_SAMPLE_COUNT`
+  - `ADAPTIVE_MARGIN_START_PCT`, `ADAPTIVE_MARGIN_END_PCT`
+  - `ADAPTIVE_MIN_BITRATE_KBPS`, `ADAPTIVE_MAXRATE_FACTOR`, `ADAPTIVE_BUFSIZE_FACTOR`
+- [ ] **docs/SMART_CODEC.md** : enrichir la doc audio smart codec (multicanal, anti-upscale, equiv-quality).
+- [ ] **docs/CHANGELOG.md** : ajouter entrée v2.8 avec les améliorations audit.
+- [ ] **docs/ARCHITECTURE.md** : mettre à jour le diagramme de modules (nouveaux modules).
+- [ ] **docs/TROUBLESHOOTING.md** : ajouter section notifications Discord (debug, erreurs courantes).
+

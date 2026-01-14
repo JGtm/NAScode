@@ -12,41 +12,20 @@
 ###########################################################
 
 # ----- Constantes du mode film-adaptive -----
-# Note: pas de readonly pour éviter les erreurs quand le fichier est sourcé plusieurs fois (tests)
-
-# BPP (Bits Per Pixel) de référence pour HEVC
-# Calibré pour produire ~1500-2500 kbps en 1080p@24fps (plus agressif)
-ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE:-0.032}"
-
-# Coefficient de complexité : bornes min/max
-# Plage réduite pour des bitrates plus homogènes
-ADAPTIVE_C_MIN="${ADAPTIVE_C_MIN:-0.85}"
-ADAPTIVE_C_MAX="${ADAPTIVE_C_MAX:-1.25}"
-
-# Seuils de mapping std-dev → coefficient C
-# Basés sur l'écart-type normalisé des tailles de frames
-# Seuils resserrés : la plupart des films sont 'standard', seuls les vrais films d'action sont 'complexes'
-ADAPTIVE_STDDEV_LOW="${ADAPTIVE_STDDEV_LOW:-0.20}"    # En dessous : contenu statique (dialogues)
-ADAPTIVE_STDDEV_HIGH="${ADAPTIVE_STDDEV_HIGH:-0.45}"  # Au dessus : contenu très complexe (action intense)
-
-# Durée d'échantillon par point (secondes)
-ADAPTIVE_SAMPLE_DURATION="${ADAPTIVE_SAMPLE_DURATION:-10}"
-
-# Nombre de points d'échantillonnage pour l'analyse de complexité
-ADAPTIVE_SAMPLE_COUNT="${ADAPTIVE_SAMPLE_COUNT:-20}"
-
-# Marge début/fin pour éviter les génériques (% de la durée totale)
-ADAPTIVE_MARGIN_START_PCT="${ADAPTIVE_MARGIN_START_PCT:-5}"   # 5% = évite générique début
-ADAPTIVE_MARGIN_END_PCT="${ADAPTIVE_MARGIN_END_PCT:-8}"       # 8% = évite générique fin
-
-# Plancher qualité (kbps minimum)
-ADAPTIVE_MIN_BITRATE_KBPS="${ADAPTIVE_MIN_BITRATE_KBPS:-800}"
-
-# Facteur multiplicateur pour maxrate (ratio vs target)
-ADAPTIVE_MAXRATE_FACTOR="${ADAPTIVE_MAXRATE_FACTOR:-1.4}"
-
-# Facteur multiplicateur pour bufsize (ratio vs target)
-ADAPTIVE_BUFSIZE_FACTOR="${ADAPTIVE_BUFSIZE_FACTOR:-2.5}"
+# NOTE: Ces constantes sont définies dans lib/constants.sh (chargé en premier).
+# Les valeurs ci-dessous servent de fallback si constants.sh n'est pas chargé (tests isolés).
+: "${ADAPTIVE_BPP_BASE:=0.032}"
+: "${ADAPTIVE_C_MIN:=0.85}"
+: "${ADAPTIVE_C_MAX:=1.25}"
+: "${ADAPTIVE_STDDEV_LOW:=0.20}"
+: "${ADAPTIVE_STDDEV_HIGH:=0.45}"
+: "${ADAPTIVE_SAMPLE_DURATION:=10}"
+: "${ADAPTIVE_SAMPLE_COUNT:=20}"
+: "${ADAPTIVE_MARGIN_START_PCT:=5}"
+: "${ADAPTIVE_MARGIN_END_PCT:=8}"
+: "${ADAPTIVE_MIN_BITRATE_KBPS:=800}"
+: "${ADAPTIVE_MAXRATE_FACTOR:=1.4}"
+: "${ADAPTIVE_BUFSIZE_FACTOR:=2.5}"
 
 ###########################################################
 # ANALYSE DES FRAMES

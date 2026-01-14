@@ -81,8 +81,9 @@ notify_discord_send_markdown() {
     [[ -z "$content" ]] && return 0
 
     # Discord limite content à 2000 chars. On coupe à ~1900 pour marge.
-    if [[ ${#content} -gt 1900 ]]; then
-        content="${content:0:1900}"$'\n...'
+    local max_chars="${DISCORD_CONTENT_MAX_CHARS:-1900}"
+    if [[ ${#content} -gt "$max_chars" ]]; then
+        content="${content:0:$max_chars}"$'\n...'
     fi
 
     local payload
@@ -99,12 +100,16 @@ notify_discord_send_markdown() {
 
     # Ne jamais afficher le webhook (secret).
     # En debug: log le code HTTP et un extrait de la réponse (sans URL).
+    local curl_timeout="${DISCORD_CURL_TIMEOUT:-10}"
+    local curl_retries="${DISCORD_CURL_RETRIES:-2}"
+    local curl_retry_delay="${DISCORD_CURL_RETRY_DELAY:-1}"
+
     if _notify_discord_debug_enabled; then
         local resp_file
         resp_file="$(mktemp 2>/dev/null || echo "")"
 
         local http_code="000"
-        http_code=$(curl -sS -m 10 --retry 2 --retry-delay 1 \
+        http_code=$(curl -sS -m "$curl_timeout" --retry "$curl_retries" --retry-delay "$curl_retry_delay" \
             -H "Content-Type: application/json; charset=utf-8" \
             -X POST \
             --data-binary "@${payload_file}" \
@@ -126,7 +131,7 @@ notify_discord_send_markdown() {
 
         [[ -n "${resp_file:-}" ]] && rm -f "${resp_file}" 2>/dev/null || true
     else
-        curl -sS -m 10 --retry 2 --retry-delay 1 \
+        curl -sS -m "$curl_timeout" --retry "$curl_retries" --retry-delay "$curl_retry_delay" \
             -H "Content-Type: application/json; charset=utf-8" \
             -X POST \
             --data-binary "@${payload_file}" \

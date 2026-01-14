@@ -74,7 +74,8 @@ get_audio_codec_rank() {
 }
 
 # Rang minimum pour considérer un codec comme "efficace" (à garder)
-AUDIO_CODEC_EFFICIENT_THRESHOLD=3
+# NOTE: Défini dans lib/constants.sh. Fallback pour tests isolés.
+: "${AUDIO_CODEC_EFFICIENT_THRESHOLD:=3}"
 
 # Retourne le bitrate cible (kbps) pour un codec audio donné
 get_audio_codec_target_bitrate() {

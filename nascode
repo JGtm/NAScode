@@ -60,6 +60,7 @@ if [[ -f "$LIB_DIR/env.sh" ]]; then
 fi
 
 # Charger les modules dans l'ordre des dépendances
+source "$LIB_DIR/constants.sh"    # Constantes globales (pas de dépendances, overridables)
 source "$LIB_DIR/ui.sh"           # Codes couleurs (pas de dépendances)
 source "$LIB_DIR/ui_options.sh"   # Formatage options UI (dépend de ui.sh)
 source "$LIB_DIR/detect.sh"       # Détection outils/système (dépend de rien, modifie PATH)
