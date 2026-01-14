@@ -56,11 +56,29 @@ NO_LOSSLESS=false
 # Objectif : compatibilité maximale et taille maîtrisée.
 AUDIO_FORCE_STEREO=false
 
+# Traduction "qualité équivalente" de bitrate audio lors d'un transcodage.
+# - Ne s'applique jamais si la décision audio est copy.
+# - But : éviter de gonfler l'audio (option 1 : jamais au-dessus du bitrate source).
+# Activé par mode dans set_conversion_mode_parameters (film-adaptive ON par défaut).
+AUDIO_TRANSLATE_EQUIV_QUALITY=false
+
+# Override global (CLI) du mode "qualité équivalente".
+# - "" : pas d'override, laisser les valeurs par mode.
+# - true : activer (audio + cap vidéo)
+# - false : désactiver (audio + cap vidéo)
+# IMPORTANT : en mode film-adaptive, l'override est ignoré (audio/vidéo restent activés).
+EQUIV_QUALITY_OVERRIDE=""
+
 # ----- Codec vidéo -----
 # Codec cible pour l'encodage (hevc, av1)
 # L'encodeur est choisi automatiquement selon le codec (modifiable dans codec_profiles.sh)
 VIDEO_CODEC="hevc"
 VIDEO_ENCODER=""     # Vide = auto-détection selon VIDEO_CODEC
+
+# Cap "qualité équivalente" (vidéo) : évite d'augmenter artificiellement le budget bitrate
+# au-delà de la source quand le codec source est moins efficace que le codec cible.
+# NOTE : ce cap ne s'applique pas en mode film-adaptive (bitrate calculé par fichier).
+VIDEO_EQUIV_QUALITY_CAP=true
 
 # Mode sample : encoder uniquement un segment de test (30s par défaut)
 SAMPLE_MODE=false
@@ -238,6 +256,8 @@ set_conversion_mode_parameters() {
             FILM_TUNE_FASTDECODE=false
             ENCODER_MODE_PROFILE="film"
             AUDIO_FORCE_STEREO=false
+            AUDIO_TRANSLATE_EQUIV_QUALITY=false
+            VIDEO_EQUIV_QUALITY_CAP=true
             ;;
         film-adaptive)
             # Films adaptatifs : bitrate calculé par fichier selon complexité
@@ -261,6 +281,8 @@ set_conversion_mode_parameters() {
             ADAPTIVE_COMPLEXITY_MODE=true
             ENCODER_MODE_PROFILE="film"
             AUDIO_FORCE_STEREO=false
+            AUDIO_TRANSLATE_EQUIV_QUALITY=true
+            VIDEO_EQUIV_QUALITY_CAP=true
             ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 21 (single-pass)
@@ -289,6 +311,8 @@ set_conversion_mode_parameters() {
             FILM_TUNE_FASTDECODE=true
             ENCODER_MODE_PROFILE="serie"
             AUDIO_FORCE_STEREO=true
+            AUDIO_TRANSLATE_EQUIV_QUALITY=false
+            VIDEO_EQUIV_QUALITY_CAP=true
             ;;
         *)
             print_error "Mode de conversion inconnu : $CONVERSION_MODE"
@@ -296,6 +320,18 @@ set_conversion_mode_parameters() {
             exit 1
             ;;
     esac
+
+    # Override CLI du mode "qualité équivalente" (audio + cap vidéo).
+    # Non compatible pour l'instant avec film-adaptive : on ignore l'override.
+    if [[ "$CONVERSION_MODE" != "film-adaptive" ]]; then
+        if [[ "${EQUIV_QUALITY_OVERRIDE:-}" == true ]]; then
+            AUDIO_TRANSLATE_EQUIV_QUALITY=true
+            VIDEO_EQUIV_QUALITY_CAP=true
+        elif [[ "${EQUIV_QUALITY_OVERRIDE:-}" == false ]]; then
+            AUDIO_TRANSLATE_EQUIV_QUALITY=false
+            VIDEO_EQUIV_QUALITY_CAP=false
+        fi
+    fi
     
     # Appliquer le facteur d'efficacité du codec cible
     # Les bitrates de référence sont pour HEVC (efficacité=70)

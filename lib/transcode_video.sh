@@ -58,14 +58,22 @@ _setup_video_encoding_params() {
     if [[ -n "$downscale_filter" ]]; then
         VIDEO_FILTER_OPTS="-vf $downscale_filter"
         if [[ "$NO_PROGRESS" != true ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
-            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+            if declare -f ui_print_raw &>/dev/null; then
+                ui_print_raw "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+            else
+                echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+            fi
         fi
     fi
     
     # Affichage 10-bit si applicable
     if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
         if [[ "$OUTPUT_PIX_FMT" == "yuv420p10le" ]]; then
-            echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+            if declare -f ui_print_raw &>/dev/null; then
+                ui_print_raw "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+            else
+                echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+            fi
         fi
     fi
 
@@ -108,7 +116,9 @@ _setup_video_encoding_params() {
     # Ne change pas la décision de skip : uniquement les paramètres d'encodage.
     local src_codec="${SOURCE_VIDEO_CODEC:-}"
     local src_bitrate_bits="${SOURCE_VIDEO_BITRATE_BITS:-}"
-    if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]] && [[ -n "$src_codec" ]] && [[ "$src_bitrate_bits" =~ ^[0-9]+$ ]] && [[ "$src_bitrate_bits" -gt 0 ]]; then
+    if [[ "${VIDEO_EQUIV_QUALITY_CAP:-true}" == true ]] && \
+       [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" != true ]] && \
+       [[ -n "$src_codec" ]] && [[ "$src_bitrate_bits" =~ ^[0-9]+$ ]] && [[ "$src_bitrate_bits" -gt 0 ]]; then
         if ! is_codec_better_or_equal "$src_codec" "$effective_codec"; then
             local src_kbps=$((src_bitrate_bits / 1000))
             if [[ "$src_kbps" -gt 0 ]] && [[ "$effective_target" =~ ^[0-9]+$ ]] && [[ "$effective_target" -gt 0 ]]; then

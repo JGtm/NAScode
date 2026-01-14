@@ -217,6 +217,18 @@ parse_arguments() {
                 NO_LOSSLESS=true
                 shift
                 ;;
+            --equiv-quality)
+                # Switch global : active le mode "qualité équivalente" (audio + cap vidéo).
+                # NOTE : ignoré en mode film-adaptive (reste activé).
+                EQUIV_QUALITY_OVERRIDE=true
+                shift
+                ;;
+            --no-equiv-quality)
+                # Switch global : désactive le mode "qualité équivalente" (audio + cap vidéo).
+                # NOTE : ignoré en mode film-adaptive (reste activé).
+                EQUIV_QUALITY_OVERRIDE=false
+                shift
+                ;;
             -*) 
                 # On vérifie si l'argument est une option courte groupée
                 if [[ "$1" =~ ^-[a-zA-Z]{2,}$ ]]; then
@@ -312,6 +324,9 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}--force${NOCOLOR}                      Raccourci pour --force-audio et --force-video
     ${GREEN}--no-lossless${NOCOLOR}                Convertir les codecs lossless/premium (DTS/DTS-HD/TrueHD/FLAC)
                                  ${DIM}Stéréo → codec cible, Multi-channel → EAC3 384k 5.1${NOCOLOR}
+    ${GREEN}--equiv-quality${NOCOLOR}              Activer le mode "qualité équivalente" (audio + cap vidéo)
+    ${GREEN}--no-equiv-quality${NOCOLOR}           Désactiver le mode "qualité équivalente" (audio + cap vidéo)
+                                 ${DIM}Ignoré en mode film-adaptive (reste activé)${NOCOLOR}
 
 ${CYAN}Remarque sur les options courtes groupées :${NOCOLOR}
     ${DIM}- Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),

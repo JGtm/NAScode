@@ -63,9 +63,9 @@ _validate_index_source() {
             print_warning "La source a changé, régénération automatique de l'index."
         else
             print_warning "La source a changé :"
-            echo -e "  ${YELLOW}    Index créé pour : $stored_source${NOCOLOR}"
-            echo -e "  ${YELLOW}    Source actuelle : $SOURCE${NOCOLOR}"
-            echo -e "  ${YELLOW}    Régénération automatique de l'index...${NOCOLOR}"
+            print_item "Index créé pour" "$stored_source" "$YELLOW"
+            print_item "Source actuelle" "$SOURCE" "$YELLOW"
+            print_warning "Régénération automatique de l'index..."
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1

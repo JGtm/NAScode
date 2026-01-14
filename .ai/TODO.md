@@ -8,8 +8,10 @@
 
 ## Audio
 
-- Réfléchir à un mode “**traduction qualité équivalente**” pour l’audio (analogue à `translate_bitrate_kbps_between_codecs` côté vidéo).
-  - Objectif : éviter de gonfler l’audio (ou le ré-encoder inutilement) quand la source est déjà à un débit bas/efficace.
+- ✅ Implémenté : mode “**traduction qualité équivalente**” pour l’audio (analogue à `translate_bitrate_kbps_between_codecs` côté vidéo).
+  - Option retenue (1) : **ne jamais dépasser le bitrate source** lors d’un transcodage.
+  - Activation : `film-adaptive` ON par défaut, `film`/`serie` OFF (activable).
+  - ✅ CLI : `--equiv-quality` / `--no-equiv-quality` (switch global audio + vidéo). `film-adaptive` ignore l’override.
 
 ### Mini-spéc (proposition)
 
@@ -22,10 +24,9 @@
 - La traduction ne doit **jamais augmenter** le bitrate au-dessus d’un plafond par mode/codec (configurable).
 - Si le bitrate source est inconnu/non-fiable (ex: N/A), on retombe sur la logique actuelle (fallback).
 
-**API / Helper (idée)**
-- Ajouter un helper du style : `translate_audio_bitrate_kbps_between_codecs <src_codec> <dst_codec> <src_kbps> [channels] [sample_rate]`
-  - Retourne un `dst_kbps` (entier) ou une valeur spéciale “no-translation”.
-  - Helper pur, testable en table-driven.
+**API / Helper**
+- Ajout : `translate_audio_bitrate_kbps_between_codecs <src_codec> <dst_codec> <src_kbps> [channels] [sample_rate]`
+  - Retour : `dst_kbps` (entier) ou vide (no-translation).
 
 **Règles (conservatrices)**
 - Garder une table de “ratios d’efficacité” par codec (ex: AAC/Opus plus efficaces que AC3).
@@ -34,28 +35,18 @@
   - puis `dst_kbps = clamp(dst_kbps, AUDIO_MINRATE_KBPS, AUDIO_MAXRATE_KBPS)`
 - Optionnel (si facile) : ajuster légèrement selon `channels` (stéréo vs 5.1) et/ou `sample_rate`.
 
-**Activation (recommandé)**
-- Rendre la fonctionnalité **disponible dans tous les modes**, mais activable par config.
-- Par défaut :
-  - `film-adaptive` : ON
-  - `film` : OFF (mais activable)
-  - `serie` : OFF (mais activable)
-- Ajouter un flag config du type : `AUDIO_TRANSLATE_EQUIV_QUALITY=1|0` (avec overrides par mode si le système le permet).
+**Activation**
+- Flag config : `AUDIO_TRANSLATE_EQUIV_QUALITY=true|false` (surchargé par mode dans `set_conversion_mode_parameters`).
 
 **Tests (Bats)**
-- Unit-like (helper pur) : table de cas `src/dst codec + kbps` → assert sur propriétés (pas d’augmentation, clamp respecté, fallback).
-- Intégration décision : vérifier que “copy” bypass toujours la traduction.
-- Cas divers : AAC bas débit, AC3 haut débit, EAC3, Opus, stéréo vs 5.1.
+- ✅ Ajout : tests unit-like + intégration décision (bypass copy, fallback bitrate inconnu, cap au bitrate source).
 
 ## UI (audit messages non centralisés)
 
-- Harmoniser les messages « décoratifs »/bannières qui utilisent encore `echo -e`/`printf` en dehors de `lib/ui*.sh`.
+- ✅ Harmonisé les messages « décoratifs »/bannières qui utilisaient encore `echo -e`/`printf` en dehors de `lib/ui*.sh`.
   - `lib/off_peak.sh` : bannières / infos “heures creuses” (mise en forme).
   - `lib/index.sh` : messages d’information sur l’index (ex: source changée, détails affichés).
   - `lib/queue.sh` : entêtes “sélection aléatoire”, messages “Aucun fichier…” et affichage contextuel de la queue.
   - `lib/video_params.sh` + `lib/transcode_video.sh` : messages vidéo (downscale 1080p, 10-bit/pix_fmt, etc.).
-- Décider si on centralise aussi la **progress UI** (plus risqué car dépend de TTY / rafraîchissement en place).
-  - `lib/progress.sh` : barres/compteurs en `printf`.
-  - `lib/vmaf.sh` : progression + affichage des stats.
-  - `lib/finalize.sh` : récap / progress/printf.
+- Décision : **ne pas centraliser la progress UI** (inchangé).
 

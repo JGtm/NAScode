@@ -147,10 +147,20 @@ _display_random_mode_selection() {
         return 0
     fi
 
-    echo -e "\n  ${CYAN}📋 Fichiers sélectionnés aléatoirement${NOCOLOR}"
-    echo -e "  ${DIM}─────────────────────────────────────────────${NOCOLOR}"
+    if declare -f ui_print_raw &>/dev/null; then
+        ui_print_raw "\n  ${CYAN}📋 Fichiers sélectionnés aléatoirement${NOCOLOR}"
+        ui_print_raw "  ${DIM}─────────────────────────────────────────────${NOCOLOR}"
+    else
+        echo -e "\n  ${CYAN}📋 Fichiers sélectionnés aléatoirement${NOCOLOR}"
+        echo -e "  ${DIM}─────────────────────────────────────────────${NOCOLOR}"
+    fi
     tr '\0' '\n' < "$QUEUE" | sed 's|.*/||' | nl -w2 -s'. ' | sed 's/^/  /'
-    echo ""
+
+    if declare -f ui_print_raw &>/dev/null; then
+        ui_print_raw ""
+    else
+        echo ""
+    fi
 }
 
 _create_readable_queue_copy() {																							  

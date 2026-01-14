@@ -49,6 +49,23 @@ _ui_is_quiet() {
     [[ "${UI_QUIET:-false}" == true ]]
 }
 
+# Helpers bas niveau pour les modules non-UI.
+# Objectif : éviter les `echo -e` dispersés tout en conservant le rendu (couleurs/Unicode)
+# et le comportement "quiet".
+#
+# Note : on utilise printf '%b' pour interpréter les séquences d'échappement.
+ui_print_raw() {
+    _ui_is_quiet && return 0
+    local msg="${1:-}"
+    printf '%b\n' "$msg"
+}
+
+ui_print_raw_stderr() {
+    _ui_is_quiet && return 0
+    local msg="${1:-}"
+    printf '%b\n' "$msg" >&2
+}
+
 # Affiche un séparateur horizontal stylé
 # Usage: print_separator [largeur] [couleur]
 print_separator() {

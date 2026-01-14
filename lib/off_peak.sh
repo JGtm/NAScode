@@ -247,24 +247,41 @@ show_off_peak_status() {
     if [[ "$OFF_PEAK_ENABLED" != true ]]; then
         return
     fi
-    
-    echo -e "${CYAN}Mode heures creuses :${NOCOLOR}"
-    echo -e "  Plage horaire    : ${OFF_PEAK_START} - ${OFF_PEAK_END}"
+
+    if declare -f ui_print_raw &>/dev/null; then
+        ui_print_raw "${CYAN}Mode heures creuses :${NOCOLOR}"
+        ui_print_raw "  Plage horaire    : ${OFF_PEAK_START} - ${OFF_PEAK_END}"
+    else
+        echo -e "${CYAN}Mode heures creuses :${NOCOLOR}"
+        echo -e "  Plage horaire    : ${OFF_PEAK_START} - ${OFF_PEAK_END}"
+    fi
     
     if is_off_peak_time; then
-        echo -e "  Statut actuel    : ${GREEN}Heures creuses (actif)${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "  Statut actuel    : ${GREEN}Heures creuses (actif)${NOCOLOR}"
+        else
+            echo -e "  Statut actuel    : ${GREEN}Heures creuses (actif)${NOCOLOR}"
+        fi
     else
         local wait_est
         wait_est=$(seconds_until_off_peak)
         local wait_fmt
         wait_fmt=$(format_wait_time "$wait_est")
-        echo -e "  Statut actuel    : ${YELLOW}Heures pleines (attente ~${wait_fmt})${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "  Statut actuel    : ${YELLOW}Heures pleines (attente ~${wait_fmt})${NOCOLOR}"
+        else
+            echo -e "  Statut actuel    : ${YELLOW}Heures pleines (attente ~${wait_fmt})${NOCOLOR}"
+        fi
     fi
     
     if [[ "$OFF_PEAK_WAIT_COUNT" -gt 0 ]]; then
         local total_wait_fmt
         total_wait_fmt=$(format_wait_time "$OFF_PEAK_TOTAL_WAIT_SECONDS")
-        echo -e "  Périodes d'attente : ${OFF_PEAK_WAIT_COUNT} (total : ${total_wait_fmt})"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "  Périodes d'attente : ${OFF_PEAK_WAIT_COUNT} (total : ${total_wait_fmt})"
+        else
+            echo -e "  Périodes d'attente : ${OFF_PEAK_WAIT_COUNT} (total : ${total_wait_fmt})"
+        fi
     fi
 }
 
@@ -273,22 +290,44 @@ show_off_peak_startup_info() {
     if [[ "$OFF_PEAK_ENABLED" != true ]]; then
         return
     fi
-    
-    echo ""
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
-    echo -e "${CYAN}⏰ MODE HEURES CREUSES ACTIVÉ${NOCOLOR}"
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
-    echo -e "  Plage horaire : ${GREEN}${OFF_PEAK_START}${NOCOLOR} - ${GREEN}${OFF_PEAK_END}${NOCOLOR}"
+
+    if declare -f ui_print_raw &>/dev/null; then
+        ui_print_raw ""
+        ui_print_raw "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        ui_print_raw "${CYAN}⏰ MODE HEURES CREUSES ACTIVÉ${NOCOLOR}"
+        ui_print_raw "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        ui_print_raw "  Plage horaire : ${GREEN}${OFF_PEAK_START}${NOCOLOR} - ${GREEN}${OFF_PEAK_END}${NOCOLOR}"
+    else
+        echo ""
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        echo -e "${CYAN}⏰ MODE HEURES CREUSES ACTIVÉ${NOCOLOR}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        echo -e "  Plage horaire : ${GREEN}${OFF_PEAK_START}${NOCOLOR} - ${GREEN}${OFF_PEAK_END}${NOCOLOR}"
+    fi
     
     if is_off_peak_time; then
-        echo -e "  Statut        : ${GREEN}✓ Heures creuses - démarrage immédiat${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "  Statut        : ${GREEN}✓ Heures creuses - démarrage immédiat${NOCOLOR}"
+        else
+            echo -e "  Statut        : ${GREEN}✓ Heures creuses - démarrage immédiat${NOCOLOR}"
+        fi
     else
         local wait_est
         wait_est=$(seconds_until_off_peak)
         local wait_fmt
         wait_fmt=$(format_wait_time "$wait_est")
-        echo -e "  Statut        : ${YELLOW}⏳ Heures pleines - attente ~${wait_fmt}${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "  Statut        : ${YELLOW}⏳ Heures pleines - attente ~${wait_fmt}${NOCOLOR}"
+        else
+            echo -e "  Statut        : ${YELLOW}⏳ Heures pleines - attente ~${wait_fmt}${NOCOLOR}"
+        fi
     fi
-    echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
-    echo ""
+
+    if declare -f ui_print_raw &>/dev/null; then
+        ui_print_raw "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        ui_print_raw ""
+    else
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        echo ""
+    fi
 }

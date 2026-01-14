@@ -2,6 +2,38 @@
 
 ## Session en cours (13/01/2026 - Fix: pas de blocage si 0 fichier / queue invalide / source exclue)
 
+### 2026-01-14 — Audio : traduction “qualité équivalente” (option 1) + UI : messages décoratifs (hors progress)
+
+Branche : `feature/audio-ui`
+
+Changements principaux :
+
+- [lib/audio_decision.sh](lib/audio_decision.sh) : ajoute `translate_audio_bitrate_kbps_between_codecs` + table d'efficacité et applique la traduction **uniquement** quand `action != copy`.
+  - Option 1 : le bitrate cible est toujours capé par `min(traduit, cible_config, bitrate_source)`.
+- [lib/config.sh](lib/config.sh) : ajoute `AUDIO_TRANSLATE_EQUIV_QUALITY` et l'active par défaut en `film-adaptive`.
+- CLI : ajoute `--equiv-quality` / `--no-equiv-quality` (switch global audio + cap vidéo), avec exception : ignoré en `film-adaptive`.
+- [lib/ui.sh](lib/ui.sh) : ajoute `ui_print_raw` / `ui_print_raw_stderr` pour remplacer `echo -e` dans des modules non-UI.
+- UI (hors progress UI) : harmonisation des messages décoratifs via helpers UI dans :
+  - [lib/off_peak.sh](lib/off_peak.sh)
+  - [lib/index.sh](lib/index.sh)
+  - [lib/queue.sh](lib/queue.sh)
+  - [lib/video_params.sh](lib/video_params.sh)
+  - [lib/transcode_video.sh](lib/transcode_video.sh)
+
+Tests :
+
+- [tests/test_audio_translate_equiv_quality.bats](tests/test_audio_translate_equiv_quality.bats) : tests unit-like + intégration (bypass copy, fallback bitrate inconnu, cap au bitrate source, cas AAC→Opus et Opus→AAC forcé).
+- [tests/test_args.bats](tests/test_args.bats) : ajoute des tests sur le parsing et l’override du switch `--equiv-quality` (y compris l’exception `film-adaptive`).
+
+Backlog :
+
+- [.ai/TODO.md](.ai/TODO.md) mis à jour (Audio/UI marqués comme implémentés, décision “ne pas centraliser progress UI”).
+
+Derniers prompts :
+
+- "Ok vas y on va appliquer l'option 1 pour l'audio"
+- "Continue jusqu'au bout"
+
 ### 2026-01-14 — UX : fin de tâches quand n < limite (random)
 
 Branche : `fix/random-limit-suffix`

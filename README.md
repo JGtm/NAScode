@@ -57,6 +57,8 @@ Rappels :
 - `--audio copy` : copie l'audio sans modification.
 - `--force-audio` : force la conversion vers le codec cible (bypass smart).
 - `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC).
+- `--equiv-quality` / `--no-equiv-quality` : active/désactive le mode "qualité équivalente" (audio + cap vidéo).
+	(Ignoré en mode `film-adaptive` : reste activé.)
 
 **Gestion des canaux (multicanal) :**
 - **Mode `serie`** : stéréo forcée (downmix systématique si 5.1/7.1+).
@@ -96,6 +98,8 @@ Rappels :
 	- Si la source est dans un codec **plus efficace** que la cible (ex: AV1 alors que la cible est HEVC), le seuil est **traduit** dans l’espace du codec source via l’efficacité codec.
 	- Exemple (mode `serie`, cible HEVC) : seuil HEVC 2772k → seuil AV1 ≈ $2772 \times 50/70 \approx 1980$k
 - `--force-video` : force le ré-encodage vidéo (bypass smart).
+- `--equiv-quality` / `--no-equiv-quality` : active/désactive le mode "qualité équivalente" (audio + cap vidéo).
+	(Ignoré en mode `film-adaptive` : reste activé.)
 
 | Codec source | vs cible | Bitrate (vs seuil) | Action | Résultat |
 |-------------|----------|--------------------|--------|----------|

@@ -446,10 +446,18 @@ display_video_params_info() {
     fi
     
     if [[ -n "$filter_opts" ]]; then
-        echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+        else
+            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+        fi
     fi
     
     if [[ -n "$input_pix_fmt" ]] && [[ "$output_pix_fmt" == "yuv420p10le" ]]; then
-        echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+        else
+            echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+        fi
     fi
 }

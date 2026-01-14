@@ -44,6 +44,11 @@ _reset_cli_state() {
     OFF_PEAK_END="06:00"
     SINGLE_FILE=""
     MIN_SIZE_BYTES=0
+
+    # Override global du mode "qualité équivalente" (CLI)
+    EQUIV_QUALITY_OVERRIDE=""
+    VIDEO_EQUIV_QUALITY_CAP=true
+    AUDIO_TRANSLATE_EQUIV_QUALITY=false
 }
 
 ###########################################################
@@ -221,6 +226,44 @@ _reset_cli_state() {
     [ "$DRYRUN" = "true" ]
     [ "$VMAF_ENABLED" = "false" ]
     [ "$SAMPLE_MODE" = "false" ]
+}
+
+###########################################################
+# TEST : Switch global "qualité équivalente" (audio + vidéo)
+###########################################################
+
+@test "parse_arguments: --equiv-quality et --no-equiv-quality" {
+    _reset_cli_state
+    parse_arguments --equiv-quality
+    [ "${EQUIV_QUALITY_OVERRIDE}" = "true" ]
+
+    _reset_cli_state
+    parse_arguments --no-equiv-quality
+    [ "${EQUIV_QUALITY_OVERRIDE}" = "false" ]
+}
+
+@test "set_conversion_mode_parameters: override equiv-quality appliqué hors film-adaptive" {
+    # Serie : l'override true force l'activation
+    _reset_cli_state
+    parse_arguments --mode serie --equiv-quality
+    set_conversion_mode_parameters
+    [ "${AUDIO_TRANSLATE_EQUIV_QUALITY}" = "true" ]
+    [ "${VIDEO_EQUIV_QUALITY_CAP}" = "true" ]
+
+    # Film : l'override false force la désactivation
+    _reset_cli_state
+    parse_arguments --mode film --no-equiv-quality
+    set_conversion_mode_parameters
+    [ "${AUDIO_TRANSLATE_EQUIV_QUALITY}" = "false" ]
+    [ "${VIDEO_EQUIV_QUALITY_CAP}" = "false" ]
+}
+
+@test "set_conversion_mode_parameters: override ignoré en film-adaptive (reste activé)" {
+    _reset_cli_state
+    parse_arguments --mode film-adaptive --no-equiv-quality
+    set_conversion_mode_parameters
+    [ "${AUDIO_TRANSLATE_EQUIV_QUALITY}" = "true" ]
+    [ "${VIDEO_EQUIV_QUALITY_CAP}" = "true" ]
 }
 
 ###########################################################
