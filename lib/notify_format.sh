@@ -59,6 +59,12 @@ _notify_discord_pad() {
     printf '%s' $'\n\n\u200B'
 }
 
+_notify_discord_lead_pad() {
+    # Discord peut ignorer les sauts de ligne en tête de message.
+    # On commence par un caractère invisible (ZWSP), puis on ajoute des sauts de lignes.
+    printf '%s' $'\u200B\n\n'
+}
+
 _notify_kv_get() {
     # Usage: _notify_kv_get <file> <key>
     local file="${1-}"
@@ -131,7 +137,7 @@ _notify_format_run_summary_markdown() {
         fi
     fi
 
-    body+=$'\n\n'"✅ Session terminée (code ${exit_code})"
+    body+=$'\n\n'"✅ Session terminée"
 
     printf '%s' "$body"$(_notify_discord_pad)
 }
@@ -155,7 +161,7 @@ _notify_format_event_run_started() {
     # Usage: _notify_format_event_run_started <now>
     local now="${1-}"
 
-    local body="Exécution"
+    local body="## Exécution"
     [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
 
     body+=$'\n\n'"**Paramètres actifs**"$'\n'
@@ -200,6 +206,7 @@ _notify_format_event_run_started() {
     [[ -n "${jobs_label:-}" ]] && body+=$'\n'"- **⏭️  Jobs parallèles** : ${jobs_label}"
 
     # Aperçu de la queue (si disponible)
+    local has_queue_preview=false
     if [[ -n "${QUEUE:-}" ]] && [[ -f "${QUEUE}" ]]; then
         local preview
         preview=$(_notify_format_queue_preview "${QUEUE}")
@@ -207,7 +214,16 @@ _notify_format_event_run_started() {
             body+=$'\n\n'"**📋 File d’attente**"$'\n'
             body+=$'\n'"\`\`\`text"$'\n'"${preview}"$'\n'"\`\`\`"
             body+=$'\n\n'
+            has_queue_preview=true
         fi
+    fi
+
+    # UX Discord: titre de transition avant le début des conversions
+    if [[ "$has_queue_preview" == true ]]; then
+        # Le bloc queue se termine déjà par \n\n, donc on évite d'en rajouter.
+        body+="**Lancement de la conversion**"
+    else
+        body+=$'\n\n'"**Lancement de la conversion**"
     fi
 
     printf '%s' "$body"$(_notify_discord_pad)
@@ -253,8 +269,8 @@ _notify_format_event_conversions_completed() {
         body+=" (${total} fichier(s))"
     fi
 
-    # UX Discord: laisser une ligne vide après les étapes “macro”
-    printf '%s' "$body"$(_notify_discord_pad)
+    # UX Discord: message macro + padding avant/après
+    printf '%s' "$(_notify_discord_lead_pad)${body}$(_notify_discord_pad)"
 }
 
 _notify_format_event_transfers_pending() {
@@ -363,7 +379,8 @@ _notify_format_event_vmaf_completed() {
         done
     fi
 
-    printf '%s' "$body"$(_notify_discord_pad)
+    # UX Discord: message macro + padding avant/après
+    printf '%s' "$(_notify_discord_lead_pad)${body}$(_notify_discord_pad)"
 }
 
 _notify_format_event_peak_pause() {
