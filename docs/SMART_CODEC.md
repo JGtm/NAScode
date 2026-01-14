@@ -45,10 +45,22 @@ Note : si une décision `copy` est retenue, les canaux sont conservés tels quel
 
 La logique s’appuie sur un rang d’efficacité (voir `get_audio_codec_rank()` dans [lib/audio_decision.sh](../lib/audio_decision.sh)) :
 
-- Opus (très efficace)
-- AAC (efficace)
-- Vorbis (efficace)
-- E-AC3 / AC3 / DTS / MP3 / PCM… (moins efficaces)
+- Opus (très efficace, rang 5)
+- AAC (efficace, rang 4)
+- Vorbis (efficace, rang 3)
+- E-AC3 (rang 2) / AC3 (rang 1) / DTS / MP3 / PCM… (moins efficaces, rang 0)
+
+Le seuil `AUDIO_CODEC_EFFICIENT_THRESHOLD` (défaut 3) détermine quels codecs sont considérés "efficaces" et donc préservés plutôt que ré-encodés. Ce seuil est configurable via [lib/constants.sh](../lib/constants.sh).
+
+### Traduction des bitrates par efficacité
+
+Quand le codec source est différent du codec cible, les seuils de bitrate sont **traduits** pour comparer des pommes avec des pommes :
+
+$$\text{seuil}_{source} = \text{seuil}_{cible} \times \frac{\mathrm{eff}(source)}{\mathrm{eff}(cible)}$$
+
+Cette logique (fonction `_translate_bitrate_by_efficiency()` dans [lib/codec_profiles.sh](../lib/codec_profiles.sh)) est centralisée et réutilisée pour :
+- Les décisions audio (anti-upscaling)
+- Les décisions vidéo (skip/encode)
 
 ## Vidéo (cible par défaut : HEVC)
 

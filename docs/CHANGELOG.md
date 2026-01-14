@@ -1,5 +1,14 @@
 # Changelog
 
+## v2.8
+
+- ✅ **Constantes centralisées** : nouveau module `lib/constants.sh` regroupant les "magic numbers" (mode film-adaptive, seuils audio, paramètres Discord). Toutes les constantes sont overridables via variables d'environnement.
+- ✅ **Robustesse documentation** : documentation systématique de `set -euo pipefail` dans les 38 modules `lib/`.
+- ✅ **Tests renforcés** : nouveaux tests unitaires pour `VIDEO_EQUIV_QUALITY_CAP`, `_clamp_min`, `_clamp_max`, `_min3`.
+- ✅ **Factorisation bitrate** : fonction `_translate_bitrate_by_efficiency()` centralisée dans `codec_profiles.sh` (audio + vidéo).
+- ✅ **Test helpers** : refactoring de `test_helper.bash` (variables standardisées, skip intelligent, modularité).
+- ✅ **Documentation** : CONFIG.md enrichi (section constantes), SMART_CODEC.md mis à jour (rangs audio, traduction bitrate).
+
 ## v2.7
 
 - ✅ **Robustesse queue / FIFO** : évite les blocages quand aucun fichier n’est traitable (entrées vides, fichiers introuvables, queue invalide) + sortie explicite si la source est exclue.

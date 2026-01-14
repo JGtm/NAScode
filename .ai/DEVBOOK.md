@@ -42,9 +42,23 @@ Objectifs :
   - Maintenabilité : code mieux factorisé, zéro duplication pour la traduction de bitrate.
   - Documentation : phases B+C n'ont identifié aucun bug, seulement des améliorations documentaires futures.
 - **Phases restantes** (voir `.ai/TODO.md` section "Phases Refactor/Audit") :
-  - **Phase D** : Documentation (CONFIG.md pour constantes ADAPTIVE_*, SMART_CODEC.md, CHANGELOG, etc.)
+  - ~~**Phase D**~~ : ✅ Terminée — Documentation (CONFIG.md enrichi, SMART_CODEC.md, CHANGELOG v2.8, ARCHITECTURE.md)
   - ~~**Phase E**~~ : ✅ Terminée — Extraction constantes vers `lib/constants.sh`
   - ~~**Phase F**~~ : ✅ Évaluée — Refactorisation structurelle non nécessaire (code déjà bien structuré, associative arrays incompatibles avec exports parallèles)
+
+#### Phase D : Documentation
+
+- **Quoi** : mise à jour de toute la documentation pour refléter les changements v2.8.
+- **Où** :
+  - `docs/CONFIG.md` : nouvelle section "Constantes centralisées" avec tableau complet des 17 constantes (ADAPTIVE_*, AUDIO_*, DISCORD_*) et exemples d'override.
+  - `docs/SMART_CODEC.md` : enrichissement de la section "Hiérarchie (efficacité)" audio avec les rangs numériques, ajout de la section "Traduction des bitrates par efficacité".
+  - `docs/CHANGELOG.md` : entrée v2.8 complète (6 points majeurs).
+  - `docs/ARCHITECTURE.md` : ajout de la catégorie "Constantes & fondations" avec `lib/constants.sh` et `lib/env.sh`.
+  - `docs/DOCS.md` : ajout du lien vers ARCHITECTURE.md dans les guides.
+  - `README.md` : ajout du lien vers CONFIG.md dans la section Documentation.
+  - `.ai/TODO.md` : nettoyage des sections terminées (Audio, UI, Phases E/F).
+- **Pourquoi** : maintenir la documentation en phase avec le code, faciliter l'onboarding des contributeurs.
+- **Impact** : documentation uniquement, aucun changement de code.
 
 ### 2026-01-14 (suite)
 

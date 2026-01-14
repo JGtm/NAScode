@@ -181,6 +181,7 @@ Sécurité : ne commit jamais le webhook. Si tu l’as posté dans un chat/log/i
 ## Documentation
 
 - Index docs : [docs/DOCS.md](docs/DOCS.md)
+- Configuration avancée & constantes : [docs/CONFIG.md](docs/CONFIG.md)
 - Ajouter un nouveau codec : [docs/ADDING_NEW_CODEC.md](docs/ADDING_NEW_CODEC.md)
 - Instructions macOS : [docs/Instructions-Mac.txt](docs/Instructions-Mac.txt)
 - Critères de conversion : [docs/SMART_CODEC.md](docs/SMART_CODEC.md)

@@ -111,6 +111,52 @@ Par défaut, `nascode` charge automatiquement `./.env.local` (si présent) au d�
 
 Sécurité : ne commit jamais le webhook. Si l’URL a été partagée publiquement, régénère-le côté Discord.
 
+## Constantes centralisées (lib/constants.sh)
+
+Depuis v2.8, les "magic numbers" sont centralisés dans [lib/constants.sh](../lib/constants.sh). Chaque constante peut être **overridée via variable d'environnement** avant de lancer le script.
+
+### Mode film-adaptive (complexity.sh)
+
+| Constante | Défaut | Description |
+|-----------|--------|-------------|
+| `ADAPTIVE_BPP_BASE` | 0.032 | BPP (Bits Per Pixel) de référence pour HEVC. Calibré pour produire ~1500-2500 kbps en 1080p@24fps. |
+| `ADAPTIVE_C_MIN` | 0.85 | Coefficient de complexité minimum (contenu statique). |
+| `ADAPTIVE_C_MAX` | 1.25 | Coefficient de complexité maximum (contenu très complexe). |
+| `ADAPTIVE_STDDEV_LOW` | 0.20 | Seuil écart-type en dessous duquel le contenu est considéré statique. |
+| `ADAPTIVE_STDDEV_HIGH` | 0.45 | Seuil écart-type au dessus duquel le contenu est considéré très complexe. |
+| `ADAPTIVE_SAMPLE_DURATION` | 10 | Durée (secondes) de chaque échantillon d'analyse. |
+| `ADAPTIVE_SAMPLE_COUNT` | 20 | Nombre de points d'échantillonnage pour l'analyse de complexité. |
+| `ADAPTIVE_MARGIN_START_PCT` | 5 | Marge début (% de la durée) pour éviter le générique d'ouverture. |
+| `ADAPTIVE_MARGIN_END_PCT` | 8 | Marge fin (% de la durée) pour éviter le générique de fin. |
+| `ADAPTIVE_MIN_BITRATE_KBPS` | 800 | Plancher qualité : bitrate minimum en kbps. |
+| `ADAPTIVE_MAXRATE_FACTOR` | 1.4 | Facteur multiplicateur pour maxrate (ratio vs target). |
+| `ADAPTIVE_BUFSIZE_FACTOR` | 2.5 | Facteur multiplicateur pour bufsize (ratio vs target). |
+
+### Audio (audio_decision.sh)
+
+| Constante | Défaut | Description |
+|-----------|--------|-------------|
+| `AUDIO_CODEC_EFFICIENT_THRESHOLD` | 3 | Rang minimum pour considérer un codec "efficace" (Opus=5, AAC=4, Vorbis=3). Les codecs au-dessus de ce seuil sont préservés plutôt que ré-encodés. |
+
+### Notifications Discord (notify_discord.sh)
+
+| Constante | Défaut | Description |
+|-----------|--------|-------------|
+| `DISCORD_CONTENT_MAX_CHARS` | 1900 | Limite de caractères par message (API Discord = 2000, marge de sécurité). |
+| `DISCORD_CURL_TIMEOUT` | 10 | Timeout curl pour l'envoi (secondes). |
+| `DISCORD_CURL_RETRIES` | 2 | Nombre de retries curl en cas d'échec. |
+| `DISCORD_CURL_RETRY_DELAY` | 1 | Délai entre retries (secondes). |
+
+**Exemple d'override :**
+
+```bash
+# Augmenter le timeout Discord pour les connexions lentes
+DISCORD_CURL_TIMEOUT=30 bash nascode -s /chemin/source
+
+# Mode film-adaptive avec analyse plus fine (plus d'échantillons)
+ADAPTIVE_SAMPLE_COUNT=30 bash nascode -m film-adaptive -s /chemin/source
+```
+
 ## Variables modifiables (extrait)
 
 Dans [lib/config.sh](../lib/config.sh), on retrouve notamment :

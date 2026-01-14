@@ -43,13 +43,17 @@ Quand `-f/--file` est fourni, le script bypass index/queue et appelle directemen
 
 Le chargement est orchestré par [../nascode](../nascode). Les responsabilités sont globalement :
 
+- **Constantes & fondations**
+  - `lib/constants.sh` : magic numbers centralisés (overridables via env)
+  - `lib/env.sh` : variables d'environnement
+
 - **CLI & UX**
   - `lib/args.sh` : parsing options
   - `lib/ui.sh` : couleurs/affichage
 
 - **Configuration & profils**
   - `lib/config.sh` : defaults + paramètres par mode
-  - `lib/codec_profiles.sh` : mapping codec→encodeur + profils
+  - `lib/codec_profiles.sh` : mapping codec→encodeur + profils + traduction bitrate
 
 - **Index / queue / traitement**
   - `lib/queue.sh` : index persistant, queue, tri, filtres (`--min-size`, random, limit)
