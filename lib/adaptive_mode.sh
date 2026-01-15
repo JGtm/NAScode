@@ -115,11 +115,7 @@ _convert_handle_adaptive_mode() {
 
     # Note UX: en mode adaptatif, le "Démarrage" est affiché avant le transfert
     # (aligné avec les autres modes). Ici, on évite d'imprimer une 2e fois.
-
-    # Notification Discord : début de l'analyse
-    if declare -f notify_event &>/dev/null; then
-        notify_event "analysis_started"
-    fi
+    # Note: Les notifications Discord sont gérées dans conversion.sh
 
     local adaptive_info
     adaptive_info=$(_convert_run_adaptive_analysis_and_export "$tmp_input" "$v_codec")
@@ -127,11 +123,6 @@ _convert_handle_adaptive_mode() {
     local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
     local _complexity_c _complexity_desc _stddev_val
     IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps _complexity_c _complexity_desc _stddev_val <<< "$adaptive_info"
-
-    # Notification Discord : résultats de l'analyse
-    if declare -f notify_event &>/dev/null; then
-        notify_event "analysis_completed" "$_complexity_c" "$_complexity_desc" "$adaptive_target_kbps"
-    fi
 
     # Vérifier si on peut skip maintenant qu'on a le seuil adaptatif
     if should_skip_conversion_adaptive "$v_codec" "$v_bitrate" "$filename" "$file_original" "$a_codec" "$a_bitrate" "$adaptive_maxrate_kbps"; then

@@ -36,6 +36,26 @@
 : "${ADAPTIVE_USE_SITI:=true}"
 
 ###########################################################
+# SPINNER ANIMÉ POUR ANALYSE SI/TI
+###########################################################
+
+# Affiche un spinner animé pendant l'analyse SI/TI.
+# Doit être lancé en arrière-plan et tué une fois l'analyse terminée.
+# Usage: _start_siti_spinner &
+#        spinner_pid=$!
+#        ...analyse...
+#        kill $spinner_pid 2>/dev/null
+_start_siti_spinner() {
+    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local i=0
+    while true; do
+        printf "\r\033[K  %s Analyse SI/TI..." "${frames[i]}" >&2
+        i=$(( (i + 1) % ${#frames[@]} ))
+        sleep 0.1
+    done
+}
+
+###########################################################
 # ANALYSE DES FRAMES
 ###########################################################
 
@@ -327,19 +347,24 @@ analyze_video_complexity() {
     local si_avg="50" ti_avg="25"
     if [[ "${ADAPTIVE_USE_SITI:-true}" == true ]]; then
         if _is_siti_available; then
-            # Afficher un indicateur d'attente pour l'analyse SI/TI
-            if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
-                printf "\r\033[K  ⏳ %-25.25s" "Analyse SI/TI..." >&2
-            fi
-            
             local siti_result
             # Utiliser un sous-ensemble des positions pour SI/TI (plus rapide)
             local siti_positions=("${positions[@]:0:5}")  # 5 premiers échantillons
+            
+            # Lancer le spinner en arrière-plan si progress activé
+            local spinner_pid=""
+            if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
+                _start_siti_spinner &
+                spinner_pid=$!
+            fi
+            
             siti_result=$(_analyze_siti_multi "$file" "$duration_int" "${siti_positions[@]}")
             IFS='|' read -r si_avg ti_avg <<< "$siti_result"
             
-            # Effacer la ligne d'attente
-            if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
+            # Arrêter le spinner
+            if [[ -n "$spinner_pid" ]]; then
+                kill "$spinner_pid" 2>/dev/null || true
+                wait "$spinner_pid" 2>/dev/null || true
                 printf "\r\033[K" >&2
             fi
         fi
