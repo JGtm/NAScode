@@ -1,6 +1,6 @@
 #!/bin/bash
 ###########################################################
-# MODE ADAPTATIF (FILM-ADAPTIVE)
+# MODE ADAPTATIF
 # Analyse de complexité et export des paramètres adaptatifs
 #
 # NOTE: Ce module n'active pas `set -euo pipefail` car :
@@ -19,7 +19,7 @@
 
 # Lance l'analyse de complexité et exporte les paramètres adaptatifs.
 # Usage: _convert_run_adaptive_analysis_and_export <file_to_analyze> [source_video_codec]
-# Retourne: adaptive_target_kbps|adaptive_maxrate_kbps|adaptive_bufsize_kbps|complexity_c|complexity_desc|stddev_val
+# Retourne: adaptive_target_kbps|adaptive_maxrate_kbps|adaptive_bufsize_kbps|complexity_c|complexity_desc|stddev_val|si_avg|ti_avg
 # Effets de bord: export ADAPTIVE_*_KBPS, affichage UX
 _convert_run_adaptive_analysis_and_export() {
     local file_to_analyze="$1"
@@ -28,18 +28,18 @@ _convert_run_adaptive_analysis_and_export() {
     local adaptive_params
     adaptive_params=$(compute_video_params_adaptive "$file_to_analyze")
 
-    # Format:
-    # pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps
+    # Format étendu avec SI/TI:
+    # pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc|stddev|target_kbps|si_avg|ti_avg
     local _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf
-    local complexity_c complexity_desc stddev_val adaptive_target_kbps
-    IFS='|' read -r _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf complexity_c complexity_desc stddev_val adaptive_target_kbps <<< "$adaptive_params"
+    local complexity_c complexity_desc stddev_val adaptive_target_kbps si_avg ti_avg
+    IFS='|' read -r _pix _flt _br _mr _bs _vbv _oh _iw _ih _ipf complexity_c complexity_desc stddev_val adaptive_target_kbps si_avg ti_avg <<< "$adaptive_params"
 
     local adaptive_maxrate_kbps adaptive_bufsize_kbps
     adaptive_maxrate_kbps="${_mr%k}"
     adaptive_bufsize_kbps="${_bs%k}"
 
     # Traduire les bitrates "référence HEVC" vers le codec cible actif.
-    # Cela rend film-adaptive cohérent quand VIDEO_CODEC != hevc.
+    # Cela rend le mode adaptatif cohérent quand VIDEO_CODEC != hevc.
     local target_codec="${VIDEO_CODEC:-hevc}"
     if [[ "$target_codec" != "hevc" ]] && declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
         adaptive_target_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_target_kbps" "hevc" "$target_codec")
@@ -47,7 +47,7 @@ _convert_run_adaptive_analysis_and_export() {
         adaptive_bufsize_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_bufsize_kbps" "hevc" "$target_codec")
     fi
 
-    display_complexity_analysis "$file_to_analyze" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps" >&2
+    display_complexity_analysis "$file_to_analyze" "$complexity_c" "$complexity_desc" "$stddev_val" "$adaptive_target_kbps" "$si_avg" "$ti_avg" >&2
 
     # Option B (UX, conditionnelle) : afficher le seuil de skip uniquement quand il
     # a du sens (source déjà dans un codec meilleur/égal au codec cible).
@@ -92,7 +92,7 @@ _convert_run_adaptive_analysis_and_export() {
     export ADAPTIVE_MAXRATE_KBPS="$adaptive_maxrate_kbps"
     export ADAPTIVE_BUFSIZE_KBPS="$adaptive_bufsize_kbps"
 
-    echo "${adaptive_target_kbps}|${adaptive_maxrate_kbps}|${adaptive_bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev_val}"
+    echo "${adaptive_target_kbps}|${adaptive_maxrate_kbps}|${adaptive_bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev_val}|${si_avg}|${ti_avg}"
 }
 
 ###########################################################

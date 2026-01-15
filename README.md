@@ -58,12 +58,12 @@ Rappels :
 - `--force-audio` : force la conversion vers le codec cible (bypass smart).
 - `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC).
 - `--equiv-quality` / `--no-equiv-quality` : active/désactive le mode "qualité équivalente" (audio + cap vidéo).
-	(Ignoré en mode `film-adaptive` : reste activé.)
+	(Ignoré en mode `adaptatif` : reste activé.)
 
 **Gestion des canaux (multicanal) :**
 - **Mode `serie`** : stéréo forcée (downmix systématique si 5.1/7.1+).
-- **Modes `film` / `film-adaptive`** : layout cible stéréo (2ch) ou **5.1** (downmix automatique si 7.1).
-- **Codec par défaut multichannel (film/film-adaptive)** : EAC3 384k (compatible TV/receivers).
+- **Modes `film` / `adaptatif`** : layout cible stéréo (2ch) ou **5.1** (downmix automatique si 7.1).
+- **Codec par défaut multichannel (film/adaptatif)** : EAC3 384k (compatible TV/receivers).
 - **AAC multichannel** : uniquement avec `-a aac --force-audio` (plafond 320k).
 - **Opus multichannel** : `-a opus` (plafond 224k).
 - **Anti-upscale** : pas de conversion si source < 256k (sauf downmix requis).
@@ -99,7 +99,7 @@ Rappels :
 	- Exemple (mode `serie`, cible HEVC) : seuil HEVC 2772k → seuil AV1 ≈ $2772 \times 50/70 \approx 1980$k
 - `--force-video` : force le ré-encodage vidéo (bypass smart).
 - `--equiv-quality` / `--no-equiv-quality` : active/désactive le mode "qualité équivalente" (audio + cap vidéo).
-	(Ignoré en mode `film-adaptive` : reste activé.)
+	(Ignoré en mode `adaptatif` : reste activé.)
 
 | Codec source | vs cible | Bitrate (vs seuil) | Action | Résultat |
 |-------------|----------|--------------------|--------|----------|

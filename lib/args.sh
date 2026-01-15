@@ -225,13 +225,13 @@ parse_arguments() {
                 ;;
             --equiv-quality)
                 # Switch global : active le mode "qualité équivalente" (audio + cap vidéo).
-                # NOTE : ignoré en mode film-adaptive (reste activé).
+                # NOTE : ignoré en mode adaptatif (reste activé).
                 EQUIV_QUALITY_OVERRIDE=true
                 shift
                 ;;
             --no-equiv-quality)
                 # Switch global : désactive le mode "qualité équivalente" (audio + cap vidéo).
-                # NOTE : ignoré en mode film-adaptive (reste activé).
+                # NOTE : ignoré en mode adaptatif (reste activé).
                 EQUIV_QUALITY_OVERRIDE=false
                 shift
                 ;;
@@ -301,7 +301,7 @@ ${CYAN}Options :${NOCOLOR}
     ${GREEN}-s, --source${NOCOLOR} DIR             Dossier source (ARG) [défaut : dossier parent]
     ${GREEN}-o, --output-dir${NOCOLOR} DIR         Dossier de destination (ARG) [défaut : \`Converted\` au même niveau que le script]
     ${GREEN}-e, --exclude${NOCOLOR} PATTERN        Ajouter un pattern d'exclusion (ARG)
-    ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, film-adaptive, serie (ARG) [défaut : serie]
+    ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, adaptatif, serie (ARG) [défaut : serie]
     ${GREEN}--min-size${NOCOLOR} SIZE              Filtrer l'index/queue : ne garder que les fichiers >= SIZE (ex: 700M, 1G)
     ${GREEN}-d, --dry-run${NOCOLOR}                Mode simulation sans conversion (FLAG)
     ${GREEN}-S  --suffix${NOCOLOR} [STRING]             Activer un suffixe dynamique ou définir un suffixe personnalisé (ARG optionnel)
@@ -332,7 +332,7 @@ ${CYAN}Options :${NOCOLOR}
                                  ${DIM}Stéréo → codec cible, Multi-channel → EAC3 384k 5.1${NOCOLOR}
     ${GREEN}--equiv-quality${NOCOLOR}              Activer le mode "qualité équivalente" (audio + cap vidéo)
     ${GREEN}--no-equiv-quality${NOCOLOR}           Désactiver le mode "qualité équivalente" (audio + cap vidéo)
-                                 ${DIM}Ignoré en mode film-adaptive (reste activé)${NOCOLOR}
+                                 ${DIM}Ignoré en mode adaptatif (reste activé)${NOCOLOR}
 
 ${CYAN}Remarque sur les options courtes groupées :${NOCOLOR}
     ${DIM}- Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
@@ -350,7 +350,7 @@ ${CYAN}Logique Smart Codec (audio) :${NOCOLOR}
 
 ${CYAN}Modes de conversion :${NOCOLOR}
   ${YELLOW}film${NOCOLOR}          : Qualité maximale (two-pass ABR, bitrate fixe)
-  ${YELLOW}film-adaptive${NOCOLOR} : Bitrate adaptatif par fichier selon complexité (CRF contraint)
+  ${YELLOW}adaptatif${NOCOLOR}     : Bitrate adaptatif par fichier selon complexité (CRF contraint)
   ${YELLOW}serie${NOCOLOR}         : Bon compromis taille/qualité [défaut]
 
 ${CYAN}Mode heures creuses :${NOCOLOR}

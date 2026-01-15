@@ -557,7 +557,7 @@ _get_counter_prefix() {
         if [[ "$slot" =~ ^[0-9]+$ ]] && [[ "$slot" -gt 0 ]]; then
             echo "${DIM}[${slot}/${limit}]${NOCOLOR} "
         elif [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
-            # Fallback (ex: film-adaptive) : le slot est réservé après l'analyse,
+            # Fallback (ex: adaptatif) : le slot est réservé après l'analyse,
             # mais on veut un compteur visible dès le démarrage.
             echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
         fi

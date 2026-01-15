@@ -93,12 +93,12 @@ teardown() {
     [[ "$X265_VBV_STRING" =~ "vbv-bufsize=" ]]
 }
 
-@test "_setup_video_encoding_params: film-adaptive applique ADAPTIVE_* en HEVC/x265" {
+@test "_setup_video_encoding_params: adaptatif applique ADAPTIVE_* en HEVC/x265" {
     # Simuler une source 720p
     get_video_stream_props() { echo "1280|720|yuv420p"; }
     export -f get_video_stream_props
 
-    CONVERSION_MODE="film-adaptive"
+    CONVERSION_MODE="adaptatif"
     VIDEO_CODEC="hevc"
     VIDEO_ENCODER="libx265"
     set_conversion_mode_parameters

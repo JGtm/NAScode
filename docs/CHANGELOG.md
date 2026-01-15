@@ -2,7 +2,7 @@
 
 ## v2.8
 
-- ✅ **Constantes centralisées** : nouveau module `lib/constants.sh` regroupant les "magic numbers" (mode film-adaptive, seuils audio, paramètres Discord). Toutes les constantes sont overridables via variables d'environnement.
+- ✅ **Constantes centralisées** : nouveau module `lib/constants.sh` regroupant les "magic numbers" (mode adaptatif, seuils audio, paramètres Discord). Toutes les constantes sont overridables via variables d'environnement.
 - ✅ **Robustesse documentation** : documentation systématique de `set -euo pipefail` dans les 38 modules `lib/`.
 - ✅ **Tests renforcés** : nouveaux tests unitaires pour `VIDEO_EQUIV_QUALITY_CAP`, `_clamp_min`, `_clamp_max`, `_min3`.
 - ✅ **Factorisation bitrate** : fonction `_translate_bitrate_by_efficiency()` centralisée dans `codec_profiles.sh` (audio + vidéo).
@@ -13,7 +13,7 @@
 
 - ✅ **Robustesse queue / FIFO** : évite les blocages quand aucun fichier n’est traitable (entrées vides, fichiers introuvables, queue invalide) + sortie explicite si la source est exclue.
 - ✅ **Notifications Discord (optionnel)** : messages démarrage/pause(off-peak)/fin, payload plus robuste + mode debug opt-in, docs + tests dédiés.
-- ✅ **Film-adaptive fiabilisé** : les budgets calculés sont réellement appliqués à l’encodage (exports) + cap SVT-AV1 en CRF (`mbr=`) et logs debug SVT opt-in.
+- ✅ **Mode adaptatif fiabilisé** : les budgets calculés sont réellement appliqués à l'encodage (exports) + cap SVT-AV1 en CRF (`mbr=`) et logs debug SVT opt-in.
 - ✅ **Vidéo “smart codec”** : seuil de skip codec-aware + politique “no downgrade” (source AV1 ré-encodée en AV1 si nécessaire) + cap “qualité équivalente” sur sources moins efficaces.
 - ✅ **UX/CLI** : meilleure cohérence des messages (skip/erreurs early) et option `--quiet` documentée dans les guides.
 - ✅ **Dev tooling** : `make lint` (ShellCheck) + nettoyage des warnings, améliore la maintenabilité.
@@ -29,7 +29,7 @@
 
 ## v2.5
 
-- ✅ **Mode film-adaptive** : bitrate adaptatif basé sur une analyse de complexité
+- ✅ **Mode adaptatif** : bitrate adaptatif basé sur une analyse de complexité
 - ✅ **Filtre de taille** : option `--min-size` pour filtrer l'index/queue (utile en mode film)
 - ✅ **Audio multicanal** : normalisation des layouts (stéréo / 5.1) + logique de préservation selon le mode
 - ✅ **Windows / Git Bash** : normalisation chemins/CRLF et meilleure robustesse avec caractères spéciaux

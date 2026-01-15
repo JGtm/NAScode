@@ -242,7 +242,7 @@ _reset_cli_state() {
     [ "${EQUIV_QUALITY_OVERRIDE}" = "false" ]
 }
 
-@test "set_conversion_mode_parameters: override equiv-quality appliqué hors film-adaptive" {
+@test "set_conversion_mode_parameters: override equiv-quality appliqué hors adaptatif" {
     # Serie : l'override true force l'activation
     _reset_cli_state
     parse_arguments --mode serie --equiv-quality
@@ -258,9 +258,9 @@ _reset_cli_state() {
     [ "${VIDEO_EQUIV_QUALITY_CAP}" = "false" ]
 }
 
-@test "set_conversion_mode_parameters: override ignoré en film-adaptive (reste activé)" {
+@test "set_conversion_mode_parameters: override ignoré en adaptatif (reste activé)" {
     _reset_cli_state
-    parse_arguments --mode film-adaptive --no-equiv-quality
+    parse_arguments --mode adaptatif --no-equiv-quality
     set_conversion_mode_parameters
     [ "${AUDIO_TRANSLATE_EQUIV_QUALITY}" = "true" ]
     [ "${VIDEO_EQUIV_QUALITY_CAP}" = "true" ]

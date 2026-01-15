@@ -2,7 +2,7 @@
 ###########################################################
 # ANALYSE DE COMPLEXITÉ VIDÉO
 #
-# Module pour le mode film-adaptive : calcule un coefficient
+# Module pour le mode adaptatif : calcule un coefficient
 # de complexité basé sur l'analyse statistique des frames.
 #
 # NOTE: Ce module n'active pas `set -euo pipefail` car :
@@ -11,7 +11,7 @@
 # 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
-# ----- Constantes du mode film-adaptive -----
+# ----- Constantes du mode adaptatif -----
 # NOTE: Ces constantes sont définies dans lib/constants.sh (chargé en premier).
 # Les valeurs ci-dessous servent de fallback si constants.sh n'est pas chargé (tests isolés).
 : "${ADAPTIVE_BPP_BASE:=0.032}"
@@ -26,6 +26,14 @@
 : "${ADAPTIVE_MIN_BITRATE_KBPS:=800}"
 : "${ADAPTIVE_MAXRATE_FACTOR:=1.4}"
 : "${ADAPTIVE_BUFSIZE_FACTOR:=2.5}"
+
+# Constantes SI/TI (Spatial/Temporal Information)
+: "${ADAPTIVE_WEIGHT_STDDEV:=0.40}"
+: "${ADAPTIVE_WEIGHT_SI:=0.30}"
+: "${ADAPTIVE_WEIGHT_TI:=0.30}"
+: "${ADAPTIVE_SI_MAX:=100}"
+: "${ADAPTIVE_TI_MAX:=50}"
+: "${ADAPTIVE_USE_SITI:=true}"
 
 ###########################################################
 # ANALYSE DES FRAMES
@@ -107,25 +115,134 @@ _compute_normalized_stddev() {
     }'
 }
 
+###########################################################
+# ANALYSE SI/TI (Spatial/Temporal Information)
+# Basé sur ITU-T P.910 - métriques standard de complexité vidéo
+###########################################################
+
+# Calcule SI (Spatial Information) et TI (Temporal Information) sur un échantillon.
+# Utilise le filtre FFmpeg 'siti' disponible depuis FFmpeg 5.0+
+# Usage: _compute_siti <file> <start_seconds> <duration_seconds>
+# Retourne: SI|TI (valeurs moyennes)
+_compute_siti() {
+    local file="$1"
+    local start_sec="$2"
+    local duration_sec="$3"
+    
+    # Essayer d'utiliser le filtre siti (FFmpeg 5+)
+    local siti_output
+    siti_output=$(ffmpeg -hide_banner -ss "$start_sec" -t "$duration_sec" -i "$file" \
+        -vf "siti=print_summary=1" -f null - 2>&1)
+    
+    # Parser la sortie pour extraire SI et TI moyens
+    local si ti
+    si=$(echo "$siti_output" | grep -oP 'SI:\s*\K[0-9.]+' | tail -1)
+    ti=$(echo "$siti_output" | grep -oP 'TI:\s*\K[0-9.]+' | tail -1)
+    
+    # Fallback si le filtre siti n'est pas disponible
+    if [[ -z "$si" ]] || [[ -z "$ti" ]]; then
+        # Retourner des valeurs neutres (milieu de plage)
+        echo "50|25"
+        return 0
+    fi
+    
+    echo "${si}|${ti}"
+}
+
+# Vérifie si le filtre siti est disponible dans FFmpeg
+_is_siti_available() {
+    ffmpeg -hide_banner -filters 2>/dev/null | grep -q "siti"
+}
+
+# Normalise une valeur SI entre 0 et 1
+# SI typique: 0-100 (peut dépasser pour contenus très texturés)
+_normalize_si() {
+    local si="$1"
+    awk -v si="$si" -v max="$ADAPTIVE_SI_MAX" 'BEGIN { 
+        norm = si / max
+        if (norm > 1) norm = 1
+        if (norm < 0) norm = 0
+        printf "%.4f", norm
+    }'
+}
+
+# Normalise une valeur TI entre 0 et 1
+# TI typique: 0-50 (peut dépasser pour contenus très dynamiques)
+_normalize_ti() {
+    local ti="$1"
+    awk -v ti="$ti" -v max="$ADAPTIVE_TI_MAX" 'BEGIN {
+        norm = ti / max
+        if (norm > 1) norm = 1
+        if (norm < 0) norm = 0
+        printf "%.4f", norm
+    }'
+}
+
+# Analyse SI/TI sur plusieurs échantillons et retourne les moyennes.
+# Usage: _analyze_siti_multi <file> <duration_seconds> <positions_array>
+# Retourne: SI_avg|TI_avg
+_analyze_siti_multi() {
+    local file="$1"
+    local duration_int="$2"
+    shift 2
+    local positions=("$@")
+    
+    local sample_duration="${ADAPTIVE_SAMPLE_DURATION}"
+    local si_sum=0 ti_sum=0 count=0
+    local margin_end=$(( duration_int * ADAPTIVE_MARGIN_END_PCT / 100 ))
+    local margin_start=$(( duration_int * ADAPTIVE_MARGIN_START_PCT / 100 ))
+    local max_start=$(( duration_int - sample_duration - margin_end ))
+    
+    for pos in "${positions[@]}"; do
+        # Ajuster la position
+        [[ "$pos" -gt "$max_start" ]] && pos="$max_start"
+        [[ "$pos" -lt "$margin_start" ]] && pos="$margin_start"
+        
+        local siti_result si ti
+        siti_result=$(_compute_siti "$file" "$pos" "$sample_duration")
+        IFS='|' read -r si ti <<< "$siti_result"
+        
+        if [[ "$si" =~ ^[0-9.]+$ ]] && [[ "$ti" =~ ^[0-9.]+$ ]]; then
+            si_sum=$(awk -v sum="$si_sum" -v val="$si" 'BEGIN { printf "%.4f", sum + val }')
+            ti_sum=$(awk -v sum="$ti_sum" -v val="$ti" 'BEGIN { printf "%.4f", sum + val }')
+            ((count++))
+        fi
+    done
+    
+    if [[ "$count" -eq 0 ]]; then
+        echo "50|25"
+        return
+    fi
+    
+    local si_avg ti_avg
+    si_avg=$(awk -v sum="$si_sum" -v n="$count" 'BEGIN { printf "%.2f", sum / n }')
+    ti_avg=$(awk -v sum="$ti_sum" -v n="$count" 'BEGIN { printf "%.2f", sum / n }')
+    
+    echo "${si_avg}|${ti_avg}"
+}
+
+###########################################################
+# ANALYSE COMBINÉE (stddev + SI + TI)
+###########################################################
+
 # Analyse la complexité d'un fichier vidéo via multi-échantillonnage.
-# Prend 6 échantillons répartis sur la durée pour une meilleure représentativité.
+# Prend N échantillons répartis sur la durée pour une meilleure représentativité.
+# Si ADAPTIVE_USE_SITI=true, combine stddev + SI + TI selon les pondérations.
 # Usage: analyze_video_complexity <file> <duration_seconds> [show_progress]
-# Retourne: coefficient de variation moyen (écart-type normalisé)
+# Retourne: stddev|SI_avg|TI_avg (3 métriques séparées par |)
 analyze_video_complexity() {
     local file="$1"
     local duration="$2"
     local show_progress="${3:-false}"
-
-    # Note: ancien label de progression supprimé (variable inutilisée).
     
     # Validation des entrées
     if [[ -z "$file" ]] || [[ ! -f "$file" ]]; then
-        echo "0"
+        echo "0|50|25"
         return 1
     fi
     
     if [[ -z "$duration" ]] || ! [[ "$duration" =~ ^[0-9]+\.?[0-9]*$ ]]; then
-        echo "0"
+        echo "0|50|25"
         return 1
     fi
     
@@ -147,14 +264,15 @@ analyze_video_complexity() {
     
     # Minimum requis : 60 secondes pour une analyse fiable
     if [[ "$duration_int" -lt 60 ]]; then
-        # Fichier trop court : analyser tout le fichier
+        # Fichier trop court : analyser tout le fichier (stddev seulement)
         if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
             _show_analysis_progress 1 1
         fi
-        local all_frames
+        local all_frames stddev
         all_frames=$(_get_frame_sizes "$file" 0 "$duration_int")
-        _compute_normalized_stddev "$all_frames"
-        unset ANALYSIS_PROGRESS_LABEL
+        stddev=$(_compute_normalized_stddev "$all_frames")
+        # Valeurs SI/TI neutres pour fichiers courts
+        echo "${stddev}|50|25"
         return 0
     fi
     
@@ -201,10 +319,24 @@ analyze_video_complexity() {
         fi
     done
     
-    # Note: L'effacement de la barre de progression est fait par l'appelant
-    # car printf dans un sous-shell ($()) ne peut pas effacer correctement
+    # Calculer stddev des frames
+    local stddev
+    stddev=$(_compute_normalized_stddev "$all_frames")
     
-    _compute_normalized_stddev "$all_frames"
+    # Analyse SI/TI si activée et disponible
+    local si_avg="50" ti_avg="25"
+    if [[ "${ADAPTIVE_USE_SITI:-true}" == true ]]; then
+        if _is_siti_available; then
+            local siti_result
+            # Utiliser un sous-ensemble des positions pour SI/TI (plus rapide)
+            local siti_positions=("${positions[@]:0:5}")  # 5 premiers échantillons
+            siti_result=$(_analyze_siti_multi "$file" "$duration_int" "${siti_positions[@]}")
+            IFS='|' read -r si_avg ti_avg <<< "$siti_result"
+        fi
+    fi
+    
+    # Retourner les 3 métriques séparées
+    echo "${stddev}|${si_avg}|${ti_avg}"
 }
 
 # Affiche une barre de progression pour l'analyse de complexité
@@ -243,7 +375,77 @@ _show_analysis_progress() {
     fi
 }
 
+###########################################################
+# CALCUL DU SCORE COMBINÉ ET COEFFICIENT C
+###########################################################
+
+# Calcule un score combiné normalisé à partir des 3 métriques.
+# Usage: _compute_combined_score <stddev> <si> <ti>
+# Retourne: score entre 0 et 1
+_compute_combined_score() {
+    local stddev="$1"
+    local si="$2"
+    local ti="$3"
+    
+    # Normaliser stddev entre 0 et 1 (basé sur les seuils)
+    local stddev_norm
+    stddev_norm=$(awk -v s="$stddev" -v low="$ADAPTIVE_STDDEV_LOW" -v high="$ADAPTIVE_STDDEV_HIGH" '
+    BEGIN {
+        if (s <= low) { print 0; exit }
+        if (s >= high) { print 1; exit }
+        printf "%.4f", (s - low) / (high - low)
+    }')
+    
+    # Normaliser SI et TI
+    local si_norm ti_norm
+    si_norm=$(_normalize_si "$si")
+    ti_norm=$(_normalize_ti "$ti")
+    
+    # Score pondéré
+    awk -v s="$stddev_norm" -v si="$si_norm" -v ti="$ti_norm" \
+        -v ws="$ADAPTIVE_WEIGHT_STDDEV" -v wsi="$ADAPTIVE_WEIGHT_SI" -v wti="$ADAPTIVE_WEIGHT_TI" '
+    BEGIN {
+        score = s * ws + si * wsi + ti * wti
+        if (score < 0) score = 0
+        if (score > 1) score = 1
+        printf "%.4f", score
+    }'
+}
+
+# Mappe le score combiné vers le coefficient de complexité C.
+# Usage: _map_score_to_complexity <combined_score>
+# Retourne: coefficient C entre ADAPTIVE_C_MIN et ADAPTIVE_C_MAX
+_map_score_to_complexity() {
+    local score="$1"
+    
+    awk -v score="$score" -v c_min="$ADAPTIVE_C_MIN" -v c_max="$ADAPTIVE_C_MAX" '
+    BEGIN {
+        c = c_min + score * (c_max - c_min)
+        printf "%.2f", c
+    }'
+}
+
+# Mappe les métriques combinées (stddev + SI + TI) vers le coefficient C.
+# Usage: _map_metrics_to_complexity <stddev> <si> <ti>
+# Retourne: coefficient C entre ADAPTIVE_C_MIN et ADAPTIVE_C_MAX
+_map_metrics_to_complexity() {
+    local stddev="$1"
+    local si="${2:-50}"
+    local ti="${3:-25}"
+    
+    # Si SI/TI désactivé ou valeurs neutres, utiliser l'ancien mapping stddev seul
+    if [[ "${ADAPTIVE_USE_SITI:-true}" != true ]] || [[ "$si" == "50" && "$ti" == "25" ]]; then
+        _map_stddev_to_complexity "$stddev"
+        return
+    fi
+    
+    local combined_score
+    combined_score=$(_compute_combined_score "$stddev" "$si" "$ti")
+    _map_score_to_complexity "$combined_score"
+}
+
 # Mappe le coefficient de variation vers le coefficient de complexité C.
+# (Legacy - conservé pour rétro-compatibilité des tests)
 # Usage: _map_stddev_to_complexity <normalized_stddev>
 # Retourne: coefficient C entre ADAPTIVE_C_MIN et ADAPTIVE_C_MAX
 _map_stddev_to_complexity() {
@@ -359,11 +561,11 @@ compute_adaptive_bufsize() {
 # API PUBLIQUE
 ###########################################################
 
-# Analyse complète d'un fichier pour le mode film-adaptive.
+# Analyse complète d'un fichier pour le mode adaptatif.
 # Usage: get_adaptive_encoding_params <file>
-# Retourne: target_kbps|maxrate_kbps|bufsize_kbps|complexity_C|complexity_desc
+# Retourne: target_kbps|maxrate_kbps|bufsize_kbps|complexity_C|complexity_desc|metrics
 #
-# Exemple: 2450|3430|6125|1.12|standard (film typique)
+# Exemple: 2450|3430|6125|1.12|standard (film typique)|0.32|45.2|18.3
 get_adaptive_encoding_params() {
     local file="$1"
     
@@ -387,10 +589,14 @@ get_adaptive_encoding_params() {
     fi
     [[ -z "$fps" ]] && fps="24"
     
-    # Analyser la complexité (avec progression)
-    local stddev complexity_c complexity_desc
-    stddev=$(analyze_video_complexity "$file" "$duration" true)
-    complexity_c=$(_map_stddev_to_complexity "$stddev")
+    # Analyser la complexité (retourne stddev|SI|TI)
+    local analysis_result stddev si_avg ti_avg
+    analysis_result=$(analyze_video_complexity "$file" "$duration" true)
+    IFS='|' read -r stddev si_avg ti_avg <<< "$analysis_result"
+    
+    # Calculer le coefficient C avec les 3 métriques
+    local complexity_c complexity_desc
+    complexity_c=$(_map_metrics_to_complexity "$stddev" "$si_avg" "$ti_avg")
     complexity_desc=$(_describe_complexity "$complexity_c")
     
     # Calculer les paramètres d'encodage
@@ -399,17 +605,20 @@ get_adaptive_encoding_params() {
     maxrate_kbps=$(compute_adaptive_maxrate "$target_kbps")
     bufsize_kbps=$(compute_adaptive_bufsize "$target_kbps")
     
-    echo "${target_kbps}|${maxrate_kbps}|${bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev}"
+    # Retourner les résultats avec les métriques détaillées
+    echo "${target_kbps}|${maxrate_kbps}|${bufsize_kbps}|${complexity_c}|${complexity_desc}|${stddev}|${si_avg}|${ti_avg}"
 }
 
 # Affiche les informations d'analyse de complexité (pour l'UI).
-# Usage: display_complexity_analysis <file> <complexity_C> <complexity_desc> <stddev> <target_kbps>
+# Usage: display_complexity_analysis <file> <complexity_C> <complexity_desc> <stddev> <target_kbps> [si] [ti]
 display_complexity_analysis() {
     local file="$1"
     local complexity_c="$2"
     local complexity_desc="$3"
     local stddev="$4"
     local target_kbps="$5"
+    local si="${6:-}"
+    local ti="${7:-}"
     
     # --no-progress ne doit pas cacher les infos (seulement les barres de progression).
     # --quiet (UI_QUIET) doit rester silencieux.
@@ -421,7 +630,16 @@ display_complexity_analysis() {
     filename=$(basename "$file")
 
     echo -e "  📊 Résultats d'analyse :"
-    echo -e "${DIM}     └─ Coefficient de variation : ${stddev}${NOCOLOR}"
+    echo -e "${DIM}     └─ Coefficient de variation (stddev) : ${stddev}${NOCOLOR}"
+    
+    # Afficher SI/TI si disponibles et non neutres
+    if [[ -n "$si" ]] && [[ -n "$ti" ]] && [[ "${ADAPTIVE_USE_SITI:-true}" == true ]]; then
+        if [[ "$si" != "50" ]] || [[ "$ti" != "25" ]]; then
+            echo -e "${DIM}     └─ Complexité spatiale (SI) : ${si}${NOCOLOR}"
+            echo -e "${DIM}     └─ Complexité temporelle (TI) : ${ti}${NOCOLOR}"
+        fi
+    fi
+    
     echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
     echo -e "${DIM}     └─ Bitrate cible (encodage) : ${target_kbps} kbps${NOCOLOR}"
 }

@@ -39,6 +39,8 @@ export_variables() {
     
     # --- Fonctions d'analyse de complexité (complexity.sh) ---
     export -f analyze_video_complexity _map_stddev_to_complexity _describe_complexity
+    export -f _map_metrics_to_complexity _map_score_to_complexity _compute_combined_score
+    export -f _normalize_si _normalize_ti _is_siti_available _compute_siti _analyze_siti_multi
     export -f _show_analysis_progress _get_frame_sizes _compute_normalized_stddev
     export -f compute_adaptive_target_bitrate compute_adaptive_maxrate compute_adaptive_bufsize
     export -f get_adaptive_encoding_params display_complexity_analysis
@@ -118,7 +120,7 @@ export_variables() {
     export ADAPTIVE_480P_MAX_HEIGHT ADAPTIVE_480P_SCALE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
     
-    # --- Variables mode film-adaptive (complexity.sh, constants.sh) ---
+    # --- Variables mode adaptatif (complexity.sh, constants.sh) ---
     export ADAPTIVE_COMPLEXITY_MODE
     export ADAPTIVE_BPP_BASE ADAPTIVE_C_MIN ADAPTIVE_C_MAX
     export ADAPTIVE_STDDEV_LOW ADAPTIVE_STDDEV_HIGH

@@ -115,7 +115,7 @@ Sécurité : ne commit jamais le webhook. Si l’URL a été partagée publiquem
 
 Depuis v2.8, les "magic numbers" sont centralisés dans [lib/constants.sh](../lib/constants.sh). Chaque constante peut être **overridée via variable d'environnement** avant de lancer le script.
 
-### Mode film-adaptive (complexity.sh)
+### Mode adaptatif (complexity.sh)
 
 | Constante | Défaut | Description |
 |-----------|--------|-------------|
@@ -153,8 +153,8 @@ Depuis v2.8, les "magic numbers" sont centralisés dans [lib/constants.sh](../li
 # Augmenter le timeout Discord pour les connexions lentes
 DISCORD_CURL_TIMEOUT=30 bash nascode -s /chemin/source
 
-# Mode film-adaptive avec analyse plus fine (plus d'échantillons)
-ADAPTIVE_SAMPLE_COUNT=30 bash nascode -m film-adaptive -s /chemin/source
+# Mode adaptatif avec analyse plus fine (plus d'échantillons)
+ADAPTIVE_SAMPLE_COUNT=30 bash nascode -m adaptatif -s /chemin/source
 ```
 
 ## Variables modifiables (extrait)
