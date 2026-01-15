@@ -15,6 +15,23 @@ Objectifs :
 
 ### 2026-01-15
 
+#### Amélioration UX mode adaptatif (terminal + Discord)
+
+- **Quoi** : ajout de feedback visuel pendant l'analyse SI/TI et notifications Discord dédiées au mode adaptatif.
+- **Où** :
+  - `lib/complexity.sh` : ajout spinner `⏳ Analyse SI/TI...` avant `_analyze_siti_multi()`, effacement après.
+  - `lib/notify_events.sh` : ajout événements `analysis_started` et `analysis_completed`, fonctions handlers.
+  - `lib/notify_format.sh` : fonctions de formatage (format succinct : `📊 C=1.12 (standard) → 2450 kbps`).
+  - `lib/adaptive_mode.sh` : appels `notify_event` dans `_convert_handle_adaptive_mode()`.
+  - `lib/exports.sh` : exports des 4 nouvelles fonctions.
+- **Pourquoi** : le script semblait figé pendant le calcul SI/TI (~20 échantillons) et Discord n'avait pas de notification spécifique pour la phase d'analyse.
+- **Comportement** :
+  - Terminal : message `⏳ Analyse SI/TI...` affiché in-place (effacé après calcul).
+  - Discord : `📊 Analyse de complexité...` puis `📊 C=1.12 (standard) → 2450 kbps` (sans répéter le nom du fichier déjà affiché dans `file_started`).
+- **Impact** :
+  - UX : retour visuel immédiat, pas d'impression de gel.
+  - Pas de régression fonctionnelle attendue.
+
 #### Renommage mode `film-adaptive` → `adaptatif`
 
 - **Quoi** : renommage du mode de conversion `-m film-adaptive` en `-m adaptatif` (francisation du nom).
