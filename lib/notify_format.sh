@@ -269,11 +269,11 @@ _notify_format_event_file_progress_update() {
     local body="${prefix}📊"
 
     if [[ -n "$speed" ]]; then
-        body+=" x${speed}"
+        body+="Vitesse : x${speed}"
     fi
 
     if [[ -n "$eta" ]]; then
-        body+=" | ETA: ${eta}"
+        body+=" | Durée estimée : ${eta}"
     fi
 
     printf '%s' "$body"
