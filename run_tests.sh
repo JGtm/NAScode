@@ -292,7 +292,7 @@ for test_file in "${TEST_FILES[@]}"; do
                 if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
                     # Mettre à jour le compteur en temps réel
                     done_count=$((local_passed + local_failed + local_skipped))
-                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
                 fi
             fi
             
