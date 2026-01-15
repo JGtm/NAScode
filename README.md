@@ -1,4 +1,4 @@
-# 🎬 NAScode — Conversion vidéo HEVC (x265) / AV1
+# 🎬 NAScode — Outil Bash — Conversion vidéo HEVC / AV1
 
 Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou **AV1** en batch (séries/films), avec une logique “smart” (skip/passthrough) et une file d’attente persistante.
 
