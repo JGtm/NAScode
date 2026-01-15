@@ -64,10 +64,12 @@ _setup_video_encoding_params() {
     if [[ -n "$downscale_filter" ]]; then
         VIDEO_FILTER_OPTS="-vf $downscale_filter"
         if [[ "$NO_PROGRESS" != true ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
+            local downscale_msg
+            downscale_msg=$(msg MSG_UI_DOWNSCALE "$input_width" "$input_height" "$DOWNSCALE_MAX_WIDTH" "$DOWNSCALE_MAX_HEIGHT")
             if declare -f ui_print_raw &>/dev/null; then
-                ui_print_raw "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+                ui_print_raw "${CYAN}  ⬇️  ${downscale_msg}${NOCOLOR}"
             else
-                echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+                echo -e "${CYAN}  ⬇️  ${downscale_msg}${NOCOLOR}"
             fi
         fi
     fi
@@ -76,9 +78,9 @@ _setup_video_encoding_params() {
     if [[ "$NO_PROGRESS" != true ]] && [[ -n "$input_pix_fmt" ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
         if [[ "$OUTPUT_PIX_FMT" == "yuv420p10le" ]]; then
             if declare -f ui_print_raw &>/dev/null; then
-                ui_print_raw "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+                ui_print_raw "${CYAN}  🎨 $(msg MSG_UI_10BIT)${NOCOLOR}"
             else
-                echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+                echo -e "${CYAN}  🎨 $(msg MSG_UI_10BIT)${NOCOLOR}"
             fi
         fi
     fi
@@ -514,7 +516,7 @@ _run_ffmpeg_encode() {
             end_msg="Terminé ✅"
             ;;
         *)
-            log_error "Mode d'encodage inconnu: $mode"
+            log_error "$(msg MSG_TRANSCODE_UNKNOWN_MODE "$mode")"
             return 1
             ;;
     esac
@@ -629,12 +631,12 @@ _run_ffmpeg_encode() {
     if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]]; then
         local log_file="${ffmpeg_log}${log_suffix}"
         if [[ "$mode" == "pass1" ]]; then
-            log_error "Erreur lors de l'analyse (pass 1)"
+            log_error "$(msg MSG_TRANSCODE_PASS1_ERROR)"
         fi
         if [[ -f "$log_file" ]]; then
-            echo "--- Dernières lignes du log ffmpeg ($log_file) ---" >&2
+            echo "--- $(msg MSG_TRANSCODE_FFMPEG_LOG "$log_file") ---" >&2
             tail -n 40 "$log_file" >&2 || true
-            echo "--- Fin du log ffmpeg ---" >&2
+            echo "--- End ffmpeg log ---" >&2
         fi
     fi
     return 1

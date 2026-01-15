@@ -94,13 +94,13 @@ _check_output_exists() {
     if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
         local counter_prefix
         counter_prefix=$(_get_counter_prefix)
-        echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Fichier de sortie déjà existant) : $filename${NOCOLOR}" >&2
+        echo -e "${counter_prefix}${BLUE}⏭️  $(msg MSG_UI_SKIP_EXISTS) : $filename${NOCOLOR}" >&2
         if [[ -n "$LOG_SESSION" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Fichier de sortie existe déjà) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Output file exists) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
 
         if declare -f notify_event &>/dev/null; then
-            notify_event file_skipped "$filename" "Fichier de sortie déjà existant" || true
+            notify_event file_skipped "$filename" "$(msg MSG_UI_SKIP_EXISTS)" || true
         fi
 
         # Alimenter la queue avec le prochain candidat si limite active
@@ -117,13 +117,13 @@ _check_output_exists() {
         if [[ -n "$heavy_output" ]] && [[ -f "$heavy_output" ]]; then
             local counter_prefix
             counter_prefix=$(_get_counter_prefix)
-            echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Sortie 'Heavier' déjà existante) : $filename${NOCOLOR}" >&2
+            echo -e "${counter_prefix}${BLUE}⏭️  $(msg MSG_UI_SKIP_HEAVIER_EXISTS) : $filename${NOCOLOR}" >&2
             if [[ -n "$LOG_SESSION" ]]; then
                 echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (Heavier output exists) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
             fi
 
             if declare -f notify_event &>/dev/null; then
-                notify_event file_skipped "$filename" "Sortie 'Heavier' déjà existante" || true
+                notify_event file_skipped "$filename" "$(msg MSG_UI_SKIP_HEAVIER_EXISTS)" || true
             fi
             if [[ "$LIMIT_FILES" -gt 0 ]]; then
                 update_queue || true
@@ -177,7 +177,7 @@ _setup_temp_files_and_logs() {
         echo ""
         local counter_str
         counter_str=$(_get_counter_prefix)
-        echo -e "${counter_str}▶️ Démarrage du fichier : $filename"
+        echo -e "${counter_str}▶️ $(msg MSG_UI_START_FILE) : $filename"
     fi
 
     # Notification Discord (best-effort) : démarrage fichier
@@ -226,7 +226,7 @@ _copy_to_temp_storage() {
     fi
 
     if ! custom_pv "$file_original" "$tmp_input" "$CYAN"; then
-        print_error "ERREUR Impossible de déplacer (custom_pv) : $file_original"
+        print_error "$(msg MSG_CONV_MOVE_ERROR "$file_original")"
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR custom_pv copy failed | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi

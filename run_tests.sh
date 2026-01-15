@@ -30,6 +30,7 @@ NC='\033[0m'
 VERBOSE=false
 FILTER=""
 SHOW_ONLY_ERRORS=false
+FAST_MODE=false
 
 ###########################################################
 # Fonctions utilitaires
@@ -166,6 +167,10 @@ while [[ $# -gt 0 ]]; do
             FILTER="$2"
             shift 2
             ;;
+        --fast)
+            FAST_MODE=true
+            shift
+            ;;
         -h|--help)
             echo "Usage: $0 [options]"
             echo ""
@@ -173,6 +178,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -v, --verbose      Mode verbeux (affiche chaque test)"
             echo "  -e, --errors-only  Affiche uniquement les fichiers avec erreurs"
             echo "  -f, --filter PAT   Exécuter seulement les tests matchant PAT"
+            echo "  --fast             Mode rapide (exclut les tests E2E lents)"
             echo "  -h, --help         Afficher cette aide"
             echo ""
             echo "Les résultats sont enregistrés dans: logs/tests/"
@@ -193,6 +199,10 @@ print_and_log "${CYAN}═══════════════════�
 print_and_log "${CYAN}             Tests Unitaires - NAScode                 ${NC}"
 print_and_log "${CYAN}═══════════════════════════════════════════════════════${NC}"
 print_and_log ""
+if [[ "$FAST_MODE" == true ]]; then
+    print_and_log "${YELLOW}⚡ Mode rapide (--fast) : tests E2E lents exclus${NC}"
+    print_and_log ""
+fi
 print_and_log "${DIM}Bats: $(bats --version) | Log: logs/tests/tests_${TIMESTAMP}.log${NC}"
 print_and_log ""
 
@@ -207,8 +217,25 @@ cd "$TESTS_DIR"
 
 # Collecter les fichiers de test
 TEST_FILES=()
+# Tests E2E lents (exclus en mode --fast)
+SLOW_TESTS=("test_e2e_full_workflow.bats" "test_e2e_stream_mapping.bats" "test_e2e_audio_smart_logic.bats" "test_vmaf_full.bats" "test_regression_e2e.bats")
+
 shopt -s nullglob
 for test_file in *.bats; do
+    # Mode fast : exclure les tests E2E lents
+    if [[ "$FAST_MODE" == true ]]; then
+        is_slow=false
+        for slow in "${SLOW_TESTS[@]}"; do
+            if [[ "$test_file" == "$slow" ]]; then
+                is_slow=true
+                break
+            fi
+        done
+        if [[ "$is_slow" == true ]]; then
+            continue
+        fi
+    fi
+
     if [[ -z "$FILTER" ]]; then
         TEST_FILES+=("$test_file")
         continue
@@ -292,7 +319,7 @@ for test_file in "${TEST_FILES[@]}"; do
                 if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
                     # Mettre à jour le compteur en temps réel
                     done_count=$((local_passed + local_failed + local_skipped))
-                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
                 fi
             fi
             
@@ -312,7 +339,7 @@ for test_file in "${TEST_FILES[@]}"; do
                 if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
                     # Mettre à jour le compteur
                     done_count=$((local_passed + local_failed + local_skipped))
-                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
                 fi
             fi
             
@@ -355,12 +382,12 @@ for test_file in "${TEST_FILES[@]}"; do
         
         if [[ $local_failed -eq 0 ]]; then
             if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
-                printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-45s ${DIM}(%2d/%-2d)${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator" >/dev/tty
-                printf "✓  [%2d/%-2d] %-45s (%2d/%-2d)%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
+                printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-55s ${DIM}(%2d/%-2d)${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator" >/dev/tty
+                printf "✓  [%2d/%-2d] %-55s (%2d/%-2d)%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
             fi
         else
-            printf "\r${RED}✗${NC}  [%2d/%-2d] %-45s ${RED}%2d échec(s)${NC} ${DIM}/ %-2d${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator" >/dev/tty
-            printf "✗  [%2d/%-2d] %-45s %2d échec(s) / %-2d%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
+            printf "\r${RED}✗${NC}  [%2d/%-2d] %-55s ${RED}%2d échec(s)${NC} ${DIM}/ %-2d${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator" >/dev/tty
+            printf "✗  [%2d/%-2d] %-55s %2d échec(s) / %-2d%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
             
             # Stocker pour le résumé
             FAILED_FILES+=("$test_file")

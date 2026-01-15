@@ -204,10 +204,10 @@ _finalize_conversion_success() {
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
         # Avertir si un fichier converti risque d'être perdu
         if [[ -f "$tmp_output" ]]; then
-            print_warning "Conversion interrompue, fichier temporaire conservé: $tmp_output"
+            print_warning "$(msg MSG_CONV_INTERRUPTED "$tmp_output")"
             # Log pour récupération manuelle si besoin
             if [[ -n "$LOG_SESSION" ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | INTERRUPTED | $file_original -> $tmp_output (fichier temp conservé)" >> "$LOG_SESSION" 2>/dev/null || true
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | $(msg MSG_FINAL_INTERRUPTED) | $file_original -> $tmp_output (fichier temp conservé)" >> "$LOG_SESSION" 2>/dev/null || true
             fi
         fi
         return 1
@@ -270,7 +270,7 @@ _finalize_conversion_success() {
 
     # Vérifier que le fichier de sortie temporaire existe
     if [[ ! -f "$tmp_output" ]]; then
-        print_error "ERREUR: Fichier temporaire introuvable après encodage: $tmp_output"
+        print_error "$(msg MSG_CONV_TMP_NOT_FOUND "$tmp_output")"
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output (fichier temp absent)" >> "$LOG_SESSION" 2>/dev/null || true
         fi
@@ -316,7 +316,7 @@ _finalize_conversion_success() {
                         if declare -f print_heavy_output_redirect &>/dev/null; then
                             print_heavy_output_redirect "$final_output_target"
                         else
-                            print_warning "Gain insuffisant : sortie redirigée vers $final_output_target"
+                            print_warning "$(msg MSG_CONV_GAIN_REDIRECT "$final_output_target")"
                         fi
 
                         if [[ -n "$LOG_SESSION" ]]; then
@@ -363,11 +363,11 @@ _finalize_conversion_error() {
     local ffmpeg_log_temp="$5"
     
     if [[ ! -f "$STOP_FLAG" ]]; then
-        print_error "Échec de la conversion : $filename"
+        print_error "$(msg MSG_CONV_FAILED "$filename")"
     fi
     if [[ -n "$LOG_SESSION" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
-        echo "--- Erreur détaillée FFMPEG ---" >> "$LOG_SESSION" 2>/dev/null || true
+        echo "--- $(msg MSG_FINAL_FFMPEG_ERROR) ---" >> "$LOG_SESSION" 2>/dev/null || true
         if [[ -n "$ffmpeg_log_temp" ]] && [[ -f "$ffmpeg_log_temp" ]] && [[ -s "$ffmpeg_log_temp" ]]; then
             cat "$ffmpeg_log_temp" >> "$LOG_SESSION" 2>/dev/null || true
         else
@@ -469,7 +469,7 @@ dry_run_compare_names() {
                     
                     # Affichage des noms
                     printf "  ${ORANGE}%-10s${NOCOLOR} : %s\n" "ORIGINAL" "$filename"
-                    printf "  ${GREEN}%-10s${NOCOLOR}    : %s\n" "GÉNÉRÉ" "$final_output_basename"
+                    printf "  ${GREEN}%-10s${NOCOLOR}    : %s\n" "$(msg MSG_FINAL_GENERATED)" "$final_output_basename"
                     
                     echo ""
                 
@@ -481,17 +481,18 @@ dry_run_compare_names() {
             {
                 echo "-------------------------------------------"
                 if [[ "$anomaly_count" -gt 0 ]]; then
-                    printf "  $anomaly_count ANOMALIE(S) de nommage trouvée(s)."
-                    printf "  Veuillez vérifier les caractères spéciaux ou les problèmes d'encodage pour ces fichiers."
+                    msg MSG_FINAL_ANOMALY_COUNT "$anomaly_count"
+                    echo ""
+                    msg MSG_FINAL_ANOMALY_HINT
                 else
-                    printf " ${GREEN}Aucune anomalie de nommage détectée.${NOCOLOR}"
+                    printf " ${GREEN}$(msg MSG_FINAL_NO_ANOMALY)${NOCOLOR}"
                 fi
 				echo ""
                 echo "-------------------------------------------"
             } | tee -a "$LOG_FILE"         
             ;;
         [nN]|*)
-            echo "Comparaison des noms ignorée."
+            msg MSG_FINAL_COMPARE_IGNORED
             ;;
     esac
 }

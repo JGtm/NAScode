@@ -168,9 +168,9 @@ show_summary() {
         local line2="$3"
 
         echo ""
-        echo -e "${GREEN}Résumé${NOCOLOR} ${DIM}(${end_date})${NOCOLOR}"
-        echo -e "${DIM}Durée:${NOCOLOR} ${CYAN}${total_elapsed_str}${NOCOLOR}"
-        echo -e "${DIM}Résultat:${NOCOLOR} ${GREEN}OK=${succ}${NOCOLOR}  ${YELLOW}SKIP=${skip}${NOCOLOR}  ${RED}ERR=${err}${NOCOLOR}"
+        echo -e "${GREEN}$(msg MSG_SUMMARY_TITLE)${NOCOLOR} ${DIM}(${end_date})${NOCOLOR}"
+        echo -e "${DIM}$(msg MSG_SUMMARY_DURATION):${NOCOLOR} ${CYAN}${total_elapsed_str}${NOCOLOR}"
+        echo -e "${DIM}$(msg MSG_SUMMARY_RESULT):${NOCOLOR} ${GREEN}OK=${succ}${NOCOLOR}  ${YELLOW}SKIP=${skip}${NOCOLOR}  ${RED}ERR=${err}${NOCOLOR}"
 
         local has_any_anomaly=false
         if [[ "$size_anomalies" -gt 0 ]] || [[ "$checksum_anomalies" -gt 0 ]]; then
@@ -181,11 +181,11 @@ show_summary() {
         fi
 
         if [[ "$has_any_anomaly" == true ]]; then
-            echo -e "${YELLOW}Anomalies:${NOCOLOR} taille=${size_anomalies} intégrité=${checksum_anomalies}${NOCOLOR}"${show_vmaf_anomaly:+" vmaf=${vmaf_anomalies}"}
+            echo -e "${YELLOW}$(msg MSG_SUMMARY_ANOMALIES):${NOCOLOR} taille=${size_anomalies} intégrité=${checksum_anomalies}${NOCOLOR}"${show_vmaf_anomaly:+" vmaf=${vmaf_anomalies}"}
         fi
 
         if [[ "$show_space_savings" == true ]]; then
-            echo -e "${DIM}Espace:${NOCOLOR} ${GREEN}${line1}${NOCOLOR}"
+            echo -e "${DIM}$(msg MSG_SUMMARY_SPACE):${NOCOLOR} ${GREEN}${line1}${NOCOLOR}"
             [[ -n "$line2" ]] && echo -e "${GREEN}${line2}${NOCOLOR}"
         fi
         echo ""

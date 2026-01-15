@@ -21,7 +21,7 @@ check_dependencies() {
     done
 
     if [[ ${#missing_deps[@]} -gt 0 ]]; then
-        print_error "Dépendances manquantes : ${missing_deps[*]}"
+        print_error "$(msg MSG_SYS_DEPS_MISSING "${missing_deps[*]}")"
         exit 1
     fi
 
@@ -30,21 +30,21 @@ check_dependencies() {
     ffmpeg_version=$(ffmpeg -version 2>/dev/null | head -n1 | grep -oE 'version [0-9]+' | cut -d ' ' -f2 || true)
 
     if [[ -z "$ffmpeg_version" ]]; then
-        print_warning "Impossible de déterminer la version de ffmpeg."
+        print_warning "$(msg MSG_SYS_FFMPEG_VERSION_UNKNOWN)"
     else
         if [[ "$ffmpeg_version" =~ ^[0-9]+$ ]]; then
             if (( ffmpeg_version < FFMPEG_MIN_VERSION )); then
-                print_warning "Version FFMPEG ($ffmpeg_version) < Recommandée ($FFMPEG_MIN_VERSION)"
+                print_warning "$(msg MSG_SYS_FFMPEG_VERSION_OLD "$ffmpeg_version" "$FFMPEG_MIN_VERSION")"
             else
                 print_item "FFmpeg" "v$ffmpeg_version" "$GREEN"
             fi
         else
-            print_warning "Version ffmpeg détectée : $ffmpeg_version"
+            print_warning "$(msg MSG_SYS_FFMPEG_VERSION_DETECTED "$ffmpeg_version")"
         fi
     fi
 
     if [[ ! -d "$SOURCE" ]]; then
-        print_error "Source '$SOURCE' introuvable."
+        print_error "$(msg MSG_SYS_SOURCE_NOT_FOUND "$SOURCE")"
         exit 1
     fi
 
@@ -120,7 +120,7 @@ check_output_suffix() {
         custom:*)
             # -S "valeur" : suffixe personnalisé
             SUFFIX_STRING="${SUFFIX_MODE#custom:}"
-            print_warning "Utilisation forcée du suffixe de sortie : ${SUFFIX_STRING}"
+            print_warning "$(msg MSG_SYS_SUFFIX_FORCED "${SUFFIX_STRING}")"
             ;;
         on)
             # -S sans argument : activer le suffixe dynamique sans question
@@ -164,7 +164,7 @@ check_output_suffix() {
             case "$response" in
                 [nN])
                     SUFFIX_STRING=""
-                    print_warning "Suffixe de sortie désactivé"
+                    print_warning "$(msg MSG_SYS_SUFFIX_DISABLED)"
                     ;;
                 *)
                     # Ne pas afficher le suffixe complet car la résolution (1080p/720p) 
@@ -191,10 +191,10 @@ check_output_suffix() {
         
         case "$final_confirm" in
             [oO]|[yY]|'')
-                print_warning "Continuation SANS suffixe. Vérifiez le Dry Run ou les logs."
+                print_warning "$(msg MSG_SYS_SUFFIX_CONTINUE_NO_SUFFIX)"
                 ;;
             *)
-                print_error "Opération annulée. Modifiez le suffixe ou le dossier de sortie."
+                print_error "$(msg MSG_SYS_SUFFIX_CANCELLED)"
                 exit 1
                 ;;
         esac
@@ -224,7 +224,7 @@ check_vmaf() {
         # L'affichage sera groupé avec les autres options dans show_active_options
         return 0
     else
-        print_error "VMAF demandé mais libvmaf non disponible dans FFmpeg"
+        print_error "$(msg MSG_SYS_VMAF_NOT_AVAILABLE)"
         VMAF_ENABLED=false
     fi
 }

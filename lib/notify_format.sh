@@ -259,7 +259,7 @@ _notify_format_event_file_started() {
     prefix=$(_notify_counter_prefix_plain)
     [[ -n "$prefix" ]] && prefix+=" "
 
-    printf '%s' "${prefix}▶️ Démarrage du fichier : $(_notify_truncate_label "$filename" 120)"
+    printf '%s' "${prefix}▶️ $(msg MSG_NOTIFY_FILE_START) : $(_notify_truncate_label "$filename" 120)"
 }
 
 _notify_format_event_file_progress_update() {
@@ -304,7 +304,7 @@ _notify_format_event_file_completed() {
     fi
 
     local elapsed_part="${elapsed:-N/A}"
-    printf '%s' "${prefix}✅ Conversion terminée en ${elapsed_part}${size_part}"
+    printf '%s' "${prefix}✅ $(msg MSG_NOTIFY_CONV_DONE) ${elapsed_part}${size_part}"
 }
 
 _notify_format_event_conversions_completed() {
@@ -332,7 +332,7 @@ _notify_format_event_transfers_pending() {
 
 _notify_format_event_transfers_done() {
     # UX Discord: laisser une ligne vide après l'étape transferts
-    printf '%s' $'✅ Transferts terminés'$(_notify_discord_pad)
+    printf '%s' $'✅ '$(msg MSG_NOTIFY_TRANSFERS_DONE)$(_notify_discord_pad)
 }
 
 _notify_format_event_vmaf_started() {
@@ -361,7 +361,7 @@ _notify_format_event_vmaf_file_started() {
         prefix="[${cur}/${total}] "
     fi
 
-    printf '%s' "${prefix}🎞️ Début d'analyse : $(_notify_truncate_label "$filename" 30)"
+    printf '%s' "${prefix}🎞️ $(msg MSG_NOTIFY_ANALYSIS_START) : $(_notify_truncate_label "$filename" 30)"
 }
 
 _notify_format_vmaf_quality_badge() {
@@ -514,7 +514,7 @@ _notify_format_parallel_jobs_label() {
         return 0
     fi
     if [[ "$jobs" == "1" ]]; then
-        printf '%s' "désactivé"
+        printf '%s' "$(msg MSG_NOTIFY_DISABLED)"
     else
         printf '%s' "$jobs"
     fi

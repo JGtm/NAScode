@@ -3,7 +3,7 @@
 load "test_helper.bash"
 
 @test "notify: no-op sans webhook" {
-  run bash -c 'source "$LIB_DIR/notify.sh"; notify_event run_started'
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; notify_event run_started'
   [ "$status" -eq 0 ]
 }
 
@@ -39,7 +39,7 @@ EOF
   export NASCODE_DISCORD_NOTIFY=true
   export NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true
 
-  run bash -c 'source "$LIB_DIR/notify.sh"; notify_discord_send_markdown "hello"; test -s "$NASCODE_TEST_PAYLOAD_FILE"'
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; notify_discord_send_markdown "hello"; test -s "$NASCODE_TEST_PAYLOAD_FILE"'
   [ "$status" -eq 0 ]
   grep -q '"content"' "$NASCODE_TEST_PAYLOAD_FILE"
 }
@@ -64,7 +64,7 @@ EOF
   export NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true
   export EXECUTION_TIMESTAMP="test"
 
-  run bash -c 'source "$LIB_DIR/notify.sh"; notify_discord_send_markdown "hello" "run_started"; test -s "$LOG_DIR/discord_notify_${EXECUTION_TIMESTAMP}.log"'
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; notify_discord_send_markdown "hello" "run_started"; test -s "$LOG_DIR/discord_notify_${EXECUTION_TIMESTAMP}.log"'
   [ "$status" -eq 0 ]
   grep -q "http=204" "$LOG_DIR/discord_notify_${EXECUTION_TIMESTAMP}.log"
 }
@@ -100,7 +100,7 @@ EOF
   export NASCODE_DISCORD_NOTIFY=true
   export NASCODE_DISCORD_NOTIFY_ALLOW_IN_TESTS=true
 
-  run bash -c 'source "$LIB_DIR/notify.sh"; notify_event file_skipped "file01.mkv" "Déjà X265 & bitrate optimisé"; test -s "$NASCODE_TEST_PAYLOAD_FILE"'
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; notify_event file_skipped "file01.mkv" "Déjà X265 & bitrate optimisé"; test -s "$NASCODE_TEST_PAYLOAD_FILE"'
   [ "$status" -eq 0 ]
 
   # Le contenu est JSON-encodé, on matche juste sur des fragments robustes.
@@ -110,7 +110,7 @@ EOF
 }
 
 @test "notify_format: jobs parallèles désactivé si =1" {
-  run bash -c 'source "$LIB_DIR/notify.sh"; PARALLEL_JOBS=1; _notify_format_parallel_jobs_label'
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; PARALLEL_JOBS=1; _notify_format_parallel_jobs_label'
   [ "$status" -eq 0 ]
   [ "$output" = "désactivé" ]
 }
@@ -125,7 +125,7 @@ EOF
     printf 'file%02d.mp4\0' "$i" >> "$q"
   done
 
-  run bash -c 'source "$LIB_DIR/notify.sh"; _notify_format_queue_preview "$1"' bash "$q"
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; _notify_format_queue_preview "$1"' bash "$q"
   [ "$status" -eq 0 ]
 
   # 20 lignes exactement : 16 + ... + 3
@@ -154,7 +154,7 @@ space_line1=120 MB (12%)
 space_line2=Total: 1.0 GB -> 0.88 GB
 EOF
 
-  run bash -c 'source "$LIB_DIR/notify.sh"; _notify_format_run_summary_markdown "$1" "2026-01-14 12:00:00" "0"' bash "$m"
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; _notify_format_run_summary_markdown "$1" "2026-01-14 12:00:00" "0"' bash "$m"
   [ "$status" -eq 0 ]
 
   echo "$output" | grep -q "Résumé"
@@ -192,4 +192,143 @@ EOF
   echo "$output" | grep -q "Erreur (code 1) : 2026-01-14"
   [[ "$output" != *"Fin :"* ]]
   [[ "$output" != *"Interrompu"* ]]
+}
+
+###########################################################
+# Tests supplémentaires notify_format.sh
+###########################################################
+
+@test "notify_format: event file_started formate correctement" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  run _notify_format_event_file_started "test_video.mkv" 5 10
+  [ "$status" -eq 0 ]
+  
+  # Doit contenir le nom du fichier
+  echo "$output" | grep -q "test_video.mkv"
+}
+
+@test "notify_format: event file_completed formate correctement" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  run _notify_format_event_file_completed "test_video.mkv" "3m 45s" "850 Mo" "1.2 Go"
+  [ "$status" -eq 0 ]
+  
+  echo "$output" | grep -q "test_video.mkv"
+  echo "$output" | grep -q "3m 45s"
+}
+
+@test "notify_format: vmaf_quality_badge retourne badge selon score" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  # Score excellent (>= 95)
+  run _notify_format_vmaf_quality_badge 98
+  [[ "$output" =~ "🟢" ]] || [[ "$output" =~ "Excellent" ]] || [[ -n "$output" ]]
+  
+  # Score bon (>= 90)
+  run _notify_format_vmaf_quality_badge 92
+  [ "$status" -eq 0 ]
+  
+  # Score moyen (>= 80)
+  run _notify_format_vmaf_quality_badge 85
+  [ "$status" -eq 0 ]
+  
+  # Score faible (< 80)
+  run _notify_format_vmaf_quality_badge 70
+  [ "$status" -eq 0 ]
+}
+
+@test "notify_format: event run_started inclut infos de base" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  # Définir les variables attendues
+  export SOURCE="/test/source"
+  export OUTPUT_DIR="/test/output"
+  export CONVERSION_MODE="serie"
+  export DRYRUN=false
+  
+  run _notify_format_event_run_started "2026-01-14 10:00:00" 15
+  [ "$status" -eq 0 ]
+  
+  # Doit contenir des infos sur le démarrage
+  [[ -n "$output" ]]
+}
+
+@test "notify_format: parallel_jobs_label avec valeur > 1" {
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; PARALLEL_JOBS=4; _notify_format_parallel_jobs_label'
+  [ "$status" -eq 0 ]
+  [ "$output" = "4" ]
+}
+
+@test "notify_format: event peak_pause formate correctement" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  run _notify_format_event_peak_pause "08:00" "22:00"
+  [ "$status" -eq 0 ]
+  
+  echo "$output" | grep -q "08:00"
+  echo "$output" | grep -q "22:00"
+}
+
+@test "notify_format: event peak_resume formate correctement" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  run _notify_format_event_peak_resume
+  [ "$status" -eq 0 ]
+  [[ -n "$output" ]]
+}
+
+@test "notify_format: queue_preview avec peu de fichiers" {
+  tmp="$BATS_TEST_TMPDIR"
+  q="$tmp/queue_small.bin"
+
+  # Queue de 5 fichiers seulement
+  : > "$q"
+  for i in $(seq 1 5); do
+    printf 'file%02d.mp4\0' "$i" >> "$q"
+  done
+
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; _notify_format_queue_preview "$1"' bash "$q"
+  [ "$status" -eq 0 ]
+
+  # 5 lignes exactement (pas de ...)
+  [ "$(printf "%s\n" "$output" | wc -l | tr -d " ")" -eq 5 ]
+  echo "$output" | grep -q "^\\[1/5\\] file01.mp4$"
+  echo "$output" | grep -q "^\\[5/5\\] file05.mp4$"
+  # Pas de ...
+  [[ "$output" != *"..."* ]]
+}
+
+@test "notify_format: queue_preview avec fichier vide" {
+  tmp="$BATS_TEST_TMPDIR"
+  q="$tmp/queue_empty.bin"
+  touch "$q"
+
+  run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; _notify_format_queue_preview "$1"' bash "$q"
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
+@test "notify_format: event transfers_pending formate correctement" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  run _notify_format_event_transfers_pending 5
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "5"
+}
+
+@test "notify_format: event vmaf_started formate correctement" {
+  load_modules minimal_fast
+  source "$LIB_DIR/notify.sh"
+  
+  run _notify_format_event_vmaf_started 10
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "10"
 }

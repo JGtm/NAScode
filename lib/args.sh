@@ -14,7 +14,7 @@ _args_require_value() {
     local opt="$1"
     local val="${2:-}"
     if [[ -z "$val" ]]; then
-        print_error "${opt} doit être suivi d'une valeur"
+        print_error "$(msg MSG_ARG_REQUIRES_VALUE "$opt")"
         exit 1
     fi
 }
@@ -59,17 +59,17 @@ parse_arguments() {
                     LIMIT_FILES="$2"
                     shift 2
                 else
-                    print_error "--limit doit être suivi d'un nombre positif"
+                    print_error "$(msg MSG_ARG_LIMIT_POSITIVE)"
                     exit 1
                 fi
                 ;;
             --min-size)
                 if [[ -z "${2:-}" ]]; then
-                    print_error "--min-size doit être suivi d'une taille (ex: 700M, 1G)"
+                    print_error "$(msg MSG_ARG_MIN_SIZE_REQUIRED)"
                     exit 1
                 fi
                 if ! MIN_SIZE_BYTES=$(parse_human_size_to_bytes "$2"); then
-                    print_error "Taille invalide pour --min-size : '$2' (ex: 700M, 1G, 500000000)"
+                    print_error "$(msg MSG_ARG_MIN_SIZE_INVALID "$2")"
                     exit 1
                 fi
                 shift 2
@@ -80,7 +80,7 @@ parse_arguments() {
                     CUSTOM_QUEUE="$2"
                     shift 2
                 else
-                    print_error "Fichier queue '$2' introuvable"
+                    print_error "$(msg MSG_ARG_QUEUE_NOT_FOUND "$2")"
                     exit 1
                 fi
                 ;;
@@ -93,6 +93,24 @@ parse_arguments() {
                 UI_QUIET=true
                 NO_PROGRESS=true
                 shift
+                ;;
+            --lang)
+                if [[ -n "${2:-}" ]]; then
+                    case "$2" in
+                        fr|en)
+                            LANG_UI="$2"
+                            _i18n_load "$2"
+                            ;;
+                        *)
+                            print_error "$(msg MSG_ARG_LANG_INVALID "$2")"
+                            exit 1
+                            ;;
+                    esac
+                    shift 2
+                else
+                    print_error "$(msg MSG_ARG_REQUIRES_VALUE "--lang")"
+                    exit 1
+                fi
                 ;;
             -h|--help)
                 show_help
@@ -131,7 +149,7 @@ parse_arguments() {
                     SINGLE_FILE="$2"
                     shift 2
                 else
-                    print_error "Fichier '$2' introuvable"
+                    print_error "$(msg MSG_ARG_FILE_NOT_FOUND "$2")"
                     exit 1
                 fi
                 ;;
@@ -142,13 +160,13 @@ parse_arguments() {
                             AUDIO_CODEC="$2"
                             ;;
                         *)
-                            print_error "Codec audio invalide : '$2'. Valeurs acceptées : copy, aac, ac3, eac3, opus"
+                            print_error "$(msg MSG_ARG_AUDIO_INVALID "$2")"
                             exit 1
                             ;;
                     esac
                     shift 2
                 else
-                    print_error "-a/--audio doit être suivi d'un nom de codec (copy, aac, ac3, eac3, opus)"
+                    print_error "$(msg MSG_ARG_AUDIO_REQUIRES_VALUE)"
                     exit 1
                 fi
                 ;;
@@ -163,13 +181,13 @@ parse_arguments() {
                             VIDEO_CODEC="$2"
                             ;;
                         *)
-                            print_error "Codec invalide : '$2'. Valeurs acceptées : hevc, av1, ..."
+                            print_error "$(msg MSG_ARG_CODEC_INVALID "$2")"
                             exit 1
                             ;;
                     esac
                     shift 2
                 else
-                    print_error "--codec doit être suivi d'un nom de codec (hevc, av1)"
+                    print_error "$(msg MSG_ARG_CODEC_REQUIRES_VALUE)"
                     exit 1
                 fi
                 ;;
@@ -178,7 +196,7 @@ parse_arguments() {
                     PARALLEL_JOBS="$2"
                     shift 2
                 else
-                    print_error "--jobs doit être suivi d'un nombre >= 1"
+                    print_error "$(msg MSG_ARG_LIMIT_MIN_ONE)"
                     exit 1
                 fi
                 ;;
@@ -188,14 +206,14 @@ parse_arguments() {
                 if [[ "$1" == *"="* ]]; then
                     local range="${1#*=}"
                     if ! parse_off_peak_range "$range"; then
-                        print_error "Format invalide pour --off-peak (attendu: HH:MM-HH:MM)"
+                        print_error "$(msg MSG_ARG_OFF_PEAK_INVALID)"
                         exit 1
                     fi
                     shift
                 elif [[ "${2:-}" =~ ^[0-9]{1,2}:[0-9]{2}-[0-9]{1,2}:[0-9]{2}$ ]]; then
                     # Format : --off-peak 22:00-06:00 (avec espace)
                     if ! parse_off_peak_range "$2"; then
-                        print_error "Format invalide pour --off-peak (attendu: HH:MM-HH:MM)"
+                        print_error "$(msg MSG_ARG_OFF_PEAK_INVALID)"
                         exit 1
                     fi
                     shift 2
@@ -258,14 +276,14 @@ parse_arguments() {
                     continue # On relance la boucle pour traiter le flag_to_process.
                 fi
                 # Si ce n'est pas une option groupée ou si ce n'est pas géré, c'est une erreur.
-                print_error "Option inconnue : $1"
+                print_error "$(msg MSG_ARG_UNKNOWN_OPTION "$1")"
                 show_help
                 exit 1
                 ;;
             *)
                 # Argument positionnel non reconnu (ni option ni flag)
-                print_error "Argument inattendu : $1"
-                echo -e "  ${DIM}Vérifiez que toutes les options sont précédées d'un tiret (ex: -l 3)${NOCOLOR}" >&2
+                print_error "$(msg MSG_ARG_UNEXPECTED "$1")"
+                echo -e "  ${DIM}$(msg MSG_ARG_UNEXPECTED_HINT)${NOCOLOR}" >&2
                 exit 1
                 ;;
         esac
@@ -283,11 +301,11 @@ parse_arguments() {
     # Avertissements d'incompatibilités
     if [[ "$DRYRUN" == true ]]; then
         if [[ "$VMAF_ENABLED" == true ]]; then
-            print_warning "VMAF désactivé en mode dry-run"
+            print_warning "$(msg MSG_WARN_VMAF_DRYRUN)"
             VMAF_ENABLED=false
         fi
         if [[ "$SAMPLE_MODE" == true ]]; then
-            print_warning "Mode sample ignoré en mode dry-run"
+            print_warning "$(msg MSG_WARN_SAMPLE_DRYRUN)"
             SAMPLE_MODE=false
         fi
     fi
@@ -305,80 +323,73 @@ parse_arguments() {
 
 show_help() {
     cat << EOF
-${CYAN}Usage :${NOCOLOR} ./conversion.sh [OPTIONS]
+${CYAN}$(msg MSG_HELP_USAGE)${NOCOLOR} ./nascode [OPTIONS]
 
-${CYAN}Options :${NOCOLOR}
-    ${GREEN}-s, --source${NOCOLOR} DIR             Dossier source (ARG) [défaut : dossier parent]
-    ${GREEN}-o, --output-dir${NOCOLOR} DIR         Dossier de destination (ARG) [défaut : \`Converted\` au même niveau que le script]
-    ${GREEN}-e, --exclude${NOCOLOR} PATTERN        Ajouter un pattern d'exclusion (ARG)
-    ${GREEN}-m, --mode${NOCOLOR} MODE              Mode de conversion : film, adaptatif, serie (ARG) [défaut : serie]
-    ${GREEN}--min-size${NOCOLOR} SIZE              Filtrer l'index/queue : ne garder que les fichiers >= SIZE (ex: 700M, 1G)
-    ${GREEN}-d, --dry-run${NOCOLOR}                Mode simulation sans conversion (FLAG)
-    ${GREEN}-S  --suffix${NOCOLOR} [STRING]             Activer un suffixe dynamique ou définir un suffixe personnalisé (ARG optionnel)
-    ${GREEN}-x, --no-suffix${NOCOLOR}              Désactiver le suffixe _x265 (FLAG)
-    ${GREEN}-r, --random${NOCOLOR}                 Tri aléatoire : sélectionne des fichiers aléatoires (FLAG) [défaut : 10]
-    ${GREEN}-l, --limit${NOCOLOR} N                Limiter le traitement à N fichiers (ARG)
-    ${GREEN}-j, --jobs${NOCOLOR} N                 Nombre de conversions parallèles (ARG) [défaut : 1]
-    ${GREEN}-q, --queue${NOCOLOR} FILE             Utiliser un fichier queue personnalisé (ARG)
-    ${GREEN}-n, --no-progress${NOCOLOR}            Désactiver l'affichage des indicateurs de progression (FLAG)
-    ${GREEN}-Q, --quiet${NOCOLOR}                  Mode silencieux : n'affiche que les warnings/erreurs (FLAG)
-    ${GREEN}-h, --help${NOCOLOR}                   Afficher cette aide (FLAG)
-    ${GREEN}-k, --keep-index${NOCOLOR}             Conserver l'index existant sans demande interactive (FLAG)
-    ${GREEN}-R, --regenerate-index${NOCOLOR}       Forcer la régénération de l'index au démarrage (FLAG)
-    ${GREEN}-v, --vmaf${NOCOLOR}                   Activer l'évaluation VMAF de la qualité vidéo (FLAG) [désactivé par défaut]
-    ${GREEN}-t, --sample${NOCOLOR}                 Mode test : encoder seulement 30s à une position aléatoire (FLAG)
-    ${GREEN}-f, --file${NOCOLOR} FILE              Convertir un fichier unique (bypass index/queue) (ARG)
-    ${GREEN}-a, --audio${NOCOLOR} CODEC            Codec audio cible : copy, aac, ac3, eac3, opus (ARG) [défaut : aac]
-                                 ${DIM}Multi-channel (5.1+) : cible par défaut = EAC3 384k
-                                 AAC en multi-channel : uniquement avec -a aac --force-audio${NOCOLOR}
-    ${GREEN}-2, --two-pass${NOCOLOR}               Forcer le mode two-pass (défaut : single-pass CRF 21 pour séries)
-    ${GREEN}-c, --codec${NOCOLOR} CODEC            Codec vidéo cible : hevc, av1 (ARG) [défaut : hevc]
-    ${GREEN}-p, --off-peak${NOCOLOR} [PLAGE]       Mode heures creuses : traitement uniquement pendant les heures creuses
-                                 PLAGE au format HH:MM-HH:MM (ARG optionnel) [défaut : 22:00-06:00]
-    ${GREEN}--force-audio${NOCOLOR}                Forcer la conversion audio vers le codec cible (bypass smart codec)
-    ${GREEN}--force-video${NOCOLOR}                Forcer le réencodage vidéo (bypass smart codec)
-    ${GREEN}--force${NOCOLOR}                      Raccourci pour --force-audio et --force-video
-    ${GREEN}--no-lossless${NOCOLOR}                Convertir les codecs lossless/premium (DTS/DTS-HD/TrueHD/FLAC)
-                                 ${DIM}Stéréo → codec cible, Multi-channel → EAC3 384k 5.1${NOCOLOR}
-    ${GREEN}--equiv-quality${NOCOLOR}              Activer le mode "qualité équivalente" (audio + cap vidéo)
-    ${GREEN}--no-equiv-quality${NOCOLOR}           Désactiver le mode "qualité équivalente" (audio + cap vidéo)
-                                 ${DIM}Ignoré en mode adaptatif (reste activé)${NOCOLOR}
+${CYAN}$(msg MSG_HELP_OPTIONS)${NOCOLOR}
+    ${GREEN}-s, --source${NOCOLOR} DIR             $(msg MSG_HELP_SOURCE)
+    ${GREEN}-o, --output-dir${NOCOLOR} DIR         $(msg MSG_HELP_OUTPUT)
+    ${GREEN}-e, --exclude${NOCOLOR} PATTERN        $(msg MSG_HELP_EXCLUDE)
+    ${GREEN}-m, --mode${NOCOLOR} MODE              $(msg MSG_HELP_MODE)
+    ${GREEN}--min-size${NOCOLOR} SIZE              $(msg MSG_HELP_MIN_SIZE)
+    ${GREEN}-d, --dry-run${NOCOLOR}                $(msg MSG_HELP_DRYRUN)
+    ${GREEN}-S, --suffix${NOCOLOR} [STRING]        $(msg MSG_HELP_SUFFIX)
+    ${GREEN}-x, --no-suffix${NOCOLOR}              $(msg MSG_HELP_NO_SUFFIX)
+    ${GREEN}-r, --random${NOCOLOR}                 $(msg MSG_HELP_RANDOM)
+    ${GREEN}-l, --limit${NOCOLOR} N                $(msg MSG_HELP_LIMIT)
+    ${GREEN}-j, --jobs${NOCOLOR} N                 $(msg MSG_HELP_JOBS)
+    ${GREEN}-q, --queue${NOCOLOR} FILE             $(msg MSG_HELP_QUEUE)
+    ${GREEN}-n, --no-progress${NOCOLOR}            $(msg MSG_HELP_NO_PROGRESS)
+    ${GREEN}-Q, --quiet${NOCOLOR}                  $(msg MSG_HELP_QUIET)
+    ${GREEN}-h, --help${NOCOLOR}                   $(msg MSG_HELP_HELP)
+    ${GREEN}-k, --keep-index${NOCOLOR}             $(msg MSG_HELP_KEEP_INDEX)
+    ${GREEN}-R, --regenerate-index${NOCOLOR}       $(msg MSG_HELP_REGEN_INDEX)
+    ${GREEN}-v, --vmaf${NOCOLOR}                   $(msg MSG_HELP_VMAF)
+    ${GREEN}-t, --sample${NOCOLOR}                 $(msg MSG_HELP_SAMPLE)
+    ${GREEN}-f, --file${NOCOLOR} FILE              $(msg MSG_HELP_FILE)
+    ${GREEN}-a, --audio${NOCOLOR} CODEC            $(msg MSG_HELP_AUDIO)
+                                 ${DIM}$(msg MSG_HELP_AUDIO_HINT)${NOCOLOR}
+    ${GREEN}-2, --two-pass${NOCOLOR}               $(msg MSG_HELP_TWO_PASS)
+    ${GREEN}-c, --codec${NOCOLOR} CODEC            $(msg MSG_HELP_CODEC)
+    ${GREEN}-p, --off-peak${NOCOLOR} [RANGE]       $(msg MSG_HELP_OFF_PEAK)
+                                 $(msg MSG_HELP_OFF_PEAK_HINT)
+    ${GREEN}--force-audio${NOCOLOR}                $(msg MSG_HELP_FORCE_AUDIO)
+    ${GREEN}--force-video${NOCOLOR}                $(msg MSG_HELP_FORCE_VIDEO)
+    ${GREEN}--force${NOCOLOR}                      $(msg MSG_HELP_FORCE)
+    ${GREEN}--no-lossless${NOCOLOR}                $(msg MSG_HELP_NO_LOSSLESS)
+                                 ${DIM}$(msg MSG_HELP_NO_LOSSLESS_HINT)${NOCOLOR}
+    ${GREEN}--equiv-quality${NOCOLOR}              $(msg MSG_HELP_EQUIV_QUALITY)
+    ${GREEN}--no-equiv-quality${NOCOLOR}           $(msg MSG_HELP_NO_EQUIV_QUALITY)
+                                 ${DIM}$(msg MSG_HELP_EQUIV_QUALITY_HINT)${NOCOLOR}
+    ${GREEN}--lang${NOCOLOR} LANG                  $(msg MSG_HELP_LANG)
 
-${CYAN}Remarque sur les options courtes groupées :${NOCOLOR}
-    ${DIM}- Les options courtes peuvent être groupées lorsque ce sont des flags (sans argument),
-        par exemple : -xdrk est équivalent à -x -d -r -k.
-    - Les options qui attendent un argument (marquées (ARG) ci-dessus : -s, -o, -e, -m, -l, -j, -q)
-        doivent être fournies séparément avec leur valeur, par exemple : -l 5 ou --limit 5.
-        par exemple : ./conversion.sh -xdrk -l 5  (groupement de flags puis -l 5 séparé),
-                      ./conversion.sh --source /path --limit 10.${NOCOLOR}
+${CYAN}$(msg MSG_HELP_SHORT_OPTIONS_TITLE)${NOCOLOR}
+    ${DIM}- $(msg MSG_HELP_SHORT_OPTIONS_DESC)
+    - $(msg MSG_HELP_SHORT_OPTIONS_ARG)
+        $(msg MSG_HELP_SHORT_OPTIONS_EXAMPLE)${NOCOLOR}
 
-${CYAN}Logique Smart Codec (audio) :${NOCOLOR}
-  ${DIM}Par défaut, si la source a un codec audio plus efficace que la cible, il est conservé.
-  Hiérarchie (du meilleur au moins bon) : Opus > AAC > E-AC3 > AC3
-  Le bitrate est limité selon le codec effectif (ex: Opus max 128k, AAC max 160k).
-  Utilisez --force-audio pour toujours convertir vers le codec cible.${NOCOLOR}
+${CYAN}$(msg MSG_HELP_SMART_CODEC_TITLE)${NOCOLOR}
+  ${DIM}$(msg MSG_HELP_SMART_CODEC_DESC)${NOCOLOR}
 
-${CYAN}Modes de conversion :${NOCOLOR}
-  ${YELLOW}film${NOCOLOR}          : Qualité maximale (two-pass ABR, bitrate fixe)
-  ${YELLOW}adaptatif${NOCOLOR}     : Bitrate adaptatif par fichier selon complexité (CRF contraint)
-  ${YELLOW}serie${NOCOLOR}         : Bon compromis taille/qualité [défaut]
+${CYAN}$(msg MSG_HELP_MODES_TITLE)${NOCOLOR}
+  ${YELLOW}film${NOCOLOR}          : $(msg MSG_HELP_MODE_FILM)
+  ${YELLOW}adaptatif${NOCOLOR}     : $(msg MSG_HELP_MODE_ADAPTATIF)
+  ${YELLOW}serie${NOCOLOR}         : $(msg MSG_HELP_MODE_SERIE)
 
-${CYAN}Mode heures creuses :${NOCOLOR}
-  ${DIM}Limite le traitement aux périodes définies (par défaut 22h-6h).
-  Si un fichier est en cours quand les heures pleines arrivent, il termine.
-  Le script attend ensuite le retour des heures creuses avant de continuer.${NOCOLOR}
+${CYAN}$(msg MSG_HELP_OFF_PEAK_TITLE)${NOCOLOR}
+  ${DIM}$(msg MSG_HELP_OFF_PEAK_DESC)${NOCOLOR}
 
-${CYAN}Exemples :${NOCOLOR}
-  ${DIM}./conversion.sh
-  ./conversion.sh -s /media/videos -o /media/converted
-  ./conversion.sh --mode film --dry-run
-    ./conversion.sh --mode serie --no-progress
-    ./conversion.sh --mode film --quiet
-  ./conversion.sh -xdrk -l 5      -x (no-suffix) -d (dry-run) -r (random) -k (keep-index) puis -l 5
-  ./conversion.sh -dnr            -d (dry-run) -n (no-progress) -r (random)
-  ./conversion.sh --vmaf          Activer l'évaluation VMAF après conversion
-  ./conversion.sh --off-peak      Mode heures creuses (22:00-06:00 par défaut)
-  ./conversion.sh -p 23:00-07:00  Mode heures creuses personnalisé (23h-7h)
-  ./conversion.sh -f /path/video.mkv  Convertir un fichier spécifique${NOCOLOR}
+${CYAN}$(msg MSG_HELP_EXAMPLES_TITLE)${NOCOLOR}
+  ${DIM}./nascode
+  ./nascode -s /media/videos -o /media/converted
+  ./nascode --mode film --dry-run
+  ./nascode --mode serie --no-progress
+  ./nascode --mode film --quiet
+  ./nascode -xdrk -l 5
+  ./nascode -dnr
+  ./nascode --vmaf
+  ./nascode --off-peak
+  ./nascode -p 23:00-07:00
+  ./nascode -f /path/video.mkv
+  ./nascode --lang en${NOCOLOR}
 EOF
 }

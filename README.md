@@ -37,6 +37,27 @@ Defaults importants (issus de la config) :
 - Codec audio : `aac`
 - Sortie : `Converted/`
 
+## 🌐 Internationalisation (i18n)
+
+NAScode supporte l'anglais et le français :
+
+```bash
+# Sortie en anglais
+bash nascode --lang en -s "/chemin/source"
+
+# Sortie en français (défaut)
+bash nascode --lang fr -s "/chemin/source"
+bash nascode -s "/chemin/source"
+
+# Définir la langue via variable d'environnement
+export NASCODE_LANG=en
+bash nascode -s "/chemin/source"
+```
+
+Documentation disponible dans les deux langues :
+- Français : [docs/](docs/)
+- Anglais : [docs/en/](docs/en/)
+
 ## Ce que fait le script
 
 - Convertit en **HEVC (x265)** ou **AV1** selon `--codec`.
