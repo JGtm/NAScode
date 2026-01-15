@@ -249,7 +249,7 @@ for test_file in "${TEST_FILES[@]}"; do
     else
         if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
             # Mode condensé : afficher le fichier en cours (colonnes alignées)
-            printf "${YELLOW}⏳${NC} [%2d/%-2d] %-45s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" 0 "$test_count" >/dev/tty
+            printf "${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" 0 "$test_count" >/dev/tty
         fi
     fi
     
