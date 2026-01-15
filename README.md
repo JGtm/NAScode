@@ -59,6 +59,10 @@ Rappels :
 - `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC).
 - `--equiv-quality` / `--no-equiv-quality` : active/désactive le mode "qualité équivalente" (audio + cap vidéo).
 	(Ignoré en mode `adaptatif` : reste activé.)
+- `--limit-fps` / `--no-limit-fps` : limite le FPS à 29.97 pour le contenu HFR (>30 fps).
+	- Mode `serie` : activé par défaut (optimisation taille).
+	- Modes `film` / `adaptatif` : désactivé par défaut (qualité max, bitrate majoré si HFR).
+	- Note : VMAF est ignoré si le FPS est modifié (comparaison frame-à-frame impossible).
 
 **Gestion des canaux (multicanal) :**
 - **Mode `serie`** : stéréo forcée (downmix systématique si 5.1/7.1+).

@@ -264,6 +264,8 @@ set_conversion_mode_parameters() {
             AUDIO_FORCE_STEREO=false
             AUDIO_TRANSLATE_EQUIV_QUALITY=false
             VIDEO_EQUIV_QUALITY_CAP=true
+            # Films : pas de limitation FPS par défaut (qualité max)
+            [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=false
             ;;
         adaptatif)
             # Films adaptatifs : bitrate calculé par fichier selon complexité
@@ -289,6 +291,8 @@ set_conversion_mode_parameters() {
             AUDIO_FORCE_STEREO=false
             AUDIO_TRANSLATE_EQUIV_QUALITY=true
             VIDEO_EQUIV_QUALITY_CAP=true
+            # Adaptatif : pas de limitation FPS (bitrate ajusté automatiquement)
+            [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=false
             ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 21 (single-pass)
@@ -319,6 +323,8 @@ set_conversion_mode_parameters() {
             AUDIO_FORCE_STEREO=true
             AUDIO_TRANSLATE_EQUIV_QUALITY=false
             VIDEO_EQUIV_QUALITY_CAP=true
+            # Séries : limiter le FPS à 29.97 par défaut (optimisation taille)
+            [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=true
             ;;
         *)
             print_error "Mode de conversion inconnu : $CONVERSION_MODE"

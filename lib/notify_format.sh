@@ -183,6 +183,15 @@ _notify_format_event_run_started() {
     body+=$'\n'"- **🎬  Codec vidéo** : ${VIDEO_CODEC:-hevc}"
     [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio** : ${AUDIO_CODEC}"
 
+    # Option LIMIT_FPS (HFR) - affiché seulement en mode série/film
+    if [[ "${CONVERSION_MODE:-serie}" != "adaptatif" ]]; then
+        if [[ "${LIMIT_FPS:-false}" == true ]]; then
+            body+=$'\n'"- **📽️  Vidéos HFR** : limitées à ${LIMIT_FPS_TARGET:-29.97} fps"
+        else
+            body+=$'\n'"- **📽️  Vidéos HFR** : bitrate ajusté (fps original conservé)"
+        fi
+    fi
+
     # Tri / limitation (queue)
     local sort_mode="${SORT_MODE:-size_desc}"
     local sort_label

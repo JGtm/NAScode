@@ -231,6 +231,11 @@ _show_active_options() {
     if [[ -n "$_LIMIT_MESSAGE" ]]; then
         options+=("$(format_option_limit "$_LIMIT_MESSAGE" "$_LIMIT_MODE")")
     fi
+
+    # Option LIMIT_FPS (HFR) - toujours affiché en mode série/film
+    if [[ "${CONVERSION_MODE:-serie}" != "adaptatif" ]]; then
+        options+=("$(format_option_limit_fps)")
+    fi
     
     # Afficher seulement si au moins une option est active
     if [[ ${#options[@]} -gt 0 ]]; then
