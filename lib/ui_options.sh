@@ -166,6 +166,16 @@ format_option_file_count() {
     echo -e "📊  Compteur de fichiers à traiter"
 }
 
+# Formate une option LIMIT_FPS (HFR) pour print_active_options
+# Usage: format_option_limit_fps
+format_option_limit_fps() {
+    if [[ "${LIMIT_FPS:-false}" == true ]]; then
+        echo -e "📽️  Vidéos HFR : ${YELLOW}limitées à ${LIMIT_FPS_TARGET:-29.97} fps${NOCOLOR}"
+    else
+        echo -e "📽️  Vidéos HFR : ${YELLOW}bitrate ajusté${NOCOLOR} (fps original conservé)"
+    fi
+}
+
 ###########################################################
 # FONCTIONS LEGACY (POUR RÉTRO-COMPATIBILITÉ)
 ###########################################################

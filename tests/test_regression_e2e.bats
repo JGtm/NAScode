@@ -603,3 +603,119 @@ teardown() {
     [[ ! "$output" =~ "Conversion interrompue" ]]
     [[ ! "$output" =~ "fichier temporaire conservé" ]]
 }
+
+###########################################################
+# SECTION 7: HFR (HIGH FRAME RATE)
+###########################################################
+
+@test "E2E HFR: vidéo 60fps avec --limit-fps produit output ≤30fps" {
+    # Créer une vidéo 60fps de 1 seconde
+    ffmpeg -y -f lavfi -i "testsrc=duration=1:size=1920x1080:rate=60" \
+        -c:v libx264 -preset ultrafast -crf 51 \
+        "$SRC_DIR/test_60fps.mkv" 2>/dev/null
+    
+    if [[ ! -f "$SRC_DIR/test_60fps.mkv" ]]; then
+        skip "Impossible de créer la vidéo 60fps de test"
+    fi
+    
+    # Vérifier que la source est bien 60fps
+    local src_fps
+    src_fps=$(ffprobe -v error -select_streams v:0 \
+        -show_entries stream=r_frame_rate -of csv=p=0 "$SRC_DIR/test_60fps.mkv")
+    echo "Source FPS: $src_fps" >&3
+    
+    run bash -lc '
+        set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode serie \
+            --limit-fps \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+    
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+    
+    [ "$status" -eq 0 ]
+    
+    # Trouver le fichier de sortie
+    local out_file
+    out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
+    
+    if [[ -n "$out_file" ]]; then
+        # Vérifier le framerate de sortie (format: num/den, ex: 30000/1001)
+        local out_fps_raw
+        out_fps_raw=$(ffprobe -v error -select_streams v:0 \
+            -show_entries stream=r_frame_rate -of csv=p=0 "$out_file")
+        
+        echo "Output FPS raw: $out_fps_raw" >&3
+        
+        # Calculer le fps effectif (num/den → float)
+        local out_fps
+        out_fps=$(echo "$out_fps_raw" | awk -F'/' '{if(NF==2 && $2>0) printf "%.2f", $1/$2; else print $1}')
+        
+        echo "Output FPS: $out_fps" >&3
+        
+        # Le FPS doit être ≤ 30 (avec marge pour 29.97)
+        local fps_ok
+        fps_ok=$(echo "$out_fps" | awk '{if($1 <= 30.01) print "yes"; else print "no"}')
+        [ "$fps_ok" = "yes" ]
+    fi
+}
+
+@test "E2E HFR: vidéo 60fps avec --no-limit-fps conserve fps original" {
+    # Créer une vidéo 60fps de 1 seconde
+    ffmpeg -y -f lavfi -i "testsrc=duration=1:size=1920x1080:rate=60" \
+        -c:v libx264 -preset ultrafast -crf 51 \
+        "$SRC_DIR/test_60fps_keep.mkv" 2>/dev/null
+    
+    if [[ ! -f "$SRC_DIR/test_60fps_keep.mkv" ]]; then
+        skip "Impossible de créer la vidéo 60fps de test"
+    fi
+    
+    run bash -lc '
+        set -euo pipefail
+        cd "$WORKDIR"
+        printf "n\n" | bash "$PROJECT_ROOT/nascode" \
+            -s "$SRC_DIR" -o "$OUT_DIR" \
+            --mode film \
+            --no-limit-fps \
+            --keep-index \
+            --no-suffix \
+            --no-progress \
+            --limit 1
+    '
+    
+    echo "=== OUTPUT ===" >&3
+    echo "$output" >&3
+    
+    [ "$status" -eq 0 ]
+    
+    # Trouver le fichier de sortie
+    local out_file
+    out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
+    
+    if [[ -n "$out_file" ]]; then
+        # Vérifier le framerate de sortie
+        local out_fps_raw
+        out_fps_raw=$(ffprobe -v error -select_streams v:0 \
+            -show_entries stream=r_frame_rate -of csv=p=0 "$out_file")
+        
+        echo "Output FPS raw: $out_fps_raw" >&3
+        
+        # Calculer le fps effectif
+        local out_fps
+        out_fps=$(echo "$out_fps_raw" | awk -F'/' '{if(NF==2 && $2>0) printf "%.2f", $1/$2; else print $1}')
+        
+        echo "Output FPS: $out_fps" >&3
+        
+        # Le FPS doit être ≥ 50 (proche de 60)
+        local fps_ok
+        fps_ok=$(echo "$out_fps" | awk '{if($1 >= 50) print "yes"; else print "no"}')
+        [ "$fps_ok" = "yes" ]
+    fi
+}
