@@ -253,6 +253,32 @@ _notify_format_event_file_started() {
     printf '%s' "${prefix}▶️ Démarrage du fichier : $(_notify_truncate_label "$filename" 120)"
 }
 
+_notify_format_event_file_progress_update() {
+    # Usage: _notify_format_event_file_progress_update <filename> <speed> <eta>
+    # Envoyé après stabilisation de la vitesse FFmpeg (~15s)
+    # Note: filename est ignoré (on garde juste le compteur et l'emoji)
+    local filename="${1-}"
+    local speed="${2-}"
+    local eta="${3-}"
+
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    # Formatage: [X/Y] 📊 x1.25 | ETA: 01:23:45
+    local body="${prefix}📊"
+
+    if [[ -n "$speed" ]]; then
+        body+=" x${speed}"
+    fi
+
+    if [[ -n "$eta" ]]; then
+        body+=" | ETA: ${eta}"
+    fi
+
+    printf '%s' "$body"
+}
+
 _notify_format_event_file_completed() {
     # Usage: _notify_format_event_file_completed <elapsed> <before> <after>
     local elapsed="${1-}"

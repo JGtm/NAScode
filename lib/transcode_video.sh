@@ -602,12 +602,14 @@ _run_ffmpeg_encode() {
             awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                 -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
                 -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+                -v PROGRESS_MARKER_FILE="${PROGRESS_MARKER_FILE:-}" -v PROGRESS_MARKER_DELAY="${PROGRESS_MARKER_DELAY:-15}" \
                 "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
     else
         "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}" | \
             awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                 -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
                 -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
+                -v PROGRESS_MARKER_FILE="${PROGRESS_MARKER_FILE:-}" -v PROGRESS_MARKER_DELAY="${PROGRESS_MARKER_DELAY:-15}" \
                 "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
     fi
 

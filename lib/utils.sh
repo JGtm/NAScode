@@ -399,6 +399,7 @@ parse_human_size_to_bytes() {
 
 # Script AWK partagé pour afficher la progression FFmpeg (pass 1 & pass 2)
 # Variables requises : DURATION, CURRENT_FILE_NAME, NOPROG, START, SLOT, PARALLEL, MAX_SLOTS, EMOJI, END_MSG
+# Variables optionnelles : PROGRESS_MARKER_FILE, PROGRESS_MARKER_DELAY (pour notification Discord)
 # Fonction get_time() doit être injectée selon HAS_GAWK
 # Usage: awk -v DURATION=... -v ... "$AWK_TIME_FUNC $AWK_FFMPEG_PROGRESS_SCRIPT"
 # shellcheck disable=SC2034
@@ -423,6 +424,11 @@ BEGIN {
     slot = SLOT + 0;
     is_parallel = PARALLEL + 0;
     max_slots = MAX_SLOTS + 0;
+    # Pour notification Discord : fichier marqueur et délai
+    marker_file = PROGRESS_MARKER_FILE;
+    marker_delay = PROGRESS_MARKER_DELAY + 0;
+    if (marker_delay < 1) marker_delay = 15;
+    marker_written = 0;
 }
 
 /out_time_us=/ {
@@ -445,6 +451,13 @@ BEGIN {
     m = int((eta % 3600) / 60);
     s = int(eta % 60);
     eta_str = sprintf("%02d:%02d:%02d", h, m, s);
+
+    # Écrire le fichier marqueur après le délai (une seule fois)
+    if (marker_file != "" && marker_written == 0 && elapsed >= marker_delay) {
+        printf "speed=%.2f\neta=%s\n", speed, eta_str > marker_file;
+        close(marker_file);
+        marker_written = 1;
+    }
 
     bar_width = 20;
     filled = int(percent * bar_width / 100);

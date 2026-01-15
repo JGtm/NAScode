@@ -19,6 +19,9 @@ notify_event() {
         file_started)
             notify_event_file_started "$@"
             ;;
+        file_progress_update)
+            notify_event_file_progress_update "$@"
+            ;;
         file_completed)
             notify_event_file_completed "$@"
             ;;
@@ -93,6 +96,17 @@ notify_event_file_started() {
     local body
     body=$(_notify_format_event_file_started "$@")
     [[ -n "$body" ]] && notify_discord_send_markdown "$body" "file_started"
+    return 0
+}
+
+notify_event_file_progress_update() {
+    # Usage: notify_event_file_progress_update <filename> <speed> <eta>
+    # Envoyé quelques secondes après le début de la conversion, quand FFmpeg a stabilisé sa vitesse
+    _notify_discord_is_enabled || return 0
+
+    local body
+    body=$(_notify_format_event_file_progress_update "$@")
+    [[ -n "$body" ]] && notify_discord_send_markdown "$body" "file_progress_update"
     return 0
 }
 

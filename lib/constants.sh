@@ -92,6 +92,10 @@ DISCORD_CURL_RETRIES="${DISCORD_CURL_RETRIES:-2}"
 # Délai entre retries (secondes)
 DISCORD_CURL_RETRY_DELAY="${DISCORD_CURL_RETRY_DELAY:-1}"
 
+# Délai avant l'envoi de la mise à jour de progression (secondes)
+# Permet à FFmpeg de stabiliser sa vitesse avant d'envoyer l'ETA
+DISCORD_PROGRESS_UPDATE_DELAY="${DISCORD_PROGRESS_UPDATE_DELAY:-15}"
+
 ###########################################################
 # EXPORTS
 ###########################################################
@@ -105,4 +109,5 @@ export ADAPTIVE_MARGIN_START_PCT ADAPTIVE_MARGIN_END_PCT
 export ADAPTIVE_MIN_BITRATE_KBPS ADAPTIVE_MAXRATE_FACTOR ADAPTIVE_BUFSIZE_FACTOR
 export AUDIO_CODEC_EFFICIENT_THRESHOLD
 export DISCORD_CONTENT_MAX_CHARS DISCORD_CURL_TIMEOUT DISCORD_CURL_RETRIES DISCORD_CURL_RETRY_DELAY
+export DISCORD_PROGRESS_UPDATE_DELAY
 
