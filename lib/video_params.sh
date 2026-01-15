@@ -352,14 +352,14 @@ compute_video_params() {
 }
 
 ###########################################################
-# CALCUL ADAPTATIF (MODE FILM-ADAPTIVE)
+# CALCUL ADAPTATIF (MODE ADAPTATIF)
 ###########################################################
 
 # Calcule les paramètres vidéo avec analyse de complexité.
 # Usage: compute_video_params_adaptive <input_file>
 # Retourne: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|complexity_C|complexity_desc
 #
-# Cette fonction étend compute_video_params pour le mode film-adaptive :
+# Cette fonction étend compute_video_params pour le mode adaptatif :
 # - Analyse la complexité du fichier (multi-échantillonnage)
 # - Calcule un bitrate adapté au contenu
 # - Applique les garde-fous (min/max, % du bitrate original)

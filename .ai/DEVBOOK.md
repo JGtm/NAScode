@@ -15,6 +15,27 @@ Objectifs :
 
 ### 2026-01-15
 
+#### Renommage mode `film-adaptive` → `adaptatif`
+
+- **Quoi** : renommage du mode de conversion `-m film-adaptive` en `-m adaptatif` (francisation du nom).
+- **Où** :
+  - CLI : `lib/args.sh`, `lib/config.sh` (case dans `set_conversion_mode_parameters`)
+  - Modules : `lib/complexity.sh`, `lib/constants.sh`, `lib/conversion.sh`, `lib/adaptive_mode.sh`, `lib/exports.sh`, `lib/skip_decision.sh`, `lib/transcode_video.sh`, `lib/ui.sh`, `lib/video_params.sh`
+  - Documentation : `docs/ADAPTATIF.md` (anciennement `FILM_ADAPTIVE.md`), `docs/ARCHITECTURE.md`, `docs/CHANGELOG.md`, `docs/CONFIG.md`, `docs/SMART_CODEC.md`, `README.md`
+  - Tests : `tests/test_adaptatif.bats` (anciennement `test_film_adaptive.bats`), `tests/test_args.bats`, `tests/test_encoding_subfunctions.bats`
+  - Contexte agent : `.ai/DEVBOOK.md`, `.ai/handoff.md`, `.ai/TODO.md`
+- **Pourquoi** : harmonisation avec la convention de nommage française du projet.
+- **Impact** :
+  - **Breaking change CLI** : les scripts utilisant `-m film-adaptive` doivent utiliser `-m adaptatif`.
+  - Tests : tous les 696 tests passent (0 régression).
+  - Documentation : mise à jour complète.
+
+#### Fusion TODO détection de grain
+
+- **Quoi** : contenu de `docs/TODO_GRAIN_DETECTION.md` fusionné dans `.ai/TODO.md`, fichier original supprimé.
+- **Où** : `.ai/TODO.md` (nouvelle section "Détection de grain pour mode adaptatif").
+- **Pourquoi** : centraliser tous les TODOs dans un seul fichier.
+
 #### Notification Discord : mise à jour de progression avec ETA et vitesse
 
 - **Quoi** : ajout d'une notification Discord envoyée quelques secondes après le début d'une conversion, affichant le pourcentage, la vitesse (x1.25) et l'ETA estimée.
@@ -118,7 +139,7 @@ Objectifs :
 - **Quoi** : implémentation des recommandations d'un audit de code complet (maintenabilité, robustesse, documentation).
 - **Où** :
   - Tous les 38 modules `lib/*.sh` : ajout d'en-têtes expliquant pourquoi `set -euo pipefail` n'est pas utilisé localement.
-  - `lib/config.sh` : documentation enrichie du verrouillage equiv-quality en mode film-adaptive.
+  - `lib/config.sh` : documentation enrichie du verrouillage equiv-quality en mode adaptatif.
   - `tests/test_transcode_video.bats` : 5 nouveaux tests pour `VIDEO_EQUIV_QUALITY_CAP`.
   - `tests/test_audio_translate_equiv_quality.bats` : 10 nouveaux tests pour `_clamp_min`, `_clamp_max`, `_min3`.
   - `tests/test_helper.bash` : refactorisation en API unifiée `load_modules()` avec modes (`base`, `base_fast`, `minimal`, `minimal_fast`).
@@ -206,7 +227,7 @@ Objectifs :
   - `lib/queue.sh` : `_validate_queue_not_empty()` détecte le format invalide (pas de séparateurs NUL) et échoue explicitement.
   - `nascode` : sortie explicite si `SOURCE` matche `EXCLUDES`.
 - **Pourquoi** : empêcher les deadlocks FIFO (writer qui attend `processed>=target`) et rendre les cas “0 fichier” explicites.
-- **Tests** : `tests/test_conversion.bats`, `tests/test_queue.bats`, ajustement non-régression `tests/test_film_adaptive.bats` (fichier factice créé).
+- **Tests** : `tests/test_conversion.bats`, `tests/test_queue.bats`, ajustement non-régression `tests/test_adaptatif.bats` (fichier factice créé).
 
 #### Dev : cible Makefile `make lint` (ShellCheck)
 - **Quoi** : ajout d’une cible `lint` pour exécuter ShellCheck sur les scripts Bash du repo (avec message d’aide si ShellCheck n’est pas installé).
@@ -218,16 +239,16 @@ Objectifs :
 
 ### 2026-01-13
 
-#### Fix : `film-adaptive` applique réellement les budgets à l'encodage (AV1 + HEVC/x265)
-- **Quoi** : en mode `film-adaptive`, les budgets calculés (`ADAPTIVE_TARGET_KBPS`, `ADAPTIVE_MAXRATE_KBPS`, `ADAPTIVE_BUFSIZE_KBPS`) sont maintenant effectivement utilisés par l'encodage.
+#### Fix : le mode `adaptatif` applique réellement les budgets à l'encodage (AV1 + HEVC/x265)
+- **Quoi** : en mode `adaptatif`, les budgets calculés (`ADAPTIVE_TARGET_KBPS`, `ADAPTIVE_MAXRATE_KBPS`, `ADAPTIVE_BUFSIZE_KBPS`) sont maintenant effectivement utilisés par l'encodage.
 - **Où** :
   - `lib/conversion.sh` : export explicite des `ADAPTIVE_*` après parsing des valeurs retournées par l'analyse.
-  - Tests : `tests/test_film_adaptive.bats`, `tests/test_encoding_subfunctions.bats`.
+  - Tests : `tests/test_adaptatif.bats`, `tests/test_encoding_subfunctions.bats`.
 - **Pourquoi** : l'analyse était appelée via `$(...)` (subshell Bash), donc les `export` réalisés dans la fonction d'analyse ne remontaient pas au shell parent ; l'encodage retombait sur les paramètres "standard" (symptôme observé : cap SVT `mbr` trop haut vs le `bitrate cible`).
 - **Impact** :
   - AV1/SVT-AV1 : le cap "capped CRF" (`mbr`) suit désormais bien le budget adaptatif (au lieu du budget standard 720p).
   - HEVC/x265 : le VBV (maxrate/bufsize) suit le budget adaptatif.
-  - Tests Bats : ajout de non-régressions, exécution locale OK (filtres `test_film_adaptive` et `test_encoding_subfunctions`).
+  - Tests Bats : ajout de non-régressions, exécution locale OK (filtres `test_adaptatif` et `test_encoding_subfunctions`).
 
 #### Backlog (interne)
 - **Quoi** : création d'une liste TODO structurée.
@@ -240,7 +261,7 @@ Objectifs :
 - **Où** :
   - `lib/skip_decision.sh` (206 lignes) : logique de décision skip/passthrough/full (`_determine_conversion_mode`, `should_skip_conversion*`), variables `CONVERSION_ACTION`, `EFFECTIVE_VIDEO_*`, `SKIP_THRESHOLD_*`.
   - `lib/conversion_prep.sh` (216 lignes) : préparation fichiers (`_prepare_file_paths`, `_check_output_exists`, `_get_temp_filename`, `_setup_temp_files_and_logs`, `_check_disk_space`, `_copy_to_temp_storage`).
-  - `lib/adaptive_mode.sh` (146 lignes) : mode film-adaptive (`_convert_run_adaptive_analysis_and_export`, `_convert_handle_adaptive_mode`).
+  - `lib/adaptive_mode.sh` (146 lignes) : mode adaptatif (`_convert_run_adaptive_analysis_and_export`, `_convert_handle_adaptive_mode`).
   - `lib/ui.sh` (+327 lignes) : fonctions d'affichage conversion (`_get_counter_prefix`, `print_skip_message`, `print_conversion_required`, `print_conversion_not_required`, `print_conversion_info` + helpers).
   - `lib/counters.sh` (+13 lignes) : variables `CURRENT_FILE_NUMBER`, `LIMIT_DISPLAY_SLOT`.
   - `lib/conversion.sh` (178 lignes) : orchestration pure (`convert_file`, `_convert_get_full_metadata`).
@@ -254,14 +275,14 @@ Objectifs :
 - **Pourquoi** : sous `set -euo pipefail`, un `return 1` “normal” dans un helper UI arrêtait le script et donnait l’impression d’un blocage.
 - **Impact** : NAScode continue la conversion au lieu de quitter silencieusement ; pas de changement de paramètres d’encodage.
 
-#### Vidéo : seuil de skip codec-aware + politique "no downgrade" (dont `film-adaptive`)
+#### Vidéo : seuil de skip codec-aware + politique "no downgrade" (dont mode `adaptatif`)
 - **Quoi** :
   - Traduction du seuil de skip dans l’espace du codec source quand celui-ci est **meilleur/plus efficace** (ex: AV1 vs cible HEVC), via les facteurs d’efficacité codec.
   - Politique par défaut : **ne jamais downgrade** le codec vidéo. Si une source AV1 est jugée “trop haut débit”, elle est ré-encodée **en AV1** pour plafonner le bitrate (sauf `--force-video`).
-  - En `film-adaptive`, les bitrates calculés (référence HEVC) sont désormais traduits vers le codec cible actif (ex: `--codec av1`).
+  - En mode `adaptatif`, les bitrates calculés (référence HEVC) sont désormais traduits vers le codec cible actif (ex: `--codec av1`).
 - **Où** :
   - `lib/conversion.sh` : seuil codec-aware + sélection `EFFECTIVE_VIDEO_CODEC` et message explicite "Conversion requise" après analyse.
-  - `lib/transcode_video.sh` : support d’un codec/encodeur effectif par fichier et traduction des budgets bitrate (standard + film-adaptive).
+  - `lib/transcode_video.sh` : support d'un codec/encodeur effectif par fichier et traduction des budgets bitrate (standard + adaptatif).
   - `lib/codec_profiles.sh` : `translate_bitrate_kbps_between_codecs()` + overrides `CODEC_EFFICIENCY_*`.
   - Tests : `tests/test_conversion.bats`, `tests/test_conversion_mode.bats`.
 - **Pourquoi** : éviter des skips trop agressifs sur codecs plus efficaces et empêcher la régression qualité liée à un downgrade codec implicite.
@@ -335,7 +356,7 @@ Objectifs :
   - `lib/args.sh` : suppression de la règle film→two-pass dans le parsing (centralisé dans `set_conversion_mode_parameters`)
   - Tests : `tests/test_args.bats`, `tests/test_audio_codec.bats`
 - **Pourquoi** : compatibilité maximale et taille maîtrisée en série ; éviter des décisions “mode-based” dispersées.
-- **Impact** : changement de comportement en mode `serie` (5.1/7.1 → stéréo systématique). Mode `film` / `film-adaptive` inchangé.
+- **Impact** : changement de comportement en mode `serie` (5.1/7.1 → stéréo systématique). Mode `film` / `adaptatif` inchangé.
 - **Doc** : `README.md`, `docs/SMART_CODEC.md`, `docs/CONFIG.md`.
 
 #### UX : compteur mode limite 1-based
@@ -347,7 +368,7 @@ Objectifs :
 - **Quoi** : le slot `[X/N]` en mode limite est désormais réservé de façon **atomique** (mutex) via `increment_converted_count`, ce qui évite les slots dupliqués quand `PARALLEL_JOBS>1`.
 - **Où** : `lib/conversion.sh`.
 - **Pourquoi** : stabiliser l'UX et éviter les collisions de compteur en exécution concurrente.
-- **Notes** : en `film-adaptive`, le slot est réservé après l'analyse (pour éviter de “gâcher” des slots sur des skips post-analyse).
+- **Notes** : en mode `adaptatif`, le slot est réservé après l'analyse (pour éviter de "gâcher" des slots sur des skips post-analyse).
 
 #### Refactor “clean code light” (sans changement UX/CLI)
 - **Quoi** : refactor ciblé des fonctions longues audio/vidéo/VMAF, avec une construction de commandes FFmpeg plus sûre via tableaux d’arguments, et découpage de `_build_effective_suffix_for_dims()` en helpers internes.
@@ -464,16 +485,16 @@ Objectifs :
 - **Audit** : Bug corrigé — le compteur de progression était incrémenté avant le filtre taille, causant un affichage incorrect. Fix : déplacement de l'incrément après le filtre.
 - **Collaboration** : Implémentation initiale (ChatGPT), audit et corrections (Claude Haiku).
 
-#### Feature : `film-adaptive` (bitrate adaptatif par fichier)
-- **Quoi** : Nouveau mode de conversion `-m film-adaptive` qui analyse la complexité de chaque fichier et calcule un bitrate personnalisé.
+#### Feature : mode `adaptatif` (bitrate adaptatif par fichier)
+- **Quoi** : Nouveau mode de conversion `-m adaptatif` qui analyse la complexité de chaque fichier et calcule un bitrate personnalisé.
 - **Où** :
   - `lib/complexity.sh` : nouveau module — analyse statistique des frames (multi-échantillonnage à 25%, 50%, 75%)
-  - `lib/config.sh` : constantes `ADAPTIVE_*`, ajout du mode `film-adaptive`
+  - `lib/config.sh` : constantes `ADAPTIVE_*`, ajout du mode `adaptatif`
   - `lib/video_params.sh` : intégration des paramètres adaptatifs dans `compute_video_params()`
   - `lib/transcode_video.sh` : utilisation des variables `ADAPTIVE_TARGET_KBPS`, `ADAPTIVE_MAXRATE_KBPS`
   - `lib/conversion.sh` : seuil de skip adaptatif pour le mode
   - `lib/exports.sh` : export des nouvelles variables
-  - `tests/test_film_adaptive.bats` : 22 tests unitaires couvrant le module
+  - `tests/test_adaptatif.bats` : 22 tests unitaires couvrant le module
 - **Pourquoi** : Les films ont une complexité variable (dialogues vs action). Un bitrate fixe sous-encode les scènes complexes ou sur-encode les scènes simples.
 - **Formule de bitrate** :
   ```
@@ -496,5 +517,5 @@ Objectifs :
 - **Impact** :
   - Compatible avec le skip intelligent et le passthrough
   - Log enrichi avec coefficient C et description du contenu
-  - Tests Bats : 22 tests dans `test_film_adaptive.bats`
+  - Tests Bats : 22 tests dans `test_adaptatif.bats`
 

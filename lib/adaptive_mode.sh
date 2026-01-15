@@ -1,6 +1,6 @@
 #!/bin/bash
 ###########################################################
-# MODE ADAPTATIF (FILM-ADAPTIVE)
+# MODE ADAPTATIF
 # Analyse de complexité et export des paramètres adaptatifs
 #
 # NOTE: Ce module n'active pas `set -euo pipefail` car :
@@ -39,7 +39,7 @@ _convert_run_adaptive_analysis_and_export() {
     adaptive_bufsize_kbps="${_bs%k}"
 
     # Traduire les bitrates "référence HEVC" vers le codec cible actif.
-    # Cela rend film-adaptive cohérent quand VIDEO_CODEC != hevc.
+    # Cela rend le mode adaptatif cohérent quand VIDEO_CODEC != hevc.
     local target_codec="${VIDEO_CODEC:-hevc}"
     if [[ "$target_codec" != "hevc" ]] && declare -f translate_bitrate_kbps_between_codecs &>/dev/null; then
         adaptive_target_kbps=$(translate_bitrate_kbps_between_codecs "$adaptive_target_kbps" "hevc" "$target_codec")

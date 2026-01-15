@@ -69,13 +69,13 @@ Le chargement est orchestré par [../nascode](../nascode). Les responsabilités 
 
 - **Conversion & pipeline FFmpeg**
   - `lib/conversion_prep.sh` : préparation fichiers, chemins, espace disque, transfert temporaire
-  - `lib/adaptive_mode.sh` : analyse complexité pour mode film-adaptive
+  - `lib/adaptive_mode.sh` : analyse complexité pour mode adaptatif
   - `lib/transcode_video.sh` : exécution FFmpeg (passthrough / CRF / two-pass)
   - `lib/conversion.sh` : orchestration par fichier (appelle les modules ci-dessus)
 
 - **Qualité / analyse**
   - `lib/vmaf.sh` : calcul VMAF (optionnel)
-  - `lib/complexity.sh` : analyse pour `film-adaptive`
+  - `lib/complexity.sh` : analyse pour mode `adaptatif`
 
 - **Robustesse & support**
   - `lib/utils.sh` : helpers généraux (paths, tailles, parsing, construction commandes)
@@ -110,7 +110,7 @@ Le chargement est orchestré par [../nascode](../nascode). Les responsabilités 
 
 - Usage : [USAGE.md](USAGE.md)
 - Config : [CONFIG.md](CONFIG.md)
-- Mode film-adaptive : [FILM_ADAPTIVE.md](FILM_ADAPTIVE.md)
+- Mode adaptatif : [ADAPTATIF.md](ADAPTATIF.md)
 - Smart codec : [SMART_CODEC.md](SMART_CODEC.md)
 - Dépannage : [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Ajouter un codec : [ADDING_NEW_CODEC.md](ADDING_NEW_CODEC.md)

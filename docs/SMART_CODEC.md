@@ -31,9 +31,9 @@ Le script gère automatiquement le nombre de canaux audio selon le mode :
 | `serie` | Stéréo (2ch) | Stéréo |
 | `serie` | 5.1 (6ch) | **Downmix → Stéréo** |
 | `serie` | 7.1 (8ch) | **Downmix → Stéréo** |
-| `film` / `film-adaptive` | Stéréo (2ch) | Stéréo |
-| `film` / `film-adaptive` | 5.1 (6ch) | **Layout conservé (pas de downmix stéréo)** |
-| `film` / `film-adaptive` | 7.1 (8ch) | **Réduit → 5.1** |
+| `film` / `adaptatif` | Stéréo (2ch) | Stéréo |
+| `film` / `adaptatif` | 5.1 (6ch) | **Layout conservé (pas de downmix stéréo)** |
+| `film` / `adaptatif` | 7.1 (8ch) | **Réduit → 5.1** |
 
 **Pourquoi ?**
 - **Mode série** : priorité à l'économie d'espace. La stéréo suffit pour un visionnage sur PC/tablette/mobile.

@@ -10,8 +10,8 @@ Changements principaux :
 
 - [lib/audio_decision.sh](lib/audio_decision.sh) : ajoute `translate_audio_bitrate_kbps_between_codecs` + table d'efficacité et applique la traduction **uniquement** quand `action != copy`.
   - Option 1 : le bitrate cible est toujours capé par `min(traduit, cible_config, bitrate_source)`.
-- [lib/config.sh](lib/config.sh) : ajoute `AUDIO_TRANSLATE_EQUIV_QUALITY` et l'active par défaut en `film-adaptive`.
-- CLI : ajoute `--equiv-quality` / `--no-equiv-quality` (switch global audio + cap vidéo), avec exception : ignoré en `film-adaptive`.
+- [lib/config.sh](lib/config.sh) : ajoute `AUDIO_TRANSLATE_EQUIV_QUALITY` et l'active par défaut en mode `adaptatif`.
+- CLI : ajoute `--equiv-quality` / `--no-equiv-quality` (switch global audio + cap vidéo), avec exception : ignoré en mode `adaptatif`.
 - [lib/ui.sh](lib/ui.sh) : ajoute `ui_print_raw` / `ui_print_raw_stderr` pour remplacer `echo -e` dans des modules non-UI.
 - UI (hors progress UI) : harmonisation des messages décoratifs via helpers UI dans :
   - [lib/off_peak.sh](lib/off_peak.sh)
@@ -23,7 +23,7 @@ Changements principaux :
 Tests :
 
 - [tests/test_audio_translate_equiv_quality.bats](tests/test_audio_translate_equiv_quality.bats) : tests unit-like + intégration (bypass copy, fallback bitrate inconnu, cap au bitrate source, cas AAC→Opus et Opus→AAC forcé).
-- [tests/test_args.bats](tests/test_args.bats) : ajoute des tests sur le parsing et l’override du switch `--equiv-quality` (y compris l’exception `film-adaptive`).
+- [tests/test_args.bats](tests/test_args.bats) : ajoute des tests sur le parsing et l’override du switch `--equiv-quality` (y compris l’exception `adaptatif`).
 
 Backlog :
 
@@ -365,14 +365,14 @@ Derniers prompts :
 
 ### Contexte
 
-- Des sorties AV1 (SVT-AV1) pouvaient devenir plus grosses que la source en mode CRF (ex: film-adaptive affichait un bitrate cible faible, mais l'encodage CRF restait trop "généreux").
+- Des sorties AV1 (SVT-AV1) pouvaient devenir plus grosses que la source en mode CRF (ex: mode adaptatif affichait un bitrate cible faible, mais l'encodage CRF restait trop "généreux").
 
-## 2026-01-13 — Fix film-adaptive : paramètres appliqués à l'encodage (AV1 + HEVC)
+## 2026-01-13 — Fix mode adaptatif : paramètres appliqués à l'encodage (AV1 + HEVC)
 
-- Problème : en mode `film-adaptive`, l'analyse affichait un `Bitrate cible (encodage)` faible mais l'encodage utilisait parfois les paramètres "standard" (symptôme : `mbr=1750` au lieu de ~`target×1.4`).
+- Problème : en mode `adaptatif`, l'analyse affichait un `Bitrate cible (encodage)` faible mais l'encodage utilisait parfois les paramètres "standard" (symptôme : `mbr=1750` au lieu de ~`target×1.4`).
 - Cause : appel `adaptive_info=$(_convert_run_adaptive_analysis_and_export ...)` via `$(...)` ⇒ subshell ⇒ les `export ADAPTIVE_*` internes ne remontaient pas au shell parent.
 - Fix : export explicite des `ADAPTIVE_TARGET_KBPS/ADAPTIVE_MAXRATE_KBPS/ADAPTIVE_BUFSIZE_KBPS` dans `convert_file()` après parsing, pour que `lib/transcode_video.sh` utilise bien les budgets adaptatifs.
-- Tests : ajout non-régression dans `tests/test_film_adaptive.bats` + test ciblé HEVC/x265 dans `tests/test_encoding_subfunctions.bats`.
+- Tests : ajout non-régression dans `tests/test_adaptatif.bats` + test ciblé HEVC/x265 dans `tests/test_encoding_subfunctions.bats`.
 - Le build local (SVT-AV1 v3.1.2 via FFmpeg) n'accepte pas les clés `max-bitrate` et `buffer-size` dans `-svtav1-params` (erreurs de parsing observées).
 
 ### Changements
@@ -429,7 +429,7 @@ Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B
 **Nouveaux modules créés :**
 - `lib/skip_decision.sh` (206 lignes) - Logique skip/passthrough/full
 - `lib/conversion_prep.sh` (216 lignes) - Préparation fichiers, chemins, espace disque
-- `lib/adaptive_mode.sh` (146 lignes) - Mode film-adaptive (analyse complexité)
+- `lib/adaptive_mode.sh` (146 lignes) - Mode adaptatif (analyse complexité)
 
 **Modules modifiés :**
 - `lib/ui.sh` (+327 lignes) - Fonctions UI de conversion ajoutées
@@ -466,18 +466,18 @@ Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B
 
 ---
 
-## Session précédente (11/01/2026 - UX film-adaptive + test E2E cap "qualité équivalente")
+## Session précédente (11/01/2026 - UX adaptatif + test E2E cap "qualité équivalente")
 
 ### Objectif
 
-- Clarifier l’UX film-adaptive : distinguer clairement bitrate source / seuil de skip / bitrate appliqué à l’encodage.
+- Clarifier l’UX adaptatif : distinguer clairement bitrate source / seuil de skip / bitrate appliqué à l’encodage.
 - Ajouter un test E2E (avec marge) pour valider le cap “qualité équivalente” (codec source moins efficace).
 
 ### Tâches accomplies
 
 - `lib/conversion.sh`
   - Message post-analyse “✅ Conversion requise” : suppression du compteur `[X/Y]`, indentation alignée, ajout du codec source dans la parenthèse.
-  - Analyse film-adaptive : la ligne “Seuil skip …” est affichée uniquement si la source est déjà dans un codec meilleur/égal (sinon décision “codec”).
+  - Analyse adaptatif : la ligne “Seuil skip …” est affichée uniquement si la source est déjà dans un codec meilleur/égal (sinon décision “codec”).
 
 - `lib/complexity.sh`
   - Renommage “Bitrate adaptatif” → “Bitrate cible (encodage)” pour clarifier l’usage.
@@ -537,19 +537,19 @@ Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B
 
 ### Branche en cours
 
-- `feature/film-adaptive-ux`
+- `feature/adaptatif-ux`
 
 ### Derniers prompts
 
 - "✗  [22/32] test_regression_e2e.bats ... `[[ \"$output\" =~ \"NASCODE_EXIT=130\" ]]` failed"
 
-## Dernière session (11/01/2026 - film-adaptive : seuil codec-aware + no-downgrade)
+## Dernière session (11/01/2026 - mode adaptatif : seuil codec-aware + no-downgrade)
 
 ### Objectif
 
 - Implémenter la traduction du seuil de skip selon l'efficacité codec (comparaison dans l'espace du codec source quand il est meilleur).
 - Empêcher tout downgrade vidéo implicite : une source AV1 trop haut débit est ré-encodée en AV1 (plafonnement) plutôt qu'en HEVC.
-- Rendre `film-adaptive` cohérent avec `--codec av1` (bitrate adaptatif traduit depuis la référence HEVC).
+- Rendre le mode `adaptatif` cohérent avec `--codec av1` (bitrate adaptatif traduit depuis la référence HEVC).
 
 ### Tâches accomplies
 
@@ -560,11 +560,11 @@ Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B
 - `lib/conversion.sh`
   - Seuil codec-aware (traduction `MAXRATE_KBPS`/maxrate adaptatif vers le codec source quand la source est meilleure).
   - Sélection par fichier : `EFFECTIVE_VIDEO_CODEC`/`EFFECTIVE_VIDEO_ENCODER` (no-downgrade sauf `--force-video`).
-  - En `film-adaptive`, traduction des bitrates calculés (référence HEVC) vers le codec cible actif.
+  - En mode `adaptatif`, traduction des bitrates calculés (référence HEVC) vers le codec cible actif.
   - UX : message explicite "✅ Conversion requise" juste après l'analyse (avant transfert).
 
 - `lib/transcode_video.sh`
-  - Support du codec/encodeur effectif par fichier et traduction des budgets bitrate (standard + film-adaptive) vers le codec effectif.
+  - Support du codec/encodeur effectif par fichier et traduction des budgets bitrate (standard + adaptatif) vers le codec effectif.
 
 - Tests / doc
   - `tests/test_conversion.bats`, `tests/test_conversion_mode.bats` mis à jour/complétés.
@@ -573,7 +573,7 @@ Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B
 
 ### Branche en cours
 
-- `feature/film-adaptive-ux`
+- `feature/adaptatif-ux`
 
 ### Notes / Validation
 
@@ -633,10 +633,10 @@ Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B
   - Déplacement du message de fin : la comparaison dry-run s'exécute d'abord, puis affichage d'un encadré final via `print_header "🧪 Dry-run terminé"`.
 
 - `lib/conversion.sh`
-  - `film-adaptive` : analyse AVANT transfert pour déterminer le seuil adaptatif et décider du skip sans téléchargement inutile, puis affichage "▶️ Démarrage du fichier" (avec compteur) uniquement si on ne skip pas.
+  - Mode `adaptatif` : analyse AVANT transfert pour déterminer le seuil adaptatif et décider du skip sans téléchargement inutile, puis affichage "▶️ Démarrage du fichier" (avec compteur) uniquement si on ne skip pas.
 
 - `lib/conversion.sh` / `lib/complexity.sh`
-  - Compteur en `film-adaptive` (notamment en mode random/limite) : fallback `[current/total]` tant que le slot limite n'est pas réservé.
+  - Compteur en mode `adaptatif` (notamment en mode random/limite) : fallback `[current/total]` tant que le slot limite n'est pas réservé.
   - Résultat de l'analyse : affichage d'une synthèse explicite (CV, C, bitrate adaptatif) via `print_info`.
 
 - `lib/ui.sh` / `lib/system.sh`
@@ -834,19 +834,19 @@ Refactoring complet de `lib/conversion.sh` (958 → 178 lignes) selon l'option B
 
 ### Tâches accomplies
 
-- Ajout d’un flag global `AUDIO_FORCE_STEREO` (activé en `serie`, désactivé en `film` / `film-adaptive`).
+- Ajout d’un flag global `AUDIO_FORCE_STEREO` (activé en `serie`, désactivé en `film` / `adaptatif`).
 - Audio :
   - Forçage du layout cible à `stereo` via `_get_target_audio_layout()`.
   - Bypass “stéréo forcée” dans `_get_smart_audio_decision()` pour les sources `>= 6` canaux : décision `convert/downscale` afin de garantir le downmix (y compris pour les cas premium/passthrough).
   - Gestion du cas `AUDIO_CODEC=copy` : bascule vers `aac` si downmix requis (impossible en copy).
 - Vidéo / centralisation mode-based :
-  - Ajout de `ENCODER_MODE_PROFILE` (ex: `film-adaptive` → `film`) et `ENCODER_MODE_PARAMS` calculé une fois dans `set_conversion_mode_parameters`.
+  - Ajout de `ENCODER_MODE_PROFILE` (ex: `adaptatif` → `film`) et `ENCODER_MODE_PARAMS` calculé une fois dans `set_conversion_mode_parameters`.
   - `lib/transcode_video.sh` n’appelle plus `get_encoder_mode_params(..., CONVERSION_MODE)` à la volée : utilise `ENCODER_MODE_PARAMS`.
   - SVT-AV1 : utilisation de `FILM_KEYINT` (centralisé) au lieu de `get_mode_keyint(CONVERSION_MODE)`.
 - CLI : suppression de la désactivation automatique de `SINGLE_PASS_MODE` dans `parse_arguments` (centralisé dans `set_conversion_mode_parameters`).
 - Exports : ajout des exports `AUDIO_FORCE_STEREO`, `ENCODER_MODE_PROFILE`, `ENCODER_MODE_PARAMS`.
 - UX : en mode limite (`-l`), le compteur affiché sur “Démarrage du fichier” commence à `[1/N]` (slot en cours) au lieu de `[0/N]`.
-- UX (robustesse) : le slot `[X/N]` en mode limite est réservé de façon atomique (mutex) pour éviter les doublons quand `PARALLEL_JOBS>1` ; en `film-adaptive`, la réservation est faite après l'analyse (évite les slots “gâchés” si skip post-analyse).
+- UX (robustesse) : le slot `[X/N]` en mode limite est réservé de façon atomique (mutex) pour éviter les doublons quand `PARALLEL_JOBS>1` ; en `adaptatif`, la réservation est faite après l'analyse (évite les slots “gâchés” si skip post-analyse).
 
 ### Tests / doc
 

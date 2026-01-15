@@ -120,7 +120,7 @@ export_variables() {
     export ADAPTIVE_480P_MAX_HEIGHT ADAPTIVE_480P_SCALE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
     
-    # --- Variables mode film-adaptive (complexity.sh, constants.sh) ---
+    # --- Variables mode adaptatif (complexity.sh, constants.sh) ---
     export ADAPTIVE_COMPLEXITY_MODE
     export ADAPTIVE_BPP_BASE ADAPTIVE_C_MIN ADAPTIVE_C_MAX
     export ADAPTIVE_STDDEV_LOW ADAPTIVE_STDDEV_HIGH

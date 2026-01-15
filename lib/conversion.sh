@@ -6,7 +6,7 @@
 # Modules associés (chargés avant) :
 # - skip_decision.sh : logique skip/passthrough/full
 # - conversion_prep.sh : préparation chemins, fichiers temp
-# - adaptive_mode.sh : mode film-adaptive
+# - adaptive_mode.sh : mode adaptatif
 # - ui.sh : messages (print_skip_message, print_conversion_info, etc.)
 #
 # NOTE: Ce module n'active pas `set -euo pipefail` car :

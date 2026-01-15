@@ -20,7 +20,7 @@ fi
 _CONSTANTS_SH_LOADED=1
 
 ###########################################################
-# MODE FILM-ADAPTIVE (complexity.sh)
+# MODE ADAPTATIF (complexity.sh)
 ###########################################################
 
 # BPP (Bits Per Pixel) de référence pour HEVC

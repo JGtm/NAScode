@@ -36,7 +36,7 @@ SKIP_THRESHOLD_TOLERANCE_PERCENT=""      # tolérance appliquée
 # Détermine le mode de conversion à appliquer pour un fichier.
 # Usage: _determine_conversion_mode <codec> <bitrate> <filename> <file_original> [opt_audio_codec] [opt_audio_bitrate] [adaptive_maxrate_kbps]
 # Définit CONVERSION_ACTION et retourne 0 si une action est nécessaire, 1 si skip total
-# Note: adaptive_maxrate_kbps est utilisé en mode film-adaptive pour le seuil de skip
+# Note: adaptive_maxrate_kbps est utilisé en mode adaptatif pour le seuil de skip
 _determine_conversion_mode() {
     local codec="$1"
     local bitrate="$2"
@@ -64,7 +64,7 @@ _determine_conversion_mode() {
     SKIP_THRESHOLD_TOLERANCE_PERCENT=""
 
     # Calcul dynamique du seuil de skip
-    # En mode film-adaptive, on utilise le maxrate adaptatif calculé pour ce fichier
+    # En mode adaptatif, on utilise le maxrate adaptatif calculé pour ce fichier
     # Sinon on utilise le MAXRATE_KBPS global
     local effective_maxrate_kbps="${MAXRATE_KBPS:-0}"
     local skip_tolerance_percent="${SKIP_TOLERANCE_PERCENT:-10}"
@@ -190,7 +190,7 @@ should_skip_conversion() {
     [[ "$CONVERSION_ACTION" == "skip" ]] && return 0 || return 1
 }
 
-# Version avec support du seuil adaptatif pour le mode film-adaptive
+# Version avec support du seuil adaptatif pour le mode adaptatif
 # Usage: should_skip_conversion_adaptive <codec> <bitrate> <filename> <file_original> [audio_codec] [audio_bitrate] [adaptive_maxrate_kbps]
 should_skip_conversion_adaptive() {
     local codec="$1"

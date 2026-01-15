@@ -2,7 +2,7 @@
 ###########################################################
 # ANALYSE DE COMPLEXITÉ VIDÉO
 #
-# Module pour le mode film-adaptive : calcule un coefficient
+# Module pour le mode adaptatif : calcule un coefficient
 # de complexité basé sur l'analyse statistique des frames.
 #
 # NOTE: Ce module n'active pas `set -euo pipefail` car :
@@ -11,7 +11,7 @@
 # 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
-# ----- Constantes du mode film-adaptive -----
+# ----- Constantes du mode adaptatif -----
 # NOTE: Ces constantes sont définies dans lib/constants.sh (chargé en premier).
 # Les valeurs ci-dessous servent de fallback si constants.sh n'est pas chargé (tests isolés).
 : "${ADAPTIVE_BPP_BASE:=0.032}"
@@ -561,7 +561,7 @@ compute_adaptive_bufsize() {
 # API PUBLIQUE
 ###########################################################
 
-# Analyse complète d'un fichier pour le mode film-adaptive.
+# Analyse complète d'un fichier pour le mode adaptatif.
 # Usage: get_adaptive_encoding_params <file>
 # Retourne: target_kbps|maxrate_kbps|bufsize_kbps|complexity_C|complexity_desc|metrics
 #

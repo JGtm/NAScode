@@ -65,14 +65,14 @@ AUDIO_FORCE_STEREO=false
 # Traduction "qualité équivalente" de bitrate audio lors d'un transcodage.
 # - Ne s'applique jamais si la décision audio est copy.
 # - But : éviter de gonfler l'audio (option 1 : jamais au-dessus du bitrate source).
-# Activé par mode dans set_conversion_mode_parameters (film-adaptive ON par défaut).
+# Activé par mode dans set_conversion_mode_parameters (adaptatif ON par défaut).
 AUDIO_TRANSLATE_EQUIV_QUALITY=false
 
 # Override global (CLI) du mode "qualité équivalente".
 # - "" : pas d'override, laisser les valeurs par mode.
 # - true : activer (audio + cap vidéo)
 # - false : désactiver (audio + cap vidéo)
-# IMPORTANT : en mode film-adaptive, l'override est ignoré (audio/vidéo restent activés).
+# IMPORTANT : en mode adaptatif, l'override est ignoré (audio/vidéo restent activés).
 EQUIV_QUALITY_OVERRIDE=""
 
 # ----- Codec vidéo -----
@@ -83,7 +83,7 @@ VIDEO_ENCODER=""     # Vide = auto-détection selon VIDEO_CODEC
 
 # Cap "qualité équivalente" (vidéo) : évite d'augmenter artificiellement le budget bitrate
 # au-delà de la source quand le codec source est moins efficace que le codec cible.
-# NOTE : ce cap ne s'applique pas en mode film-adaptive (bitrate calculé par fichier).
+# NOTE : ce cap ne s'applique pas en mode adaptatif (bitrate calculé par fichier).
 VIDEO_EQUIV_QUALITY_CAP=true
 
 # Mode sample : encoder uniquement un segment de test (30s par défaut)
@@ -98,8 +98,8 @@ SAMPLE_KEYFRAME_POS=""  # Position exacte du keyframe utilisé (décimal, pour V
 SINGLE_PASS_MODE=true
 CRF_VALUE=21  # Valeur CRF par défaut (0=lossless, 18=excellent, 23=défaut x265)
 
-# Mode film-adaptive : calcul de bitrate adaptatif par fichier selon complexité
-# Activé automatiquement quand CONVERSION_MODE="film-adaptive"
+# Mode adaptatif : calcul de bitrate adaptatif par fichier selon complexité
+# Activé automatiquement quand CONVERSION_MODE="adaptatif"
 ADAPTIVE_COMPLEXITY_MODE=false
 
 # Mode de tri pour la construction de la file d'attente (optionnel)
@@ -232,7 +232,7 @@ X265_EXTRA_PARAMS=""
 # Pass 1 rapide (no-slow-firstpass) - désactivé par défaut pour qualité max
 X265_PASS1_FAST=false
 
-# Profil logique utilisé pour les paramètres encodeur (regroupe film-adaptive -> film).
+# Profil logique utilisé pour les paramètres encodeur (regroupe adaptatif -> film).
 ENCODER_MODE_PROFILE="serie"
 
 # Paramètres encodeur spécifiques au mode (calculés dans set_conversion_mode_parameters)
@@ -265,7 +265,7 @@ set_conversion_mode_parameters() {
             AUDIO_TRANSLATE_EQUIV_QUALITY=false
             VIDEO_EQUIV_QUALITY_CAP=true
             ;;
-        film-adaptive)
+        adaptatif)
             # Films adaptatifs : bitrate calculé par fichier selon complexité
             # Utilise Constrained CRF avec maxrate adaptatif
             # Les bitrates réels sont calculés dans lib/complexity.sh
@@ -322,18 +322,18 @@ set_conversion_mode_parameters() {
             ;;
         *)
             print_error "Mode de conversion inconnu : $CONVERSION_MODE"
-            echo "  Modes disponibles : film, film-adaptive, serie"
+            echo "  Modes disponibles : film, adaptatif, serie"
             exit 1
             ;;
     esac
 
     # Override CLI du mode "qualité équivalente" (audio + cap vidéo).
     #
-    # EXCEPTION film-adaptive : l'override est ignoré car ce mode calcule
+    # EXCEPTION adaptatif : l'override est ignoré car ce mode calcule
     # un bitrate adaptatif PAR FICHIER via l'analyse de complexité.
     # La traduction "qualité équivalente" est donc intrinsèque au mode et n'a
-    # pas de sens à désactiver — sans elle, film-adaptive perd sa raison d'être.
-    if [[ "$CONVERSION_MODE" != "film-adaptive" ]]; then
+    # pas de sens à désactiver — sans elle, le mode adaptatif perd sa raison d'être.
+    if [[ "$CONVERSION_MODE" != "adaptatif" ]]; then
         if [[ "${EQUIV_QUALITY_OVERRIDE:-}" == true ]]; then
             AUDIO_TRANSLATE_EQUIV_QUALITY=true
             VIDEO_EQUIV_QUALITY_CAP=true

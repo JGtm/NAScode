@@ -1,9 +1,9 @@
 #!/usr/bin/env bats
 ###########################################################
-# TESTS DU MODE FILM-ADAPTIVE
+# TESTS DU MODE ADAPTATIF
 #
 # Tests unitaires pour l'analyse de complexité et le calcul
-# de bitrate adaptatif introduits par le mode film-adaptive.
+# de bitrate adaptatif introduits par le mode adaptatif.
 ###########################################################
 
 load test_helper
@@ -210,31 +210,31 @@ teardown() {
 }
 
 ###########################################################
-# Tests du mode film-adaptive dans config.sh
+# Tests du mode adaptatif dans config.sh
 ###########################################################
 
-@test "set_conversion_mode_parameters: film-adaptive définit ADAPTIVE_COMPLEXITY_MODE" {
+@test "set_conversion_mode_parameters: adaptatif définit ADAPTIVE_COMPLEXITY_MODE" {
     # complexity.sh already loaded by load_base_modules
     
-    CONVERSION_MODE="film-adaptive"
+    CONVERSION_MODE="adaptatif"
     set_conversion_mode_parameters
     
     [[ "${ADAPTIVE_COMPLEXITY_MODE}" == true ]]
 }
 
-@test "set_conversion_mode_parameters: film-adaptive active CRF 21" {
+@test "set_conversion_mode_parameters: adaptatif active CRF 21" {
     # complexity.sh already loaded by load_base_modules
     
-    CONVERSION_MODE="film-adaptive"
+    CONVERSION_MODE="adaptatif"
     set_conversion_mode_parameters
     
     [[ "${CRF_VALUE}" -eq 21 ]]
 }
 
-@test "set_conversion_mode_parameters: film-adaptive est en single-pass" {
+@test "set_conversion_mode_parameters: adaptatif est en single-pass" {
     # complexity.sh already loaded by load_base_modules
     
-    CONVERSION_MODE="film-adaptive"
+    CONVERSION_MODE="adaptatif"
     set_conversion_mode_parameters
     
     [[ "${SINGLE_PASS_MODE}" == true ]]
@@ -254,7 +254,7 @@ teardown() {
 # Tests de non-régression : export des paramètres adaptatifs
 ###########################################################
 
-@test "convert_file: film-adaptive exporte ADAPTIVE_* (AV1)" {
+@test "convert_file: adaptatif exporte ADAPTIVE_* (AV1)" {
     source "$LIB_DIR/conversion.sh"
 
     ADAPTIVE_COMPLEXITY_MODE=true
@@ -291,7 +291,7 @@ teardown() {
     [ "$ADAPTIVE_BUFSIZE_KBPS" = "2000" ]
 }
 
-@test "convert_file: film-adaptive exporte ADAPTIVE_* (HEVC/x265)" {
+@test "convert_file: adaptatif exporte ADAPTIVE_* (HEVC/x265)" {
     source "$LIB_DIR/conversion.sh"
 
     ADAPTIVE_COMPLEXITY_MODE=true

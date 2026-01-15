@@ -1,11 +1,11 @@
-# Mode Film-Adaptive
+# Mode Adaptatif
 
-Le mode `film-adaptive` calcule dynamiquement le bitrate cible pour chaque fichier en analysant sa complexité visuelle. Contrairement aux modes à bitrate fixe, il adapte les paramètres d'encodage au contenu réel.
+Le mode `adaptatif` calcule dynamiquement le bitrate cible pour chaque fichier en analysant sa complexité visuelle. Contrairement aux modes à bitrate fixe, il adapte les paramètres d'encodage au contenu réel.
 
 ## Activation
 
 ```bash
-bash nascode -m film-adaptive -s "/chemin/vers/films"
+bash nascode -m adaptatif -s "/chemin/vers/films"
 ```
 
 ---
@@ -201,7 +201,7 @@ export ADAPTIVE_USE_SITI=false
 
 ## Comparaison avec le Mode Film Standard
 
-| Aspect | Mode `film` | Mode `film-adaptive` |
+| Aspect | Mode `film` | Mode `adaptatif` |
 |--------|-------------|---------------------|
 | Bitrate | Fixe (2035 kbps) | Dynamique (800-2500+ kbps) |
 | Analyse préalable | Non | Oui (~30s par fichier) |
