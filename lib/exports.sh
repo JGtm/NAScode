@@ -151,6 +151,10 @@ export_variables() {
     declare -F _notify_discord_is_enabled &>/dev/null && export -f _notify_discord_is_enabled
     declare -F notify_discord_send_markdown &>/dev/null && export -f notify_discord_send_markdown
     declare -F _notify_format_event_file_progress_update &>/dev/null && export -f _notify_format_event_file_progress_update
+    declare -F notify_event_analysis_started &>/dev/null && export -f notify_event_analysis_started
+    declare -F notify_event_analysis_completed &>/dev/null && export -f notify_event_analysis_completed
+    declare -F _notify_format_event_analysis_started &>/dev/null && export -f _notify_format_event_analysis_started
+    declare -F _notify_format_event_analysis_completed &>/dev/null && export -f _notify_format_event_analysis_completed
 
     # --- Variables vidéo ---
     export VIDEO_EQUIV_QUALITY_CAP

@@ -327,11 +327,21 @@ analyze_video_complexity() {
     local si_avg="50" ti_avg="25"
     if [[ "${ADAPTIVE_USE_SITI:-true}" == true ]]; then
         if _is_siti_available; then
+            # Afficher un indicateur d'attente pour l'analyse SI/TI
+            if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
+                printf "\r\033[K  ⏳ %-25.25s" "Analyse SI/TI..." >&2
+            fi
+            
             local siti_result
             # Utiliser un sous-ensemble des positions pour SI/TI (plus rapide)
             local siti_positions=("${positions[@]:0:5}")  # 5 premiers échantillons
             siti_result=$(_analyze_siti_multi "$file" "$duration_int" "${siti_positions[@]}")
             IFS='|' read -r si_avg ti_avg <<< "$siti_result"
+            
+            # Effacer la ligne d'attente
+            if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]]; then
+                printf "\r\033[K" >&2
+            fi
         fi
     fi
     

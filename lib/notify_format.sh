@@ -169,6 +169,31 @@ _notify_format_event_file_skipped() {
     printf '%s' "$body"
 }
 
+_notify_format_event_analysis_started() {
+    # Usage: _notify_format_event_analysis_started
+    # Notification succincte du début d'analyse (mode adaptatif)
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    printf '%s' "${prefix}📊 Analyse de complexité..."
+}
+
+_notify_format_event_analysis_completed() {
+    # Usage: _notify_format_event_analysis_completed <complexity_c> <complexity_desc> <target_kbps>
+    # Notification succincte des résultats (mode adaptatif)
+    local complexity_c="${1:-1.00}"
+    local complexity_desc="${2:-standard}"
+    local target_kbps="${3:-2000}"
+
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    # Format succinct : C=1.12 (standard) → 2450 kbps
+    printf '%s' "${prefix}📊 C=${complexity_c} (${complexity_desc}) → ${target_kbps} kbps"
+}
+
 _notify_format_event_run_started() {
     # Usage: _notify_format_event_run_started <now>
     local now="${1-}"

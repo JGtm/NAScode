@@ -28,6 +28,12 @@ notify_event() {
         file_skipped)
             notify_event_file_skipped "$@"
             ;;
+        analysis_started)
+            notify_event_analysis_started "$@"
+            ;;
+        analysis_completed)
+            notify_event_analysis_completed "$@"
+            ;;
         conversions_completed)
             notify_event_conversions_completed "$@"
             ;;
@@ -117,6 +123,28 @@ notify_event_file_completed() {
     local body
     body=$(_notify_format_event_file_completed "$@")
     [[ -n "$body" ]] && notify_discord_send_markdown "$body" "file_completed"
+    return 0
+}
+
+notify_event_analysis_started() {
+    # Usage: notify_event_analysis_started
+    # Notifie le début de l'analyse de complexité (mode adaptatif)
+    _notify_discord_is_enabled || return 0
+
+    local body
+    body=$(_notify_format_event_analysis_started)
+    [[ -n "$body" ]] && notify_discord_send_markdown "$body" "analysis_started"
+    return 0
+}
+
+notify_event_analysis_completed() {
+    # Usage: notify_event_analysis_completed <complexity_c> <complexity_desc> <target_kbps>
+    # Notifie les résultats de l'analyse de complexité (mode adaptatif)
+    _notify_discord_is_enabled || return 0
+
+    local body
+    body=$(_notify_format_event_analysis_completed "$@")
+    [[ -n "$body" ]] && notify_discord_send_markdown "$body" "analysis_completed"
     return 0
 }
 
