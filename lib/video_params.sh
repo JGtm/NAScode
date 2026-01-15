@@ -413,9 +413,14 @@ compute_video_params_adaptive() {
     [[ -z "$fps" ]] && fps="24"
 
     # Analyser la complexité (multi-échantillonnage avec progression)
-    local stddev complexity_c complexity_desc
-    stddev=$(analyze_video_complexity "$input_file" "$duration" true)
-    complexity_c=$(_map_stddev_to_complexity "$stddev")
+    # Retourne: stddev|SI|TI
+    local analysis_result stddev si_avg ti_avg
+    analysis_result=$(analyze_video_complexity "$input_file" "$duration" true)
+    IFS='|' read -r stddev si_avg ti_avg <<< "$analysis_result"
+    
+    # Calculer le coefficient C avec les 3 métriques
+    local complexity_c complexity_desc
+    complexity_c=$(_map_metrics_to_complexity "$stddev" "$si_avg" "$ti_avg")
     complexity_desc=$(_describe_complexity "$complexity_c")
 
     # Calculer le bitrate adaptatif avec la formule BPP × C
@@ -429,8 +434,8 @@ compute_video_params_adaptive() {
     local video_bufsize="${effective_bufsize}k"
     local vbv_string="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
 
-    # Retourner toutes les valeurs séparées par | (format étendu)
-    echo "${output_pix_fmt}|${filter_opts}|${video_bitrate}|${video_maxrate}|${video_bufsize}|${vbv_string}|${output_height}|${input_width}|${input_height}|${input_pix_fmt}|${complexity_c}|${complexity_desc}|${stddev}|${effective_target}"
+    # Retourner toutes les valeurs séparées par | (format étendu avec SI/TI)
+    echo "${output_pix_fmt}|${filter_opts}|${video_bitrate}|${video_maxrate}|${video_bufsize}|${vbv_string}|${output_height}|${input_width}|${input_height}|${input_pix_fmt}|${complexity_c}|${complexity_desc}|${stddev}|${effective_target}|${si_avg}|${ti_avg}"
 }
 
 ###########################################################

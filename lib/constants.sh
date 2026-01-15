@@ -55,6 +55,21 @@ ADAPTIVE_MAXRATE_FACTOR="${ADAPTIVE_MAXRATE_FACTOR:-1.4}"
 # Facteur multiplicateur pour bufsize (ratio vs target)
 ADAPTIVE_BUFSIZE_FACTOR="${ADAPTIVE_BUFSIZE_FACTOR:-2.5}"
 
+# ----- Analyse SI/TI (Spatial/Temporal Information) -----
+# Pondération des métriques dans le calcul du score combiné
+# stddev (variation tailles frames) + SI (spatial) + TI (temporal) = 1.0
+ADAPTIVE_WEIGHT_STDDEV="${ADAPTIVE_WEIGHT_STDDEV:-0.40}"   # 40% - variation frames
+ADAPTIVE_WEIGHT_SI="${ADAPTIVE_WEIGHT_SI:-0.30}"           # 30% - complexité spatiale
+ADAPTIVE_WEIGHT_TI="${ADAPTIVE_WEIGHT_TI:-0.30}"           # 30% - complexité temporelle
+
+# Valeurs typiques pour normalisation (basées sur ITU-T P.910)
+# SI typique: 0-100 (textures/edges), TI typique: 0-50 (mouvement)
+ADAPTIVE_SI_MAX="${ADAPTIVE_SI_MAX:-100}"
+ADAPTIVE_TI_MAX="${ADAPTIVE_TI_MAX:-50}"
+
+# Activer/désactiver l'analyse SI/TI (fallback sur stddev seul si false)
+ADAPTIVE_USE_SITI="${ADAPTIVE_USE_SITI:-true}"
+
 ###########################################################
 # SEUILS AUDIO (audio_decision.sh, config.sh)
 ###########################################################
@@ -107,6 +122,8 @@ export ADAPTIVE_STDDEV_LOW ADAPTIVE_STDDEV_HIGH
 export ADAPTIVE_SAMPLE_DURATION ADAPTIVE_SAMPLE_COUNT
 export ADAPTIVE_MARGIN_START_PCT ADAPTIVE_MARGIN_END_PCT
 export ADAPTIVE_MIN_BITRATE_KBPS ADAPTIVE_MAXRATE_FACTOR ADAPTIVE_BUFSIZE_FACTOR
+export ADAPTIVE_WEIGHT_STDDEV ADAPTIVE_WEIGHT_SI ADAPTIVE_WEIGHT_TI
+export ADAPTIVE_SI_MAX ADAPTIVE_TI_MAX ADAPTIVE_USE_SITI
 export AUDIO_CODEC_EFFICIENT_THRESHOLD
 export DISCORD_CONTENT_MAX_CHARS DISCORD_CURL_TIMEOUT DISCORD_CURL_RETRIES DISCORD_CURL_RETRY_DELAY
 export DISCORD_PROGRESS_UPDATE_DELAY

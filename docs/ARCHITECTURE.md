@@ -110,6 +110,7 @@ Le chargement est orchestré par [../nascode](../nascode). Les responsabilités 
 
 - Usage : [USAGE.md](USAGE.md)
 - Config : [CONFIG.md](CONFIG.md)
+- Mode film-adaptive : [FILM_ADAPTIVE.md](FILM_ADAPTIVE.md)
 - Smart codec : [SMART_CODEC.md](SMART_CODEC.md)
 - Dépannage : [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
 - Ajouter un codec : [ADDING_NEW_CODEC.md](ADDING_NEW_CODEC.md)
