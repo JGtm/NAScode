@@ -105,6 +105,10 @@ export_variables() {
     # --- Fonctions VMAF (qualité vidéo) ---
     export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
     
+    # --- Fonctions HFR (video_params.sh) ---
+    export -f _get_video_fps _is_hfr _compute_hfr_bitrate_factor
+    export -f _apply_hfr_bitrate_adjustment _build_fps_limit_filter
+    
     # ========================================================
     # VARIABLES DE CONFIGURATION ENCODAGE
     # ========================================================
@@ -128,6 +132,10 @@ export_variables() {
     export ADAPTIVE_MARGIN_START_PCT ADAPTIVE_MARGIN_END_PCT
     export ADAPTIVE_MIN_BITRATE_KBPS ADAPTIVE_MAXRATE_FACTOR ADAPTIVE_BUFSIZE_FACTOR
     export ADAPTIVE_TARGET_KBPS ADAPTIVE_MAXRATE_KBPS ADAPTIVE_BUFSIZE_KBPS
+    
+    # --- Variables HFR / limitation FPS (constants.sh, config.sh) ---
+    export LIMIT_FPS HFR_THRESHOLD_FPS LIMIT_FPS_TARGET
+    export FPS_WAS_LIMITED FPS_ORIGINAL HFR_BITRATE_ADJUSTED HFR_FACTOR
     
     # --- Variables audio ---
     export AUDIO_CODEC AUDIO_BITRATE_KBPS NO_LOSSLESS FORCE_AUDIO_CODEC AUDIO_FORCE_STEREO

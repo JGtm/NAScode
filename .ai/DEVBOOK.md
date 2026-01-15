@@ -15,6 +15,31 @@ Objectifs :
 
 ### 2026-01-15
 
+#### Gestion HFR (High Frame Rate) avec options --limit-fps / --no-limit-fps
+
+- **Quoi** : ajout de la gestion du contenu HFR (>30 fps) avec deux stratégies :
+  1. **Limitation FPS** : réduction à 29.97 fps (mode `serie` par défaut)
+  2. **Majoration bitrate** : bitrate × (fps/30) pour préserver la fluidité (modes `film`/`adaptatif`)
+- **Où** :
+  - `lib/constants.sh` : nouvelles constantes `HFR_THRESHOLD_FPS`, `LIMIT_FPS_TARGET`
+  - `lib/args.sh` : options CLI `--limit-fps` et `--no-limit-fps`
+  - `lib/config.sh` : `LIMIT_FPS` par défaut selon le mode (true pour serie, false pour film/adaptatif)
+  - `lib/video_params.sh` : helpers HFR (`_get_video_fps`, `_is_hfr`, `_compute_hfr_bitrate_factor`, `_apply_hfr_bitrate_adjustment`, `_build_fps_limit_filter`) + intégration dans `compute_video_params` et `compute_video_params_adaptive`
+  - `lib/vmaf.sh` : skip VMAF si `FPS_WAS_LIMITED=true` (comparaison frame-à-frame impossible)
+  - `lib/exports.sh` : exports des nouvelles fonctions et variables
+  - `tests/test_hfr.bats` : 26 tests unitaires
+  - `README.md` : documentation de l'option
+- **Pourquoi** : 
+  - Mode `serie` : optimisation taille (les séries à 60 fps sont rares et la réduction à 30 fps économise ~50% de bitrate)
+  - Modes `film`/`adaptatif` : préserver la qualité HFR pour le sport/gaming, avec bitrate ajusté automatiquement
+- **Comportement** :
+  - Message UI : `📽️ FPS limité (59.94 → 29.97 fps)` ou `📽️ HFR détecté (59.94 fps) → bitrate ajusté ×2.0`
+  - VMAF : ignoré avec warning si FPS modifié
+- **Impact** :
+  - Tests : 722 tests passent (+26 nouveaux)
+  - UX : comportement par défaut différent selon le mode
+  - Compatibilité : 100% rétrocompatible (comportement inchangé pour contenu ≤30 fps)
+
 #### Renommage mode `film-adaptive` → `adaptatif`
 
 - **Quoi** : renommage du mode de conversion `-m film-adaptive` en `-m adaptatif` (francisation du nom).

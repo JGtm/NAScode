@@ -281,6 +281,92 @@ _build_effective_suffix_for_dims() {
 }
 
 ###########################################################
+# GESTION HFR (High Frame Rate)
+###########################################################
+
+# Récupère le FPS d'un fichier vidéo.
+# Usage: _get_video_fps <input_file>
+# Retourne: FPS en décimal (ex: 23.976, 29.97, 59.94)
+_get_video_fps() {
+    local input_file="$1"
+    local fps
+    
+    fps=$(ffprobe_safe -v error -select_streams v:0 \
+        -show_entries stream=r_frame_rate \
+        -of default=noprint_wrappers=1:nokey=1 \
+        "$input_file" 2>/dev/null | head -1)
+    
+    # Convertir le FPS (format "24000/1001" ou "24")
+    if [[ "$fps" == *"/"* ]]; then
+        fps=$(awk -F/ '{if($2>0) printf "%.3f", $1/$2; else print $1}' <<< "$fps")
+    fi
+    [[ -z "$fps" ]] && fps="24"
+    
+    echo "$fps"
+}
+
+# Vérifie si un FPS est considéré comme HFR (High Frame Rate).
+# Usage: _is_hfr <fps>
+# Retourne: 0 (true) si HFR, 1 (false) sinon
+_is_hfr() {
+    local fps="$1"
+    local threshold="${HFR_THRESHOLD_FPS:-30}"
+    
+    awk -v fps="$fps" -v t="$threshold" 'BEGIN { exit (fps > t ? 0 : 1) }'
+}
+
+# Calcule le facteur de majoration bitrate pour HFR.
+# Usage: _compute_hfr_bitrate_factor <fps>
+# Retourne: facteur (ex: 1.0, 1.5, 2.0)
+_compute_hfr_bitrate_factor() {
+    local fps="$1"
+    local ref="${HFR_REFERENCE_FPS:-30}"
+    
+    # Si FPS <= seuil, pas de majoration
+    if ! _is_hfr "$fps"; then
+        echo "1.0"
+        return 0
+    fi
+    
+    # Facteur = fps / référence
+    awk -v fps="$fps" -v ref="$ref" 'BEGIN { printf "%.2f", fps / ref }'
+}
+
+# Applique la majoration HFR à un bitrate.
+# Usage: _apply_hfr_bitrate_adjustment <base_kbps> <fps>
+# Retourne: bitrate ajusté (kbps)
+_apply_hfr_bitrate_adjustment() {
+    local base_kbps="$1"
+    local fps="$2"
+    
+    local factor
+    factor=$(_compute_hfr_bitrate_factor "$fps")
+    
+    awk -v base="$base_kbps" -v f="$factor" 'BEGIN { printf "%.0f", base * f }'
+}
+
+# Construit le filtre FPS si limitation activée.
+# Usage: _build_fps_limit_filter <fps>
+# Retourne: filtre "fps=29.97" ou chaîne vide
+_build_fps_limit_filter() {
+    local fps="$1"
+    local target="${LIMIT_FPS_TARGET:-29.97}"
+    
+    # Si limitation désactivée ou FPS <= seuil, pas de filtre
+    if [[ "${LIMIT_FPS:-false}" != true ]]; then
+        echo ""
+        return 0
+    fi
+    
+    if ! _is_hfr "$fps"; then
+        echo ""
+        return 0
+    fi
+    
+    echo "fps=${target}"
+}
+
+###########################################################
 # PIXEL FORMAT
 ###########################################################
 
@@ -310,9 +396,9 @@ build_downscale_filter() {
 
 # Calcule tous les paramètres vidéo pour un fichier donné.
 # Usage: compute_video_params <input_file>
-# Retourne: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height
+# Retourne: pix_fmt|filter_opts|bitrate|maxrate|bufsize|vbv_string|output_height|input_width|input_height|input_pix_fmt|source_fps|output_fps
 #
-# Exemple: yuv420p10le|-vf scale=...|1449k|1764k|2646k|vbv-maxrate=1764:vbv-bufsize=2646|720
+# Exemple: yuv420p10le|-vf scale=...|1449k|1764k|2646k|vbv-maxrate=1764:vbv-bufsize=2646|720|1920|1080|yuv420p|59.94|29.97
 compute_video_params() {
     local input_file="$1"
     
@@ -322,15 +408,41 @@ compute_video_params() {
     local input_width input_height input_pix_fmt
     IFS='|' read -r input_width input_height input_pix_fmt <<< "$input_props"
 
+    # Récupérer le FPS source
+    local source_fps
+    source_fps=$(_get_video_fps "$input_file")
+    local output_fps="$source_fps"
+
     # Pixel format de sortie
     local output_pix_fmt
     output_pix_fmt=$(_select_output_pix_fmt "$input_pix_fmt")
 
+    # Construire les filtres vidéo
+    local filters=()
+    
     # Filtre de downscale si nécessaire
-    local downscale_filter filter_opts=""
+    local downscale_filter
     downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
     if [[ -n "$downscale_filter" ]]; then
-        filter_opts="-vf $downscale_filter"
+        filters+=("$downscale_filter")
+    fi
+    
+    # Filtre de limitation FPS si activé et HFR détecté
+    local fps_filter
+    fps_filter=$(_build_fps_limit_filter "$source_fps")
+    if [[ -n "$fps_filter" ]]; then
+        filters+=("$fps_filter")
+        output_fps="${LIMIT_FPS_TARGET:-29.97}"
+        # Marquer que le FPS a été limité (pour UI et VMAF)
+        export FPS_WAS_LIMITED=true
+        export FPS_ORIGINAL="$source_fps"
+    fi
+    
+    # Construire l'option -vf si des filtres sont présents
+    local filter_opts=""
+    if [[ ${#filters[@]} -gt 0 ]]; then
+        local IFS=','
+        filter_opts="-vf ${filters[*]}"
     fi
 
     # Calcul du bitrate adapté à la résolution de sortie
@@ -341,6 +453,16 @@ compute_video_params() {
     effective_target=$(_compute_effective_bitrate_kbps_for_height "${TARGET_BITRATE_KBPS}" "$output_height")
     effective_maxrate=$(_compute_effective_bitrate_kbps_for_height "${MAXRATE_KBPS}" "$output_height")
     effective_bufsize=$(_compute_effective_bitrate_kbps_for_height "${BUFSIZE_KBPS}" "$output_height")
+    
+    # Si HFR et pas de limitation FPS → majorer le bitrate
+    if [[ "${LIMIT_FPS:-false}" != true ]] && _is_hfr "$source_fps"; then
+        effective_target=$(_apply_hfr_bitrate_adjustment "$effective_target" "$source_fps")
+        effective_maxrate=$(_apply_hfr_bitrate_adjustment "$effective_maxrate" "$source_fps")
+        effective_bufsize=$(_apply_hfr_bitrate_adjustment "$effective_bufsize" "$source_fps")
+        # Marquer pour l'UI
+        export HFR_BITRATE_ADJUSTED=true
+        export HFR_FACTOR=$(_compute_hfr_bitrate_factor "$source_fps")
+    fi
 
     local video_bitrate="${effective_target}k"
     local video_maxrate="${effective_maxrate}k"
@@ -348,7 +470,7 @@ compute_video_params() {
     local vbv_string="vbv-maxrate=${effective_maxrate}:vbv-bufsize=${effective_bufsize}"
 
     # Retourner toutes les valeurs séparées par |
-    echo "${output_pix_fmt}|${filter_opts}|${video_bitrate}|${video_maxrate}|${video_bufsize}|${vbv_string}|${output_height}|${input_width}|${input_height}|${input_pix_fmt}"
+    echo "${output_pix_fmt}|${filter_opts}|${video_bitrate}|${video_maxrate}|${video_bufsize}|${vbv_string}|${output_height}|${input_width}|${input_height}|${input_pix_fmt}|${source_fps}|${output_fps}"
 }
 
 ###########################################################
@@ -373,15 +495,40 @@ compute_video_params_adaptive() {
     local video_bitrate_bps _video_codec duration input_width input_height input_pix_fmt audio_codec _audio_bitrate
     IFS='|' read -r video_bitrate_bps _video_codec duration input_width input_height input_pix_fmt audio_codec _audio_bitrate <<< "$metadata"
     
+    # Récupérer le FPS source (utiliser le helper)
+    local source_fps
+    source_fps=$(_get_video_fps "$input_file")
+    local output_fps="$source_fps"
+    
     # Pixel format de sortie
     local output_pix_fmt
     output_pix_fmt=$(_select_output_pix_fmt "$input_pix_fmt")
 
+    # Construire les filtres vidéo
+    local filters=()
+    
     # Filtre de downscale si nécessaire
-    local downscale_filter filter_opts=""
+    local downscale_filter
     downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
     if [[ -n "$downscale_filter" ]]; then
-        filter_opts="-vf $downscale_filter"
+        filters+=("$downscale_filter")
+    fi
+    
+    # Filtre de limitation FPS si activé explicitement (rare en mode adaptatif)
+    local fps_filter
+    fps_filter=$(_build_fps_limit_filter "$source_fps")
+    if [[ -n "$fps_filter" ]]; then
+        filters+=("$fps_filter")
+        output_fps="${LIMIT_FPS_TARGET:-29.97}"
+        export FPS_WAS_LIMITED=true
+        export FPS_ORIGINAL="$source_fps"
+    fi
+    
+    # Construire l'option -vf si des filtres sont présents
+    local filter_opts=""
+    if [[ ${#filters[@]} -gt 0 ]]; then
+        local IFS=','
+        filter_opts="-vf ${filters[*]}"
     fi
 
     # Calcul de la hauteur de sortie (après downscale éventuel)
@@ -399,19 +546,6 @@ compute_video_params_adaptive() {
         fi
     fi
 
-    # Récupérer le FPS
-    local fps
-    fps=$(ffprobe_safe -v error -select_streams v:0 \
-        -show_entries stream=r_frame_rate \
-        -of default=noprint_wrappers=1:nokey=1 \
-        "$input_file" 2>/dev/null | head -1)
-    
-    # Convertir le FPS (format "24000/1001" ou "24")
-    if [[ "$fps" == *"/"* ]]; then
-        fps=$(awk -F/ '{if($2>0) printf "%.3f", $1/$2; else print $1}' <<< "$fps")
-    fi
-    [[ -z "$fps" ]] && fps="24"
-
     # Analyser la complexité (multi-échantillonnage avec progression)
     # Retourne: stddev|SI|TI
     local analysis_result stddev si_avg ti_avg
@@ -424,8 +558,9 @@ compute_video_params_adaptive() {
     complexity_desc=$(_describe_complexity "$complexity_c")
 
     # Calculer le bitrate adaptatif avec la formule BPP × C
+    # Utiliser output_fps (après limitation éventuelle) pour le calcul
     local effective_target effective_maxrate effective_bufsize
-    effective_target=$(compute_adaptive_target_bitrate "$output_width" "$output_height" "$fps" "$complexity_c" "$video_bitrate_bps")
+    effective_target=$(compute_adaptive_target_bitrate "$output_width" "$output_height" "$output_fps" "$complexity_c" "$video_bitrate_bps")
     effective_maxrate=$(compute_adaptive_maxrate "$effective_target")
     effective_bufsize=$(compute_adaptive_bufsize "$effective_target")
 
@@ -442,7 +577,7 @@ compute_video_params_adaptive() {
 # AFFICHAGE DES PARAMÈTRES (effet de bord volontaire)
 ###########################################################
 
-# Affiche les informations de downscale/10-bit si applicable.
+# Affiche les informations de downscale/10-bit/HFR si applicable.
 # Cette fonction a un effet de bord (echo vers stderr) mais c'est voulu pour l'UI.
 # Usage: display_video_params_info <filter_opts> <output_pix_fmt> <input_pix_fmt> <input_width> <input_height>
 display_video_params_info() {
@@ -469,6 +604,23 @@ display_video_params_info() {
             ui_print_raw "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
         else
             echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+        fi
+    fi
+    
+    # Afficher info HFR : limitation FPS ou majoration bitrate
+    if [[ "${FPS_WAS_LIMITED:-false}" == true ]]; then
+        local msg="${CYAN}  📽️  FPS limité (${FPS_ORIGINAL} → ${LIMIT_FPS_TARGET:-29.97} fps)${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "$msg"
+        else
+            echo -e "$msg"
+        fi
+    elif [[ "${HFR_BITRATE_ADJUSTED:-false}" == true ]]; then
+        local msg="${CYAN}  📽️  HFR détecté (${FPS_ORIGINAL:-?} fps) → bitrate ajusté ×${HFR_FACTOR:-?}${NOCOLOR}"
+        if declare -f ui_print_raw &>/dev/null; then
+            ui_print_raw "$msg"
+        else
+            echo -e "$msg"
         fi
     fi
 }

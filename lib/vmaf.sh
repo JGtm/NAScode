@@ -23,6 +23,15 @@ compute_vmaf_score() {
     # FFmpeg à utiliser pour VMAF (peut être différent du principal)
     local ffmpeg_cmd="${FFMPEG_VMAF:-ffmpeg}"
     
+    # Si le FPS a été modifié, VMAF n'est pas fiable (frame count différent)
+    if [[ "${FPS_WAS_LIMITED:-false}" == true ]]; then
+        if [[ "${NO_PROGRESS:-false}" != true ]]; then
+            print_warning "VMAF ignoré (FPS modifié: ${FPS_ORIGINAL:-?} → ${LIMIT_FPS_TARGET:-29.97})"
+        fi
+        echo "NA"
+        return 0
+    fi
+    
     # Vérifier que libvmaf est disponible
     if [[ "$HAS_LIBVMAF" -ne 1 ]]; then
         echo "NA"

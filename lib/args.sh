@@ -235,6 +235,16 @@ parse_arguments() {
                 EQUIV_QUALITY_OVERRIDE=false
                 shift
                 ;;
+            --limit-fps)
+                # Force la limitation du FPS à 29.97 pour le contenu HFR (>30fps)
+                LIMIT_FPS=true
+                shift
+                ;;
+            --no-limit-fps)
+                # Désactive la limitation FPS (garde le FPS original, majore le bitrate)
+                LIMIT_FPS=false
+                shift
+                ;;
             -*) 
                 # On vérifie si l'argument est une option courte groupée
                 if [[ "$1" =~ ^-[a-zA-Z]{2,}$ ]]; then

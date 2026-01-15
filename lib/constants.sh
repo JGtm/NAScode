@@ -71,6 +71,16 @@ ADAPTIVE_TI_MAX="${ADAPTIVE_TI_MAX:-50}"
 ADAPTIVE_USE_SITI="${ADAPTIVE_USE_SITI:-true}"
 
 ###########################################################
+# LIMITATION FPS (HFR - High Frame Rate)
+###########################################################
+
+# Seuil FPS au-delà duquel on considère le contenu comme HFR
+HFR_THRESHOLD_FPS="${HFR_THRESHOLD_FPS:-30}"
+
+# FPS cible pour la limitation (29.97 = standard NTSC, compatible partout)
+LIMIT_FPS_TARGET="${LIMIT_FPS_TARGET:-29.97}"
+
+###########################################################
 # SEUILS AUDIO (audio_decision.sh, config.sh)
 ###########################################################
 
@@ -125,6 +135,7 @@ export ADAPTIVE_MIN_BITRATE_KBPS ADAPTIVE_MAXRATE_FACTOR ADAPTIVE_BUFSIZE_FACTOR
 export ADAPTIVE_WEIGHT_STDDEV ADAPTIVE_WEIGHT_SI ADAPTIVE_WEIGHT_TI
 export ADAPTIVE_SI_MAX ADAPTIVE_TI_MAX ADAPTIVE_USE_SITI
 export AUDIO_CODEC_EFFICIENT_THRESHOLD
+export HFR_THRESHOLD_FPS LIMIT_FPS_TARGET
 export DISCORD_CONTENT_MAX_CHARS DISCORD_CURL_TIMEOUT DISCORD_CURL_RETRIES DISCORD_CURL_RETRY_DELAY
 export DISCORD_PROGRESS_UPDATE_DELAY
 
