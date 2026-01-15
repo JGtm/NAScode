@@ -2,7 +2,11 @@
 
 ## v2.8
 
-- ✅ **Constantes centralisées** : nouveau module `lib/constants.sh` regroupant les "magic numbers" (mode adaptatif, seuils audio, paramètres Discord). Toutes les constantes sont overridables via variables d'environnement.
+- ✅ **Gestion HFR (High Frame Rate)** : nouvelles options `--limit-fps` / `--no-limit-fps` pour gérer les vidéos >30 fps. En mode série (défaut), les vidéos HFR sont limitées à 29.97 fps pour optimiser la taille. En mode film/adaptatif, le bitrate est ajusté proportionnellement au framerate.
+- ✅ **Affichage option HFR** : l'option LIMIT_FPS apparaît dans les paramètres actifs (terminal) et dans la notification Discord `run_started`.
+- ✅ **Skip VMAF intelligent** : le score VMAF est automatiquement ignoré lorsque le framerate est modifié (comparaison invalide).
+- ✅ **Tests HFR** : 26 tests unitaires + 2 tests e2e pour la gestion HFR.
+- ✅ **Constantes centralisées** : nouveau module `lib/constants.sh` regroupant les "magic numbers" (mode adaptatif, seuils audio, paramètres Discord, seuils HFR). Toutes les constantes sont overridables via variables d'environnement.
 - ✅ **Robustesse documentation** : documentation systématique de `set -euo pipefail` dans les 38 modules `lib/`.
 - ✅ **Tests renforcés** : nouveaux tests unitaires pour `VIDEO_EQUIV_QUALITY_CAP`, `_clamp_min`, `_clamp_max`, `_min3`.
 - ✅ **Factorisation bitrate** : fonction `_translate_bitrate_by_efficiency()` centralisée dans `codec_profiles.sh` (audio + vidéo).
