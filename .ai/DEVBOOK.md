@@ -15,6 +15,27 @@ Objectifs :
 
 ### 2026-01-15
 
+#### Notification Discord : mise à jour de progression avec ETA et vitesse
+
+- **Quoi** : ajout d'une notification Discord envoyée quelques secondes après le début d'une conversion, affichant le pourcentage, la vitesse (x1.25) et l'ETA estimée.
+- **Où** :
+  - `lib/constants.sh` : nouvelle constante `DISCORD_PROGRESS_UPDATE_DELAY` (défaut: 15s, configurable via env).
+  - `lib/notify_events.sh` : nouvel événement `file_progress_update` avec fonction `notify_event_file_progress_update()`.
+  - `lib/notify_format.sh` : fonction de formatage `_notify_format_event_file_progress_update()`.
+  - `lib/utils.sh` : modification du script AWK `AWK_FFMPEG_PROGRESS_SCRIPT` pour écrire un fichier marqueur avec les métriques (percent, speed, eta) après le délai configuré.
+  - `lib/ffmpeg_pipeline.sh` : 3 nouvelles fonctions helper (`_create_progress_marker_file`, `_start_progress_watcher`, `_stop_progress_watcher`) ; intégration dans `_execute_ffmpeg_pipeline` pour lancer le watcher en arrière-plan sur les modes crf/twopass.
+  - `lib/transcode_video.sh` : passage des variables `PROGRESS_MARKER_FILE` et `PROGRESS_MARKER_DELAY` au script AWK.
+  - `lib/exports.sh` : exports conditionnels des nouvelles fonctions et variable.
+- **Pourquoi** : permettre un retour rapide sur Discord avec l'ETA estimée et la vitesse réelle de conversion, une fois que FFmpeg a stabilisé son rythme.
+- **Comportement** :
+  - Notification envoyée uniquement si : durée vidéo > (délai + 30s), mode crf ou twopass (pas passthrough), webhook Discord configuré.
+  - Format : `[X/Y] 📊 filename | 5.2% | x1.25 | ETA: 01:23:45`
+  - Le watcher est automatiquement nettoyé en fin de conversion (succès ou erreur).
+- **Impact** :
+  - Tests : aucune régression (695/696 tests passent, 1 skip attendu).
+  - Config : nouvelle variable env `DISCORD_PROGRESS_UPDATE_DELAY` (défaut 15s).
+  - UX : notification supplémentaire optionnelle sur Discord.
+
 #### Audit complet du codebase (Phases A, B, C)
 
 - **Quoi** : audit de professionnalisation et robustesse du codebase complet, en 3 phases :

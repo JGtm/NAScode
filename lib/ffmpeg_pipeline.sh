@@ -39,6 +39,85 @@ _ffmpeg_pipeline_show_error() {
     fi
 }
 
+# Crée un fichier marqueur temporaire pour la notification de progression Discord
+# Usage: _create_progress_marker_file
+# Retourne le chemin du fichier sur stdout
+_create_progress_marker_file() {
+    local marker_file
+    marker_file=$(mktemp 2>/dev/null || echo "")
+    if [[ -z "$marker_file" ]]; then
+        marker_file="/tmp/nascode_progress_marker_$$.txt"
+    fi
+    # Supprimer le fichier pour qu'AWK puisse le créer
+    rm -f "$marker_file" 2>/dev/null || true
+    printf '%s' "$marker_file"
+}
+
+# Lance un watcher en arrière-plan qui surveille le fichier marqueur
+# et envoie une notification Discord quand il apparaît
+# Usage: _start_progress_watcher <marker_file> <filename> <watcher_pid_var>
+# Le PID du watcher est stocké dans la variable dont le nom est passé en $3
+_start_progress_watcher() {
+    local marker_file="$1"
+    local filename="$2"
+    local pid_var_name="$3"
+    
+    # Vérifier si les notifications Discord sont activées
+    if ! declare -f _notify_discord_is_enabled &>/dev/null || ! _notify_discord_is_enabled; then
+        eval "$pid_var_name=0"
+        return 0
+    fi
+    
+    # Timeout max pour le watcher (évite les zombies)
+    local max_wait="${DISCORD_PROGRESS_UPDATE_DELAY:-15}"
+    max_wait=$((max_wait + 30))  # Marge supplémentaire
+    
+    (
+        local elapsed=0
+        while [[ $elapsed -lt $max_wait ]]; do
+            if [[ -f "$marker_file" ]]; then
+                # Lire les métriques du fichier
+                local speed eta
+                speed=$(grep -E '^speed=' "$marker_file" 2>/dev/null | cut -d'=' -f2 || echo "")
+                eta=$(grep -E '^eta=' "$marker_file" 2>/dev/null | cut -d'=' -f2 || echo "")
+                
+                # Envoyer la notification si on a des données valides
+                if [[ -n "$speed" ]]; then
+                    notify_event file_progress_update "$filename" "$speed" "$eta" 2>/dev/null || true
+                fi
+                
+                # Supprimer le fichier marqueur
+                rm -f "$marker_file" 2>/dev/null || true
+                break
+            fi
+            sleep 1
+            ((elapsed++))
+        done
+        # Nettoyage si timeout
+        rm -f "$marker_file" 2>/dev/null || true
+    ) &
+    
+    eval "$pid_var_name=$!"
+}
+
+# Arrête le watcher de progression et nettoie le fichier marqueur
+# Usage: _stop_progress_watcher <watcher_pid> <marker_file>
+_stop_progress_watcher() {
+    local watcher_pid="$1"
+    local marker_file="$2"
+    
+    # Tuer le watcher s'il tourne encore
+    if [[ -n "$watcher_pid" ]] && [[ "$watcher_pid" -gt 0 ]]; then
+        kill "$watcher_pid" 2>/dev/null || true
+        wait "$watcher_pid" 2>/dev/null || true
+    fi
+    
+    # Nettoyage du fichier marqueur
+    if [[ -n "$marker_file" ]]; then
+        rm -f "$marker_file" 2>/dev/null || true
+    fi
+}
+
 # Prépare les paramètres du mode sample (seek + durée)
 # Retourne via variables globales : SAMPLE_SEEK_PARAMS, SAMPLE_DURATION_PARAMS, EFFECTIVE_DURATION
 _setup_sample_mode_params() {
@@ -163,6 +242,19 @@ _execute_ffmpeg_pipeline() {
     local stream_mapping
     stream_mapping=$(_build_stream_mapping "$tmp_input")
 
+    # ===== PRÉPARATION NOTIFICATION PROGRESSION DISCORD =====
+    local progress_marker_file=""
+    local progress_watcher_pid=0
+    local progress_marker_delay="${DISCORD_PROGRESS_UPDATE_DELAY:-15}"
+    
+    # Créer le fichier marqueur et lancer le watcher uniquement si :
+    # - Ce n'est pas du passthrough (trop rapide pour être utile)
+    # - La durée est suffisante (> 60s après délai)
+    if [[ "$mode" != "passthrough" ]] && [[ "${effective_duration%.*}" -gt $((progress_marker_delay + 30)) ]]; then
+        progress_marker_file=$(_create_progress_marker_file)
+        _start_progress_watcher "$progress_marker_file" "$base_name" progress_watcher_pid
+    fi
+
     # ===== EXÉCUTION SELON LE MODE =====
     
     # Texte à afficher dans la barre de progression
@@ -240,28 +332,42 @@ _execute_ffmpeg_pipeline() {
 
             if [[ "$mode" == "crf" ]]; then
                 # Mode single-pass CRF
+                # Exporter les variables pour le watcher Discord (utilisées par AWK via _run_ffmpeg_encode)
+                export PROGRESS_MARKER_FILE="$progress_marker_file"
+                export PROGRESS_MARKER_DELAY="$progress_marker_delay"
+                
                 if ! _run_ffmpeg_encode "crf" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
                                         "$encoder_base_params" "$audio_params" "$stream_mapping" \
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
+                    _stop_progress_watcher "$progress_watcher_pid" "$progress_marker_file"
                     _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
             else
                 # Mode two-pass
-                # Pass 1 : Analyse
+                # Pour two-pass, on n'active le marqueur que sur pass2 (l'encodage réel)
+                
+                # Pass 1 : Analyse (pas de notification)
+                export PROGRESS_MARKER_FILE=""
+                export PROGRESS_MARKER_DELAY="$progress_marker_delay"
+                
                 if ! _run_ffmpeg_encode "pass1" "$tmp_input" "" "$ffmpeg_log_temp" "$base_name" \
                                         "$encoder_base_params" "" "" \
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
+                    _stop_progress_watcher "$progress_watcher_pid" "$progress_marker_file"
                     _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
 
-                # Pass 2 : Encodage
+                # Pass 2 : Encodage (avec notification)
+                export PROGRESS_MARKER_FILE="$progress_marker_file"
+                
                 if ! _run_ffmpeg_encode "pass2" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$base_name" \
                                         "$encoder_base_params" "$audio_params" "$stream_mapping" \
                                         "$progress_slot" "$is_parallel" "$awk_time_func"; then
                     rm -f "x265_2pass.log" "x265_2pass.log.cutree" 2>/dev/null || true
                     rm -f "svtav1_2pass.log" "ffmpeg2pass-0.log" 2>/dev/null || true
+                    _stop_progress_watcher "$progress_watcher_pid" "$progress_marker_file"
                     _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                     return 1
                 fi
@@ -278,6 +384,9 @@ _execute_ffmpeg_pipeline() {
             return 1
             ;;
     esac
+
+    # Arrêter le watcher de progression et nettoyer
+    _stop_progress_watcher "$progress_watcher_pid" "$progress_marker_file"
 
     # Libérer le slot de progression
     if [[ "$is_parallel" -eq 1 && "$progress_slot" -gt 0 ]]; then

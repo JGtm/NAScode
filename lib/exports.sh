@@ -138,6 +138,17 @@ export_variables() {
 
     # --- Variables Discord (constants.sh) ---
     export DISCORD_CONTENT_MAX_CHARS DISCORD_CURL_TIMEOUT DISCORD_CURL_RETRIES DISCORD_CURL_RETRY_DELAY
+    export DISCORD_PROGRESS_UPDATE_DELAY
+    
+    # --- Fonctions notification Discord (ffmpeg_pipeline.sh, notify_*.sh) ---
+    # Ces fonctions peuvent ne pas être chargées dans certains contextes (tests unitaires)
+    declare -F _create_progress_marker_file &>/dev/null && export -f _create_progress_marker_file
+    declare -F _start_progress_watcher &>/dev/null && export -f _start_progress_watcher
+    declare -F _stop_progress_watcher &>/dev/null && export -f _stop_progress_watcher
+    declare -F notify_event &>/dev/null && export -f notify_event
+    declare -F _notify_discord_is_enabled &>/dev/null && export -f _notify_discord_is_enabled
+    declare -F notify_discord_send_markdown &>/dev/null && export -f notify_discord_send_markdown
+    declare -F _notify_format_event_file_progress_update &>/dev/null && export -f _notify_format_event_file_progress_update
 
     # --- Variables vidéo ---
     export VIDEO_EQUIV_QUALITY_CAP
