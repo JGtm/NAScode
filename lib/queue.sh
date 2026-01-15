@@ -26,19 +26,19 @@ validate_queue_file() {
     local queue_file="$1"
     
     if [[ ! -f "$queue_file" ]]; then
-        print_error "ERREUR : Le fichier queue '$queue_file' n'existe pas."
+        print_error "$(msg MSG_QUEUE_FILE_NOT_FOUND "$queue_file")"
         return 1
     fi
     
     if [[ ! -s "$queue_file" ]]; then
-        print_error "Le fichier queue est vide"
+        print_error "$(msg MSG_QUEUE_FILE_EMPTY)"
         return 1
     fi
     
     local file_count
     file_count=$(count_null_separated "$queue_file")
     if [[ $file_count -eq 0 ]]; then
-        print_error "Format du fichier queue invalide (séparateur NUL attendu)"
+        print_error "$(msg MSG_QUEUE_FORMAT_INVALID)"
         return 1
     fi
     
@@ -136,14 +136,14 @@ _apply_queue_limitations() {
 
 _validate_queue_not_empty() {										   
     if ! [[ -s "$QUEUE" ]]; then
-        echo "Aucun fichier à traiter trouvé (vérifiez les filtres ou la source)."
+        msg MSG_QUEUE_NO_FILES
         exit 0
     fi
 
     local file_count
     file_count=$(count_null_separated "$QUEUE")
     if [[ "$file_count" -eq 0 ]]; then
-        print_error "Format du fichier queue invalide (séparateur NUL attendu)"
+        print_error "$(msg MSG_QUEUE_FORMAT_INVALID)"
         exit 1
     fi
 }
@@ -153,11 +153,13 @@ _display_random_mode_selection() {
         return 0
     fi
 
+    local random_label
+    random_label=$(msg MSG_QUEUE_RANDOM_SELECTED)
     if declare -f ui_print_raw &>/dev/null; then
-        ui_print_raw "\n  ${CYAN}📋 Fichiers sélectionnés aléatoirement${NOCOLOR}"
+        ui_print_raw "\n  ${CYAN}📋 ${random_label}${NOCOLOR}"
         ui_print_raw "  ${DIM}─────────────────────────────────────────────${NOCOLOR}"
     else
-        echo -e "\n  ${CYAN}📋 Fichiers sélectionnés aléatoirement${NOCOLOR}"
+        echo -e "\n  ${CYAN}📋 ${random_label}${NOCOLOR}"
         echo -e "  ${DIM}─────────────────────────────────────────────${NOCOLOR}"
     fi
     tr '\0' '\n' < "$QUEUE" | sed 's|.*/||' | nl -w2 -s'. ' | sed 's/^/  /'

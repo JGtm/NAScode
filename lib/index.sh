@@ -36,14 +36,14 @@ _normalize_source_path() {
 _validate_index_source() {
     # Si régénération forcée demandée
     if [[ "${REGENERATE_INDEX:-false}" == true ]]; then
-        print_warning "Régénération forcée de l'index demandée."
+        print_warning "$(msg MSG_INDEX_REGEN_FORCED)"
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
     fi
 
     # Si pas de fichier de métadonnées, on ne peut pas valider → régénérer
     if [[ ! -f "$INDEX_META" ]]; then
-        print_warning "Pas de métadonnées pour l'index existant, régénération..."
+        print_warning "$(msg MSG_INDEX_NO_META)"
         rm -f "$INDEX" "$INDEX_READABLE"
         return 1
     fi
@@ -53,7 +53,7 @@ _validate_index_source() {
     stored_source=$(grep '^SOURCE=' "$INDEX_META" 2>/dev/null | cut -d'=' -f2-)
     
     if [[ -z "$stored_source" ]]; then
-        print_warning "Source non trouvée dans les métadonnées, régénération..."
+        print_warning "$(msg MSG_INDEX_SOURCE_NOT_IN_META)"
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
     fi
@@ -66,12 +66,12 @@ _validate_index_source() {
     
     if [[ "$current_source_normalized" != "$stored_source_normalized" ]]; then
         if [[ "${UI_QUIET:-false}" == true ]]; then
-            print_warning "La source a changé, régénération automatique de l'index."
+            print_warning "$(msg MSG_INDEX_SOURCE_CHANGED)"
         else
-            print_warning "La source a changé :"
+            print_warning "$(msg MSG_INDEX_SOURCE_CHANGED_DETAIL)"
             print_item "Index créé pour" "$stored_source" "$YELLOW"
             print_item "Source actuelle" "$SOURCE" "$YELLOW"
-            print_warning "Régénération automatique de l'index..."
+            print_warning "$(msg MSG_INDEX_REGEN_AUTO)"
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
@@ -135,7 +135,7 @@ _handle_existing_index() {
     
     # Vérifier que l'index n'est pas vide
     if ! [[ -s "$INDEX" ]]; then 
-        print_warning "Index vide, régénération nécessaire..."
+        print_warning "$(msg MSG_INDEX_EMPTY)"
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
         return 1
     fi

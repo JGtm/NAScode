@@ -259,7 +259,7 @@ analyze_video_complexity() {
         if declare -f _get_counter_prefix &>/dev/null; then
             counter_prefix=$(_get_counter_prefix)
         fi
-        echo -e "${counter_prefix}▶️ Analyse de complexité du fichier : ${filename}" >&2
+        echo -e "${counter_prefix}▶️ $(msg MSG_COMPLEX_ANALYZING) : ${filename}" >&2
     fi
     
     # Minimum requis : 60 secondes pour une analyse fiable
@@ -629,17 +629,17 @@ display_complexity_analysis() {
     local filename
     filename=$(basename "$file")
 
-    echo -e "  📊 Résultats d'analyse :"
+    echo -e "  📊 $(msg MSG_COMPLEX_RESULTS) :"
     echo -e "${DIM}     └─ Coefficient de variation (stddev) : ${stddev}${NOCOLOR}"
     
     # Afficher SI/TI si disponibles et non neutres
     if [[ -n "$si" ]] && [[ -n "$ti" ]] && [[ "${ADAPTIVE_USE_SITI:-true}" == true ]]; then
         if [[ "$si" != "50" ]] || [[ "$ti" != "25" ]]; then
-            echo -e "${DIM}     └─ Complexité spatiale (SI) : ${si}${NOCOLOR}"
-            echo -e "${DIM}     └─ Complexité temporelle (TI) : ${ti}${NOCOLOR}"
+            echo -e "${DIM}     └─ $(msg MSG_COMPLEX_SPATIAL) : ${si}${NOCOLOR}"
+            echo -e "${DIM}     └─ $(msg MSG_COMPLEX_TEMPORAL) : ${ti}${NOCOLOR}"
         fi
     fi
     
-    echo -e "${DIM}     └─ Complexité (C) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
+    echo -e "${DIM}     └─ $(msg MSG_COMPLEX_VALUE) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
     echo -e "${DIM}     └─ Bitrate cible (encodage) : ${target_kbps} kbps${NOCOLOR}"
 }

@@ -1,5 +1,20 @@
 # Changelog
 
+## v2.9
+
+- ✅ **Internationalisation (i18n)** : système complet de traduction avec support français et anglais. Nouvelle option `--lang <fr|en>` pour choisir la langue de l'interface.
+- ✅ **Module i18n** : nouveau module `lib/i18n.sh` avec fonction `msg()` utilisant l'indirection Bash pour les traductions dynamiques.
+- ✅ **Fichiers de locale** : `locale/fr.sh` et `locale/en.sh` contenant ~305 messages traduits (CLI, erreurs, logs, notifications Discord).
+- ✅ **Documentation traduite** : 10 fichiers de documentation disponibles en anglais dans `docs/en/` (ARCHITECTURE, CHANGELOG, CONFIG, USAGE, TROUBLESHOOTING, etc.).
+- ✅ **README bilingue** : `README.en.md` complet + section i18n dans le README principal.
+- ✅ **Auto-chargement i18n** : `ui.sh` charge automatiquement `i18n.sh` si `msg()` n'est pas définie (compatibilité tests/subshells).
+- ✅ **Tests i18n** : nouveau fichier `test_i18n.bats` (13 tests) validant le chargement des locales, le fallback, les placeholders et la cohérence des clés.
+- ✅ **Tests audio_decision** : nouveau fichier `test_audio_decision.bats` (55 tests) couvrant la logique smart codec audio.
+- ✅ **Tests video_params** : nouveau fichier `test_video_params.bats` (36 tests) couvrant pix_fmt, downscale, bitrate adaptatif.
+- ✅ **Tests notify enrichis** : `test_notify.bats` étendu de 8 à 19 tests (notify_format.sh).
+- ✅ **Mode --fast** : nouvelle option `run_tests.sh --fast` excluant les tests E2E lents (~11 min vs ~15 min).
+- ✅ **Couverture tests** : passage de ~728 à ~830 tests, 3 modules critiques couverts (i18n, audio_decision, video_params).
+
 ## v2.8
 
 - ✅ **Gestion HFR (High Frame Rate)** : nouvelles options `--limit-fps` / `--no-limit-fps` pour gérer les vidéos >30 fps. En mode série (défaut), les vidéos HFR sont limitées à 29.97 fps pour optimiser la taille. En mode film/adaptatif, le bitrate est ajusté proportionnellement au framerate.

@@ -327,7 +327,7 @@ set_conversion_mode_parameters() {
             [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=true
             ;;
         *)
-            print_error "Mode de conversion inconnu : $CONVERSION_MODE"
+            print_error "$(msg MSG_CFG_UNKNOWN_MODE "$CONVERSION_MODE")"
             echo "  Modes disponibles : film, adaptatif, serie"
             exit 1
             ;;
@@ -381,7 +381,7 @@ set_conversion_mode_parameters() {
     
     # Valider que le codec/encodeur est disponible dans FFmpeg
     if ! validate_codec_config; then
-        print_error "Configuration codec invalide. Vérifiez que FFmpeg supporte l'encodeur $VIDEO_ENCODER."
+        print_error "$(msg MSG_CFG_ENCODER_INVALID "$VIDEO_ENCODER")"
         exit 1
     fi
     

@@ -173,9 +173,9 @@ _setup_sample_mode_params() {
     seek_formatted=$(printf "%02d:%02d:%02d" "$seek_h" "$seek_m" "$seek_s")
 
     if [[ "$available_range" -gt 0 ]]; then
-        echo -e "${YELLOW}  🎯 Segment de ${sample_len}s à partir de ${seek_formatted}${NOCOLOR}"
+        echo -e "${YELLOW}  🎯 $(msg MSG_FFMPEG_SEGMENT "$sample_len" "$seek_formatted")${NOCOLOR}"
     else
-        print_warning "Vidéo courte : segment de ${sample_len}s à partir de ${seek_formatted}"
+        print_warning "$(msg MSG_FFMPEG_SHORT_VIDEO "$sample_len" "$seek_formatted")"
     fi
 }
 
@@ -379,7 +379,7 @@ _execute_ffmpeg_pipeline() {
             ;;
 
         *)
-            log_error "Mode FFmpeg inconnu: $mode"
+            log_error "$(msg MSG_FFMPEG_UNKNOWN_MODE "$mode")"
             _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
             return 1
             ;;

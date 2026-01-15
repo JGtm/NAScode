@@ -49,7 +49,7 @@ cleanup() {
     # Note: On utilise une variable pour détecter les signaux plutôt que le code de sortie
     if [[ "${_INTERRUPTED:-}" == "1" ]] && [[ ! -f "$STOP_FLAG" ]]; then
         echo ""
-        print_warning "Interruption détectée, arrêt en cours..."
+        print_warning "$(msg MSG_LOCK_INTERRUPT)"
     fi
 
     # Notification externe (Discord) — best-effort
@@ -132,10 +132,10 @@ check_lock() {
         pid=$(cat "$LOCKFILE")
         
         if ps -p "$pid" > /dev/null 2>&1; then
-            print_error "Le script est déjà en cours d'exécution (PID $pid)."
+            print_error "$(msg MSG_LOCK_ALREADY_RUNNING "$pid")"
             exit 1
         else
-            print_warning "Fichier lock trouvé mais processus absent. Nettoyage..."
+            print_warning "$(msg MSG_LOCK_STALE)"
             rm -f "$LOCKFILE"
         fi
     fi

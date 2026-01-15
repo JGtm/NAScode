@@ -190,7 +190,7 @@ wait_for_off_peak() {
     while ! is_off_peak_time; do
         # Vérifier si le script a été interrompu
         if [[ -f "$STOP_FLAG" ]]; then
-            print_warning "Arrêt demandé pendant l'attente des heures creuses"
+            print_warning "$(msg MSG_OFF_PEAK_STOP)"
             return 1
         fi
         
@@ -282,10 +282,12 @@ show_off_peak_status() {
     if [[ "$OFF_PEAK_WAIT_COUNT" -gt 0 ]]; then
         local total_wait_fmt
         total_wait_fmt=$(format_wait_time "$OFF_PEAK_TOTAL_WAIT_SECONDS")
+        local wait_label
+        wait_label="$(msg MSG_OFF_PEAK_WAIT_PERIODS) : ${OFF_PEAK_WAIT_COUNT} ($(msg MSG_OFF_PEAK_TOTAL) : ${total_wait_fmt})"
         if declare -f ui_print_raw &>/dev/null; then
-            ui_print_raw "  Périodes d'attente : ${OFF_PEAK_WAIT_COUNT} (total : ${total_wait_fmt})"
+            ui_print_raw "  ${wait_label}"
         else
-            echo -e "  Périodes d'attente : ${OFF_PEAK_WAIT_COUNT} (total : ${total_wait_fmt})"
+            echo -e "  ${wait_label}"
         fi
     fi
 }
@@ -299,22 +301,24 @@ show_off_peak_startup_info() {
     if declare -f ui_print_raw &>/dev/null; then
         ui_print_raw ""
         ui_print_raw "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
-        ui_print_raw "${CYAN}⏰ MODE HEURES CREUSES ACTIVÉ${NOCOLOR}"
-        ui_print_raw "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        ui_print_raw "${CYAN}⏰ $(msg MSG_OFF_PEAK_MODE_TITLE)${NOCOLOR}"
+        ui_print_raw "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
         ui_print_raw "  Plage horaire : ${GREEN}${OFF_PEAK_START}${NOCOLOR} - ${GREEN}${OFF_PEAK_END}${NOCOLOR}"
     else
         echo ""
-        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
-        echo -e "${CYAN}⏰ MODE HEURES CREUSES ACTIVÉ${NOCOLOR}"
+        echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
+        echo -e "${CYAN}⏰ $(msg MSG_OFF_PEAK_MODE_TITLE)${NOCOLOR}"
         echo -e "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NOCOLOR}"
         echo -e "  Plage horaire : ${GREEN}${OFF_PEAK_START}${NOCOLOR} - ${GREEN}${OFF_PEAK_END}${NOCOLOR}"
     fi
     
     if is_off_peak_time; then
+        local status_label
+        status_label="$(msg MSG_OFF_PEAK_STATUS)        : ${GREEN}✓ $(msg MSG_OFF_PEAK_IMMEDIATE)${NOCOLOR}"
         if declare -f ui_print_raw &>/dev/null; then
-            ui_print_raw "  Statut        : ${GREEN}✓ Heures creuses - démarrage immédiat${NOCOLOR}"
+            ui_print_raw "  ${status_label}"
         else
-            echo -e "  Statut        : ${GREEN}✓ Heures creuses - démarrage immédiat${NOCOLOR}"
+            echo -e "  ${status_label}"
         fi
     else
         local wait_est

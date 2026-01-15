@@ -592,18 +592,20 @@ display_video_params_info() {
     fi
     
     if [[ -n "$filter_opts" ]]; then
+        local downscale_msg
+        downscale_msg=$(msg MSG_UI_DOWNSCALE "$input_width" "$input_height" "$DOWNSCALE_MAX_WIDTH" "$DOWNSCALE_MAX_HEIGHT")
         if declare -f ui_print_raw &>/dev/null; then
-            ui_print_raw "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+            ui_print_raw "${CYAN}  ⬇️  ${downscale_msg}${NOCOLOR}"
         else
-            echo -e "${CYAN}  ⬇️  Downscale activé : ${input_width}x${input_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+            echo -e "${CYAN}  ⬇️  ${downscale_msg}${NOCOLOR}"
         fi
     fi
     
     if [[ -n "$input_pix_fmt" ]] && [[ "$output_pix_fmt" == "yuv420p10le" ]]; then
         if declare -f ui_print_raw &>/dev/null; then
-            ui_print_raw "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+            ui_print_raw "${CYAN}  🎨 $(msg MSG_UI_10BIT)${NOCOLOR}"
         else
-            echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+            echo -e "${CYAN}  🎨 $(msg MSG_UI_10BIT)${NOCOLOR}"
         fi
     fi
     

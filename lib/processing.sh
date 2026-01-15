@@ -42,7 +42,7 @@ _process_queue_simple() {
         [[ -z "$file" ]] && continue
         # Vérifier les heures creuses avant de lancer une nouvelle conversion
         if ! check_off_peak_before_processing; then
-            print_warning "Traitement interrompu (arrêt demandé pendant l'attente)"
+            print_warning "$(msg MSG_PROC_INTERRUPTED)"
             break
         fi
         
@@ -137,7 +137,7 @@ _process_queue_with_fifo() {
     # Créer le FIFO et lancer un writer de fond
     rm -f "$WORKFIFO" 2>/dev/null || true
     if ! mkfifo "$WORKFIFO" 2>/dev/null; then
-        print_warning "Impossible de créer le FIFO (mkfifo). Bascule en mode --limit sans remplacement dynamique."
+        print_warning "$(msg MSG_PROC_MKFIFO_FAILED)"
         rm -f "$WORKFIFO" 2>/dev/null || true
         _process_queue_simple
         return 0
@@ -193,7 +193,7 @@ _process_queue_with_fifo() {
             [[ -z "$file" ]] && continue
             # Vérifier les heures creuses avant de lancer une nouvelle conversion
             if ! check_off_peak_before_processing; then
-                print_warning "Traitement interrompu (arrêt demandé pendant l'attente)"
+                print_warning "$(msg MSG_PROC_INTERRUPTED)"
                 break
             fi
             
@@ -255,7 +255,7 @@ _process_queue_with_fifo() {
         fi
 
         if [[ "$effective_limit" -gt 0 ]] && [[ "$converted_count" -lt "$effective_limit" ]]; then
-            print_warning_box "Fin des tâches" "Tous les fichiers restants sont déjà optimisés."
+            print_warning_box "$(msg MSG_UI_TASKS_END)" "$(msg MSG_PROC_ALL_OPTIMIZED)"
         fi
     fi
 
@@ -305,7 +305,7 @@ prepare_dynamic_queue() {
         # Guardrail : mkfifo n'est pas toujours disponible (Git Bash minimal / environnements restreints).
         # Fallback : traiter simplement la queue limitée, sans remplacement dynamique.
         if ! command -v mkfifo >/dev/null 2>&1; then
-            print_warning "mkfifo introuvable : mode --limit sans remplacement dynamique."
+            print_warning "$(msg MSG_PROC_MKFIFO_NOT_FOUND)"
             _process_queue_simple
             return 0
         fi

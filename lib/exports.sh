@@ -102,6 +102,10 @@ export_variables() {
     # --- Fonctions de logging (logging.sh) ---
     export -f log_error log_warning log_info log_success
     
+    # --- Fonctions i18n (internationalisation) ---
+    export -f msg _i18n_load
+    export LANG_UI
+    
     # --- Fonctions VMAF (qualité vidéo) ---
     export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
     

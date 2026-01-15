@@ -13,6 +13,61 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-16
+
+#### Documentation multilingue (traduction anglaise complète)
+
+- **Quoi** : traduction de toute la documentation en anglais.
+- **Où** :
+  - `docs/en/` (nouveau dossier) : traductions complètes de tous les guides.
+    - `DOCS.md` : index de la documentation.
+    - `USAGE.md` : guide d'utilisation.
+    - `CONFIG.md` : configuration avancée.
+    - `ARCHITECTURE.md` : architecture du projet.
+    - `SMART_CODEC.md` : logique smart codec.
+    - `TROUBLESHOOTING.md` : dépannage.
+    - `ADAPTATIF.md` : mode adaptatif.
+    - `ADDING_NEW_CODEC.md` : guide ajout codec.
+    - `CHANGELOG.md` : historique des versions.
+    - `SAMPLES.md` : génération de samples FFmpeg.
+  - `README.en.md` (nouveau) : version anglaise complète du README.
+  - `README.md` : ajout section i18n avec exemples `--lang`.
+- **Pourquoi** :
+  - Rendre le projet accessible à la communauté anglophone.
+  - Compléter l'infrastructure i18n avec de la documentation traduite.
+- **Impact** :
+  - 10 nouveaux fichiers de documentation anglaise.
+  - README français enrichi avec section internationalisation.
+  - Liens vers docs/en/ dans README.en.md.
+
+#### Internationalisation (i18n) — Infrastructure multilingue
+
+- **Quoi** : ajout du support multilingue au script, avec français (par défaut) et anglais.
+- **Où** :
+  - `lib/i18n.sh` (nouveau) : module de chargement des locales, fonction `msg()` avec indirection Bash.
+  - `locale/fr.sh` (nouveau) : ~100 clés de messages en français (source de vérité).
+  - `locale/en.sh` (nouveau) : traductions anglaises.
+  - `lib/args.sh` : ajout de l'option `--lang fr|en` + migration des messages vers `msg()`.
+  - `lib/exports.sh` : export des fonctions `msg`, `_i18n_load` et variable `LANG_UI` pour sous-shells.
+  - `nascode` : chargement de `i18n.sh` en premier (avant tout message utilisateur).
+  - Modules migrés : `lib/system.sh`, `lib/queue.sh`, `lib/lock.sh`, `lib/index.sh`, `lib/processing.sh`, `lib/conversion.sh`, `lib/finalize.sh`, `lib/config.sh`, `lib/off_peak.sh`, `lib/vmaf.sh`, `lib/transcode_video.sh`, `lib/ffmpeg_pipeline.sh`, `lib/conversion_prep.sh`.
+- **Pourquoi** :
+  - Rendre le script accessible aux utilisateurs anglophones.
+  - Préserver le texte français soigneusement rédigé comme source de vérité.
+  - Permettre l'ajout futur d'autres langues (structure extensible).
+- **Architecture** :
+  - Les messages sont des variables `MSG_*` définies dans les fichiers `locale/*.sh`.
+  - `msg "MSG_KEY" [args...]` utilise `printf` avec les placeholders `%s`, `%d`.
+  - Fallback automatique vers français si locale demandée absente.
+  - Variable d'environnement `NASCODE_LANG` ou option CLI `--lang`.
+- **Impact** :
+  - UX : nouvelle option `--lang fr|en` dans l'aide.
+  - Rétrocompatibilité : totale (français par défaut, comportement inchangé).
+  - Documentation : à compléter (section i18n dans README).
+- **Prochaines étapes** :
+  - Traduction de la documentation (README, docs/).
+  - Vérification exhaustive des messages restants non migrés.
+
 ### 2026-01-15
 
 #### Gestion HFR (High Frame Rate) avec options --limit-fps / --no-limit-fps

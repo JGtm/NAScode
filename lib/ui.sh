@@ -10,6 +10,18 @@
 # 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
+# Charger i18n.sh si msg() n'est pas encore définie
+# (permet aux tests et modules de fonctionner sans charger i18n explicitement)
+if ! declare -f msg >/dev/null 2>&1; then
+    # Définir SCRIPT_DIR si non défini (i18n.sh en a besoin pour localiser les fichiers de locale)
+    if [[ -z "${SCRIPT_DIR:-}" ]]; then
+        SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+    fi
+    if [[ -f "$SCRIPT_DIR/lib/i18n.sh" ]]; then
+        source "$SCRIPT_DIR/lib/i18n.sh"
+    fi
+fi
+
 # === COULEURS DE BASE ===
 readonly NOCOLOR=$'\033[0m'
 readonly GREEN=$'\033[0;32m'
@@ -260,7 +272,7 @@ print_success_box() {
 print_transfer_item() {
     _ui_is_quiet && return 0
     local filename="$1"
-    echo -e "${CYAN}  ┌─ 📥 ${WHITE}Téléchargement vers dossier temporaire${NOCOLOR}"
+    echo -e "${CYAN}  ┌─ 📥 ${WHITE}$(msg MSG_UI_DOWNLOAD_TEMP)${NOCOLOR}"
     echo -e "${CYAN}  │${NOCOLOR}"
 }
 
@@ -323,7 +335,7 @@ print_indexing_end() {
     echo "" >&2
     echo -e "${MAGENTA}  ├──────────────────────────────────────────────────┤${NOCOLOR}" >&2
     # Format : "  │  ✅ 9999 fichiers indexés                       │"
-    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%4d${GREEN} fichiers indexés${NOCOLOR}                        ${MAGENTA}│${NOCOLOR}\n" "$count" >&2
+    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%4d${GREEN} $(msg MSG_UI_FILES_INDEXED "" | sed 's/%d//')${NOCOLOR}                        ${MAGENTA}│${NOCOLOR}\n" "$count" >&2
     echo -e "${MAGENTA}  └──────────────────────────────────────────────────┘${NOCOLOR}" >&2
 }
 
@@ -357,7 +369,7 @@ print_summary_header() {
     echo ""
     echo -e "${GREEN}  ╔═══════════════════════════════════════════╗${NOCOLOR}"
     echo -e "${GREEN}  ║                                           ║${NOCOLOR}"
-    echo -e "${GREEN}  ║       📋  RÉSUMÉ DE CONVERSION  📋        ║${NOCOLOR}"
+    echo -e "${GREEN}  ║       📋  $(msg MSG_UI_SUMMARY_TITLE)  📋        ║${NOCOLOR}"
     echo -e "${GREEN}  ║                                           ║${NOCOLOR}"
     echo -e "${GREEN}  ╠═══════════════════════════════════════════╣${NOCOLOR}"
 }
@@ -484,7 +496,7 @@ print_transfer_complete() {
     _ui_is_quiet && return 0
     echo ""
     echo -e "${CYAN}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Tous les transferts terminés${NOCOLOR}${CYAN}        ┃${NOCOLOR}"
+    echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}$(msg MSG_UI_TRANSFERS_DONE)${NOCOLOR}${CYAN}        ┃${NOCOLOR}"
     echo -e "${CYAN}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
@@ -501,7 +513,7 @@ print_vmaf_complete() {
     _ui_is_quiet && return 0
     echo ""
     echo -e "${YELLOW}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Analyses VMAF terminées${NOCOLOR}${YELLOW}             ┃${NOCOLOR}"
+    echo -e "${YELLOW}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}$(msg MSG_UI_VMAF_DONE)${NOCOLOR}${YELLOW}             ┃${NOCOLOR}"
     echo -e "${YELLOW}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
@@ -524,7 +536,7 @@ print_conversion_complete() {
     _ui_is_quiet && return 0
     echo ""
     echo -e "${BLUE}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
-    echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}Toutes les conversions terminées${NOCOLOR}${BLUE}    ┃${NOCOLOR}"
+    echo -e "${BLUE}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}$(msg MSG_UI_CONVERSIONS_DONE)${NOCOLOR}${BLUE}    ┃${NOCOLOR}"
     echo -e "${BLUE}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"
 }
 
@@ -639,7 +651,7 @@ print_conversion_required() {
     [[ "${NO_PROGRESS:-false}" == true ]] && return 0
 
     if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
-        echo -e "${CYAN}  ⚠ Conversion requise : audio à optimiser (vidéo conservée)${NOCOLOR}" >&2
+        echo -e "${CYAN}  ⚠ $(msg MSG_UI_CONVERSION_AUDIO_ONLY)${NOCOLOR}" >&2
         return 0
     fi
 
@@ -699,7 +711,7 @@ print_conversion_not_required() {
     [[ "${UI_QUIET:-false}" == true ]] && return 0
     [[ "${NO_PROGRESS:-false}" == true ]] && return 0
 
-    echo -e "${CYAN}  ✅ Pas de conversion nécessaire${NOCOLOR}" >&2
+    echo -e "${CYAN}  ✅ $(msg MSG_UI_NO_CONVERSION)${NOCOLOR}" >&2
 }
 
 ###########################################################
@@ -716,7 +728,7 @@ _print_downscale_info() {
         local downscale_filter
         downscale_filter=$(_build_downscale_filter_if_needed "$v_width" "$v_height")
         if [[ -n "$downscale_filter" ]]; then
-            echo -e "${CYAN}  ⬇️  Downscale activé : ${v_width}x${v_height} → Max ${DOWNSCALE_MAX_WIDTH}x${DOWNSCALE_MAX_HEIGHT}${NOCOLOR}"
+            echo -e "${CYAN}  ⬇️  $(msg MSG_UI_DOWNSCALE "$v_width" "$v_height" "$DOWNSCALE_MAX_WIDTH" "$DOWNSCALE_MAX_HEIGHT")${NOCOLOR}"
             return 0
         fi
     fi
@@ -732,7 +744,7 @@ _print_10bit_info() {
         local output_pix_fmt
         output_pix_fmt=$(_select_output_pix_fmt "$v_pix_fmt")
         if [[ -n "$v_pix_fmt" && "$output_pix_fmt" == "yuv420p10le" ]]; then
-            echo -e "${CYAN}  🎨 Sortie 10-bit activée${NOCOLOR}"
+            echo -e "${CYAN}  🎨 $(msg MSG_UI_10BIT)${NOCOLOR}"
             return 0
         fi
     fi
@@ -747,12 +759,12 @@ _print_audio_multichannel_info() {
     if [[ -n "$channels" && "$channels" =~ ^[0-9]+$ ]] && declare -f _is_audio_multichannel &>/dev/null; then
         if _is_audio_multichannel "$channels"; then
             if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]]; then
-                echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Downmix stéréo${NOCOLOR}"
+                echo -e "${CYAN}  🔊 $(msg MSG_UI_AUDIO_DOWNMIX "$channels")${NOCOLOR}"
             else
                 if [[ "$channels" -gt 6 ]]; then
                     echo -e "${CYAN}  🔊 Audio multicanal (${channels}ch) → Downmix 7.1 → 5.1${NOCOLOR}"
                 else
-                    echo -e "${CYAN}  🔊 Audio multicanal 5.1 (${channels}ch) → Layout conservé (pas de downmix stéréo)${NOCOLOR}"
+                    echo -e "${CYAN}  🔊 $(msg MSG_UI_AUDIO_KEEP_LAYOUT "$channels")${NOCOLOR}"
                 fi
             fi
             return 0
@@ -832,7 +844,7 @@ print_conversion_info() {
     [[ "$v_codec" == "hevc" || "$v_codec" == "h265" ]] && codec_display="X265"
     [[ "$v_codec" == "av1" ]] && codec_display="AV1"
     if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
-        echo -e "${CYAN}  📋 Codec vidéo déjà optimisé → Conversion audio seule${NOCOLOR}"
+        echo -e "${CYAN}  📋 $(msg MSG_UI_VIDEO_OPTIMIZED)${NOCOLOR}"
     else
         local target_codec="${VIDEO_CODEC:-hevc}"
         if declare -f is_codec_better_or_equal &>/dev/null && is_codec_better_or_equal "$v_codec" "$target_codec"; then

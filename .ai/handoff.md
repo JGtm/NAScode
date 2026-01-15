@@ -1,6 +1,79 @@
 # Handoff
 
-## Session en cours (14/01/2026 - Audit clean code : documentation et tests)
+## Session en cours (16/01/2026 - Internationalisation i18n + Documentation)
+
+### 2026-01-16 — i18n : Documentation multilingue (traduction anglaise)
+
+Branche : `feature/i18n`
+
+Contexte : Suite à l'infrastructure i18n, traduction complète de toute la documentation en anglais.
+
+Changements principaux :
+
+- **docs/en/** (nouveau dossier) : traductions complètes de tous les guides :
+  - `DOCS.md` : index de la documentation
+  - `USAGE.md` : guide d'utilisation
+  - `CONFIG.md` : configuration avancée
+  - `ARCHITECTURE.md` : architecture du projet
+  - `SMART_CODEC.md` : logique smart codec
+  - `TROUBLESHOOTING.md` : dépannage
+  - `ADAPTATIF.md` : mode adaptatif
+  - `ADDING_NEW_CODEC.md` : guide ajout codec
+  - `CHANGELOG.md` : historique des versions
+  - `SAMPLES.md` : génération de samples FFmpeg
+- **README.en.md** (nouveau) : version anglaise complète du README avec section i18n
+- **README.md** : ajout section "Internationalisation (i18n)" avec exemples `--lang`
+
+Prochaines étapes :
+
+- [ ] Lancer les tests : `bash run_tests.sh`
+- [ ] Commit sur branche `feature/i18n`
+
+Derniers prompts :
+
+- "et que reste t'il à faire maintenant à part les tests ?"
+- "Oui et traduis aussi toute la doc"
+
+---
+
+### 2026-01-16 — i18n : Infrastructure multilingue (français/anglais)
+
+Branche : `feature/i18n`
+
+Contexte : Rendre le script accessible aux utilisateurs anglophones tout en préservant le texte français soigneusement rédigé comme source de vérité.
+
+Changements principaux :
+
+- **lib/i18n.sh** (nouveau) : module de chargement des locales avec fonction `msg()` utilisant l'indirection Bash (`${!key}`). Fallback automatique vers français si locale absente.
+- **locale/fr.sh** (nouveau) : ~100 clés de messages en français, organisées par catégorie (MSG_ARG_*, MSG_SYS_*, MSG_QUEUE_*, MSG_CONV_*, MSG_HELP_*, etc.).
+- **locale/en.sh** (nouveau) : traductions anglaises complètes.
+- **lib/args.sh** : ajout option `--lang fr|en` + migration de tous les messages vers `msg()`.
+- **lib/exports.sh** : export des fonctions `msg`, `_i18n_load` et variable `LANG_UI` pour sous-shells.
+- **nascode** : chargement de `i18n.sh` en premier (avant tout autre module utilisant des messages).
+- **Modules migrés** : system.sh, queue.sh, lock.sh, index.sh, processing.sh, conversion.sh, finalize.sh, config.sh, off_peak.sh, vmaf.sh, transcode_video.sh, ffmpeg_pipeline.sh, conversion_prep.sh.
+
+Architecture i18n :
+
+- Variables MSG_* définies dans locale/*.sh
+- msg "MSG_KEY" [args...] → printf avec placeholders %s, %d
+- Détection : NASCODE_LANG env var > --lang CLI > défaut fr
+- Extensible : ajouter un fichier locale/XX.sh pour nouvelle langue
+
+Prochaines étapes :
+
+- [ ] Vérifier les messages non migrés restants (modules secondaires)
+- [ ] Traduction de la documentation (README, docs/) — phase 2
+- [ ] Tests fonctionnels avec --lang en
+
+Derniers prompts :
+
+- "Que me proposes tu pour rendre tout mon script dispo en anglais ?"
+- "Ok pour l'option 1, tant qu'on touche pas à mon texte consciencieusement choisi en français ça me va"
+- "Fais le i18n, toute la doc sera traduite dans un second temps"
+
+---
+
+## Session précédente (14/01/2026 - Audit clean code)
 
 ### 2026-01-14 — Audio : traduction “qualité équivalente” (option 1) + UI : messages décoratifs (hors progress)
 

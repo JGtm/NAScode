@@ -26,7 +26,7 @@ compute_vmaf_score() {
     # Si le FPS a été modifié, VMAF n'est pas fiable (frame count différent)
     if [[ "${FPS_WAS_LIMITED:-false}" == true ]]; then
         if [[ "${NO_PROGRESS:-false}" != true ]]; then
-            print_warning "VMAF ignoré (FPS modifié: ${FPS_ORIGINAL:-?} → ${LIMIT_FPS_TARGET:-29.97})"
+            print_warning "$(msg MSG_VMAF_FPS_IGNORED "${FPS_ORIGINAL:-?}" "${LIMIT_FPS_TARGET:-29.97}")"
         fi
         echo "NA"
         return 0

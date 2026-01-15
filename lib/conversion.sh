@@ -82,13 +82,13 @@ convert_file() {
 
     # Protection : entrée vide ou fichier absent -> ne doit jamais bloquer le FIFO.
     if [[ -z "$file_original" ]]; then
-        print_warning "Entrée vide détectée dans la queue, skip."
+        print_warning "$(msg MSG_CONV_EMPTY_ENTRY)"
         [[ "${LIMIT_FILES:-0}" -gt 0 ]] && call_if_exists update_queue || true
         _mark_processed_once
         return 0
     fi
     if [[ ! -f "$file_original" ]]; then
-        print_warning "Fichier introuvable, skip : $file_original"
+        print_warning "$(msg MSG_CONV_FILE_NOT_FOUND "$file_original")"
         [[ "${LIMIT_FILES:-0}" -gt 0 ]] && call_if_exists update_queue || true
         _mark_processed_once
         return 0
@@ -105,7 +105,7 @@ convert_file() {
     # 1. Récupérer TOUTES les métadonnées en un seul appel
     local full_metadata
     if ! full_metadata=$(_convert_get_full_metadata "$file_original"); then
-        print_warning "Impossible de lire les métadonnées, skip : $file_original"
+        print_warning "$(msg MSG_CONV_METADATA_ERROR "$file_original")"
         [[ "${LIMIT_FILES:-0}" -gt 0 ]] && call_if_exists update_queue || true
         _mark_processed_once
         return 0
@@ -123,7 +123,7 @@ convert_file() {
     # 2. Préparation des chemins (fonction dans conversion_prep.sh)
     local path_info
     if ! path_info=$(_prepare_file_paths "$file_original" "$output_dir" "$v_width" "$v_height" "$a_codec" "$a_bitrate" "$v_codec"); then
-        print_error "Préparation des chemins impossible : $file_original"
+        print_error "$(msg MSG_CONV_PREP_FAILED "$file_original")"
         _mark_processed_once
         return 1
     fi

@@ -44,10 +44,14 @@ LIB_DIR="$SCRIPT_DIR/lib"
 
 # Vérifier que le répertoire lib existe
 if [[ ! -d "$LIB_DIR" ]]; then
-    echo "ERREUR : Répertoire lib introuvable : $LIB_DIR"
-    echo "Assurez-vous que tous les modules sont présents dans le dossier lib/"
+    echo "ERROR / ERREUR : lib directory not found / Répertoire lib introuvable : $LIB_DIR"
+    echo "Make sure all modules are present in lib/ / Assurez-vous que tous les modules sont présents dans lib/"
     exit 1
 fi
+
+# Charger l'internationalisation en premier (avant tout message utilisateur)
+# Note: i18n.sh charge automatiquement la locale selon NASCODE_LANG ou --lang
+source "$LIB_DIR/i18n.sh"
 
 # Auto-charger un fichier d'environnement local (optionnel)
 # Remarque: implémentation dans lib/env.sh (sans `source` du .env)
@@ -121,13 +125,13 @@ main() {
         # Convertir en chemin absolu (robuste aux espaces)
         local single_file_input="$SINGLE_FILE"
         if ! SINGLE_FILE="$(abspath_path "$single_file_input")"; then
-            print_error "ERREUR: Chemin de fichier invalide : $single_file_input"
+            print_error "$(msg MSG_MAIN_PATH_INVALID "$single_file_input")"
             exit 1
         fi
 
         # Valider l'entrée
         if [[ ! -f "$SINGLE_FILE" ]]; then
-            print_error "ERREUR: Le fichier source n'existe pas : $SINGLE_FILE"
+            print_error "$(msg MSG_MAIN_FILE_NOT_EXIST "$SINGLE_FILE")"
             exit 1
         fi
 
@@ -171,7 +175,7 @@ main() {
     
     # Vérifier que SOURCE existe avant de convertir en chemin absolu
     if [[ ! -d "$SOURCE" ]]; then
-        print_error "ERREUR: Le répertoire source n'existe pas : $SOURCE"
+        print_error "$(msg MSG_MAIN_DIR_NOT_EXIST "$SOURCE")"
         exit 1
     fi
     SOURCE=$(cd "$SOURCE" && pwd)
@@ -179,7 +183,7 @@ main() {
     # Protection : si la source est elle-même dans les exclusions, le run ne peut pas produire de fichiers.
     # On sort explicitement pour éviter un comportement perçu comme un blocage.
     if is_excluded "$SOURCE"; then
-        print_error "ERREUR: Le répertoire source est exclu par la configuration (EXCLUDES) : $SOURCE"
+        print_error "$(msg MSG_MAIN_SOURCE_EXCLUDED "$SOURCE")"
         exit 1
     fi
     
@@ -221,7 +225,7 @@ main() {
     
     # Si mode heures creuses, attendre le début des heures creuses avant de continuer
     if ! check_off_peak_before_processing; then
-        print_warning "Arrêt demandé avant le début du traitement."
+        print_warning "$(msg MSG_MAIN_STOP_BEFORE_PROC)"
         exit 0
     fi
 
@@ -234,7 +238,7 @@ main() {
     # Afficher le résumé final
     if [[ "$DRYRUN" == true ]]; then
         dry_run_compare_names
-        print_header "🧪 Dry run terminé" "$GREEN"
+        print_header "$(msg MSG_MAIN_DRYRUN_DONE)" "$GREEN"
     else
         show_summary
     fi
