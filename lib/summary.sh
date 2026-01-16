@@ -181,7 +181,7 @@ show_summary() {
         fi
 
         if [[ "$has_any_anomaly" == true ]]; then
-            echo -e "${YELLOW}$(msg MSG_SUMMARY_ANOMALIES):${NOCOLOR} taille=${size_anomalies} intégrité=${checksum_anomalies}${NOCOLOR}"${show_vmaf_anomaly:+" vmaf=${vmaf_anomalies}"}
+            echo -e "${YELLOW}$(msg MSG_SUMMARY_ANOMALIES):${NOCOLOR} $(msg MSG_SUMMARY_ANOM_SIZE_LABEL)=${size_anomalies} $(msg MSG_SUMMARY_ANOM_INTEGRITY_LABEL)=${checksum_anomalies}${NOCOLOR}"${show_vmaf_anomaly:+" $(msg MSG_SUMMARY_ANOM_VMAF_LABEL)=${vmaf_anomalies}"}
         fi
 
         if [[ "$show_space_savings" == true ]]; then
@@ -226,7 +226,7 @@ show_summary() {
     local total_processed
     total_processed=$((succ + err))
     if [[ "$total_processed" -eq 0 ]]; then
-        print_empty_state "Aucun fichier à traiter"
+        print_empty_state "$(msg MSG_SUMMARY_NO_FILES)"
     fi
     
     # Déterminer si on doit afficher la section anomalies
@@ -277,25 +277,25 @@ show_summary() {
     else
         {
             print_summary_header
-            print_summary_item "Date fin" "$end_date"
-            print_summary_item "Durée totale" "${total_elapsed_str}" "$CYAN"
+            print_summary_item "$(msg MSG_SUMMARY_END_DATE_LABEL)" "$end_date"
+            print_summary_item "$(msg MSG_SUMMARY_TOTAL_DURATION_LABEL)" "${total_elapsed_str}" "$CYAN"
             print_summary_separator
-            print_summary_item "Succès" "$succ" "$GREEN"
-            print_summary_item "Ignorés" "$skip" "$YELLOW"
-            print_summary_item "Erreurs" "$err" "$RED"
+            print_summary_item "$(msg MSG_SUMMARY_SUCCESS_LABEL)" "$succ" "$GREEN"
+            print_summary_item "$(msg MSG_SUMMARY_SKIPPED_LABEL)" "$skip" "$YELLOW"
+            print_summary_item "$(msg MSG_SUMMARY_ERRORS_LABEL)" "$err" "$RED"
             # Section anomalies : intégrée avec titre centré
             if [[ "$has_any_anomaly" == true ]]; then
                 print_summary_separator
-                print_summary_section_title "⚠  ANOMALIE(S)  ⚠"
+                print_summary_section_title "$(msg MSG_SUMMARY_ANOMALIES_TITLE)"
                 print_summary_separator
-                [[ "$size_anomalies" -gt 0 ]] && print_summary_item "Taille" "$size_anomalies" "$YELLOW"
-                [[ "$checksum_anomalies" -gt 0 ]] && print_summary_item "Intégrité" "$checksum_anomalies" "$RED"
-                [[ "$show_vmaf_anomaly" == true ]] && print_summary_item "VMAF" "$vmaf_anomalies" "$YELLOW"
+                [[ "$size_anomalies" -gt 0 ]] && print_summary_item "$(msg MSG_SUMMARY_ANOM_SIZE_LABEL)" "$size_anomalies" "$YELLOW"
+                [[ "$checksum_anomalies" -gt 0 ]] && print_summary_item "$(msg MSG_SUMMARY_ANOM_INTEGRITY_LABEL)" "$checksum_anomalies" "$RED"
+                [[ "$show_vmaf_anomaly" == true ]] && print_summary_item "$(msg MSG_SUMMARY_ANOM_VMAF_LABEL)" "$vmaf_anomalies" "$YELLOW"
             fi
             # Afficher le gain de place si disponible (sur deux lignes)
             if [[ "$show_space_savings" == true ]]; then
                 print_summary_separator
-                print_summary_item "Espace économisé" "$line1" "$GREEN"
+                print_summary_item "$(msg MSG_SUMMARY_SPACE_SAVED_LABEL)" "$line1" "$GREEN"
                 print_summary_value_only "$line2" "$GREEN"
             fi
             print_summary_footer

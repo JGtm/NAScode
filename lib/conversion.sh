@@ -180,12 +180,22 @@ convert_file() {
         # Mode adaptatif : analyse AVANT transfert (fonctions dans adaptive_mode.sh)
         mkdir -p "$final_dir" 2>/dev/null || true
 
+        # Notification Discord : début de l'analyse
+        if declare -f notify_event &>/dev/null; then
+            notify_event "analysis_started"
+        fi
+
         local adaptive_info
         adaptive_info=$(_convert_run_adaptive_analysis_and_export "$file_original" "$v_codec")
 
         local adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps
         local _complexity_c _complexity_desc _stddev_val
         IFS='|' read -r adaptive_target_kbps adaptive_maxrate_kbps adaptive_bufsize_kbps _complexity_c _complexity_desc _stddev_val <<< "$adaptive_info"
+
+        # Notification Discord : résultats de l'analyse
+        if declare -f notify_event &>/dev/null; then
+            notify_event "analysis_completed" "$_complexity_c" "$_complexity_desc" "$adaptive_target_kbps"
+        fi
 
         # IMPORTANT (bash) : l'appel via "$(...)" exécute la fonction dans un subshell,
         # donc les exports faits dans _convert_run_adaptive_analysis_and_export ne remontent pas.

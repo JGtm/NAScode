@@ -10,7 +10,7 @@
 ###########################################################
 
 check_dependencies() {
-    print_section "Vérification de l'environnement"
+    print_section "$(msg MSG_SYS_ENV_CHECK)"
 
     local missing_deps=()
 
@@ -50,12 +50,12 @@ check_dependencies() {
 
     # Affichage adapté selon le mode d'encodage
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
-        print_item "Mode conversion" "$CONVERSION_MODE (CRF=$CRF_VALUE, single-pass)" "$CYAN"
+        print_item "$(msg MSG_SYS_CONV_MODE_LABEL)" "$CONVERSION_MODE (CRF=$CRF_VALUE, single-pass)" "$CYAN"
     else
-        print_item "Mode conversion" "$CONVERSION_MODE (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)" "$CYAN"
+        print_item "$(msg MSG_SYS_CONV_MODE_LABEL)" "$CONVERSION_MODE (bitrate=${TARGET_BITRATE_KBPS}k, two-pass)" "$CYAN"
     fi
 
-    print_success "Environnement validé"
+    print_success "$(msg MSG_SYS_ENV_VALIDATED)"
     echo ""
 }
 
@@ -77,21 +77,21 @@ check_plexignore() {
     # Vérifier si OUTPUT_DIR est un sous-dossier de SOURCE
     if [[ "$output_abs" = "$source_abs"/* ]]; then
         if [[ -f "$plexignore_file" ]]; then
-            print_info_compact "Fichier .plexignore déjà présent dans le répertoire de destination"
+            print_info_compact "$(msg MSG_SYS_PLEXIGNORE_EXISTS)"
             return 0
         fi
 
-        ask_question "Créer un fichier .plexignore dans le répertoire de destination pour éviter les doublons dans Plex ?" "O/n"
+        ask_question "$(msg MSG_SYS_PLEXIGNORE_CREATE)" "O/n"
         read -r response
 
         case "$response" in
             [oO]|[yY]|'')
                 echo "*" > "$plexignore_file"
-                print_success "Fichier .plexignore créé dans le répertoire de destination"
+                print_success "$(msg MSG_SYS_PLEXIGNORE_CREATED)"
                 echo ""
                 ;;
             [nN]|*)
-                print_info "Création de .plexignore ignorée"
+                print_info "$(msg MSG_SYS_PLEXIGNORE_SKIPPED)"
                 ;;
         esac
     fi
@@ -115,7 +115,7 @@ check_output_suffix() {
         off)
             # -x / --no-suffix : désactiver le suffixe
             SUFFIX_STRING=""
-            print_info "Option --no-suffix activée. Le suffixe est désactivé par commande."
+            print_info "$(msg MSG_SYS_NO_SUFFIX_ENABLED)"
             ;;
         custom:*)
             # -S "valeur" : suffixe personnalisé
@@ -125,7 +125,7 @@ check_output_suffix() {
         on)
             # -S sans argument : activer le suffixe dynamique sans question
             # SUFFIX_STRING garde sa valeur par défaut (suffixe dynamique)
-            print_success "Suffixe de sortie activé"
+            print_success "$(msg MSG_SYS_SUFFIX_ENABLED)"
             ;;
         ask|*)
             # Mode interactif par défaut
@@ -155,9 +155,9 @@ check_output_suffix() {
             hint_720=$(_extract_suffix_hint "$suffix_example_720")
 
             if [[ -n "$suffix_example_720" ]] && [[ "$suffix_example_720" != "$suffix_example_1080" ]]; then
-                ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080 / $hint_720"
+                ask_question "$(msg MSG_SYS_SUFFIX_USE) Ex: $hint_1080 / $hint_720"
             else
-                ask_question "Utiliser le suffixe de sortie ? Ex: $hint_1080"
+                ask_question "$(msg MSG_SYS_SUFFIX_USE) Ex: $hint_1080"
             fi
             read -r response
             
@@ -169,7 +169,7 @@ check_output_suffix() {
                 *)
                     # Ne pas afficher le suffixe complet car la résolution (1080p/720p) 
                     # dépend de chaque fichier source et peut prêter à confusion
-                    print_success "Suffixe de sortie activé"
+                    print_success "$(msg MSG_SYS_SUFFIX_ENABLED)"
                     ;;
             esac
             ;;
@@ -178,15 +178,15 @@ check_output_suffix() {
     # Vérifications de sécurité (Écrasement / Coexistence)
     if [[ -z "$SUFFIX_STRING" ]] && [[ "$is_same_dir" == true ]]; then
         # ALERTE : Pas de suffixe ET même répertoire = RISQUE D'ÉCRASMENT
-        print_critical_alert "RISQUE D'ÉCRASEMENT" \
-            "Source et sortie IDENTIQUES: $source_abs" \
-            "L'absence de suffixe ÉCRASERA les originaux !"
+        print_critical_alert "$(msg MSG_SYS_OVERWRITE_RISK_TITLE)" \
+            "$(msg MSG_SYS_OVERWRITE_SAME_DIR "$source_abs")" \
+            "$(msg MSG_SYS_OVERWRITE_WARNING)"
         
         if [[ "$DRYRUN" == true ]]; then
-            print_info "(MODE DRY RUN) : Visualisez les fichiers qui seront écrasés"
+            print_info "$(msg MSG_SYS_DRYRUN_PREVIEW)"
         fi
         
-        ask_question "Continuer SANS suffixe dans le même répertoire ?"
+        ask_question "$(msg MSG_SYS_CONTINUE_NO_SUFFIX)"
         read -r final_confirm
         
         case "$final_confirm" in
@@ -202,8 +202,8 @@ check_output_suffix() {
     # Vérification de sécurité douce
     elif [[ -n "$SUFFIX_STRING" ]] && [[ "$is_same_dir" == true ]]; then
         # ATTENTION : Suffixe utilisé, mais toujours dans le même répertoire
-        print_warning_box "Coexistence de fichiers" \
-            "Les fichiers originaux et convertis coexisteront dans le même répertoire."
+        print_warning_box "$(msg MSG_UI_COEXIST_TITLE)" \
+            "$(msg MSG_SYS_COEXIST_MESSAGE)"
     fi
 }
 
@@ -219,7 +219,7 @@ check_vmaf() {
     if [[ "$HAS_LIBVMAF" -eq 1 ]]; then
         # Si on utilise un FFmpeg alternatif pour VMAF, afficher une info
         if [[ -n "${FFMPEG_VMAF:-}" ]] && [[ "$FFMPEG_VMAF" != "ffmpeg" ]]; then
-            print_info "VMAF via FFmpeg alternatif (libvmaf détecté)"
+            print_info "$(msg MSG_SYS_VMAF_ALT_FFMPEG)"
         fi
         # L'affichage sera groupé avec les autres options dans show_active_options
         return 0

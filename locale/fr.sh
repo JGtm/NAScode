@@ -34,10 +34,17 @@ MSG_ARG_UNEXPECTED_HINT="Vérifiez que toutes les options sont précédées d'un
 MSG_ARG_LANG_INVALID="Langue invalide : '%s'. Valeurs acceptées : fr, en"
 
 ###########################################################
+# GENERAL / COMMON
+###########################################################
+
+MSG_UNKNOWN="inconnu"
+
+###########################################################
 # SYSTÈME / DÉPENDANCES (lib/system.sh)
 ###########################################################
 
 MSG_SYS_DEPS_MISSING="Dépendances manquantes : %s"
+MSG_SYS_ENV_CHECK="Vérification de l'environnement"
 MSG_SYS_FFMPEG_VERSION_UNKNOWN="Impossible de déterminer la version de ffmpeg."
 MSG_SYS_FFMPEG_VERSION_OLD="Version FFMPEG (%s) < Recommandée (%s)"
 MSG_SYS_FFMPEG_VERSION_DETECTED="Version ffmpeg détectée : %s"
@@ -47,7 +54,22 @@ MSG_SYS_SUFFIX_DISABLED="Suffixe de sortie désactivé"
 MSG_SYS_SUFFIX_CONTINUE_NO_SUFFIX="Continuation SANS suffixe. Vérifiez le Dry Run ou les logs."
 MSG_SYS_SUFFIX_CANCELLED="Opération annulée. Modifiez le suffixe ou le dossier de sortie."
 MSG_SYS_VMAF_NOT_AVAILABLE="VMAF demandé mais libvmaf non disponible dans FFmpeg"
-
+MSG_SYS_ENV_VALIDATED="Environnement validé"
+MSG_SYS_CONV_MODE_LABEL="Mode conversion"
+MSG_SYS_PLEXIGNORE_EXISTS="Fichier .plexignore déjà présent dans le répertoire de destination"
+MSG_SYS_PLEXIGNORE_CREATE="Créer un fichier .plexignore dans le répertoire de destination pour éviter les doublons dans Plex ?"
+MSG_SYS_PLEXIGNORE_CREATED="Fichier .plexignore créé dans le répertoire de destination"
+MSG_SYS_PLEXIGNORE_SKIPPED="Création de .plexignore ignorée"
+MSG_SYS_NO_SUFFIX_ENABLED="Option --no-suffix activée. Le suffixe est désactivé par commande."
+MSG_SYS_SUFFIX_ENABLED="Suffixe de sortie activé"
+MSG_SYS_SUFFIX_USE="Utiliser le suffixe de sortie ?"
+MSG_SYS_OVERWRITE_RISK_TITLE="RISQUE D'ÉCRASEMENT"
+MSG_SYS_OVERWRITE_SAME_DIR="Source et sortie IDENTIQUES : %s"
+MSG_SYS_OVERWRITE_WARNING="L'absence de suffixe ÉCRASERA les originaux !"
+MSG_SYS_DRYRUN_PREVIEW="(MODE DRY RUN) : Visualisez les fichiers qui seront écrasés"
+MSG_SYS_CONTINUE_NO_SUFFIX="Continuer SANS suffixe dans le même répertoire ?"
+MSG_SYS_COEXIST_MESSAGE="Les fichiers originaux et convertis coexisteront dans le même répertoire."
+MSG_SYS_VMAF_ALT_FFMPEG="VMAF via FFmpeg alternatif (libvmaf détecté)"
 ###########################################################
 # QUEUE / INDEX (lib/queue.sh, lib/index.sh)
 ###########################################################
@@ -55,13 +77,26 @@ MSG_SYS_VMAF_NOT_AVAILABLE="VMAF demandé mais libvmaf non disponible dans FFmpe
 MSG_QUEUE_FILE_NOT_FOUND="ERREUR : Le fichier queue '%s' n'existe pas."
 MSG_QUEUE_FILE_EMPTY="Le fichier queue est vide"
 MSG_QUEUE_FORMAT_INVALID="Format du fichier queue invalide (séparateur NUL attendu)"
-MSG_INDEX_REGEN_FORCED="Régénération forcée de l'index demandée."
-MSG_INDEX_NO_META="Pas de métadonnées pour l'index existant, régénération..."
-MSG_INDEX_SOURCE_NOT_IN_META="Source non trouvée dans les métadonnées, régénération..."
-MSG_INDEX_SOURCE_CHANGED="La source a changé, régénération automatique de l'index."
+MSG_QUEUE_VALID="Le fichier queue semble valide (%s fichiers détectés)."
+MSG_QUEUE_VALIDATED="Fichier queue validé : %s"
+MSG_QUEUE_LIMIT_RANDOM="Sélection de %s fichier(s) maximum"
+MSG_QUEUE_LIMIT_NORMAL="%s fichier(s) maximum"
+MSG_INDEX_REGEN_FORCED="Regénération de l'index demandée."
+MSG_INDEX_NO_META="Pas de métadonnées pour l'index existant, regénération..."
+MSG_INDEX_SOURCE_NOT_IN_META="Source non trouvée dans les métadonnées, regénération..."
+MSG_INDEX_SOURCE_CHANGED="Source modifiée, regénération automatique de l'index."
 MSG_INDEX_SOURCE_CHANGED_DETAIL="La source a changé :"
-MSG_INDEX_REGEN_AUTO="Régénération automatique de l'index..."
-MSG_INDEX_EMPTY="Index vide, régénération nécessaire..."
+MSG_INDEX_REGEN_AUTO="Regénération automatique de l'index..."
+MSG_INDEX_EMPTY="Index vide, regénération nécessaire..."
+MSG_INDEX_CREATED_FOR="Index créé pour"
+MSG_INDEX_CURRENT_SOURCE="Source actuelle"
+MSG_INDEX_CUSTOM_QUEUE="Utilisation du fichier queue personnalisé : %s"
+MSG_INDEX_FORCED_USE="Utilisation forcée de l'index existant"
+MSG_INDEX_FOUND_TITLE="Index existant trouvé"
+MSG_INDEX_CREATION_DATE="Date de création : %s"
+MSG_INDEX_KEEP_QUESTION="Conserver ce fichier index ?"
+MSG_INDEX_REGENERATING="Régénération d'un nouvel index..."
+MSG_INDEX_KEPT="Index existant conservé"
 
 ###########################################################
 # LOCK / INTERRUPTION (lib/lock.sh)
@@ -113,12 +148,21 @@ MSG_TRANSCODE_PASS1_ERROR="Erreur lors de l'analyse (pass 1)"
 
 MSG_FFMPEG_UNKNOWN_MODE="Mode FFmpeg inconnu: %s"
 MSG_FFMPEG_SHORT_VIDEO="Vidéo courte : segment de %ss à partir de %s"
-
+MSG_FFMPEG_REMUX_ERROR="Erreur lors du remuxage"
+MSG_PROGRESS_DONE="Terminé ✅"
+MSG_PROGRESS_ANALYSIS_OK="Analyse OK"
 ###########################################################
 # VMAF (lib/vmaf.sh)
 ###########################################################
 
 MSG_VMAF_FPS_IGNORED="VMAF ignoré (FPS modifié: %s → %s)"
+MSG_VMAF_FILE_NOT_FOUND="NA (fichier introuvable)"
+MSG_VMAF_FILE_EMPTY="NA (fichier vide)"
+MSG_VMAF_QUALITY_EXCELLENT="Excellent"
+MSG_VMAF_QUALITY_VERY_GOOD="Très bon"
+MSG_VMAF_QUALITY_GOOD="Bon"
+MSG_VMAF_QUALITY_DEGRADED="Dégradé"
+MSG_VMAF_QUALITY_NA="NA"
 
 ###########################################################
 # CONFIGURATION (lib/config.sh)
@@ -126,6 +170,9 @@ MSG_VMAF_FPS_IGNORED="VMAF ignoré (FPS modifié: %s → %s)"
 
 MSG_CFG_UNKNOWN_MODE="Mode de conversion inconnu : %s"
 MSG_CFG_ENCODER_INVALID="Configuration codec invalide. Vérifiez que FFmpeg supporte l'encodeur %s."
+MSG_CFG_CODEC_UNSUPPORTED="Codec non supporté : %s"
+MSG_CFG_CODEC_AVAILABLE="Codecs disponibles : %s"
+MSG_CFG_ENCODER_UNAVAILABLE="Encodeur non disponible dans FFmpeg : %s"
 
 ###########################################################
 # UI / AFFICHAGE (lib/ui.sh)
@@ -249,6 +296,7 @@ MSG_UI_FILES_INDEXED="%d fichiers indexés"
 MSG_UI_SUMMARY_TITLE="RÉSUMÉ DE CONVERSION"
 MSG_UI_TRANSFERS_DONE="Tous les transferts terminés"
 MSG_UI_VMAF_DONE="Analyses VMAF terminées"
+MSG_UI_VMAF_TITLE="ANALYSE VMAF"
 MSG_UI_CONVERSIONS_DONE="Toutes les conversions terminées"
 MSG_UI_SKIP_NO_VIDEO="SKIPPED (Pas de flux vidéo)"
 MSG_UI_SKIP_EXISTS="SKIPPED (Fichier de sortie déjà existant)"
@@ -263,6 +311,19 @@ MSG_UI_AUDIO_DOWNMIX="Audio multicanal (%sch) → Downmix stéréo"
 MSG_UI_AUDIO_KEEP_LAYOUT="Audio multicanal 5.1 (%sch) → Layout conservé (pas de downmix stéréo)"
 MSG_UI_VIDEO_OPTIMIZED="Codec vidéo déjà optimisé → Conversion audio seule"
 MSG_UI_START_FILE="Démarrage du fichier"
+MSG_UI_FILES_TO_PROCESS="%s fichier(s) à traiter"
+MSG_UI_INDEXING="Indexation"
+MSG_UI_FILES="fichiers"
+MSG_UI_PROGRESS_PROCESSING="Traitement en cours"
+MSG_UI_REASON_NO_VIDEO="Pas de flux vidéo"
+MSG_UI_REASON_ALREADY_OPTIMIZED="Déjà %s & bitrate optimisé"
+MSG_UI_REASON_ALREADY_OPTIMIZED_ADAPTIVE="Déjà %s & bitrate optimisé (adaptatif)"
+MSG_UI_CONVERSION_REQUIRED="Conversion requise"
+MSG_UI_CONVERSION_REQUIRED_CODEC="Conversion requise : codec %s → %s (source : %s kbps)"
+MSG_UI_CONVERSION_REQUIRED_BITRATE="Conversion requise : bitrate %s kbps (%s) > %s kbps (%s)"
+MSG_UI_CONVERSION_REQUIRED_BITRATE_NO_DOWNGRADE="Conversion non requise : bitrate %s kbps (%s) ≤ %s kbps (%s) (pas de downgrade pour %s)"
+MSG_UI_FILES_PENDING="%s fichier(s) en attente"
+MSG_UI_FILES_TO_ANALYZE="%s fichier(s) à analyser"
 
 ###########################################################
 # SUMMARY (lib/summary.sh)
@@ -273,6 +334,17 @@ MSG_SUMMARY_DURATION="Durée"
 MSG_SUMMARY_RESULT="Résultat"
 MSG_SUMMARY_ANOMALIES="Anomalies"
 MSG_SUMMARY_SPACE="Espace"
+MSG_SUMMARY_NO_FILES="Aucun fichier à traiter"
+MSG_SUMMARY_END_DATE_LABEL="Date fin"
+MSG_SUMMARY_TOTAL_DURATION_LABEL="Durée totale"
+MSG_SUMMARY_SUCCESS_LABEL="Succès"
+MSG_SUMMARY_SKIPPED_LABEL="Ignorés"
+MSG_SUMMARY_ERRORS_LABEL="Erreurs"
+MSG_SUMMARY_ANOMALIES_TITLE="Anomalies"
+MSG_SUMMARY_ANOM_SIZE_LABEL="Taille"
+MSG_SUMMARY_ANOM_INTEGRITY_LABEL="Intégrité"
+MSG_SUMMARY_ANOM_VMAF_LABEL="VMAF"
+MSG_SUMMARY_SPACE_SAVED_LABEL="Espace économisé"
 
 ###########################################################
 # COMPLEXITY (lib/complexity.sh)
@@ -283,6 +355,24 @@ MSG_COMPLEX_RESULTS="Résultats d'analyse"
 MSG_COMPLEX_SPATIAL="Complexité spatiale (SI)"
 MSG_COMPLEX_TEMPORAL="Complexité temporelle (TI)"
 MSG_COMPLEX_VALUE="Complexité (C)"
+MSG_COMPLEX_PROGRESS_RUNNING="Calcul en cours..."
+MSG_COMPLEX_PROGRESS_DONE="Calcul terminé"
+MSG_COMPLEX_SITI_RUNNING="Analyse SI/TI..."
+MSG_COMPLEX_SITI_DONE="SI/TI terminé"
+MSG_COMPLEX_STDDEV_LABEL="Coefficient de variation (stddev)"
+MSG_COMPLEX_TARGET_BITRATE_LABEL="Bitrate cible (encodage)"
+MSG_COMPLEX_DESC_STATIC="statique → scène simple, peu de mouvement, facile à compresser"
+MSG_COMPLEX_DESC_STANDARD="standard → mouvement normal, compressibilité moyenne"
+MSG_COMPLEX_DESC_COMPLEX="complexe → beaucoup de mouvement/détails, plus difficile à compresser"
+
+###########################################################
+# TRANSFERT (lib/transfer.sh)
+###########################################################
+
+MSG_TRANSFER_REMAINING="%s transfert(s) restant(s)..."
+MSG_TRANSFER_BG_STARTED="Transfert lancé en arrière-plan"
+MSG_TRANSFER_WAIT="Attente fin de transfert... (%s en cours)"
+MSG_TRANSFER_SLOT_AVAILABLE="Slot de transfert disponible"
 
 ###########################################################
 # OFF-PEAK (lib/off_peak.sh) - compléments
@@ -293,6 +383,15 @@ MSG_OFF_PEAK_TOTAL="total"
 MSG_OFF_PEAK_MODE_TITLE="MODE HEURES CREUSES ACTIVÉ"
 MSG_OFF_PEAK_STATUS="Statut"
 MSG_OFF_PEAK_IMMEDIATE="Heures creuses - démarrage immédiat"
+MSG_OFF_PEAK_MODE_LABEL="Mode heures creuses"
+MSG_OFF_PEAK_RANGE_LABEL="Plage horaire"
+MSG_OFF_PEAK_STATUS_ACTIVE="Heures creuses (actif)"
+MSG_OFF_PEAK_STATUS_WAIT="Heures pleines (attente ~%s)"
+MSG_OFF_PEAK_DETECTED="Heures pleines détectées (%s = heures creuses)"
+MSG_OFF_PEAK_WAIT_EST="Attente estimée : %s (reprise à %s)"
+MSG_OFF_PEAK_CHECK_INTERVAL="Vérification toutes les %ss... (Ctrl+C pour annuler)"
+MSG_OFF_PEAK_REMAINING="Temps restant estimé : %s"
+MSG_OFF_PEAK_RESUME="Heures creuses ! Reprise du traitement (attendu %s)"
 
 ###########################################################
 # NOTIFY FORMAT (lib/notify_format.sh)
@@ -302,7 +401,69 @@ MSG_NOTIFY_FILE_START="Démarrage du fichier"
 MSG_NOTIFY_CONV_DONE="Conversion terminée en"
 MSG_NOTIFY_TRANSFERS_DONE="Transferts terminés"
 MSG_NOTIFY_ANALYSIS_START="Début d'analyse"
+MSG_NOTIFY_ANALYSIS_STARTED="Analyse de complexité…"
 MSG_NOTIFY_DISABLED="désactivé"
+MSG_NOTIFY_SUMMARY_TITLE="Résumé"
+MSG_NOTIFY_END_LABEL="Fin"
+MSG_NOTIFY_DURATION_LABEL="Durée"
+MSG_NOTIFY_RESULTS_LABEL="Résultats"
+MSG_NOTIFY_SUCCESS_LABEL="Succès"
+MSG_NOTIFY_SKIPPED_LABEL="Ignorés"
+MSG_NOTIFY_ERRORS_LABEL="Erreurs"
+MSG_NOTIFY_ANOMALIES_LABEL="Anomalies"
+MSG_NOTIFY_ANOM_SIZE_LABEL="Taille"
+MSG_NOTIFY_ANOM_INTEGRITY_LABEL="Intégrité"
+MSG_NOTIFY_ANOM_VMAF_LABEL="VMAF"
+MSG_NOTIFY_SPACE_SAVED_LABEL="Espace économisé"
+MSG_NOTIFY_SESSION_DONE_OK="Session terminée"
+MSG_NOTIFY_SESSION_DONE_INTERRUPTED="Session interrompue"
+MSG_NOTIFY_SESSION_DONE_ERROR="Session en erreur (code %s)"
+MSG_NOTIFY_SKIPPED_TITLE="Ignoré"
+MSG_NOTIFY_REASON_LABEL="Raison"
+MSG_NOTIFY_RUN_TITLE="Exécution"
+MSG_NOTIFY_START_LABEL="Début"
+MSG_NOTIFY_ACTIVE_PARAMS_LABEL="Paramètres actifs"
+MSG_NOTIFY_MODE_LABEL="Mode"
+MSG_NOTIFY_SOURCE_LABEL="Source"
+MSG_NOTIFY_DEST_LABEL="Destination"
+MSG_NOTIFY_VIDEO_CODEC_LABEL="Codec vidéo"
+MSG_NOTIFY_AUDIO_CODEC_LABEL="Codec audio"
+MSG_NOTIFY_HFR_LABEL="HFR"
+MSG_NOTIFY_HFR_LIMITED="Limité à %s fps"
+MSG_NOTIFY_HFR_ADJUSTED="Bitrate ajusté (fps original conservé)"
+MSG_NOTIFY_LIMIT_LABEL="Limite"
+MSG_NOTIFY_LIMIT_MAX="max %s"
+MSG_NOTIFY_DRYRUN_LABEL="Dry-run"
+MSG_NOTIFY_SAMPLE_LABEL="Mode sample"
+MSG_NOTIFY_VMAF_LABEL="VMAF"
+MSG_NOTIFY_OFF_PEAK_LABEL="Heures creuses"
+MSG_NOTIFY_JOBS_LABEL="Jobs parallèles"
+MSG_NOTIFY_QUEUE_TITLE="File d'attente"
+MSG_NOTIFY_CONV_LAUNCH="Lancement de la conversion"
+MSG_NOTIFY_SPEED_LABEL="Vitesse"
+MSG_NOTIFY_ETA_LABEL="Durée estimée"
+MSG_NOTIFY_FILES_COUNT="%s fichiers"
+MSG_NOTIFY_TRANSFERS_PENDING="Transferts en attente"
+MSG_NOTIFY_VMAF_STARTED_TITLE="VMAF démarré"
+MSG_NOTIFY_FILES_LABEL="Fichiers"
+MSG_NOTIFY_FILE_LABEL="Fichier"
+MSG_NOTIFY_VMAF_DONE_TITLE="VMAF terminé"
+MSG_NOTIFY_VMAF_ANALYZED_LABEL="Analysés"
+MSG_NOTIFY_VMAF_AVG_LABEL="Moyenne"
+MSG_NOTIFY_VMAF_MINMAX_LABEL="Min / Max"
+MSG_NOTIFY_VMAF_DEGRADED_LABEL="Dégradés"
+MSG_NOTIFY_VMAF_WORST_LABEL="Pires fichiers"
+MSG_NOTIFY_PEAK_PAUSE_TITLE="Pause (heures pleines)"
+MSG_NOTIFY_PEAK_RESUME_TITLE="Reprise (heures creuses)"
+MSG_NOTIFY_OFF_PEAK_RANGE_LABEL="Plage heures creuses"
+MSG_NOTIFY_WAIT_ESTIMATED_LABEL="Attente estimée"
+MSG_NOTIFY_RESUME_AT_LABEL="Reprise à"
+MSG_NOTIFY_CHECK_EVERY_LABEL="Vérifier toutes les"
+MSG_NOTIFY_SECONDS="%ss"
+MSG_NOTIFY_WAIT_ACTUAL_LABEL="Attente réelle"
+MSG_NOTIFY_RUN_END_OK="Fin"
+MSG_NOTIFY_RUN_END_INTERRUPTED="Interrompu"
+MSG_NOTIFY_RUN_END_ERROR="Erreur (code %s)"
 
 ###########################################################
 # FFMPEG PIPELINE (lib/ffmpeg_pipeline.sh) - compléments
@@ -321,6 +482,13 @@ MSG_FINAL_NO_ANOMALY="Aucune anomalie de nommage détectée."
 MSG_FINAL_COMPARE_IGNORED="Comparaison des noms ignorée."
 MSG_FINAL_FFMPEG_ERROR="Erreur détaillée FFMPEG"
 MSG_FINAL_INTERRUPTED="INTERRUPTED"
+MSG_FINAL_TEMP_KEPT="fichier temp conservé"
+MSG_FINAL_TEMP_MISSING="fichier temp absent"
+MSG_FINAL_CONV_DONE="Conversion terminée en %s"
+MSG_FINAL_SHOW_COMPARISON="Afficher la comparaison des noms de fichiers originaux et générés ?"
+MSG_LOG_HEAVIER_FILE="FICHIER PLUS LOURD"
+MSG_LOG_DISK_SPACE="Espace disque insuffisant dans %s (%s MB libres)"
+MSG_FINAL_FILENAME_SIM_TITLE="SIMULATION DES NOMS DE FICHIERS"
 
 ###########################################################
 # QUEUE (lib/queue.sh) - compléments

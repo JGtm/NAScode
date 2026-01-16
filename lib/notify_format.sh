@@ -22,13 +22,13 @@ _notify_counter_prefix_plain() {
         return 0
     fi
 
-    # Mode limite : afficher [slot/LIMIT] si slot réservé, sinon fallback [current/total]
+    # Mode limite : afficher [slot/LIMIT] ou [?/LIMIT] si pas encore décidé
     if [[ "$limit" -gt 0 ]]; then
         local slot="${LIMIT_DISPLAY_SLOT:-0}"
         if [[ "$slot" =~ ^[0-9]+$ ]] && [[ "$slot" -gt 0 ]]; then
             printf '[%d/%d]' "$slot" "$limit"
-        elif [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
-            printf '[%d/%d]' "$current_num" "$total_num"
+        else
+            printf '[?/%d]' "$limit"
         fi
         return 0
     fi
@@ -107,14 +107,15 @@ _notify_format_run_summary_markdown() {
     space_line1=$(_notify_kv_get "$metrics_file" "space_line1")
     space_line2=$(_notify_kv_get "$metrics_file" "space_line2")
 
-    local body="🧾 Résumé"
-    [[ -n "$now" ]] && body+=$'\n\n'"**Fin** : ${now}"
-    [[ -n "$duration_total" ]] && body+=$'\n'"**Durée** : ${duration_total}"
+    local body
+    body="$(msg MSG_NOTIFY_SUMMARY_TITLE)"
+    [[ -n "$now" ]] && body+=$'\n\n'"**$(msg MSG_NOTIFY_END_LABEL)** : ${now}"
+    [[ -n "$duration_total" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_DURATION_LABEL)** : ${duration_total}"
 
-    body+=$'\n\n'"**Résultats**"
-    [[ -n "$succ" ]] && body+=$'\n'"- Succès : ${succ}"
-    [[ -n "$skip" ]] && body+=$'\n'"- Ignorés : ${skip}"
-    [[ -n "$err" ]] && body+=$'\n'"- Erreurs : ${err}"
+    body+=$'\n\n'"**$(msg MSG_NOTIFY_RESULTS_LABEL)**"
+    [[ -n "$succ" ]] && body+=$'\n'"- $(msg MSG_NOTIFY_SUCCESS_LABEL) : ${succ}"
+    [[ -n "$skip" ]] && body+=$'\n'"- $(msg MSG_NOTIFY_SKIPPED_LABEL) : ${skip}"
+    [[ -n "$err" ]] && body+=$'\n'"- $(msg MSG_NOTIFY_ERRORS_LABEL) : ${err}"
 
     local any_anomaly=false
     if [[ "${size_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$size_anomalies" -gt 0 ]]; then any_anomaly=true; fi
@@ -122,21 +123,21 @@ _notify_format_run_summary_markdown() {
     if [[ "${vmaf_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$vmaf_anomalies" -gt 0 ]]; then any_anomaly=true; fi
 
     if [[ "$any_anomaly" == true ]]; then
-        body+=$'\n\n'"**Anomalies**"
+        body+=$'\n\n'"**$(msg MSG_NOTIFY_ANOMALIES_LABEL)**"
         if [[ "${size_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$size_anomalies" -gt 0 ]]; then
-            body+=$'\n'"- ⚠️  Taille : ${size_anomalies}"
+            body+=$'\n'"- ⚠️  $(msg MSG_NOTIFY_ANOM_SIZE_LABEL) : ${size_anomalies}"
         fi
         if [[ "${checksum_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$checksum_anomalies" -gt 0 ]]; then
-            body+=$'\n'"- ❌ Intégrité : ${checksum_anomalies}"
+            body+=$'\n'"- ❌ $(msg MSG_NOTIFY_ANOM_INTEGRITY_LABEL) : ${checksum_anomalies}"
         fi
         if [[ "${vmaf_anomalies:-0}" =~ ^[0-9]+$ ]] && [[ "$vmaf_anomalies" -gt 0 ]]; then
-            body+=$'\n'"- 🎞️  VMAF (NA/dégradé) : ${vmaf_anomalies}"
+            body+=$'\n'"- 🎞️  $(msg MSG_NOTIFY_ANOM_VMAF_LABEL) : ${vmaf_anomalies}"
         fi
     fi
 
     if [[ "$show_space_savings" == "true" ]]; then
         if [[ -n "$space_line1" ]] || [[ -n "$space_line2" ]]; then
-            body+=$'\n\n'"**Espace économisé**"
+            body+=$'\n\n'"**$(msg MSG_NOTIFY_SPACE_SAVED_LABEL)**"
             [[ -n "$space_line1" ]] && body+=$'\n'"${space_line1}"
             [[ -n "$space_line2" ]] && body+=$'\n'"${space_line2}"
         fi
@@ -144,11 +145,11 @@ _notify_format_run_summary_markdown() {
 
     # Message final selon le code de sortie
     if [[ "$exit_code" -eq 0 ]]; then
-        body+=$'\n\n'"✅ Session terminée"
+        body+=$'\n\n'"✅ $(msg MSG_NOTIFY_SESSION_DONE_OK)"
     elif [[ "$exit_code" -eq 130 ]]; then
-        body+=$'\n\n'"⚠️ Session interrompue (Ctrl+C)"
+        body+=$'\n\n'"⚠️ $(msg MSG_NOTIFY_SESSION_DONE_INTERRUPTED)"
     else
-        body+=$'\n\n'"❌ Session terminée avec erreur (code ${exit_code})"
+        body+=$'\n\n'"❌ $(msg MSG_NOTIFY_SESSION_DONE_ERROR "$exit_code")"
     fi
 
     printf '%s' "$body"$(_notify_discord_pad)
@@ -158,14 +159,14 @@ _notify_format_event_file_skipped() {
     # Usage: _notify_format_event_file_skipped <filename> [reason]
     local filename="${1-}"
     local reason="${2-}"
-    [[ -z "$filename" ]] && filename="(inconnu)"
+    [[ -z "$filename" ]] && filename="($(msg MSG_UNKNOWN))"
 
     local prefix
     prefix=$(_notify_counter_prefix_plain)
     [[ -n "$prefix" ]] && prefix+=" "
 
-    local body="${prefix}⏭️ Ignoré : $(_notify_truncate_label "$filename" 120)"
-    [[ -n "$reason" ]] && body+=$'\n'"**Raison** : ${reason}"
+    local body="${prefix}⏭️ $(msg MSG_NOTIFY_SKIPPED_TITLE) : $(_notify_truncate_label "$filename" 120)"
+    [[ -n "$reason" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_REASON_LABEL)** : ${reason}"
     printf '%s' "$body"
 }
 
@@ -173,22 +174,23 @@ _notify_format_event_run_started() {
     # Usage: _notify_format_event_run_started <now>
     local now="${1-}"
 
-    local body="## Exécution"
-    [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
+    local body="## $(msg MSG_NOTIFY_RUN_TITLE)"
+    [[ -n "$now" ]] && body+=$'\n\n'"**$(msg MSG_NOTIFY_START_LABEL)** : ${now}"
 
-    body+=$'\n\n'"**Paramètres actifs**"$'\n'
-    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **📊  Mode** : ${CONVERSION_MODE}"
-    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **📂  Source** : ${SOURCE}"
-    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **📂  Destination** : ${OUTPUT_DIR}"
-    body+=$'\n'"- **🎬  Codec vidéo** : ${VIDEO_CODEC:-hevc}"
-    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  Codec audio** : ${AUDIO_CODEC}"
+    body+=$'\n\n'"**$(msg MSG_NOTIFY_ACTIVE_PARAMS_LABEL)**"$'\n'
+    [[ -n "${CONVERSION_MODE:-}" ]] && body+=$'\n'"- **📊  $(msg MSG_NOTIFY_MODE_LABEL)** : ${CONVERSION_MODE}"
+    [[ -n "${SOURCE:-}" ]] && body+=$'\n'"- **📂  $(msg MSG_NOTIFY_SOURCE_LABEL)** : ${SOURCE}"
+    [[ -n "${OUTPUT_DIR:-}" ]] && body+=$'\n'"- **📂  $(msg MSG_NOTIFY_DEST_LABEL)** : ${OUTPUT_DIR}"
+    body+=$'\n'"- **🎬  $(msg MSG_NOTIFY_VIDEO_CODEC_LABEL)** : ${VIDEO_CODEC:-hevc}"
+    [[ -n "${AUDIO_CODEC:-}" ]] && body+=$'\n'"- **🎵  $(msg MSG_NOTIFY_AUDIO_CODEC_LABEL)** : ${AUDIO_CODEC}"
 
     # Option LIMIT_FPS (HFR) - affiché seulement en mode série/film
     if [[ "${CONVERSION_MODE:-serie}" != "adaptatif" ]]; then
         if [[ "${LIMIT_FPS:-false}" == true ]]; then
-            body+=$'\n'"- **📽️  Vidéos HFR** : limitées à ${LIMIT_FPS_TARGET:-29.97} fps"
+            local fps_target="${LIMIT_FPS_TARGET:-29.97}"
+            body+=$'\n'"- **📽️  $(msg MSG_NOTIFY_HFR_LABEL)** : $(msg MSG_NOTIFY_HFR_LIMITED "$fps_target")"
         else
-            body+=$'\n'"- **📽️  Vidéos HFR** : bitrate ajusté (fps original conservé)"
+            body+=$'\n'"- **📽️  $(msg MSG_NOTIFY_HFR_LABEL)** : $(msg MSG_NOTIFY_HFR_ADJUSTED)"
         fi
     fi
 
@@ -196,35 +198,35 @@ _notify_format_event_run_started() {
     local sort_mode="${SORT_MODE:-size_desc}"
     local sort_label
     if [[ "${RANDOM_MODE:-false}" == true ]]; then
-        sort_label="aléatoire (sélection)"
+        sort_label="$(msg MSG_UI_OPT_SORT_RANDOM)"
     else
         case "$sort_mode" in
-            size_desc) sort_label="taille décroissante" ;;
-            size_asc)  sort_label="taille croissante" ;;
-            name_asc)  sort_label="nom ascendant" ;;
-            name_desc) sort_label="nom descendant" ;;
+            size_desc) sort_label="$(msg MSG_UI_OPT_SORT_SIZE_DESC)" ;;
+            size_asc)  sort_label="$(msg MSG_UI_OPT_SORT_SIZE_ASC)" ;;
+            name_asc)  sort_label="$(msg MSG_UI_OPT_SORT_NAME_ASC)" ;;
+            name_desc) sort_label="$(msg MSG_UI_OPT_SORT_NAME_DESC)" ;;
             *)         sort_label="$sort_mode" ;;
         esac
     fi
-    body+=$'\n'"- **↕️  Tri de la queue** : ${sort_label}"
+    body+=$'\n'"- **↕️  $(msg MSG_UI_OPT_SORT_QUEUE)** : ${sort_label}"
 
     if [[ "${LIMIT_FILES:-0}" -gt 0 ]]; then
         local limit_icon="🔒"
         [[ "${RANDOM_MODE:-false}" == true ]] && limit_icon="🎲"
-        body+=$'\n'"- **${limit_icon}  Limitation** : ${LIMIT_FILES} fichier(s) maximum"
+        body+=$'\n'"- **${limit_icon}  $(msg MSG_NOTIFY_LIMIT_LABEL)** : $(msg MSG_NOTIFY_LIMIT_MAX "$LIMIT_FILES")"
     fi
 
-    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  Dry-run**"
-    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  Échantillon**"
-    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **🎞️  VMAF**"
+    [[ "${DRYRUN:-false}" == true ]] && body+=$'\n'"- **🔍  $(msg MSG_NOTIFY_DRYRUN_LABEL)**"
+    [[ "${SAMPLE_MODE:-false}" == true ]] && body+=$'\n'"- **🧪  $(msg MSG_NOTIFY_SAMPLE_LABEL)**"
+    [[ "${VMAF_ENABLED:-false}" == true ]] && body+=$'\n'"- **🎞️  $(msg MSG_NOTIFY_VMAF_LABEL)**"
 
     if [[ "${OFF_PEAK_ENABLED:-false}" == true ]]; then
-        body+=$'\n'"- **⏰  Heures creuses** : ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
+        body+=$'\n'"- **⏰  $(msg MSG_NOTIFY_OFF_PEAK_LABEL)** : ${OFF_PEAK_START:-22:00}-${OFF_PEAK_END:-06:00}"
     fi
 
     local jobs_label
     jobs_label=$(_notify_format_parallel_jobs_label)
-    [[ -n "${jobs_label:-}" ]] && body+=$'\n'"- **⏭️  Jobs parallèles** : ${jobs_label}"
+    [[ -n "${jobs_label:-}" ]] && body+=$'\n'"- **⏭️  $(msg MSG_NOTIFY_JOBS_LABEL)** : ${jobs_label}"
 
     # Aperçu de la queue (si disponible)
     local has_queue_preview=false
@@ -232,7 +234,7 @@ _notify_format_event_run_started() {
         local preview
         preview=$(_notify_format_queue_preview "${QUEUE}")
         if [[ -n "$preview" ]]; then
-            body+=$'\n\n'"**📋 File d’attente**"$'\n'
+            body+=$'\n\n'"**📋 $(msg MSG_NOTIFY_QUEUE_TITLE)**"$'\n'
             body+=$'\n'"\`\`\`text"$'\n'"${preview}"$'\n'"\`\`\`"
             body+=$'\n\n'
             has_queue_preview=true
@@ -242,18 +244,43 @@ _notify_format_event_run_started() {
     # UX Discord: titre de transition avant le début des conversions
     if [[ "$has_queue_preview" == true ]]; then
         # Le bloc queue se termine déjà par \n\n, donc on évite d'en rajouter.
-        body+="**Lancement de la conversion**"
+        body+="**$(msg MSG_NOTIFY_CONV_LAUNCH)**"
     else
-        body+=$'\n\n'"**Lancement de la conversion**"
+        body+=$'\n\n'"**$(msg MSG_NOTIFY_CONV_LAUNCH)**"
     fi
 
     printf '%s' "$body"$(_notify_discord_pad)
 }
 
+_notify_format_event_analysis_started() {
+    # Usage: _notify_format_event_analysis_started
+    # Notification succincte du début d'analyse (mode adaptatif)
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    printf '%s' "${prefix}📊 $(msg MSG_NOTIFY_ANALYSIS_STARTED)"
+}
+
+_notify_format_event_analysis_completed() {
+    # Usage: _notify_format_event_analysis_completed <complexity_c> <complexity_desc> <target_kbps>
+    # Notification succincte des résultats (mode adaptatif)
+    local complexity_c="${1:-1.00}"
+    local complexity_desc="${2:-standard}"
+    local target_kbps="${3:-2000}"
+
+    local prefix
+    prefix=$(_notify_counter_prefix_plain)
+    [[ -n "$prefix" ]] && prefix+=" "
+
+    # Format succinct : C=1.12 (standard) → 2450 kbps
+    printf '%s' "${prefix}📊 C=${complexity_c} (${complexity_desc}) → ${target_kbps} kbps"
+}
+
 _notify_format_event_file_started() {
     # Usage: _notify_format_event_file_started <filename>
     local filename="${1-}"
-    [[ -z "$filename" ]] && filename="(inconnu)"
+    [[ -z "$filename" ]] && filename="($(msg MSG_UNKNOWN))"
 
     local prefix
     prefix=$(_notify_counter_prefix_plain)
@@ -278,11 +305,11 @@ _notify_format_event_file_progress_update() {
     local body="${prefix}📊"
 
     if [[ -n "$speed" ]]; then
-        body+="Vitesse : x${speed}"
+        body+=" $(msg MSG_NOTIFY_SPEED_LABEL) : x${speed}"
     fi
 
     if [[ -n "$eta" ]]; then
-        body+=" | Durée estimée : ${eta}"
+        body+=" | $(msg MSG_NOTIFY_ETA_LABEL) : ${eta}"
     fi
 
     printf '%s' "$body"
@@ -311,9 +338,9 @@ _notify_format_event_conversions_completed() {
     # Usage: _notify_format_event_conversions_completed <total>
     local total="${1-}"
 
-    local body="✅ Toutes les conversions terminées"
+    local body="✅ $(msg MSG_UI_CONVERSIONS_DONE)"
     if [[ -n "$total" ]] && [[ "$total" =~ ^[0-9]+$ ]] && [[ "$total" -gt 0 ]]; then
-        body+=" (${total} fichier(s))"
+        body+=" ($(msg MSG_NOTIFY_FILES_COUNT "$total"))"
     fi
 
     # UX Discord: message macro + padding avant/après
@@ -323,7 +350,7 @@ _notify_format_event_conversions_completed() {
 _notify_format_event_transfers_pending() {
     # Usage: _notify_format_event_transfers_pending <count>
     local count="${1-}"
-    local body="📤 Transferts en attente"
+    local body="📤 $(msg MSG_NOTIFY_TRANSFERS_PENDING)"
     if [[ -n "$count" ]] && [[ "$count" =~ ^[0-9]+$ ]]; then
         body+=" : ${count}"
     fi
@@ -332,7 +359,7 @@ _notify_format_event_transfers_pending() {
 
 _notify_format_event_transfers_done() {
     # UX Discord: laisser une ligne vide après l'étape transferts
-    printf '%s' $'✅ '$(msg MSG_NOTIFY_TRANSFERS_DONE)$(_notify_discord_pad)
+    printf '%s' $'\u2705 '"$(msg MSG_NOTIFY_TRANSFERS_DONE)"$(_notify_discord_pad)
 }
 
 _notify_format_event_vmaf_started() {
@@ -341,10 +368,10 @@ _notify_format_event_vmaf_started() {
     local count="${2-0}"
     local mode="${3-}"
 
-    local body="🎞️ Analyse VMAF — début"
-    [[ -n "$now" ]] && body+=$'\n\n'"**Début** : ${now}"
-    [[ -n "$count" ]] && body+=$'\n'"**Fichiers** : ${count}"
-    [[ -n "$mode" ]] && body+=$'\n'"**Mode** : ${mode}"
+    local body="🎞️ $(msg MSG_NOTIFY_VMAF_STARTED_TITLE)"
+    [[ -n "$now" ]] && body+=$'\n\n'"**$(msg MSG_NOTIFY_START_LABEL)** : ${now}"
+    [[ -n "$count" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_FILES_LABEL)** : ${count}"
+    [[ -n "$mode" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_MODE_LABEL)** : ${mode}"
 
     # UX Discord: laisser une ligne vide après l'annonce de début
     printf '%s' "$body"$(_notify_discord_pad)
@@ -372,6 +399,18 @@ _notify_format_vmaf_quality_badge() {
         BON)       printf '%s' "🟡" ;;
         DEGRADE)   printf '%s' "❌" ;;
         *)         printf '%s' "ℹ️" ;;
+    esac
+}
+
+_notify_format_vmaf_quality_label() {
+    local quality="${1-NA}"
+    case "$quality" in
+        EXCELLENT) printf '%s' "$(msg MSG_VMAF_QUALITY_EXCELLENT)" ;;
+        TRES_BON)  printf '%s' "$(msg MSG_VMAF_QUALITY_VERY_GOOD)" ;;
+        BON)       printf '%s' "$(msg MSG_VMAF_QUALITY_GOOD)" ;;
+        DEGRADE)   printf '%s' "$(msg MSG_VMAF_QUALITY_DEGRADED)" ;;
+        NA|"")    printf '%s' "$(msg MSG_VMAF_QUALITY_NA)" ;;
+        *)         printf '%s' "$quality" ;;
     esac
 }
 
@@ -407,19 +446,53 @@ _notify_format_event_vmaf_completed() {
     local duration="${9-}"
     shift 9 || true
 
-    local body="✅ Analyse VMAF — terminée"
-    [[ -n "$now" ]] && body+=$'\n\n'"**Fin** : ${now}"
-    [[ -n "$duration" ]] && body+=$'\n'"**Durée** : ${duration}"
+    # Cas simple : un seul fichier → message compact (Option A)
+    if [[ "$count" == "1" ]]; then
+        local first_line=""
+        local line
+        for line in "$@"; do
+            [[ -n "$line" ]] && { first_line="$line"; break; }
+        done
 
-    body+=$'\n\n'"**Résultats**"
-    body+=$'\n'"- Analysés : ${ok}/${count}"
+        # worst_lines provient de vmaf.sh sous la forme: "- filename : 98.72 (EXCELLENT)"
+        first_line="${first_line#- }"
+
+        local file_name="" score="" quality=""
+        if [[ -n "$first_line" ]] && [[ "$first_line" =~ ^(.*)[[:space:]]*:[[:space:]]*([0-9]+([.][0-9]+)?)[[:space:]]*\(([A-Z_]+)\)$ ]]; then
+            file_name="${BASH_REMATCH[1]}"
+            score="${BASH_REMATCH[2]}"
+            quality="${BASH_REMATCH[4]}"
+
+            local quality_label
+            quality_label=$(_notify_format_vmaf_quality_label "$quality")
+
+            local body="✅ $(msg MSG_NOTIFY_VMAF_DONE_TITLE) — ${score} (${quality_label})"
+            body+=$'\n'"**$(msg MSG_NOTIFY_FILE_LABEL)** : ${file_name}"
+            [[ -n "$duration" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_DURATION_LABEL)** : ${duration}"
+
+            # N'afficher NA que si non nul (évite le bruit en cas nominal)
+            if [[ "$na" =~ ^[0-9]+$ ]] && [[ "$na" -gt 0 ]]; then
+                body+=$'\n'"**NA** : ${na}"
+            fi
+
+            printf '%s' "$(_notify_discord_lead_pad)${body}$(_notify_discord_pad)"
+            return 0
+        fi
+    fi
+
+    local body="✅ $(msg MSG_NOTIFY_VMAF_DONE_TITLE)"
+    [[ -n "$now" ]] && body+=$'\n\n'"**$(msg MSG_NOTIFY_END_LABEL)** : ${now}"
+    [[ -n "$duration" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_DURATION_LABEL)** : ${duration}"
+
+    body+=$'\n\n'"**$(msg MSG_NOTIFY_RESULTS_LABEL)**"
+    body+=$'\n'"- $(msg MSG_NOTIFY_VMAF_ANALYZED_LABEL) : ${ok}/${count}"
     body+=$'\n'"- NA : ${na}"
-    body+=$'\n'"- Moyenne : ${avg}"
-    body+=$'\n'"- Min / Max : ${min} / ${max}"
-    body+=$'\n'"- Dégradés : ${degraded}"
+    body+=$'\n'"- $(msg MSG_NOTIFY_VMAF_AVG_LABEL) : ${avg}"
+    body+=$'\n'"- $(msg MSG_NOTIFY_VMAF_MINMAX_LABEL) : ${min} / ${max}"
+    body+=$'\n'"- $(msg MSG_NOTIFY_VMAF_DEGRADED_LABEL) : ${degraded}"
 
     if [[ "$#" -gt 0 ]]; then
-        body+=$'\n\n'"**Pires scores**"
+        body+=$'\n\n'"**$(msg MSG_NOTIFY_VMAF_WORST_LABEL)**"
         local line
         for line in "$@"; do
             [[ -n "$line" ]] && body+=$'\n'"$line"
@@ -437,11 +510,11 @@ _notify_format_event_peak_pause() {
     local resume_time="${3-}"
     local interval="${4-}"
 
-    local body="⏸️ Pause (heures pleines)"
-    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses** : ${range}"
-    [[ -n "$wait_fmt" ]] && body+=$'\n'"**Attente estimée** : ${wait_fmt}"
-    [[ -n "$resume_time" ]] && body+=$'\n'"**Reprise prévue** : ${resume_time}"
-    [[ -n "$interval" ]] && body+=$'\n'"**Vérification** : toutes les ${interval}s"
+    local body="⏸️ $(msg MSG_NOTIFY_PEAK_PAUSE_TITLE)"
+    [[ -n "$range" ]] && body+=$'\n\n'"**$(msg MSG_NOTIFY_OFF_PEAK_RANGE_LABEL)** : ${range}"
+    [[ -n "$wait_fmt" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_WAIT_ESTIMATED_LABEL)** : ${wait_fmt}"
+    [[ -n "$resume_time" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_RESUME_AT_LABEL)** : ${resume_time}"
+    [[ -n "$interval" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_CHECK_EVERY_LABEL)** : $(msg MSG_NOTIFY_SECONDS "$interval")"
     printf '%s' "$body"$(_notify_discord_pad)
 }
 
@@ -450,9 +523,9 @@ _notify_format_event_peak_resume() {
     local range="${1-}"
     local actual_wait="${2-}"
 
-    local body="▶️ Reprise (heures creuses)"
-    [[ -n "$range" ]] && body+=$'\n\n'"**Plage heures creuses** : ${range}"
-    [[ -n "$actual_wait" ]] && body+=$'\n'"**Attente réelle** : ${actual_wait}"
+    local body="▶️ $(msg MSG_NOTIFY_PEAK_RESUME_TITLE)"
+    [[ -n "$range" ]] && body+=$'\n\n'"**$(msg MSG_NOTIFY_OFF_PEAK_RANGE_LABEL)** : ${range}"
+    [[ -n "$actual_wait" ]] && body+=$'\n'"**$(msg MSG_NOTIFY_WAIT_ACTUAL_LABEL)** : ${actual_wait}"
     printf '%s' "$body"$(_notify_discord_pad)
 }
 
@@ -472,7 +545,7 @@ _notify_format_event_script_exit_summary() {
         local summary_snippet
         summary_snippet=$(head -n 40 "${SUMMARY_FILE}" 2>/dev/null | _notify_strip_ansi | sed 's/[[:space:]]*$//' || true)
         if [[ -n "$summary_snippet" ]]; then
-            local body="🧾 Résumé"
+            local body="$(msg MSG_NOTIFY_SUMMARY_TITLE)"
             body+=$'\n\n'"\`\`\`text"$'\n'"${summary_snippet}"$'\n'"\`\`\`"$'\n\n'
             printf '%s' "$body"$(_notify_discord_pad)
             return 0
@@ -489,11 +562,11 @@ _notify_format_event_script_exit_end() {
 
     local body
     if [[ "$exit_code" -eq 0 ]]; then
-        body="🏁 Fin"
+        body="🏁 $(msg MSG_NOTIFY_RUN_END_OK)"
     elif [[ "$exit_code" -eq 130 ]]; then
-        body="🛑 Interrompu"
+        body="🛑 $(msg MSG_NOTIFY_RUN_END_INTERRUPTED)"
     else
-        body="❌ Erreur (code ${exit_code})"
+        body="❌ $(msg MSG_NOTIFY_RUN_END_ERROR "$exit_code")"
     fi
 
     [[ -n "$now" ]] && body+=" : ${now}"

@@ -240,7 +240,7 @@ print_warning_box() {
 print_heavy_output_redirect() {
     _ui_is_quiet && return 0
     local target="$1"
-    print_warning_box "Sortie redirigée" "Gain insuffisant : fichier déplacé vers ${target}"
+    print_warning_box "$(msg MSG_UI_REDIRECT_TITLE)" "$(msg MSG_UI_REDIRECT_MSG "$target")"
 }
 
 # Affiche un encadré d'information
@@ -323,8 +323,8 @@ print_indexing_progress() {
     _ui_is_quiet && return 0
     local current="$1"
     local total="$2"
-    # Format : "  │  📊 Indexation : 9999/9999 fichiers             │"
-    printf "\r${MAGENTA}  │${NOCOLOR}  📊 Indexation : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} fichiers              ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
+    # Format : "  │  📊 Indexing : 9999/9999 files                  │"
+    printf "\r${MAGENTA}  │${NOCOLOR}  📊 $(msg MSG_UI_INDEXING) : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} $(msg MSG_UI_FILES)              ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
 }
 
 # Affiche la fin du bloc d'indexation avec le résultat
@@ -334,8 +334,10 @@ print_indexing_end() {
     local count="$1"
     echo "" >&2
     echo -e "${MAGENTA}  ├──────────────────────────────────────────────────┤${NOCOLOR}" >&2
-    # Format : "  │  ✅ 9999 fichiers indexés                       │"
-    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%4d${GREEN} $(msg MSG_UI_FILES_INDEXED "" | sed 's/%d//')${NOCOLOR}                        ${MAGENTA}│${NOCOLOR}\n" "$count" >&2
+    # Format : "  │  ✅ 9 fichiers indexés                           │"
+    local indexed_msg
+    indexed_msg=$(msg MSG_UI_FILES_INDEXED "$count")
+    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%-46s${NOCOLOR}${MAGENTA}│${NOCOLOR}\n" "$indexed_msg" >&2
     echo -e "${MAGENTA}  └──────────────────────────────────────────────────┘${NOCOLOR}" >&2
 }
 
@@ -485,7 +487,7 @@ print_transfer_start() {
     local nb_files="${1:-}"
     local subtitle=""
     if [[ -n "$nb_files" ]]; then
-        subtitle="$nb_files fichier(s) en attente"
+        subtitle="$(msg MSG_UI_FILES_PENDING "$nb_files")"
     fi
     print_phase_start "📤 TRANSFERT" "$subtitle" "$CYAN"
 }
@@ -504,7 +506,7 @@ print_transfer_complete() {
 # Usage: print_vmaf_start nb_fichiers
 print_vmaf_start() {
     local nb_files="$1"
-    print_phase_start "📊 ANALYSE VMAF" "$nb_files fichier(s) à analyser" "$YELLOW"
+    print_phase_start "📊 $(msg MSG_UI_VMAF_TITLE)" "$(msg MSG_UI_FILES_TO_ANALYZE "$nb_files")" "$YELLOW"
 }
 
 # Affiche la fin de la section VMAF
@@ -522,8 +524,8 @@ print_vmaf_complete() {
 print_conversion_start() {
     local nb_files="$1"
     local limitation="${2:-}"
-    
-    print_phase_start "🎬 CONVERSION" "$nb_files fichier(s) à traiter" "$BLUE"
+
+    print_phase_start "🎬 CONVERSION" "$(msg MSG_UI_FILES_TO_PROCESS "$nb_files")" "$BLUE"
     
     if [[ -n "$limitation" ]]; then
         print_limitation "$limitation"
@@ -563,15 +565,13 @@ _get_counter_prefix() {
         return
     fi
     
-    # Mode limite : afficher [slot/LIMIT] uniquement si un slot a été réservé.
+    # Mode limite : afficher [slot/LIMIT] ou [?/LIMIT] si pas encore décidé
     if [[ "$limit" -gt 0 ]]; then
         local slot="${LIMIT_DISPLAY_SLOT:-0}"
         if [[ "$slot" =~ ^[0-9]+$ ]] && [[ "$slot" -gt 0 ]]; then
             echo "${DIM}[${slot}/${limit}]${NOCOLOR} "
-        elif [[ "$current_num" -gt 0 ]] && [[ "$total_num" -gt 0 ]]; then
-            # Fallback (ex: adaptatif) : le slot est réservé après l'analyse,
-            # mais on veut un compteur visible dès le démarrage.
-            echo "${DIM}[${current_num}/${total_num}]${NOCOLOR} "
+        else
+            echo "${DIM}[?/${limit}]${NOCOLOR} "
         fi
         return
     fi
@@ -595,19 +595,20 @@ print_skip_message() {
         "skip")
             if [[ -z "$codec" ]]; then
                 if declare -f notify_event &>/dev/null; then
-                    notify_event file_skipped "$filename" "Pas de flux vidéo" || true
+                    notify_event file_skipped "$filename" "$(msg MSG_UI_REASON_NO_VIDEO)" || true
                 fi
-                echo -e "${counter_prefix}${BLUE}⏭️  SKIPPED (Pas de flux vidéo) : $filename${NOCOLOR}" >&2
+                echo -e "${counter_prefix}${BLUE}⏭️  $(msg MSG_UI_SKIP_NO_VIDEO) : $filename${NOCOLOR}" >&2
                 if [[ -n "$LOG_SESSION" ]]; then
-                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED (pas de flux vidéo) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+                    echo "$(date '+%Y-%m-%d %H:%M:%S') | SKIPPED ($(msg MSG_UI_REASON_NO_VIDEO)) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
                 fi
             else
                 local codec_display="${codec^^}"
                 [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
-                local skip_msg="Déjà ${codec_display} & bitrate optimisé"
+                local skip_msg
+                skip_msg=$(msg MSG_UI_REASON_ALREADY_OPTIMIZED "$codec_display")
                 # En mode adaptatif, préciser que c'est par rapport au seuil adaptatif
                 if [[ "${ADAPTIVE_COMPLEXITY_MODE:-false}" == true ]]; then
-                    skip_msg="Déjà ${codec_display} & bitrate ≤ seuil adaptatif"
+                    skip_msg=$(msg MSG_UI_REASON_ALREADY_OPTIMIZED_ADAPTIVE "$codec_display")
                 fi
                 if declare -f notify_event &>/dev/null; then
                     notify_event file_skipped "$filename" "$skip_msg" || true
@@ -621,7 +622,7 @@ print_skip_message() {
         "video_passthrough")
             # Log discret - le message visible sera affiché après le transfert
             if [[ -n "$LOG_PROGRESS" ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | VIDEO_PASSTHROUGH | Audio à optimiser | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | VIDEO_PASSTHROUGH | $(msg MSG_UI_VIDEO_PASSTHROUGH) | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
             fi
             ;;
         "full")
@@ -635,7 +636,7 @@ print_skip_message() {
             if [[ "$is_better_or_equal" == true && -n "$LOG_PROGRESS" ]]; then
                 local codec_display="${codec^^}"
                 [[ "$codec" == "hevc" || "$codec" == "h265" ]] && codec_display="X265"
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Ré-encodage ${codec_display}) | Bitrate trop élevé | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING (Re-encode ${codec_display}) | $(msg MSG_UI_REENCODE_BITRATE) | $file_original" >> "$LOG_PROGRESS" 2>/dev/null || true
             fi
             ;;
     esac
@@ -656,7 +657,7 @@ print_conversion_required() {
     fi
 
     if [[ ! "$v_bitrate_bits" =~ ^[0-9]+$ ]] || [[ "$v_bitrate_bits" -le 0 ]]; then
-        echo -e "${CYAN}  ⚠ Conversion requise${NOCOLOR}" >&2
+        echo -e "${CYAN}  ⚠ $(msg MSG_UI_CONVERSION_REQUIRED)${NOCOLOR}" >&2
         return 0
     fi
 
@@ -691,17 +692,17 @@ print_conversion_required() {
         if [[ "$is_better_or_equal" != true ]]; then
             # Source dans un codec moins efficace : la conversion est requise pour changer de codec
             # (le seuil skip n'est pas pertinent dans ce cas).
-            echo -e "${CYAN}  ⚠ Conversion requise : codec source ${src_display} → ${target_display} (bitrate ${src_kbps}k)${NOCOLOR}" >&2
+            echo -e "${CYAN}  ⚠ $(msg MSG_UI_CONVERSION_REQUIRED_CODEC "$src_display" "$target_display" "$src_kbps")${NOCOLOR}" >&2
         else
             # Source déjà dans un codec meilleur/égal : la conversion est requise car le bitrate est trop élevé.
             if [[ "$effective_codec" != "$target_codec" ]]; then
-                echo -e "${CYAN}  ⚠ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display}) → pas de downgrade (encodage ${effective_codec^^})${NOCOLOR}" >&2
+                echo -e "${CYAN}  ⚠ $(msg MSG_UI_CONVERSION_REQUIRED_BITRATE_NO_DOWNGRADE "$src_kbps" "$src_display" "$threshold_kbps" "$cmp_display" "${effective_codec^^}")${NOCOLOR}" >&2
             else
-                echo -e "${CYAN}  ⚠ Conversion requise : bitrate ${src_kbps}k (${src_display}) > seuil de conservation ${threshold_kbps}k (${cmp_display})${NOCOLOR}" >&2
+                echo -e "${CYAN}  ⚠ $(msg MSG_UI_CONVERSION_REQUIRED_BITRATE "$src_kbps" "$src_display" "$threshold_kbps" "$cmp_display")${NOCOLOR}" >&2
             fi
         fi
     else
-        echo -e "${CYAN}  ⚠ Conversion requise${NOCOLOR}" >&2
+        echo -e "${CYAN}  ⚠ $(msg MSG_UI_CONVERSION_REQUIRED)${NOCOLOR}" >&2
     fi
 }
 

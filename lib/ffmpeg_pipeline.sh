@@ -262,7 +262,7 @@ _execute_ffmpeg_pipeline() {
     if [[ "$PROGRESS_DISPLAY_TEXT_USE_FILENAME" == true ]]; then
         progress_display_text="$base_name"
     else
-        progress_display_text="$PROGRESS_DISPLAY_TEXT_FIXED"
+        progress_display_text="$(_get_progress_display_text_fixed)"
     fi
     
     case "$mode" in
@@ -295,13 +295,13 @@ _execute_ffmpeg_pipeline() {
                 (cd "${NASCODE_WORKDIR}" && "${cmd[@]}" 2> "$ffmpeg_log_temp") | \
                     awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-                        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
+                        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="$(msg MSG_PROGRESS_DONE)" \
                         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
             else
                 "${cmd[@]}" 2> "$ffmpeg_log_temp" | \
                     awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
-                        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="Terminé ✅" \
+                        -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="$(msg MSG_PROGRESS_DONE)" \
                         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
             fi
 
@@ -310,7 +310,7 @@ _execute_ffmpeg_pipeline() {
             local awk_rc=${PIPESTATUS[1]:-0}
 
             if [[ "$ffmpeg_rc" -ne 0 || "$awk_rc" -ne 0 ]]; then
-                _ffmpeg_pipeline_show_error "Erreur lors du remuxage" "$ffmpeg_log_temp"
+                _ffmpeg_pipeline_show_error "$(msg MSG_FFMPEG_REMUX_ERROR)" "$ffmpeg_log_temp"
                 _ffmpeg_pipeline_release_slot_if_needed "$is_parallel" "$progress_slot"
                 return 1
             fi

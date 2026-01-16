@@ -175,9 +175,9 @@ wait_for_off_peak() {
     local wait_formatted
     wait_formatted=$(format_wait_time "$wait_seconds")
     
-    print_info "⏸️  Heures pleines détectées (${OFF_PEAK_START}-${OFF_PEAK_END} = heures creuses)"
-    print_info "Attente estimée : ${wait_formatted} (reprise à ${OFF_PEAK_START})"
-    print_info "Vérification toutes les ${OFF_PEAK_CHECK_INTERVAL}s... (Ctrl+C pour annuler)"
+    print_info "⏸️  $(msg MSG_OFF_PEAK_DETECTED "${OFF_PEAK_START}-${OFF_PEAK_END}")"
+    print_info "$(msg MSG_OFF_PEAK_WAIT_EST "$wait_formatted" "$OFF_PEAK_START")"
+    print_info "$(msg MSG_OFF_PEAK_CHECK_INTERVAL "$OFF_PEAK_CHECK_INTERVAL")"
 
     # Notification externe (Discord) — best-effort
     if declare -f notify_event_peak_pause &>/dev/null; then
@@ -201,7 +201,7 @@ wait_for_off_peak() {
             remaining=$(seconds_until_off_peak)
             local remaining_fmt
             remaining_fmt=$(format_wait_time "$remaining")
-            print_info "⏳ Temps restant estimé : ${remaining_fmt}"
+            print_info "⏳ $(msg MSG_OFF_PEAK_REMAINING "$remaining_fmt")"
         fi
         
         sleep "$OFF_PEAK_CHECK_INTERVAL"
@@ -217,7 +217,7 @@ wait_for_off_peak() {
     
     local actual_wait_fmt
     actual_wait_fmt=$(format_wait_time "$actual_wait")
-    print_info "▶️  Heures creuses ! Reprise du traitement (attendu ${actual_wait_fmt})"
+    print_info "▶️  $(msg MSG_OFF_PEAK_RESUME "$actual_wait_fmt")"
 
     # Notification externe (Discord) — best-effort
     if declare -f notify_event_peak_resume &>/dev/null; then
@@ -254,18 +254,18 @@ show_off_peak_status() {
     fi
 
     if declare -f ui_print_raw &>/dev/null; then
-        ui_print_raw "${CYAN}Mode heures creuses :${NOCOLOR}"
-        ui_print_raw "  Plage horaire    : ${OFF_PEAK_START} - ${OFF_PEAK_END}"
+        ui_print_raw "${CYAN}$(msg MSG_OFF_PEAK_MODE_LABEL):${NOCOLOR}"
+        ui_print_raw "  $(msg MSG_OFF_PEAK_RANGE_LABEL)    : ${OFF_PEAK_START} - ${OFF_PEAK_END}"
     else
-        echo -e "${CYAN}Mode heures creuses :${NOCOLOR}"
-        echo -e "  Plage horaire    : ${OFF_PEAK_START} - ${OFF_PEAK_END}"
+        echo -e "${CYAN}$(msg MSG_OFF_PEAK_MODE_LABEL):${NOCOLOR}"
+        echo -e "  $(msg MSG_OFF_PEAK_RANGE_LABEL)    : ${OFF_PEAK_START} - ${OFF_PEAK_END}"
     fi
     
     if is_off_peak_time; then
         if declare -f ui_print_raw &>/dev/null; then
-            ui_print_raw "  Statut actuel    : ${GREEN}Heures creuses (actif)${NOCOLOR}"
+            ui_print_raw "  $(msg MSG_OFF_PEAK_STATUS)    : ${GREEN}$(msg MSG_OFF_PEAK_STATUS_ACTIVE)${NOCOLOR}"
         else
-            echo -e "  Statut actuel    : ${GREEN}Heures creuses (actif)${NOCOLOR}"
+            echo -e "  $(msg MSG_OFF_PEAK_STATUS)    : ${GREEN}$(msg MSG_OFF_PEAK_STATUS_ACTIVE)${NOCOLOR}"
         fi
     else
         local wait_est
@@ -273,9 +273,9 @@ show_off_peak_status() {
         local wait_fmt
         wait_fmt=$(format_wait_time "$wait_est")
         if declare -f ui_print_raw &>/dev/null; then
-            ui_print_raw "  Statut actuel    : ${YELLOW}Heures pleines (attente ~${wait_fmt})${NOCOLOR}"
+            ui_print_raw "  $(msg MSG_OFF_PEAK_STATUS)    : ${YELLOW}$(msg MSG_OFF_PEAK_STATUS_WAIT "$wait_fmt")${NOCOLOR}"
         else
-            echo -e "  Statut actuel    : ${YELLOW}Heures pleines (attente ~${wait_fmt})${NOCOLOR}"
+            echo -e "  $(msg MSG_OFF_PEAK_STATUS)    : ${YELLOW}$(msg MSG_OFF_PEAK_STATUS_WAIT "$wait_fmt")${NOCOLOR}"
         fi
     fi
     

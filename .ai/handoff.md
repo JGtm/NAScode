@@ -2,6 +2,64 @@
 
 ## Session en cours (16/01/2026 - Internationalisation i18n + Documentation)
 
+### 2026-01-16 — i18n : complétion EN (terminal + notifs Discord)
+
+Branche : `fix/i18n-en-discord`
+
+Contexte : avec `--lang en`, certaines sorties restaient en français (UI terminal + notifs Discord). Objectif : supprimer les chaînes FR hardcodées et compléter les clés manquantes dans les locales.
+
+Changements principaux :
+
+- [lib/ui.sh](lib/ui.sh) : migration vers `msg()` des messages restants (indexation, “conversion requise”, raisons de skip, “%s fichier(s) à traiter”) + correctif d’affichage d’indexation (évite le rendu type “9 0 files indexed”).
+- [lib/complexity.sh](lib/complexity.sh) : progression + libellés + descriptions de complexité via clés i18n.
+- [lib/transcode_video.sh](lib/transcode_video.sh) : texte fixe de progression (“Traitement en cours”) via i18n.
+- [lib/transfer.sh](lib/transfer.sh) : messages de transferts via i18n.
+- [lib/summary.sh](lib/summary.sh) : libellés du résumé de fin via i18n.
+- [lib/notify_format.sh](lib/notify_format.sh) : refonte majeure du markdown Discord pour utiliser `msg MSG_NOTIFY_*` (run_started, file_skipped, progress, VMAF, off-peak, script_exit, résumé).
+- [lib/vmaf.sh](lib/vmaf.sh) : messages NA via i18n + labels de qualité via i18n ; suppression d’un doublon de fonction `_vmaf_quality_label()`.
+- [locale/en.sh](locale/en.sh), [locale/fr.sh](locale/fr.sh) : ajout des clés manquantes (UI/complexity/summary/transfer/notify/VMAF).
+- [tests/test_notify.bats](tests/test_notify.bats) : stabilise la langue (FR par défaut) et ajoute un test minimal sur le résumé en anglais.
+
+Prochaines étapes :
+
+- [ ] Lancer les tests : `bash run_tests.sh` (au moins `-f notify` puis complet).
+- [ ] Smoke-run avec `--lang en` sur un petit sample pour confirmer terminal + Discord.
+
+Derniers prompts :
+
+- "Il reste des parties non traduites, également dans les notifs Discord"
+- "Continue sans t'arreter"
+
+### 2026-01-16 — i18n : cohérence FR/EN (termes + clé FFmpeg)
+
+Branche : `fix/i18n-en-discord`
+
+Contexte : revue comparative des locales FR/EN pour valider le vocabulaire anglais et la parité des clés.
+
+Changements principaux :
+
+- [locale/fr.sh](locale/fr.sh) : correction d’une ligne concaténée qui empêchait la définition de `MSG_FFMPEG_REMUX_ERROR` (utilisé dans `lib/ffmpeg_pipeline.sh`).
+- [locale/en.sh](locale/en.sh) : micro-ajustements de libellés pour un anglais plus idiomatique (ex: “Environment check”, “Queue sort order”, “Files to process”).
+
+Vérification : parité des clés `MSG_*` OK (352/352).
+
+Dernier prompt :
+
+- "Tu peux comparer les deux fichiers de langues en et fr…"
+- "Oui vasy"
+
+### 2026-01-16 — Discord : VMAF compact quand count=1
+
+Branche : `fix/i18n-en-discord`
+
+Contexte : quand VMAF ne porte que sur un seul fichier (ex: `--limit 1`), le message Discord de fin était trop verbeux (stats + “Worst files”).
+
+Changements principaux :
+
+- [lib/notify_format.sh](lib/notify_format.sh) : format compact pour `vmaf_completed` si `count=1` (score + qualité + fichier + durée), sans sections “Results” / “Worst files”.
+- [locale/fr.sh](locale/fr.sh), [locale/en.sh](locale/en.sh) : ajout de `MSG_NOTIFY_FILE_LABEL`.
+- [tests/test_notify.bats](tests/test_notify.bats) : test de régression du rendu compact.
+
 ### 2026-01-16 — i18n : Documentation multilingue (traduction anglaise)
 
 Branche : `feature/i18n`

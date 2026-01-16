@@ -19,6 +19,12 @@ notify_event() {
         file_started)
             notify_event_file_started "$@"
             ;;
+        analysis_started)
+            notify_event_analysis_started "$@"
+            ;;
+        analysis_completed)
+            notify_event_analysis_completed "$@"
+            ;;
         file_progress_update)
             notify_event_file_progress_update "$@"
             ;;
@@ -96,6 +102,27 @@ notify_event_file_started() {
     local body
     body=$(_notify_format_event_file_started "$@")
     [[ -n "$body" ]] && notify_discord_send_markdown "$body" "file_started"
+    return 0
+}
+
+notify_event_analysis_started() {
+    # Notification du début d'analyse de complexité (mode adaptatif)
+    _notify_discord_is_enabled || return 0
+
+    local body
+    body=$(_notify_format_event_analysis_started)
+    [[ -n "$body" ]] && notify_discord_send_markdown "$body" "analysis_started"
+    return 0
+}
+
+notify_event_analysis_completed() {
+    # Usage: notify_event_analysis_completed <complexity_c> <complexity_desc> <target_kbps>
+    # Notification des résultats d'analyse (mode adaptatif)
+    _notify_discord_is_enabled || return 0
+
+    local body
+    body=$(_notify_format_event_analysis_completed "$@")
+    [[ -n "$body" ]] && notify_discord_send_markdown "$body" "analysis_completed"
     return 0
 }
 

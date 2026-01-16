@@ -13,7 +13,12 @@
 # Pour afficher le nom du fichier : PROGRESS_DISPLAY_TEXT="$base_name"
 # Pour afficher un texte fixe : PROGRESS_DISPLAY_TEXT="Traitement en cours"
 PROGRESS_DISPLAY_TEXT_USE_FILENAME=false  # true = nom du fichier, false = texte fixe
-PROGRESS_DISPLAY_TEXT_FIXED="Traitement en cours"
+# Note: PROGRESS_DISPLAY_TEXT_FIXED est défini dynamiquement via _get_progress_display_text_fixed()
+# pour respecter le changement de langue via --lang (évalué après le parsing des arguments).
+
+_get_progress_display_text_fixed() {
+    echo "$(msg MSG_UI_PROGRESS_PROCESSING)"
+}
 
 ###########################################################
 # SOUS-FONCTIONS ENCODAGE (FORMAT / SCALE)
@@ -499,21 +504,21 @@ _run_ffmpeg_encode() {
             stream_opt=""
             log_suffix=".pass1"
             emoji="🔍"
-            end_msg="Analyse OK"
+            end_msg="$(msg MSG_PROGRESS_ANALYSIS_OK)"
             ;;
         "pass2")
             audio_opt="$audio_params"
             stream_opt="$stream_mapping -f matroska"
             log_suffix=""
             emoji="🎬"
-            end_msg="Terminé ✅"
+            end_msg="$(msg MSG_PROGRESS_DONE)"
             ;;
         "crf")
             audio_opt="$audio_params"
             stream_opt="$stream_mapping -f matroska"
             log_suffix=""
             emoji="⚡"
-            end_msg="Terminé ✅"
+            end_msg="$(msg MSG_PROGRESS_DONE)"
             ;;
         *)
             log_error "$(msg MSG_TRANSCODE_UNKNOWN_MODE "$mode")"
@@ -529,7 +534,7 @@ _run_ffmpeg_encode() {
     if [[ "$PROGRESS_DISPLAY_TEXT_USE_FILENAME" == true ]]; then
         progress_display_text="$base_name"
     else
-        progress_display_text="$PROGRESS_DISPLAY_TEXT_FIXED"
+        progress_display_text="$(_get_progress_display_text_fixed)"
     fi
     
     # Options spécifiques à l'encodeur

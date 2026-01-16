@@ -58,7 +58,7 @@ format_option_limit() {
 # Formate une option mode aléatoire pour print_active_options
 # Usage: format_option_random_mode
 format_option_random_mode() {
-    echo -e "🎲  $(msg MSG_UI_OPT_RANDOM_MODE | sed "s/activé/${YELLOW}activé${NOCOLOR}/;s/enabled/${YELLOW}enabled${NOCOLOR}/")"
+    echo -e "🎲  ${YELLOW}$(msg MSG_UI_OPT_RANDOM_MODE)${NOCOLOR}"
 }
 
 # Formate l'ordre de tri effectif de la queue pour print_active_options
@@ -97,7 +97,7 @@ format_option_sort_mode() {
 # Formate une option mode échantillon pour print_active_options
 # Usage: format_option_sample
 format_option_sample() {
-    echo -e "🧪  $(msg MSG_UI_OPT_SAMPLE | sed "s/échantillon/${YELLOW}échantillon${NOCOLOR}/;s/Sample/${YELLOW}Sample${NOCOLOR}/")"
+    echo -e "🧪  ${YELLOW}$(msg MSG_UI_OPT_SAMPLE)${NOCOLOR}"
 }
 
 # Formate une option dry-run pour print_active_options
