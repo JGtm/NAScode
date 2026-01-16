@@ -172,9 +172,9 @@ format_option_file_count() {
 # Usage: format_option_limit_fps
 format_option_limit_fps() {
     if [[ "${LIMIT_FPS:-false}" == true ]]; then
-        echo -e "📽️  ${YELLOW}$(msg MSG_UI_OPT_HFR_LIMITED "${LIMIT_FPS_TARGET:-29.97}")${NOCOLOR}"
+        echo -e "📽️   ${YELLOW}$(msg MSG_UI_OPT_HFR_LIMITED "${LIMIT_FPS_TARGET:-29.97}")${NOCOLOR}"
     else
-        echo -e "📽️  ${YELLOW}$(msg MSG_UI_OPT_HFR_BITRATE)${NOCOLOR}"
+        echo -e "📽️   ${YELLOW}$(msg MSG_UI_OPT_HFR_BITRATE)${NOCOLOR}"
     fi
 }
 
