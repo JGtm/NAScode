@@ -200,7 +200,7 @@ _check_disk_space() {
     free_space_mb=$(df -m "$TMP_DIR" | awk 'NR==2 {print $4}' 2>/dev/null) || return 0
     if [[ "$free_space_mb" -lt "$MIN_TMP_FREE_MB" ]]; then
         if [[ -n "$LOG_SESSION" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR Espace disque insuffisant dans $TMP_DIR ($free_space_mb MB libres) | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR $(msg MSG_LOG_DISK_SPACE "$TMP_DIR" "$free_space_mb") | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         return 1
     fi

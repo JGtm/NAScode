@@ -2,6 +2,10 @@
 
 load "test_helper.bash"
 
+setup() {
+  export NASCODE_LANG=fr
+}
+
 @test "notify: no-op sans webhook" {
   run bash -c 'source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; notify_event run_started'
   [ "$status" -eq 0 ]
@@ -172,6 +176,35 @@ EOF
   echo "$output" | grep -q "Session terminée"
 }
 
+@test "notify_format: résumé run markdown en anglais" {
+  tmp="$BATS_TEST_TMPDIR"
+  m="$tmp/summary_metrics.kv"
+
+  cat > "$m" <<'EOF'
+duration_total=1h 02min
+succ=3
+skip=1
+err=0
+size_anomalies=0
+checksum_anomalies=2
+vmaf_anomalies=0
+show_space_savings=true
+space_line1=120 MB (12%)
+space_line2=Total: 1.0 GB -> 0.88 GB
+EOF
+
+  run bash -c 'export NASCODE_LANG=en; source "$LIB_DIR/ui.sh"; source "$LIB_DIR/notify.sh"; _notify_format_run_summary_markdown "$1" "2026-01-14 12:00:00" "0"' bash "$m"
+  [ "$status" -eq 0 ]
+
+  echo "$output" | grep -q "Summary"
+  echo "$output" | grep -q "\*\*End\*\* : 2026-01-14 12:00:00"
+  echo "$output" | grep -q "\*\*Duration\*\* : 1h 02min"
+  echo "$output" | grep -q "\*\*Results\*\*"
+  echo "$output" | grep -q -- "- Success : 3"
+  echo "$output" | grep -q -- "- Skipped : 1"
+  echo "$output" | grep -q -- "- Errors : 0"
+}
+
 @test "notify_format: message fin distingue succès/interruption/erreur" {
   load_modules minimal_fast
   source "$LIB_DIR/notify.sh"
@@ -331,4 +364,29 @@ EOF
   run _notify_format_event_vmaf_started 10
   [ "$status" -eq 0 ]
   echo "$output" | grep -q "10"
+}
+
+@test "notify_format: vmaf_completed compact quand count=1 (EN)" {
+  load_modules minimal_fast
+
+  run bash -c '
+    export NASCODE_LANG=en
+    source "$LIB_DIR/ui.sh"
+    source "$LIB_DIR/notify.sh"
+    _notify_format_event_vmaf_completed \
+      "2026-01-16 18:37:30" \
+      "1" "1" "0" "98.72" "98.72" "98.72" "0" "00:00:13" \
+      "- Go ! - 1x04 - Épisode 4_x265_1080p_AAC_sample.mkv : 98.72 (EXCELLENT)"
+  '
+  [ "$status" -eq 0 ]
+
+  echo "$output" | grep -q "VMAF analysis completed"
+  echo "$output" | grep -q "98.72 (Excellent)"
+  echo "$output" | grep -q "\*\*File\*\* : Go ! - 1x04"
+  echo "$output" | grep -q "\*\*Duration\*\* : 00:00:13"
+
+  # Le mode compact ne doit pas afficher le rapport détaillé
+  [[ "$output" != *"**Results**"* ]]
+  [[ "$output" != *"Worst files"* ]]
+  [[ "$output" != *"**NA**"* ]]
 }

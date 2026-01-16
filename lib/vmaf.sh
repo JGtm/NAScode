@@ -264,6 +264,18 @@ compute_vmaf_score() {
     fi
 }
 
+_vmaf_quality_label() {
+    local q="${1-NA}"
+    case "$q" in
+        EXCELLENT) echo "$(msg MSG_VMAF_QUALITY_EXCELLENT)" ;;
+        TRES_BON)  echo "$(msg MSG_VMAF_QUALITY_VERY_GOOD)" ;;
+        BON)       echo "$(msg MSG_VMAF_QUALITY_GOOD)" ;;
+        DEGRADE)   echo "$(msg MSG_VMAF_QUALITY_DEGRADED)" ;;
+        NA|"")    echo "$(msg MSG_VMAF_QUALITY_NA)" ;;
+        *)         echo "$q" ;;
+    esac
+}
+
 ###########################################################
 # GESTION DE LA QUEUE VMAF
 ###########################################################
@@ -401,7 +413,7 @@ process_vmaf_queue() {
         # Vérifier que les fichiers existent toujours
         if [[ ! -f "$file_original" ]] || [[ ! -f "$final_actual" ]]; then
             if [[ "$NO_PROGRESS" != true ]]; then
-                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-45s${NOCOLOR} : NA (fichier introuvable)\n" "$current" "$vmaf_count" "$display_name" >&2
+                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-45s${NOCOLOR} : %s\n" "$current" "$vmaf_count" "$display_name" "$(msg MSG_VMAF_FILE_NOT_FOUND)" >&2
             fi
             continue
         fi
@@ -411,7 +423,7 @@ process_vmaf_queue() {
         converted_size=$(get_file_size_bytes "$final_actual")
         if [[ "$converted_size" -eq 0 ]]; then
             if [[ "$NO_PROGRESS" != true ]]; then
-                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-45s${NOCOLOR} : NA (fichier vide)\n" "$current" "$vmaf_count" "$display_name" >&2
+                printf "  ${YELLOW}⚠${NOCOLOR} ${CYAN}[%d/%d] %-45s${NOCOLOR} : %s\n" "$current" "$vmaf_count" "$display_name" "$(msg MSG_VMAF_FILE_EMPTY)" >&2
             fi
             continue
         fi
@@ -488,7 +500,7 @@ process_vmaf_queue() {
                 display_name_final="${display_name_final:0:42}..."
             fi
             # Compteur et nom de fichier en CYAN, ajout du temps d'analyse à la fin
-            printf "\r  %s ${CYAN}[%d/%d] %-45s${NOCOLOR} : %s (%s) | %s\n" "$status_icon" "$current" "$vmaf_count" "$display_name_final" "$vmaf_score" "${vmaf_quality:-NA}" "$vmaf_duration_str" >&2
+            printf "\r  %s ${CYAN}[%d/%d] %-45s${NOCOLOR} : %s (%s) | %s\n" "$status_icon" "$current" "$vmaf_count" "$display_name_final" "$vmaf_score" "$(_vmaf_quality_label "${vmaf_quality:-NA}")" "$vmaf_duration_str" >&2
         fi
         
     done < "$VMAF_QUEUE_FILE"

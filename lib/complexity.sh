@@ -36,6 +36,27 @@
 : "${ADAPTIVE_USE_SITI:=true}"
 
 ###########################################################
+# SPINNER ANIMÉ POUR ANALYSE SI/TI
+###########################################################
+
+# Affiche un spinner animé pendant l'analyse SI/TI.
+# Doit être lancé en arrière-plan et tué une fois l'analyse terminée.
+# Usage: _start_siti_spinner <label> &
+#        spinner_pid=$!
+#        ...analyse...
+#        kill $spinner_pid 2>/dev/null
+_start_siti_spinner() {
+    local label="${1:-Analyse SI/TI...}"
+    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local i=0
+    while true; do
+        printf "\r\033[K  %s %s" "${frames[i]}" "$label" >&2
+        i=$(( (i + 1) % ${#frames[@]} ))
+        sleep 0.1
+    done
+}
+
+###########################################################
 # ANALYSE DES FRAMES
 ###########################################################
 
@@ -330,8 +351,25 @@ analyze_video_complexity() {
             local siti_result
             # Utiliser un sous-ensemble des positions pour SI/TI (plus rapide)
             local siti_positions=("${positions[@]:0:5}")  # 5 premiers échantillons
+
+            # Lancer le spinner en arrière-plan si progress activé
+            local spinner_pid=""
+            if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]] && [[ "${UI_QUIET:-false}" != true ]]; then
+                local siti_label
+                siti_label="$(msg MSG_COMPLEX_SITI_RUNNING)"
+                _start_siti_spinner "$siti_label" &
+                spinner_pid=$!
+            fi
+
             siti_result=$(_analyze_siti_multi "$file" "$duration_int" "${siti_positions[@]}")
             IFS='|' read -r si_avg ti_avg <<< "$siti_result"
+
+            # Arrêter le spinner et afficher "Done"
+            if [[ -n "$spinner_pid" ]]; then
+                kill "$spinner_pid" 2>/dev/null || true
+                wait "$spinner_pid" 2>/dev/null || true
+                printf "\r\033[K  ✓ %s\n" "$(msg MSG_COMPLEX_SITI_DONE)" >&2
+            fi
         fi
     fi
     
@@ -346,17 +384,15 @@ _show_analysis_progress() {
     local total="$2"
     local percent=$((current * 100 / total))
 
-    local status_label
+    # Aligner avec la progression FFmpeg :
+    # "  <emoji> <label sur 25 chars> <bar> ..."
+    local emoji="⚡"
+    local label_text
     if [[ "$percent" -ge 100 ]]; then
-        status_label="⚡ Calcul terminé"
+        label_text="$(msg MSG_COMPLEX_PROGRESS_DONE)"
     else
-        status_label="⚡ Calcul en cours"
+        label_text="$(msg MSG_COMPLEX_PROGRESS_RUNNING)"
     fi
-
-        # Aligner avec la progression FFmpeg :
-        # "  <emoji> <label sur 25 chars> <bar> ..."
-        local emoji="⚡"
-        local label_text="${status_label#${emoji} }"
     
     # Construire la barre de progression (20 caractères)
     local bar_width=20
@@ -475,20 +511,20 @@ _map_stddev_to_complexity() {
 # Retourne: description textuelle
 _describe_complexity() {
     local c="$1"
-    
-    awk -v c="$c" -v c_min="$ADAPTIVE_C_MIN" -v c_max="$ADAPTIVE_C_MAX" '
-    BEGIN {
-        range = c_max - c_min
-        third = range / 3
-        
-        if (c <= c_min + third) {
-            print "statique (dialogues/interviews)"
-        } else if (c <= c_min + 2*third) {
-            print "standard (film typique)"
-        } else {
-            print "complexe (action/grain/pluie)"
-        }
-    }'
+
+    local c_min="${ADAPTIVE_C_MIN}"
+    local c_max="${ADAPTIVE_C_MAX}"
+    local t1 t2
+    t1=$(awk -v cmin="$c_min" -v cmax="$c_max" 'BEGIN { range=cmax-cmin; third=range/3; printf "%.6f", (cmin+third) }')
+    t2=$(awk -v cmin="$c_min" -v cmax="$c_max" 'BEGIN { range=cmax-cmin; third=range/3; printf "%.6f", (cmin+2*third) }')
+
+    if awk -v c="$c" -v t="$t1" 'BEGIN { exit (c <= t) ? 0 : 1 }'; then
+        echo "$(msg MSG_COMPLEX_DESC_STATIC)"
+    elif awk -v c="$c" -v t="$t2" 'BEGIN { exit (c <= t) ? 0 : 1 }'; then
+        echo "$(msg MSG_COMPLEX_DESC_STANDARD)"
+    else
+        echo "$(msg MSG_COMPLEX_DESC_COMPLEX)"
+    fi
 }
 
 ###########################################################
@@ -630,7 +666,7 @@ display_complexity_analysis() {
     filename=$(basename "$file")
 
     echo -e "  📊 $(msg MSG_COMPLEX_RESULTS) :"
-    echo -e "${DIM}     └─ Coefficient de variation (stddev) : ${stddev}${NOCOLOR}"
+    echo -e "${DIM}     └─ $(msg MSG_COMPLEX_STDDEV_LABEL) : ${stddev}${NOCOLOR}"
     
     # Afficher SI/TI si disponibles et non neutres
     if [[ -n "$si" ]] && [[ -n "$ti" ]] && [[ "${ADAPTIVE_USE_SITI:-true}" == true ]]; then
@@ -641,5 +677,5 @@ display_complexity_analysis() {
     fi
     
     echo -e "${DIM}     └─ $(msg MSG_COMPLEX_VALUE) : ${complexity_c} → ${complexity_desc^}${NOCOLOR}"
-    echo -e "${DIM}     └─ Bitrate cible (encodage) : ${target_kbps} kbps${NOCOLOR}"
+    echo -e "${DIM}     └─ $(msg MSG_COMPLEX_TARGET_BITRATE_LABEL) : ${target_kbps} kbps${NOCOLOR}"
 }

@@ -69,8 +69,8 @@ _validate_index_source() {
             print_warning "$(msg MSG_INDEX_SOURCE_CHANGED)"
         else
             print_warning "$(msg MSG_INDEX_SOURCE_CHANGED_DETAIL)"
-            print_item "Index créé pour" "$stored_source" "$YELLOW"
-            print_item "Source actuelle" "$SOURCE" "$YELLOW"
+            print_item "$(msg MSG_INDEX_CREATED_FOR)" "$stored_source" "$YELLOW"
+            print_item "$(msg MSG_INDEX_CURRENT_SOURCE)" "$SOURCE" "$YELLOW"
             print_warning "$(msg MSG_INDEX_REGEN_AUTO)"
         fi
         rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
@@ -99,7 +99,7 @@ _handle_custom_queue() {
     if [[ -n "$CUSTOM_QUEUE" ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
             echo ""
-                print_info "Utilisation du fichier queue personnalisé : $CUSTOM_QUEUE"
+                print_info "$(msg MSG_INDEX_CUSTOM_QUEUE "$CUSTOM_QUEUE")"
         fi
         
         if ! validate_queue_file "$CUSTOM_QUEUE"; then
@@ -150,29 +150,29 @@ _handle_existing_index() {
     # Si l'utilisateur a demandé de conserver l'index, on l'accepte sans demander
     if [[ "$KEEP_INDEX" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
-            print_index_kept "Utilisation forcée de l'index existant"
+            print_index_kept "$(msg MSG_INDEX_FORCED_USE)"
         fi
         return 0
     fi
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_info_box "Index existant trouvé" "Date de création : $index_date"
+        print_info_box "$(msg MSG_INDEX_FOUND_TITLE)" "$(msg MSG_INDEX_CREATION_DATE "$index_date")"
     fi
     
     # Lire la réponse depuis le terminal pour éviter de consommer l'entrée de xargs/cat
-    ask_question "Conserver ce fichier index ?"
+    ask_question "$(msg MSG_INDEX_KEEP_QUESTION)"
     read -r response < /dev/tty
     
     case "$response" in
         [nN])
             if [[ "$NO_PROGRESS" != true ]]; then
-                print_status "Régénération d'un nouvel index..."
+                print_status "$(msg MSG_INDEX_REGENERATING)"
             fi
             rm -f "$INDEX" "$INDEX_READABLE" "$INDEX_META"
             return 1
             ;;
         *)
             if [[ "$NO_PROGRESS" != true ]]; then
-                print_index_kept "Index existant conservé"
+                print_index_kept "$(msg MSG_INDEX_KEPT)"
             fi
             return 0
             ;;

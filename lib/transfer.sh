@@ -104,7 +104,7 @@ wait_for_transfer_slot() {
     
     # Afficher le message d'attente
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_status "Attente fin de transfert... ($active_count en cours)" "$YELLOW"
+        print_status "$(msg MSG_TRANSFER_WAIT "$active_count")" "$YELLOW"
     fi
     
     # Attendre qu'au moins un transfert se termine
@@ -114,7 +114,7 @@ wait_for_transfer_slot() {
     done
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_success "Slot de transfert disponible"
+        print_success "$(msg MSG_TRANSFER_SLOT_AVAILABLE)"
     fi
 }
 
@@ -179,7 +179,7 @@ wait_all_transfers() {
         # Afficher la progression si le nombre a changé
         if [[ "$new_count" -ne "$active_count" ]] && [[ "$NO_PROGRESS" != true ]]; then
             if [[ "$new_count" -gt 0 ]]; then
-                print_status "$new_count transfert(s) restant(s)..." "$MAGENTA"
+                print_status "$(msg MSG_TRANSFER_REMAINING "$new_count")" "$MAGENTA"
             fi
         fi
         active_count="$new_count"
@@ -229,7 +229,7 @@ start_async_transfer() {
     _add_transfer_pid "$transfer_pid"
     
     if [[ "$NO_PROGRESS" != true ]]; then
-        print_info "Transfert lancé en arrière-plan" >&2
+        print_info "$(msg MSG_TRANSFER_BG_STARTED)" >&2
     fi
 }
 

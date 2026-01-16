@@ -428,8 +428,8 @@ convert_preset() {
 validate_codec_config() {
     # Vérifier que le codec est supporté
     if ! is_codec_supported "$VIDEO_CODEC"; then
-        echo "Codec non supporté: $VIDEO_CODEC" >&2
-        echo "Codecs disponibles: $(list_supported_codecs)" >&2
+        echo "$(msg MSG_CFG_CODEC_UNSUPPORTED "$VIDEO_CODEC")" >&2
+        echo "$(msg MSG_CFG_CODEC_AVAILABLE "$(list_supported_codecs)")" >&2
         return 1
     fi
     
@@ -440,7 +440,7 @@ validate_codec_config() {
     
     # Vérifier que l'encodeur est disponible dans FFmpeg
     if ! ffmpeg -encoders 2>/dev/null | grep -q "^ V.*${VIDEO_ENCODER}"; then
-        echo "Encodeur non disponible dans FFmpeg: $VIDEO_ENCODER" >&2
+        echo "$(msg MSG_CFG_ENCODER_UNAVAILABLE "$VIDEO_ENCODER")" >&2
         return 1
     fi
     

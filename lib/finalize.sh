@@ -99,7 +99,7 @@ _finalize_log_and_verify() {
 
     if [[ "$size_after_mb" -ge "$size_before_mb" ]]; then
         if [[ -n "$LOG_SESSION" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: FICHIER PLUS LOURD ($size_comparison). | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: $(msg MSG_LOG_HEAVIER_FILE) ($size_comparison). | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
     fi
 
@@ -207,7 +207,7 @@ _finalize_conversion_success() {
             print_warning "$(msg MSG_CONV_INTERRUPTED "$tmp_output")"
             # Log pour récupération manuelle si besoin
             if [[ -n "$LOG_SESSION" ]]; then
-                echo "$(date '+%Y-%m-%d %H:%M:%S') | $(msg MSG_FINAL_INTERRUPTED) | $file_original -> $tmp_output (fichier temp conservé)" >> "$LOG_SESSION" 2>/dev/null || true
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | $(msg MSG_FINAL_INTERRUPTED) | $file_original -> $tmp_output ($(msg MSG_FINAL_TEMP_KEPT))" >> "$LOG_SESSION" 2>/dev/null || true
             fi
         fi
         return 1
@@ -265,14 +265,14 @@ _finalize_conversion_success() {
             fi
         fi
 
-        print_success "Conversion terminée en ${elapsed_display}${size_part}"
+        print_success "$(msg MSG_FINAL_CONV_DONE "$elapsed_display")${size_part}"
     fi
 
     # Vérifier que le fichier de sortie temporaire existe
     if [[ ! -f "$tmp_output" ]]; then
         print_error "$(msg MSG_CONV_TMP_NOT_FOUND "$tmp_output")"
         if [[ -n "$LOG_SESSION" ]]; then
-            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output (fichier temp absent)" >> "$LOG_SESSION" 2>/dev/null || true
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output ($(msg MSG_FINAL_TEMP_MISSING))" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
         return 1
@@ -371,7 +371,7 @@ _finalize_conversion_error() {
         if [[ -n "$ffmpeg_log_temp" ]] && [[ -f "$ffmpeg_log_temp" ]] && [[ -s "$ffmpeg_log_temp" ]]; then
             cat "$ffmpeg_log_temp" >> "$LOG_SESSION" 2>/dev/null || true
         else
-            echo "(Log d'erreur : ffmpeg_log_temp='$ffmpeg_log_temp' exists=$([ -f "$ffmpeg_log_temp" ] && echo 'OUI' || echo 'NON'))" >> "$LOG_SESSION" 2>/dev/null || true
+            echo "(Log error: ffmpeg_log_temp='$ffmpeg_log_temp' exists=$([ -f "$ffmpeg_log_temp" ] && echo 'YES' || echo 'NO'))" >> "$LOG_SESSION" 2>/dev/null || true
         fi
         echo "-------------------------------" >> "$LOG_SESSION" 2>/dev/null || true
     fi
@@ -386,13 +386,13 @@ dry_run_compare_names() {
     local TTY_DEV="/dev/tty"
     local LOG_FILE="$LOG_DRYRUN_COMPARISON"
 
-    ask_question "Afficher la comparaison des noms de fichiers originaux et générés ?"
+    ask_question "$(msg MSG_FINAL_SHOW_COMPARISON)"
     read -r response
     
     case "$response" in
         [oO]|[yY]|'')
             {
-                print_header "SIMULATION DES NOMS DE FICHIERS"
+                print_header "$(msg MSG_FINAL_FILENAME_SIM_TITLE)"
             } | tee -a "$LOG_FILE"
             
             local total_files

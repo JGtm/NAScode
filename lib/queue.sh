@@ -45,9 +45,9 @@ validate_queue_file() {
     local test_read
     test_read=$(head -c 100 "$queue_file" | tr '\0' '\n' | head -1)
     if [[ -z "$test_read" ]] && [[ $file_count -gt 0 ]]; then
-        print_info "Le fichier queue semble valide ($file_count fichiers détectés)."
+        print_info "$(msg MSG_QUEUE_VALID "$file_count")"
     else
-        print_success "Fichier queue validé : $queue_file"
+        print_success "$(msg MSG_QUEUE_VALIDATED "$queue_file")"
     fi
     
     return 0
@@ -109,10 +109,10 @@ _apply_queue_limitations() {
     
     # Stocker les informations de limitation pour affichage groupé
     if [[ "$RANDOM_MODE" == true ]]; then
-        _LIMIT_MESSAGE="Sélection de $limit_count fichier(s) maximum"
+        _LIMIT_MESSAGE="$(msg MSG_QUEUE_LIMIT_RANDOM "$limit_count")"
         _LIMIT_MODE="random"
     else
-        _LIMIT_MESSAGE="$limit_count fichier(s) maximum"
+        _LIMIT_MESSAGE="$(msg MSG_QUEUE_LIMIT_NORMAL "$limit_count")"
         _LIMIT_MODE="normal"
     fi
     
