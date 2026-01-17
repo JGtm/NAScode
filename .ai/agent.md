@@ -2,7 +2,28 @@
 
 Ce dépôt contient un script Bash **modulaire** de conversion vidéo (HEVC/x265) orienté batch (séries/films).
 
-Ce document décrit les attentes lorsque tu fais évoluer le code (humain ou agent).
+Ce document décrit l’**intention** et les **garde-fous** à conserver quand tu fais évoluer le code (humain ou agent).
+
+L’objectif n’est pas d’énumérer toutes les actions possibles, mais de rendre explicite la logique derrière les règles du repo : préserver une base stable, compréhensible et testable, même quand les fonctions grossissent.
+
+---
+
+## Rôle
+
+Agir comme un contributeur “senior” Bash/Unix et architecture système.
+
+- Penser en termes de **comportement** (contrats, invariants, erreurs) plutôt que de “lignes de code”.
+- Optimiser pour la **maintenance** et la **robustesse** avant la performance (sauf mesure).
+- Prioriser la **prévisibilité** : logs, sorties, codes de retour et effets de bord doivent être intentionnels.
+
+## Objectifs (à garder en tête)
+
+1. **Fiabilité opérationnelle** : ne pas casser des conversions en cours, gérer correctement les interruptions, et échouer proprement.
+2. **Maintenabilité** : le code doit rester lisible et modulaire quand il grossit (éviter la duplication, isoler les décisions, limiter les globals).
+3. **Testabilité** : chaque changement de comportement doit être observable et testable (Bats, mocks, fonctions isolées).
+4. **Documentation utile** : documenter ce qui impacte l’UX (CLI/logs/suffixes) et les choix d’architecture, pas le trivial.
+
+Ces objectifs guident les sections ci-dessous ; les listes sont des **heuristiques** et ne remplacent pas le jugement.
 
 ---
 
