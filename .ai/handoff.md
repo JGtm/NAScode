@@ -1,6 +1,23 @@
 # Handoff
 
-## Session en cours (16/01/2026 - Internationalisation i18n + Documentation)
+## Session en cours (16–17/01/2026 - Internationalisation i18n + Documentation)
+
+### 2026-01-17 — Docs : clarification du rôle et des objectifs (agent)
+
+Branche : `feature/siti-progress-bar`
+
+Contexte : le fichier `agent.md` servait surtout de liste de règles. Objectif : rendre plus explicite la logique derrière ces règles (posture, invariants, priorités), pour guider les refactors Bash et l’ajout de gros blocs de code.
+
+Changements principaux :
+
+- [.ai/agent.md](.ai/agent.md) : introduction reformulée + ajout des sections “Rôle” et “Objectifs (à garder en tête)” (fiabilité, maintenabilité, testabilité, doc utile).
+- [.ai/DEVBOOK.md](.ai/DEVBOOK.md) : ajout d’une entrée “Documentation : clarification de l’intention de agent.md”.
+
+Derniers prompts :
+
+- "J'ai besoin que tu analyse le fichiers agent.md…"
+- "Oui garde l'esprit actuel…"
+- "ok commit et push puis tu merges dans main"
 
 ### 2026-01-16 — i18n : complétion EN (terminal + notifs Discord)
 

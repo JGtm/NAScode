@@ -620,3 +620,10 @@ Objectifs :
   - Log enrichi avec coefficient C et description du contenu
   - Tests Bats : 22 tests dans `test_adaptatif.bats`
 
+#### Documentation : clarification de l’intention de `agent.md`
+- **Quoi** : Clarification du rôle et des objectifs “à garder en tête” pour guider les contributions sans transformer le document en checklist exhaustive.
+- **Où** :
+  - `.ai/agent.md` : ajout des sections “Rôle” et “Objectifs”, et reformulation de l’introduction
+- **Pourquoi** : Les listes d’actions vieillissent vite ; l’intention (contrats, invariants, robustesse, testabilité) aide à prendre de bonnes décisions quand le code grossit.
+- **Impact** : Documentation interne plus explicite ; aucune modification de comportement du script.
+
