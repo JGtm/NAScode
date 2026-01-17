@@ -40,7 +40,7 @@ ADAPTIVE_STDDEV_HIGH="${ADAPTIVE_STDDEV_HIGH:-0.45}"  # Au dessus : contenu trè
 ADAPTIVE_SAMPLE_DURATION="${ADAPTIVE_SAMPLE_DURATION:-10}"
 
 # Nombre de points d'échantillonnage pour l'analyse de complexité
-ADAPTIVE_SAMPLE_COUNT="${ADAPTIVE_SAMPLE_COUNT:-20}"
+ADAPTIVE_SAMPLE_COUNT="${ADAPTIVE_SAMPLE_COUNT:-12}"
 
 # Marge début/fin pour éviter les génériques (% de la durée totale)
 ADAPTIVE_MARGIN_START_PCT="${ADAPTIVE_MARGIN_START_PCT:-5}"   # Évite générique début
