@@ -13,6 +13,27 @@ Objectifs :
 
 ## Journal
 
+### 2026-01-17
+
+#### Fix parsing SI/TI pour le mode adaptatif
+
+- **Quoi** : correction critique du parsing des valeurs SI (Spatial Information) et TI (Temporal Information) dans l'analyse de complexité vidéo.
+- **Où** :
+  - `lib/complexity.sh` : réécriture de `_compute_siti()` avec parsing awk robuste
+  - `tests/test_adaptatif.bats` : +15 tests couvrant parsing, normalisation, agrégation, orchestration et e2e
+  - `.gitignore` : ajout de `Converted_Heavier/`
+- **Pourquoi** :
+  - **Bug critique** : tous les coefficients de complexité étaient ~1.13 quelle que soit la vidéo
+  - **Cause racine** : le regex `grep -oP 'SI:\s*\K[0-9.]+'` ne correspondait pas au format réel de FFmpeg qui produit `Spatial Information:\nAverage: X`
+  - **Aggravant** : FFmpeg produit DEUX blocs "SITI Summary" (le premier avec `nan`, le second avec les vraies valeurs) — le code prenait le premier (nan) → fallback 50|25 → C constant ~1.13
+- **Solution** :
+  - Utilisation de `awk` pour extraire la DERNIÈRE occurrence de `Average:` après chaque section
+  - Parsing cross-platform (compatible Git Bash Windows, macOS, Linux)
+- **Impact** :
+  - Mode adaptatif : coefficients de complexité désormais corrects (variation 0.8–1.4 selon contenu)
+  - Tests : 853 tests passent (+15 nouveaux tests de régression)
+  - Pas de changement d'interface CLI ou de comportement utilisateur visible
+
 ### 2026-01-16
 
 #### Documentation multilingue (traduction anglaise complète)
