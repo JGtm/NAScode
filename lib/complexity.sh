@@ -36,24 +36,30 @@
 : "${ADAPTIVE_USE_SITI:=true}"
 
 ###########################################################
-# SPINNER ANIMÉ POUR ANALYSE SI/TI
+# BARRE DE PROGRESSION POUR ANALYSE SI/TI
 ###########################################################
 
-# Affiche un spinner animé pendant l'analyse SI/TI.
-# Doit être lancé en arrière-plan et tué une fois l'analyse terminée.
-# Usage: _start_siti_spinner <label> &
-#        spinner_pid=$!
-#        ...analyse...
-#        kill $spinner_pid 2>/dev/null
-_start_siti_spinner() {
-    local label="${1:-Analyse SI/TI...}"
-    local frames=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    local i=0
-    while true; do
-        printf "\r\033[K  %s %s" "${frames[i]}" "$label" >&2
-        i=$(( (i + 1) % ${#frames[@]} ))
-        sleep 0.1
-    done
+# Affiche une barre de progression pour l'analyse SI/TI.
+# Ne met JAMAIS de newline - c'est l'appelant qui gère la finalisation.
+# Usage: _show_siti_progress <current> <total>
+_show_siti_progress() {
+    local current="$1"
+    local total="$2"
+    local percent=$((current * 100 / total))
+
+    local emoji="⚡"
+    local label_text="$(msg MSG_COMPLEX_SITI_RUNNING)"
+    
+    # Construire la barre de progression (20 caractères)
+    local bar_width=20
+    local filled=$((percent * bar_width / 100))
+    local bar="╢"
+    for ((i=0; i<filled; i++)); do bar+="█"; done
+    for ((i=filled; i<bar_width; i++)); do bar+="░"; done
+    bar+="╟"
+    
+    # Afficher sur stderr (sans newline - mise à jour sur place)
+    printf "\r\033[K  %s %-25.25s %s %3d%%" "$emoji" "$label_text" "$bar" "$percent" >&2
 }
 
 ###########################################################
@@ -218,12 +224,13 @@ _normalize_ti() {
 }
 
 # Analyse SI/TI sur plusieurs échantillons et retourne les moyennes.
-# Usage: _analyze_siti_multi <file> <duration_seconds> <positions_array>
+# Usage: _analyze_siti_multi <file> <duration_seconds> <show_progress> <positions_array>
 # Retourne: SI_avg|TI_avg
 _analyze_siti_multi() {
     local file="$1"
     local duration_int="$2"
-    shift 2
+    local show_progress="$3"
+    shift 3
     local positions=("$@")
     
     local sample_duration="${ADAPTIVE_SAMPLE_DURATION}"
@@ -232,7 +239,17 @@ _analyze_siti_multi() {
     local margin_start=$(( duration_int * ADAPTIVE_MARGIN_START_PCT / 100 ))
     local max_start=$(( duration_int - sample_duration - margin_end ))
     
+    local total=${#positions[@]}
+    local current=0
+    
     for pos in "${positions[@]}"; do
+        ((current++))
+        
+        # Afficher la progression si demandé
+        if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]] && [[ "${UI_QUIET:-false}" != true ]]; then
+            _show_siti_progress "$current" "$total"
+        fi
+        
         # Ajuster la position
         [[ "$pos" -gt "$max_start" ]] && pos="$max_start"
         [[ "$pos" -lt "$margin_start" ]] && pos="$margin_start"
@@ -247,6 +264,15 @@ _analyze_siti_multi() {
             ((count++))
         fi
     done
+    
+    # Afficher ligne finale 100% (remplace la ligne de progression)
+    if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]] && [[ "${UI_QUIET:-false}" != true ]]; then
+        # Forcer l'affichage final avec newline (la boucle a déjà affiché le dernier état)
+        local emoji="⚡"
+        local label_text="$(msg MSG_COMPLEX_SITI_DONE)"
+        local bar="╢████████████████████╟"
+        printf "\r\033[K  %s %-25.25s %s 100%%\n" "$emoji" "$label_text" "$bar" >&2
+    fi
     
     if [[ "$count" -eq 0 ]]; then
         echo "50|25"
@@ -370,24 +396,8 @@ analyze_video_complexity() {
             # Utiliser un sous-ensemble des positions pour SI/TI (plus rapide)
             local siti_positions=("${positions[@]:0:5}")  # 5 premiers échantillons
 
-            # Lancer le spinner en arrière-plan si progress activé
-            local spinner_pid=""
-            if [[ "$show_progress" == true ]] && [[ "${NO_PROGRESS:-false}" != true ]] && [[ "${UI_QUIET:-false}" != true ]]; then
-                local siti_label
-                siti_label="$(msg MSG_COMPLEX_SITI_RUNNING)"
-                _start_siti_spinner "$siti_label" &
-                spinner_pid=$!
-            fi
-
-            siti_result=$(_analyze_siti_multi "$file" "$duration_int" "${siti_positions[@]}")
+            siti_result=$(_analyze_siti_multi "$file" "$duration_int" "$show_progress" "${siti_positions[@]}")
             IFS='|' read -r si_avg ti_avg <<< "$siti_result"
-
-            # Arrêter le spinner et afficher "Done"
-            if [[ -n "$spinner_pid" ]]; then
-                kill "$spinner_pid" 2>/dev/null || true
-                wait "$spinner_pid" 2>/dev/null || true
-                printf "\r\033[K  ✓ %s\n" "$(msg MSG_COMPLEX_SITI_DONE)" >&2
-            fi
         fi
     fi
     
