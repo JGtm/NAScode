@@ -36,7 +36,7 @@ The script automatically manages the number of audio channels according to mode:
 | `film` / `adaptatif` | 7.1 (8ch) | **Reduced → 5.1** |
 
 **Why?**
-- **Serie mode**: priority on space savings. Stereo is sufficient for viewing on PC/tablet/mobile.
+- **Series mode**: priority on space savings. Stereo is sufficient for viewing on PC/tablet/mobile.
 - **Film mode**: priority on quality. 5.1 allows enjoying a home theater system.
 
 Note: if a `copy` decision is retained, channels are kept as-is. In `serie` mode, a multichannel source forces a conversion/downmix decision to guarantee stereo output.

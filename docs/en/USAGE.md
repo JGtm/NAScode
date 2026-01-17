@@ -72,9 +72,9 @@ The script evolves: the table below is a reminder, the authority remains `bash n
 
 To understand audio/video decisions (skip/passthrough/convert), see [SMART_CODEC.md](SMART_CODEC.md).
 
-## Heavier outputs / low gain ("Heavier")
+## Heavier outputs / low savings ("Heavier")
 
-If a conversion produces a **heavier** file (or a gain below a threshold), NAScode can redirect the output to a separate folder to avoid reprocessing loops.
+If a conversion produces a **heavier** file (or a savings below a threshold), NAScode can redirect the output to a separate folder to avoid reprocessing loops.
 
 - Default folder: `Converted_Heavier/` (next to `Converted/`), preserving the folder structure.
 - Anti-loop: if a "Heavier" output already exists for a file, NAScode **skips** that file.

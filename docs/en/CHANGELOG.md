@@ -2,7 +2,7 @@
 
 ## v2.8
 
-- ✅ **HFR (High Frame Rate) Management**: new `--limit-fps` / `--no-limit-fps` options to handle videos >30 fps. In serie mode (default), HFR videos are limited to 29.97 fps to optimize size. In film/adaptatif mode, bitrate is proportionally adjusted to framerate.
+- ✅ **HFR (High Frame Rate) Management**: new `--limit-fps` / `--no-limit-fps` options to handle videos >30 fps. In series mode (default), HFR videos are limited to 29.97 fps to optimize size. In film/adaptatif mode, bitrate is proportionally adjusted to framerate.
 - ✅ **HFR option display**: LIMIT_FPS option appears in active parameters (terminal) and in `run_started` Discord notification.
 - ✅ **Intelligent VMAF skip**: VMAF score is automatically ignored when framerate is modified (invalid comparison).
 - ✅ **HFR tests**: 26 unit tests + 2 e2e tests for HFR management.
@@ -76,7 +76,7 @@
 
 ## v2.0
 
-- ✅ New optimized x265 parameters for serie mode
+- ✅ New optimized x265 parameters for series mode
 - ✅ Fast pass 1 (`no-slow-firstpass`) for time savings
 - ✅ Opus 128k audio conversion preparation (temporarily disabled)
 - ✅ Improved VMAF management (empty file detection)
