@@ -155,13 +155,31 @@ _compute_siti() {
     siti_output=$(ffmpeg -hide_banner -ss "$start_sec" -t "$duration_sec" -i "$file" \
         -vf "siti=print_summary=1" -f null - 2>&1)
     
-    # Parser la sortie pour extraire SI et TI moyens
-    local si ti
-    si=$(echo "$siti_output" | grep -oP 'SI:\s*\K[0-9.]+' | tail -1)
-    ti=$(echo "$siti_output" | grep -oP 'TI:\s*\K[0-9.]+' | tail -1)
+    # Parser la sortie FFmpeg pour extraire SI et TI moyens
+    # Format FFmpeg (peut apparaître 2 fois, on prend la dernière valeur valide):
+    #   [Parsed_siti_0] SITI Summary:
+    #   Total frames: N
+    #   Spatial Information:
+    #   Average: 45.517094
+    #   ...
+    #   Temporal Information:
+    #   Average: 13.169580
+    # On utilise awk pour une meilleure compatibilité cross-platform (Git Bash inclus)
+    # et on prend la DERNIÈRE occurrence de chaque Average (le premier bloc peut être nan)
+    local siti_parsed
+    siti_parsed=$(echo "$siti_output" | awk '
+        /Spatial Information:/ { found_si=1 }
+        found_si && /Average:/ { si=$2; found_si=0 }
+        /Temporal Information:/ { found_ti=1 }
+        found_ti && /Average:/ { ti=$2; found_ti=0 }
+        END { print si "|" ti }
+    ')
     
-    # Fallback si le filtre siti n'est pas disponible
-    if [[ -z "$si" ]] || [[ -z "$ti" ]]; then
+    local si ti
+    IFS='|' read -r si ti <<< "$siti_parsed"
+    
+    # Fallback si le filtre siti n'est pas disponible ou parsing échoué
+    if [[ -z "$si" ]] || [[ -z "$ti" ]] || [[ "$si" == "nan" ]] || [[ "$ti" == "nan" ]]; then
         # Retourner des valeurs neutres (milieu de plage)
         echo "50|25"
         return 0
