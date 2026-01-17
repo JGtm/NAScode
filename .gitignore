@@ -1,6 +1,7 @@
 # Logs et fichiers temporaires
 logs/
 Converted/
+Converted_Heavier/
 .temp_processing/
 .idea/
 .vs/
