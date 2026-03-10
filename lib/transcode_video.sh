@@ -312,9 +312,11 @@ _build_encoder_params_internal() {
 _get_tune_option() {
     local encoder="${1:-libx265}"
     
-    # Seul x265 supporte -tune fastdecode comme option directe
+    # Seul x265 supporte -tune fastdecode comme option directe.
+    # Désactivé par défaut : x265 4.x active dhdr10-info avec cette option,
+    # provoquant un segfault si aucune donnée HDR10+ n'est présente.
     if [[ "$encoder" == "libx265" ]]; then
-        if [[ "${FILM_TUNE_FASTDECODE:-true}" == true ]]; then
+        if [[ "${FILM_TUNE_FASTDECODE:-false}" == true ]]; then
             echo "-tune fastdecode"
             return
         fi

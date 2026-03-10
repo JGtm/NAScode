@@ -304,21 +304,22 @@ build_encoder_params() {
 }
 
 # Construit l'option -tune pour FFmpeg (si applicable)
-# Usage: build_tune_option "libx265" "serie" -> "-tune fastdecode"
+# Usage: build_tune_option "libx265" "serie" -> "-tune fastdecode" (si FILM_TUNE_FASTDECODE=true)
+# NOTE: FILM_TUNE_FASTDECODE est false par défaut (x265 4.x bug : dhdr10-info segfault)
 build_tune_option() {
     local encoder="$1"
     local mode="$2"
     
-    # Seul x265 utilise -tune fastdecode en mode option
-    if [[ "$encoder" == "libx265" ]]; then
-        case "$mode" in
-            serie) echo "-tune fastdecode" ;;
-            film)  echo "" ;;
-            *)     echo "" ;;
-        esac
-    else
-        echo ""
+    # Seul x265 utilise -tune fastdecode, mais uniquement si explicitement activé.
+    # Désactivé par défaut : x265 4.x active dhdr10-info avec -tune fastdecode,
+    # provoquant un segfault sans fichier tone-map présent.
+    if [[ "$encoder" == "libx265" ]] && [[ "$mode" == "serie" ]]; then
+        if [[ "${FILM_TUNE_FASTDECODE:-false}" == true ]]; then
+            echo "-tune fastdecode"
+            return
+        fi
     fi
+    echo ""
 }
 
 # Retourne le keyint (GOP) pour le mode courant

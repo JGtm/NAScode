@@ -432,8 +432,13 @@ teardown() {
 # Tests build_tune_option()
 ###########################################################
 
-@test "build_tune_option: libx265 serie retourne -tune fastdecode" {
-    result=$(build_tune_option "libx265" "serie")
+@test "build_tune_option: libx265 serie retourne vide si FILM_TUNE_FASTDECODE=false (défaut)" {
+    FILM_TUNE_FASTDECODE=false result=$(build_tune_option "libx265" "serie")
+    [ -z "$result" ]
+}
+
+@test "build_tune_option: libx265 serie retourne -tune fastdecode si FILM_TUNE_FASTDECODE=true" {
+    result=$(FILM_TUNE_FASTDECODE=true build_tune_option "libx265" "serie")
     [ "$result" = "-tune fastdecode" ]
 }
 

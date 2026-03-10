@@ -317,8 +317,10 @@ set_conversion_mode_parameters() {
             fi
             # GOP long pour meilleure compression (600 frames ~25s @ 24fps)
             FILM_KEYINT=600
-            # Tune fastdecode pour décodage fluide sur appareils variés
-            FILM_TUNE_FASTDECODE=true
+            # NOTE: FILM_TUNE_FASTDECODE désactivé car -tune fastdecode active dhdr10-info
+            # dans x265 4.x (Windows), ce qui provoque un segfault si aucun fichier de
+            # tone-map n'est fourni (x265 bug : https://bitbucket.org/multicoreware/x265_git/issues).
+            FILM_TUNE_FASTDECODE=false
             ENCODER_MODE_PROFILE="serie"
             AUDIO_FORCE_STEREO=true
             AUDIO_TRANSLATE_EQUIV_QUALITY=false
