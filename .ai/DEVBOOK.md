@@ -13,6 +13,26 @@ Objectifs :
 
 ## Journal
 
+### 2026-03-10
+
+#### Fix segfault x265 4.x avec -tune fastdecode (régression Windows)
+
+- **Quoi** : correction d'un crash `Segmentation fault` (exit 139) lors de l'encodage HEVC en mode `serie`.
+- **Où** :
+  - `lib/config.sh` : `FILM_TUNE_FASTDECODE=false` (était `true`) en mode `serie`
+  - `lib/transcode_video.sh` : valeur fallback `:-false` dans `_get_tune_option()` (était `:-true`)
+  - `lib/codec_profiles.sh` : `build_tune_option()` respecte `FILM_TUNE_FASTDECODE` au lieu de hardcoder `-tune fastdecode`
+  - `tests/test_codec_profiles.bats` : tests mis à jour (2 remplacés, 1 nouveau)
+- **Pourquoi** :
+  - **Bug x265 4.1** (Windows/MSYS2, ffmpeg 8.0.1) : `-tune fastdecode` active implicitement `dhdr10-info`, qui tente d'ouvrir un fichier tone-map inexistant → segfault immédiat après initialisation
+  - Comportement absent sur x265 3.x (ancien PC) — régression liée au changement d'environnement
+  - Le log ffmpeg s'arrête à `tools: lslices=6 dhdr10-info` sans encoder aucune frame
+- **Solution** : désactiver `-tune fastdecode` par défaut. L'option peut être réactivée manuellement via `FILM_TUNE_FASTDECODE=true` si la version x265 utilisée ne présente pas ce bug.
+- **Impact** :
+  - Mode `serie` : plus de segfault sur x265 4.x Windows
+  - Qualité/taille inchangées (l'option n'affecte que le décodage sur appareils anciens)
+  - 72 tests passent, 0 régression
+
 ### 2026-01-17
 
 #### Fix parsing SI/TI pour le mode adaptatif
