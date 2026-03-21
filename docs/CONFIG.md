@@ -1,183 +1,183 @@
 # Configuration
 
-Ce projet est conçu pour fonctionner “out of the box” via la CLI, mais la configuration de base se trouve dans [lib/config.sh](../lib/config.sh).
+This project is designed to work "out of the box" via CLI, but the base configuration is located in [lib/config.sh](../lib/config.sh).
 
-## Defaults (à connaître)
+## Defaults (important to know)
 
-- Mode : `serie`
-- Codec vidéo : `hevc`
-- Codec audio : `aac`
-- Sortie : `Converted/` (dans le dossier du script)
+- Mode: `serie`
+- Video codec: `hevc`
+- Audio codec: `aac`
+- Output: `Converted/` (in the script's directory)
 
-## Modes de conversion
+## Conversion Modes
 
-Les modes sont définis dans [lib/config.sh](../lib/config.sh) via `set_conversion_mode_parameters()`.
+Modes are defined in [lib/config.sh](../lib/config.sh) via `set_conversion_mode_parameters()`.
 
-| Paramètre | Mode `serie` | Mode `film` |
+| Parameter | `serie` Mode | `film` Mode |
 |-----------|--------------|-------------|
-| Encodage | **CRF 21** (single-pass, par défaut) ou two-pass | Two-pass **forcé** |
-| Target bitrate (HEVC ref) | 2070 kbps (si two-pass) | 2035 kbps |
+| Encoding | **CRF 21** (single-pass, default) or two-pass | Two-pass **forced** |
+| Target bitrate (HEVC ref) | 2070 kbps (if two-pass) | 2035 kbps |
 | Maxrate (HEVC ref) | 2520 kbps | 3200 kbps |
 | GOP (keyint) | 600 (~25s @ ~24fps) | 240 (~10s @ ~24fps) |
-| Tune fastdecode | Oui | Non |
-| x265 extra params | Oui (optimisations série) | Non (qualité max) |
-| Audio (layout cible) | **Stéréo forcée** (downmix si multicanal) | Stéréo/5.1 selon la source |
+| Tune fastdecode | Yes | No |
+| x265 extra params | Yes (series optimizations) | No (max quality) |
+| Audio (target layout) | **Forced stereo** (downmix if multichannel) | Stereo/5.1 depending on source |
 
-Notes :
-- Le projet vise du **10-bit** (`yuv420p10le`) côté vidéo.
-- Les bitrates “référence” ci-dessus sont **HEVC** et sont ensuite ajustés selon l’efficacité du codec cible (voir plus bas).
+Notes:
+- The project aims for **10-bit** (`yuv420p10le`) on the video side.
+- The "reference" bitrates above are **HEVC** and are then adjusted according to target codec efficiency (see below).
 
-## Adaptation bitrate par résolution (par fichier)
+## Bitrate Adaptation by Resolution (per file)
 
-Objectif : éviter de gaspiller de la taille quand la sortie est nettement inférieure à 1080p (ex: 720p).
+Goal: avoid wasting size when the output is significantly lower than 1080p (e.g., 720p).
 
-- Si la hauteur de sortie estimée est $\le 720p$, le budget bitrate est réduit via `ADAPTIVE_720P_SCALE_PERCENT`.
-- Valeurs : `ADAPTIVE_BITRATE_BY_RESOLUTION=true`, `ADAPTIVE_720P_MAX_HEIGHT=720`, `ADAPTIVE_720P_SCALE_PERCENT=70`.
+- If the estimated output height is $\le 720p$, the bitrate budget is reduced via `ADAPTIVE_720P_SCALE_PERCENT`.
+- Values: `ADAPTIVE_BITRATE_BY_RESOLUTION=true`, `ADAPTIVE_720P_MAX_HEIGHT=720`, `ADAPTIVE_720P_SCALE_PERCENT=70`.
 
-## Codecs & encodeurs
+## Codecs & Encoders
 
-### Codecs supportés
+### Supported Codecs
 
-- Vidéo : `hevc`, `av1`
-- Audio : `aac`, `copy`, `ac3`, `eac3`, `opus`
+- Video: `hevc`, `av1`
+- Audio: `aac`, `copy`, `ac3`, `eac3`, `opus`
 
-### Choix de l’encodeur
+### Encoder Selection
 
-- Le mapping codec→encodeur est géré dans [lib/codec_profiles.sh](../lib/codec_profiles.sh).
-- Pour changer d’encodeur (ex: AV1 via `libaom-av1` au lieu de `libsvtav1`), c’est là que ça se fait.
+- The codec→encoder mapping is managed in [lib/codec_profiles.sh](../lib/codec_profiles.sh).
+- To change encoder (e.g., AV1 via `libaom-av1` instead of `libsvtav1`), that's where it's done.
 
-### Efficacité codec (impact sur les bitrates)
+### Codec Efficiency (impact on bitrates)
 
-Les bitrates sont calculés à partir d’un **référentiel HEVC (70%)** et d’une efficacité par codec.
+Bitrates are calculated from a **HEVC reference (70%)** and an efficiency per codec.
 
-Formule (simplifiée) :
+Formula (simplified):
 
-$$\text{bitrate}_\text{codec} = \text{bitrate}_\text{hevc} \times \frac{\text{efficacité}_\text{codec}}{70}$$
+$$\text{bitrate}_\text{codec} = \text{bitrate}_\text{hevc} \times \frac{\text{efficiency}_\text{codec}}{70}$$
 
-Exemple : AV1 (50%) applique un facteur $50/70 \approx 0{,}71$.
+Example: AV1 (50%) applies a factor of $50/70 \approx 0.71$.
 
-## Accélération matérielle
+## Hardware Acceleration
 
-Selon l’OS et la disponibilité, le projet peut activer une accélération matérielle (ex: CUDA / VideoToolbox) pour décodage/traitements.
+Depending on the OS and availability, the project can enable hardware acceleration (e.g., CUDA / VideoToolbox) for decoding/processing.
 
-## Heures creuses (off-peak)
+## Off-Peak Hours
 
-Quand `-p/--off-peak` est activé :
+When `-p/--off-peak` is enabled:
 
-- Le script ne démarre de nouvelles conversions **que** pendant la plage définie.
-- Si un fichier est en cours quand les heures pleines reviennent, il **termine**, puis attend le retour des heures creuses.
+- The script only starts new conversions **during** the defined time range.
+- If a file is in progress when peak hours return, it **finishes**, then waits for off-peak hours to resume.
 
-## Sorties plus lourdes / gain faible ("Heavier")
+## Heavier Outputs / Low Gain ("Heavier")
 
-Objectif : éviter la boucle "re-encode" quand une conversion produit un fichier **plus lourd** (ou un gain trop faible). Dans ce cas, NAScode peut rediriger la sortie vers un dossier alternatif (par défaut `Converted_Heavier/`) en conservant l'arborescence.
+Goal: avoid the "re-encode" loop when a conversion produces a **heavier** file (or too low gain). In this case, NAScode can redirect the output to an alternative folder (default `Converted_Heavier/`) while preserving the directory structure.
 
-Comportement (si activé) :
+Behavior (if enabled):
 
-- Si `taille_sortie >= taille_source` **ou** si le gain est inférieur à un seuil, la sortie est déplacée vers `OUTPUT_DIR` + suffixe (`_Heavier` par défaut).
-- Anti-boucle : si une sortie "Heavier" existe déjà pour le fichier, NAScode **skip** le fichier (pour éviter de reconvertir indéfiniment).
+- If `output_size >= source_size` **or** if the gain is below a threshold, the output is moved to `OUTPUT_DIR` + suffix (`_Heavier` by default).
+- Anti-loop: if a "Heavier" output already exists for the file, NAScode **skips** the file (to avoid converting indefinitely).
 
-Variables :
+Variables:
 
-- `HEAVY_OUTPUT_ENABLED` : `true`/`false` (défaut `true`).
-- `HEAVY_MIN_SAVINGS_PERCENT` : gain minimum en % (défaut `10`).
-- `HEAVY_OUTPUT_DIR_SUFFIX` : suffixe ajouté au dossier `OUTPUT_DIR` (défaut `_Heavier`).
+- `HEAVY_OUTPUT_ENABLED`: `true`/`false` (default `true`).
+- `HEAVY_MIN_SAVINGS_PERCENT`: minimum gain in % (default `10`).
+- `HEAVY_OUTPUT_DIR_SUFFIX`: suffix added to `OUTPUT_DIR` folder (default `_Heavier`).
 
-## Notifications Discord (optionnel)
+## Discord Notifications (optional)
 
-NAScode peut envoyer des notifications Discord via un webhook (Markdown). C’est volontairement **best-effort** : si Discord est indisponible, la conversion continue.
+NAScode can send Discord notifications via a webhook (Markdown). This is intentionally **best-effort**: if Discord is unavailable, the conversion continues.
 
-Notes :
+Notes:
 
-- Le message de démarrage inclut les paramètres actifs, et un aperçu de la queue quand elle existe.
-- Si `PARALLEL_JOBS=1`, l’UI indique « Jobs parallèles : désactivé ».
-- Des messages “début/fin” sont envoyés pour chaque fichier, et des notifications spécifiques existent pour les transferts et VMAF (si activé).
-- Des messages “ignoré” (skip) peuvent être envoyés avec la raison.
+- The startup message includes active parameters and a queue preview when it exists.
+- If `PARALLEL_JOBS=1`, the UI shows "Parallel jobs: disabled".
+- "Start/end" messages are sent for each file, and specific notifications exist for transfers and VMAF (if enabled).
+- "Skipped" messages may be sent with the reason.
 
-Variables d’environnement :
+Environment variables:
 
-- `NASCODE_DISCORD_WEBHOOK_URL` (secret) : URL du webhook Discord
-- `NASCODE_DISCORD_NOTIFY` : `true` / `false` (optionnel ; défaut `true` si l’URL est définie)
+- `NASCODE_DISCORD_WEBHOOK_URL` (secret): Discord webhook URL
+- `NASCODE_DISCORD_NOTIFY`: `true` / `false` (optional; defaults to `true` if URL is defined)
 
-Recommandé : utiliser un fichier local `.env.local` (ignoré par Git) basé sur [.env.example](../.env.example).
+Recommended: use a local `.env.local` file (ignored by Git) based on [.env.example](../.env.example).
 
 ```bash
 cp .env.example .env.local
 ```
 
-Par défaut, `nascode` charge automatiquement `./.env.local` (si présent) au démarrage.
+By default, `nascode` automatically loads `./.env.local` (if present) at startup.
 
-- Désactiver : `NASCODE_ENV_AUTOLOAD=false`
-- Utiliser un autre fichier : `NASCODE_ENV_FILE=/chemin/vers/mon.env`
+- Disable: `NASCODE_ENV_AUTOLOAD=false`
+- Use another file: `NASCODE_ENV_FILE=/path/to/my.env`
 
-Sécurité : ne commit jamais le webhook. Si l’URL a été partagée publiquement, régénère-le côté Discord.
+Security: never commit the webhook. If the URL has been shared publicly, regenerate it on Discord's side.
 
-## Constantes centralisées (lib/constants.sh)
+## Centralized Constants (lib/constants.sh)
 
-Depuis v2.8, les "magic numbers" sont centralisés dans [lib/constants.sh](../lib/constants.sh). Chaque constante peut être **overridée via variable d'environnement** avant de lancer le script.
+Since v2.8, "magic numbers" are centralized in [lib/constants.sh](../lib/constants.sh). Each constant can be **overridden via environment variable** before running the script.
 
-### Mode adaptatif (complexity.sh)
+### Adaptive Mode (complexity.sh)
 
-| Constante | Défaut | Description |
-|-----------|--------|-------------|
-| `ADAPTIVE_BPP_BASE` | 0.032 | BPP (Bits Per Pixel) de référence pour HEVC. Calibré pour produire ~1500-2500 kbps en 1080p@24fps. |
-| `ADAPTIVE_C_MIN` | 0.85 | Coefficient de complexité minimum (contenu statique). |
-| `ADAPTIVE_C_MAX` | 1.25 | Coefficient de complexité maximum (contenu très complexe). |
-| `ADAPTIVE_STDDEV_LOW` | 0.20 | Seuil écart-type en dessous duquel le contenu est considéré statique. |
-| `ADAPTIVE_STDDEV_HIGH` | 0.45 | Seuil écart-type au dessus duquel le contenu est considéré très complexe. |
-| `ADAPTIVE_SAMPLE_DURATION` | 10 | Durée (secondes) de chaque échantillon d'analyse. |
-| `ADAPTIVE_SAMPLE_COUNT` | 20 | Nombre de points d'échantillonnage pour l'analyse de complexité. |
-| `ADAPTIVE_MARGIN_START_PCT` | 5 | Marge début (% de la durée) pour éviter le générique d'ouverture. |
-| `ADAPTIVE_MARGIN_END_PCT` | 8 | Marge fin (% de la durée) pour éviter le générique de fin. |
-| `ADAPTIVE_MIN_BITRATE_KBPS` | 800 | Plancher qualité : bitrate minimum en kbps. |
-| `ADAPTIVE_MAXRATE_FACTOR` | 1.4 | Facteur multiplicateur pour maxrate (ratio vs target). |
-| `ADAPTIVE_BUFSIZE_FACTOR` | 2.5 | Facteur multiplicateur pour bufsize (ratio vs target). |
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `ADAPTIVE_BPP_BASE` | 0.032 | Reference BPP (Bits Per Pixel) for HEVC. Calibrated to produce ~1500-2500 kbps at 1080p@24fps. |
+| `ADAPTIVE_C_MIN` | 0.85 | Minimum complexity coefficient (static content). |
+| `ADAPTIVE_C_MAX` | 1.25 | Maximum complexity coefficient (very complex content). |
+| `ADAPTIVE_STDDEV_LOW` | 0.20 | Standard deviation threshold below which content is considered static. |
+| `ADAPTIVE_STDDEV_HIGH` | 0.45 | Standard deviation threshold above which content is considered very complex. |
+| `ADAPTIVE_SAMPLE_DURATION` | 10 | Duration (seconds) of each analysis sample. |
+| `ADAPTIVE_SAMPLE_COUNT` | 20 | Number of sampling points for complexity analysis. |
+| `ADAPTIVE_MARGIN_START_PCT` | 5 | Start margin (% of duration) to avoid opening credits. |
+| `ADAPTIVE_MARGIN_END_PCT` | 8 | End margin (% of duration) to avoid closing credits. |
+| `ADAPTIVE_MIN_BITRATE_KBPS` | 800 | Quality floor: minimum bitrate in kbps. |
+| `ADAPTIVE_MAXRATE_FACTOR` | 1.4 | Multiplier factor for maxrate (ratio vs target). |
+| `ADAPTIVE_BUFSIZE_FACTOR` | 2.5 | Multiplier factor for bufsize (ratio vs target). |
 
 ### Audio (audio_decision.sh)
 
-| Constante | Défaut | Description |
-|-----------|--------|-------------|
-| `AUDIO_CODEC_EFFICIENT_THRESHOLD` | 3 | Rang minimum pour considérer un codec "efficace" (Opus=5, AAC=4, Vorbis=3). Les codecs au-dessus de ce seuil sont préservés plutôt que ré-encodés. |
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `AUDIO_CODEC_EFFICIENT_THRESHOLD` | 3 | Minimum rank to consider a codec "efficient" (Opus=5, AAC=4, Vorbis=3). Codecs above this threshold are preserved rather than re-encoded. |
 
-### Notifications Discord (notify_discord.sh)
+### Discord Notifications (notify_discord.sh)
 
-| Constante | Défaut | Description |
-|-----------|--------|-------------|
-| `DISCORD_CONTENT_MAX_CHARS` | 1900 | Limite de caractères par message (API Discord = 2000, marge de sécurité). |
-| `DISCORD_CURL_TIMEOUT` | 10 | Timeout curl pour l'envoi (secondes). |
-| `DISCORD_CURL_RETRIES` | 2 | Nombre de retries curl en cas d'échec. |
-| `DISCORD_CURL_RETRY_DELAY` | 1 | Délai entre retries (secondes). |
+| Constant | Default | Description |
+|----------|---------|-------------|
+| `DISCORD_CONTENT_MAX_CHARS` | 1900 | Character limit per message (Discord API = 2000, safety margin). |
+| `DISCORD_CURL_TIMEOUT` | 10 | Curl timeout for sending (seconds). |
+| `DISCORD_CURL_RETRIES` | 2 | Number of curl retries on failure. |
+| `DISCORD_CURL_RETRY_DELAY` | 1 | Delay between retries (seconds). |
 
-**Exemple d'override :**
+**Override example:**
 
 ```bash
-# Augmenter le timeout Discord pour les connexions lentes
-DISCORD_CURL_TIMEOUT=30 bash nascode -s /chemin/source
+# Increase Discord timeout for slow connections
+DISCORD_CURL_TIMEOUT=30 bash nascode -s /path/source
 
-# Mode adaptatif avec analyse plus fine (plus d'échantillons)
-ADAPTIVE_SAMPLE_COUNT=30 bash nascode -m adaptatif -s /chemin/source
+# Adaptive mode with finer analysis (more samples)
+ADAPTIVE_SAMPLE_COUNT=30 bash nascode -m adaptatif -s /path/source
 ```
 
-## Variables modifiables (extrait)
+## Modifiable Variables (excerpt)
 
-Dans [lib/config.sh](../lib/config.sh), on retrouve notamment :
+In [lib/config.sh](../lib/config.sh), you'll find notably:
 
 - `CONVERSION_MODE`
 - `VIDEO_CODEC`
 - `AUDIO_CODEC`
-- `AUDIO_FORCE_STEREO` (activé automatiquement en mode `serie`)
+- `AUDIO_FORCE_STEREO` (automatically enabled in `serie` mode)
 - `SAMPLE_DURATION`
 
-Autres variables utiles :
-- `SKIP_TOLERANCE_PERCENT` (tolérance pour décider un skip)
-- `SUFFIX_MODE` (suffixe ask/on/off/custom)
+Other useful variables:
+- `SKIP_TOLERANCE_PERCENT` (tolerance for skip decision)
+- `SUFFIX_MODE` (suffix ask/on/off/custom)
 - `PARALLEL_JOBS` (jobs)
 
 ## Suffixes
 
-Le suffixe peut être :
+The suffix can be:
 
-- interactif (question),
-- forcé “on/off”,
-- ou personnalisé.
+- interactive (question),
+- forced "on/off",
+- or custom.
 
-Le détail est documenté via l’aide CLI (`bash nascode --help`).
+Details are documented via CLI help (`bash nascode --help`).

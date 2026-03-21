@@ -1,98 +1,83 @@
 # Changelog
 
-## v2.9
-
-- ✅ **Internationalisation (i18n)** : système complet de traduction avec support français et anglais. Nouvelle option `--lang <fr|en>` pour choisir la langue de l'interface.
-- ✅ **Module i18n** : nouveau module `lib/i18n.sh` avec fonction `msg()` utilisant l'indirection Bash pour les traductions dynamiques.
-- ✅ **Fichiers de locale** : `locale/fr.sh` et `locale/en.sh` contenant ~305 messages traduits (CLI, erreurs, logs, notifications Discord).
-- ✅ **Documentation traduite** : 10 fichiers de documentation disponibles en anglais dans `docs/en/` (ARCHITECTURE, CHANGELOG, CONFIG, USAGE, TROUBLESHOOTING, etc.).
-- ✅ **README bilingue** : `README.en.md` complet + section i18n dans le README principal.
-- ✅ **Auto-chargement i18n** : `ui.sh` charge automatiquement `i18n.sh` si `msg()` n'est pas définie (compatibilité tests/subshells).
-- ✅ **Tests i18n** : nouveau fichier `test_i18n.bats` (13 tests) validant le chargement des locales, le fallback, les placeholders et la cohérence des clés.
-- ✅ **Tests audio_decision** : nouveau fichier `test_audio_decision.bats` (55 tests) couvrant la logique smart codec audio.
-- ✅ **Tests video_params** : nouveau fichier `test_video_params.bats` (36 tests) couvrant pix_fmt, downscale, bitrate adaptatif.
-- ✅ **Tests notify enrichis** : `test_notify.bats` étendu de 8 à 19 tests (notify_format.sh).
-- ✅ **Mode --fast** : nouvelle option `run_tests.sh --fast` excluant les tests E2E lents (~11 min vs ~15 min).
-- ✅ **Couverture tests** : passage de ~728 à ~830 tests, 3 modules critiques couverts (i18n, audio_decision, video_params).
-
 ## v2.8
 
-- ✅ **Gestion HFR (High Frame Rate)** : nouvelles options `--limit-fps` / `--no-limit-fps` pour gérer les vidéos >30 fps. En mode série (défaut), les vidéos HFR sont limitées à 29.97 fps pour optimiser la taille. En mode film/adaptatif, le bitrate est ajusté proportionnellement au framerate.
-- ✅ **Affichage option HFR** : l'option LIMIT_FPS apparaît dans les paramètres actifs (terminal) et dans la notification Discord `run_started`.
-- ✅ **Skip VMAF intelligent** : le score VMAF est automatiquement ignoré lorsque le framerate est modifié (comparaison invalide).
-- ✅ **Tests HFR** : 26 tests unitaires + 2 tests e2e pour la gestion HFR.
-- ✅ **Constantes centralisées** : nouveau module `lib/constants.sh` regroupant les "magic numbers" (mode adaptatif, seuils audio, paramètres Discord, seuils HFR). Toutes les constantes sont overridables via variables d'environnement.
-- ✅ **Robustesse documentation** : documentation systématique de `set -euo pipefail` dans les 38 modules `lib/`.
-- ✅ **Tests renforcés** : nouveaux tests unitaires pour `VIDEO_EQUIV_QUALITY_CAP`, `_clamp_min`, `_clamp_max`, `_min3`.
-- ✅ **Factorisation bitrate** : fonction `_translate_bitrate_by_efficiency()` centralisée dans `codec_profiles.sh` (audio + vidéo).
-- ✅ **Test helpers** : refactoring de `test_helper.bash` (variables standardisées, skip intelligent, modularité).
-- ✅ **Documentation** : CONFIG.md enrichi (section constantes), SMART_CODEC.md mis à jour (rangs audio, traduction bitrate).
+- ✅ **HFR (High Frame Rate) Management**: new `--limit-fps` / `--no-limit-fps` options to handle videos >30 fps. In series mode (default), HFR videos are limited to 29.97 fps to optimize size. In film/adaptatif mode, bitrate is proportionally adjusted to framerate.
+- ✅ **HFR option display**: LIMIT_FPS option appears in active parameters (terminal) and in `run_started` Discord notification.
+- ✅ **Intelligent VMAF skip**: VMAF score is automatically ignored when framerate is modified (invalid comparison).
+- ✅ **HFR tests**: 26 unit tests + 2 e2e tests for HFR management.
+- ✅ **Centralized constants**: new `lib/constants.sh` module grouping "magic numbers" (adaptive mode, audio thresholds, Discord parameters, HFR thresholds). All constants are overridable via environment variables.
+- ✅ **Documentation robustness**: systematic documentation of `set -euo pipefail` in 38 `lib/` modules.
+- ✅ **Reinforced tests**: new unit tests for `VIDEO_EQUIV_QUALITY_CAP`, `_clamp_min`, `_clamp_max`, `_min3`.
+- ✅ **Bitrate factorization**: `_translate_bitrate_by_efficiency()` function centralized in `codec_profiles.sh` (audio + video).
+- ✅ **Test helpers**: refactoring of `test_helper.bash` (standardized variables, intelligent skip, modularity).
+- ✅ **Documentation**: CONFIG.md enriched (constants section), SMART_CODEC.md updated (audio ranks, bitrate translation).
 
 ## v2.7
 
-- ✅ **Robustesse queue / FIFO** : évite les blocages quand aucun fichier n’est traitable (entrées vides, fichiers introuvables, queue invalide) + sortie explicite si la source est exclue.
-- ✅ **Notifications Discord (optionnel)** : messages démarrage/pause(off-peak)/fin, payload plus robuste + mode debug opt-in, docs + tests dédiés.
-- ✅ **Mode adaptatif fiabilisé** : les budgets calculés sont réellement appliqués à l'encodage (exports) + cap SVT-AV1 en CRF (`mbr=`) et logs debug SVT opt-in.
-- ✅ **Vidéo “smart codec”** : seuil de skip codec-aware + politique “no downgrade” (source AV1 ré-encodée en AV1 si nécessaire) + cap “qualité équivalente” sur sources moins efficaces.
-- ✅ **UX/CLI** : meilleure cohérence des messages (skip/erreurs early) et option `--quiet` documentée dans les guides.
-- ✅ **Dev tooling** : `make lint` (ShellCheck) + nettoyage des warnings, améliore la maintenabilité.
-- ✅ **Tests & docs** : ajouts/renforcements Bats (queue, conversion, notifs) + dépannage et guides alignés.
+- ✅ **Queue / FIFO robustness**: avoids blocking when no files are processable (empty entries, missing files, invalid queue) + explicit exit if source is excluded.
+- ✅ **Discord notifications (optional)**: start/pause(off-peak)/end messages, more robust payload + opt-in debug mode, dedicated docs + tests.
+- ✅ **Stabilized adaptive mode**: calculated budgets are actually applied to encoding (exports) + SVT-AV1 cap in CRF (`mbr=`) and opt-in SVT debug logs.
+- ✅ **Video "smart codec"**: codec-aware skip threshold + "no downgrade" policy (AV1 source re-encoded in AV1 if necessary) + "equivalent quality" cap on less efficient sources.
+- ✅ **UX/CLI**: better message consistency (skip/early errors) and `--quiet` option documented in guides.
+- ✅ **Dev tooling**: `make lint` (ShellCheck) + warnings cleanup, improves maintainability.
+- ✅ **Tests & docs**: Bats additions/reinforcements (queue, conversion, notifs) + troubleshooting and aligned guides.
 
 ## v2.6
 
-- ✅ **Audio lossless/premium** : option `--no-lossless` pour forcer la conversion des pistes DTS/DTS-HD, TrueHD, FLAC (désactive le passthrough “premium”)
-- ✅ **Audio multicanal** : règles finalisées (downmix 7.1 → 5.1, EAC3 par défaut, Opus multicanal via `-a opus`, AAC multicanal uniquement avec `--force-audio`)
-- ✅ **Refactor audio** : séparation claire entre décision (`lib/audio_decision.sh`) et paramètres FFmpeg/layout (`lib/audio_params.sh`)
-- ✅ **Refactor “clean code light”** : simplification interne des grosses fonctions (audio/vidéo/VMAF/suffixe) et construction des commandes FFmpeg via tableaux d’arguments (pas de changement UX/CLI attendu)
-- ✅ **Tests & docs** : nouveaux tests Bats multicanal + docs alignées (README + docs)
+- ✅ **Lossless/premium audio**: `--no-lossless` option to force conversion of DTS/DTS-HD, TrueHD, FLAC tracks (disables "premium" passthrough)
+- ✅ **Multichannel audio**: finalized rules (downmix 7.1 → 5.1, EAC3 by default, multichannel Opus via `-a opus`, multichannel AAC only with `--force-audio`)
+- ✅ **Audio refactor**: clear separation between decision (`lib/audio_decision.sh`) and FFmpeg parameters/layout (`lib/audio_params.sh`)
+- ✅ **"Clean code light" refactor**: internal simplification of large functions (audio/video/VMAF/suffix) and FFmpeg command building via argument arrays (no expected UX/CLI change)
+- ✅ **Tests & docs**: new Bats multichannel tests + aligned docs (README + docs)
 
 ## v2.5
 
-- ✅ **Mode adaptatif** : bitrate adaptatif basé sur une analyse de complexité
-- ✅ **Filtre de taille** : option `--min-size` pour filtrer l'index/queue (utile en mode film)
-- ✅ **Audio multicanal** : normalisation des layouts (stéréo / 5.1) + logique de préservation selon le mode
-- ✅ **Windows / Git Bash** : normalisation chemins/CRLF et meilleure robustesse avec caractères spéciaux
-- ✅ **VMAF & UX** : ajustements d'affichage + paramètre de subsampling, amélioration des messages et compteurs
-- ✅ **Tests** : refactor et optimisations pour exécution plus rapide et plus robuste
-- ✅ **Refactor audio** : extraction de la logique “smart codec” dans `lib/audio_decision.sh` (et `lib/audio_params.sh` recentré sur FFmpeg/layout)
+- ✅ **Adaptive mode**: adaptive bitrate based on complexity analysis
+- ✅ **Size filter**: `--min-size` option to filter index/queue (useful in film mode)
+- ✅ **Multichannel audio**: layout normalization (stereo / 5.1) + preservation logic according to mode
+- ✅ **Windows / Git Bash**: path/CRLF normalization and better robustness with special characters
+- ✅ **VMAF & UX**: display adjustments + subsampling parameter, improved messages and counters
+- ✅ **Tests**: refactor and optimizations for faster and more robust execution
+- ✅ **Audio refactor**: extraction of "smart codec" logic into `lib/audio_decision.sh` (and `lib/audio_params.sh` refocused on FFmpeg/layout)
 
 ## v2.4
 
-- ✅ **Audio multi-codec** : option `-a/--audio` pour choisir AAC, AC3, Opus ou copy
-- ✅ **Logique anti-upscaling** : ne convertit l'audio que si gain réel (>20%)
-- ✅ Bitrates optimisés : AAC 160k, AC3 384k, Opus 128k
-- ✅ Suffixe audio dans le nom de fichier (`_aac`, `_opus`, etc.)
-- ✅ Refactoring audio : nouveau module `audio_params.sh` dédié (paramètres FFmpeg/layout)
-- ✅ Aide colorée avec options mises en évidence
-- ✅ Affichage codec vidéo dans les paramètres actifs
+- ✅ **Multi-codec audio**: `-a/--audio` option to choose AAC, AC3, Opus or copy
+- ✅ **Anti-upscaling logic**: only converts audio if real gain (>20%)
+- ✅ Optimized bitrates: AAC 160k, AC3 384k, Opus 128k
+- ✅ Audio suffix in filename (`_aac`, `_opus`, etc.)
+- ✅ Audio refactoring: new dedicated `audio_params.sh` module (FFmpeg parameters/layout)
+- ✅ Colored help with highlighted options
+- ✅ Video codec display in active parameters
 
 ## v2.3
 
-- ✅ **Support multi-codec vidéo** : option `-c/--codec` pour choisir HEVC ou AV1
-- ✅ Nouveau module `codec_profiles.sh` pour configuration modulaire des encodeurs
-- ✅ Support libsvtav1 et libaom-av1 pour AV1
-- ✅ Suffixe dynamique par codec (`_x265_`, `_av1_`)
-- ✅ Skip automatique adapté au codec cible
-- ✅ Validation encodeur FFmpeg avant conversion
+- ✅ **Multi-codec video support**: `-c/--codec` option to choose HEVC or AV1
+- ✅ New `codec_profiles.sh` module for modular encoder configuration
+- ✅ libsvtav1 and libaom-av1 support for AV1
+- ✅ Dynamic suffix by codec (`_x265_`, `_av1_`)
+- ✅ Automatic skip adapted to target codec
+- ✅ FFmpeg encoder validation before conversion
 
 ## v2.2
 
-- ✅ Option `-f/--file` pour convertir un fichier unique (bypass index/queue)
-- ✅ Affichage du gain de place total dans le résumé final (avant → après, économie en %)
-- ✅ Amélioration fiabilité pipefail et nettoyage fichiers temporaires
+- ✅ `-f/--file` option to convert a single file (bypasses index/queue)
+- ✅ Total space savings display in final summary (before → after, savings in %)
+- ✅ Improved pipefail reliability and temporary file cleanup
 
 ## v2.1
 
-- ✅ Mode film optimisé qualité (two-pass 2035 kbps, keyint=240)
-- ✅ GOP différencié : 240 frames (film) vs 600 frames (série)
-- ✅ Tune fastdecode optionnel (activé série, désactivé film)
-- ✅ Tests refactorisés : comportement vs valeurs en dur
-- ✅ Affichage tests condensé avec progression temps réel
+- ✅ Quality-optimized film mode (two-pass 2035 kbps, keyint=240)
+- ✅ Differentiated GOP: 240 frames (film) vs 600 frames (serie)
+- ✅ Optional tune fastdecode (enabled serie, disabled film)
+- ✅ Refactored tests: behavior vs hardcoded values
+- ✅ Condensed test display with real-time progress
 
 ## v2.0
 
-- ✅ Nouveaux paramètres x265 optimisés pour le mode série
-- ✅ Pass 1 rapide (`no-slow-firstpass`) pour gain de temps
-- ✅ Préparation conversion audio Opus 128k (désactivé temporairement)
-- ✅ Amélioration gestion VMAF (détection fichiers vides)
-- ✅ Suffixe dynamique avec indicateur `_tuned`
+- ✅ New optimized x265 parameters for series mode
+- ✅ Fast pass 1 (`no-slow-firstpass`) for time savings
+- ✅ Opus 128k audio conversion preparation (temporarily disabled)
+- ✅ Improved VMAF management (empty file detection)
+- ✅ Dynamic suffix with `_tuned` indicator

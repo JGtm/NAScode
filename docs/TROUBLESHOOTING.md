@@ -1,79 +1,79 @@
-# Dépannage
+# Troubleshooting
 
-## Logs (où regarder)
+## Logs (where to look)
 
-Les logs sont dans `logs/`.
+Logs are in `logs/`.
 
-Fichiers typiques :
-- `Session_*.log` : journal unifié de la session
-- `Summary_*.log` : résumé de fin de conversion
-- `Progress_*.log` : progression détaillée
+Typical files:
+- `Session_*.log`: unified session journal
+- `Summary_*.log`: end-of-conversion summary
+- `Progress_*.log`: detailed progress
 - `Success_*.log` / `Error_*.log` / `Skipped_*.log`
-- `SVT_*.log` : extrait de config SVT-AV1 (option debug, voir ci-dessous)
-- `Index` : index des fichiers à traiter (null-separated)
-- `Index_readable_*.txt` : index lisible (liste)
-- `Queue` / `Queue.full` : file d’attente (généralement temporaire)
-- `DryRun_Comparison_*.log` : comparaison des noms (dry-run)
+- `SVT_*.log`: SVT-AV1 config excerpt (debug option, see below)
+- `Index`: index of files to process (null-separated)
+- `Index_readable_*.txt`: readable index (list)
+- `Queue` / `Queue.full`: queue (usually temporary)
+- `DryRun_Comparison_*.log`: filename comparison (dry-run)
 
-## Aucun fichier à traiter / queue invalide / source exclue
+## No files to process / invalid queue / excluded source
 
-### 1) Message “Aucun fichier à traiter”
+### 1) "No files to process" message
 
-Ça arrive typiquement quand **aucun fichier ne passe les filtres** (ex: `--min-size`) ou quand la **source** (`-s`) ne pointe pas sur le bon dossier.
+This typically happens when **no files pass the filters** (e.g., `--min-size`) or when the **source** (`-s`) doesn't point to the right folder.
 
-Actions rapides :
+Quick actions:
 
 ```bash
-# Régénérer index + queue depuis la source
-bash nascode -R -s "/chemin/source"
+# Regenerate index + queue from source
+bash nascode -R -s "/path/source"
 
-# Si tu avais un filtre taille, essaye sans
-bash nascode -R -s "/chemin/source"  # sans --min-size
+# If you had a size filter, try without
+bash nascode -R -s "/path/source"  # without --min-size
 ```
 
-### 2) Message “Format du fichier queue invalide (séparateur NUL attendu)”
+### 2) "Invalid queue file format (NUL separator expected)" message
 
-NAScode utilise des fichiers `logs/Index`/`logs/Queue` au format **null-separated**.
-Si tu fournis un fichier queue personnalisé (option `-q`), il doit respecter ce format.
+NAScode uses `logs/Index`/`logs/Queue` files in **null-separated** format.
+If you provide a custom queue file (`-q` option), it must respect this format.
 
-Actions rapides :
+Quick actions:
 
 ```bash
-# Supprimer la queue et régénérer
+# Delete queue and regenerate
 rm -f logs/Queue logs/Queue.full 2>/dev/null || true
-bash nascode -R -s "/chemin/source"
+bash nascode -R -s "/path/source"
 ```
 
-### 3) Erreur “Le répertoire source est exclu par la configuration (EXCLUDES)”
+### 3) "Source directory is excluded by configuration (EXCLUDES)" error
 
-La config contient une liste d’exclusions (`EXCLUDES`). Si ta `SOURCE` (après normalisation) matche une exclusion, NAScode s’arrête explicitement.
+The config contains an exclusions list (`EXCLUDES`). If your `SOURCE` (after normalization) matches an exclusion, NAScode stops explicitly.
 
-Actions rapides :
+Quick actions:
 
-- Vérifie que tu passes bien le bon `-s`.
-- Ajuste `EXCLUDES` (dans la config) si tu veux autoriser ce chemin.
+- Verify you're passing the correct `-s`.
+- Adjust `EXCLUDES` (in config) if you want to allow this path.
 
 ## Lockfile / Stop flag
 
-En cas de crash, le script peut laisser :
-- Lockfile : `/tmp/conversion_video.lock`
-- Stop flag : `/tmp/conversion_stop_flag`
+In case of crash, the script may leave:
+- Lockfile: `/tmp/conversion_video.lock`
+- Stop flag: `/tmp/conversion_stop_flag`
 
-Si aucun `nascode` ne tourne, supprimer :
+If no `nascode` is running, delete:
 
 ```bash
 rm -f /tmp/conversion_video.lock /tmp/conversion_stop_flag
 ```
 
-## Vérifier FFmpeg (encoders/filters)
+## Check FFmpeg (encoders/filters)
 
 ```bash
 ffmpeg -hide_banner -encoders | grep libx265
-ffmpeg -hide_banner -encoders | grep libsvtav1  # optionnel (AV1)
-ffmpeg -hide_banner -filters | grep libvmaf     # optionnel (VMAF)
+ffmpeg -hide_banner -encoders | grep libsvtav1  # optional (AV1)
+ffmpeg -hide_banner -filters | grep libvmaf     # optional (VMAF)
 ```
 
-## FFmpeg sans libx265
+## FFmpeg without libx265
 
 ```bash
 # Ubuntu/Debian
@@ -83,61 +83,61 @@ sudo apt install ffmpeg
 brew install ffmpeg
 ```
 
-## Windows (Git Bash) : FFmpeg avec SVT-AV1
+## Windows (Git Bash): FFmpeg with SVT-AV1
 
-La version "essentials" de FFmpeg (gyan.dev) ne contient pas `libsvtav1` pour l'encodage AV1.
-Si tu utilises Git Bash avec MSYS2, tu peux installer une version complète de FFmpeg :
+The "essentials" version of FFmpeg (gyan.dev) doesn't include `libsvtav1` for AV1 encoding.
+If you're using Git Bash with MSYS2, you can install a complete version of FFmpeg:
 
 ```bash
-# 1. Installer FFmpeg et SVT-AV1 via pacman (MSYS2)
+# 1. Install FFmpeg and SVT-AV1 via pacman (MSYS2)
 pacman -S mingw-w64-ucrt-x86_64-ffmpeg mingw-w64-ucrt-x86_64-svt-av1
 
-# 2. Ajouter MSYS2 au PATH (dans ~/.bashrc)
+# 2. Add MSYS2 to PATH (in ~/.bashrc)
 echo 'export PATH="/c/msys64/ucrt64/bin:$PATH"' >> ~/.bashrc
 source ~/.bashrc
 
-# 3. Vérifier que libsvtav1 est disponible
+# 3. Verify libsvtav1 is available
 ffmpeg -encoders 2>/dev/null | grep libsvtav1
 ```
 
-Note : sans MSYS2, il est possible d'utiliser un FFmpeg "full" depuis https://www.gyan.dev/ffmpeg/builds/.
+Note: without MSYS2, you can use a "full" FFmpeg from https://www.gyan.dev/ffmpeg/builds/.
 
-## Debug SVT-AV1 : vérifier "capped CRF" / `mbr`
+## Debug SVT-AV1: verify "capped CRF" / `mbr`
 
-Si tu veux confirmer que SVT-AV1 a bien activé le mode "capped CRF" et pris en compte `mbr=<kbps>`, tu peux activer un mode debug qui écrit un petit log dédié **sans spammer le terminal** :
+If you want to confirm that SVT-AV1 has properly enabled "capped CRF" mode and taken `mbr=<kbps>` into account, you can enable a debug mode that writes a small dedicated log **without spamming the terminal**:
 
 ```bash
 NASCODE_LOG_SVT_CONFIG=1 bash nascode [options]
 ```
 
-Résultat :
-- Un fichier `logs/SVT_<timestamp>_*.log` est créé par conversion AV1 (SVT-AV1) et contient les lignes `Svt[info]: SVT [config] ...` incluant notamment `BRC mode ... capped CRF ... max bitrate`.
-- Le terminal reste inchangé (la sortie FFmpeg est déjà redirigée, on n’affiche pas ces lignes en direct).
+Result:
+- A `logs/SVT_<timestamp>_*.log` file is created per AV1 conversion (SVT-AV1) and contains `Svt[info]: SVT [config] ...` lines including notably `BRC mode ... capped CRF ... max bitrate`.
+- The terminal remains unchanged (FFmpeg output is already redirected, we don't display these lines live).
 
 ## VMAF
 
-- Si ton FFmpeg principal n’a pas `libvmaf`, le script peut chercher un FFmpeg alternatif selon l’environnement.
-- En cas de doute : tester sur un fichier via `-l 1` et activer les logs.
+- If your main FFmpeg doesn't have `libvmaf`, the script may look for an alternative FFmpeg depending on the environment.
+- When in doubt: test on a file via `-l 1` and enable logs.
 
-Repères de lecture (indicatifs) :
+Reading benchmarks (indicative):
 
-| Score | Qualité |
+| Score | Quality |
 |-------|---------|
 | ≥ 90 | EXCELLENT |
-| 80-89 | TRÈS BON |
-| 70-79 | BON |
-| < 70 | DÉGRADÉ |
+| 80-89 | VERY GOOD |
+| 70-79 | GOOD |
+| < 70 | DEGRADED |
 
-## Fichiers sautés (skip)
+## Skipped files (skip)
 
-- Consulter `logs/Skipped_*.log`.
+- Check `logs/Skipped_*.log`.
 
-## Erreurs d'encodage
+## Encoding errors
 
-1. Consulter `logs/Error_*.log`
-2. Vérifier l'espace disque dans `/tmp`
-3. Tester avec un seul fichier : `bash nascode -l 1`
+1. Check `logs/Error_*.log`
+2. Verify disk space in `/tmp`
+3. Test with a single file: `bash nascode -l 1`
 
-## Noms de fichiers
+## File names
 
-Le script gère les espaces et caractères spéciaux, mais éviter les caractères de contrôle.
+The script handles spaces and special characters, but avoid control characters.

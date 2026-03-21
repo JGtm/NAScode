@@ -1,219 +1,219 @@
-# 🎬 NAScode — Outil Bash — Conversion vidéo HEVC / AV1
+# 🎬 NAScode — Bash Tool — HEVC / AV1 Video Conversion
 
-Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou **AV1** en batch (séries/films), avec une logique “smart” (skip/passthrough) et une file d’attente persistante.
+Bash automation script for converting videos to **HEVC (x265)** or **AV1** in batch (series/movies), with "smart" logic (skip/passthrough) and a persistent queue.
 
-Prérequis :
-- **bash 4+** (Git Bash/WSL sur Windows OK)
-- **ffmpeg** avec `libx265` (AV1 via `libsvtav1` optionnel, VMAF via `libvmaf` optionnel)
+Prerequisites:
+- **bash 4+** (Git Bash/WSL on Windows OK)
+- **ffmpeg** with `libx265` (AV1 via `libsvtav1` optional, VMAF via `libvmaf` optional)
 
-Installation :
+Installation:
 ```bash
 git clone <repo_url> NAScode
 cd NAScode
 chmod +x nascode
 ```
 
-Usage minimal :
+Minimal usage:
 ```bash
-# Convertir un dossier (mode série par défaut)
-bash nascode -s "/chemin/vers/series"
+# Convert a folder (serie mode by default)
+bash nascode -s "/path/to/series"
 
-# Mode film (plus orienté qualité)
-bash nascode -m film -s "/chemin/vers/films"
+# Film mode (more quality-oriented)
+bash nascode -m film -s "/path/to/movies"
 
 # Dry-run (simulation)
-bash nascode -d -s "/chemin/source"
+bash nascode -d -s "/path/source"
 
-# Heures creuses (plage par défaut 22:00-06:00)
-bash nascode -p -s "/chemin/vers/series"
+# Off-peak hours (default range 22:00-06:00)
+bash nascode -p -s "/path/to/series"
 
-# Filtrer l'index/queue : ignorer les petits fichiers (utile pour films)
-bash nascode -m film --min-size 700M -s "/chemin/vers/films"
+# Filter index/queue: ignore small files (useful for movies)
+bash nascode -m film --min-size 700M -s "/path/to/movies"
 ```
 
-Defaults importants (issus de la config) :
-- Mode : `serie`
-- Codec vidéo : `hevc`
-- Codec audio : `aac`
-- Sortie : `Converted/`
+Important defaults (from config):
+- Mode: `serie`
+- Video codec: `hevc`
+- Audio codec: `aac`
+- Output: `Converted/`
 
-## 🌐 Internationalisation (i18n)
+## What the script does
 
-NAScode supporte l'anglais et le français :
+- Converts to **HEVC (x265)** or **AV1** depending on `--codec`.
+- Manages a **queue** (persistent index) and can **skip** files already "good".
+- Supports **video passthrough** mode (video copied, audio optimized if relevant).
+- Adds a **suffix** (dynamic or custom) to reflect video codec, output resolution and (optionally) audio codec.
+- Optional: **VMAF** and **sample** for quick testing.
+- Limitation: **portrait mode** videos (vertical / rotation metadata) are not effectively supported; resolution/bitrate estimation logic is primarily designed for "landscape" sources and may produce unsuitable parameters.
+
+## 🌐 Internationalization (i18n)
+
+NAScode supports English and French:
 
 ```bash
-# Sortie en anglais
-bash nascode --lang en -s "/chemin/source"
+# English output
+bash nascode --lang en -s "/path/source"
 
-# Sortie en français (défaut)
-bash nascode --lang fr -s "/chemin/source"
-bash nascode -s "/chemin/source"
+# French output (default)
+bash nascode --lang fr -s "/path/source"
+bash nascode -s "/path/source"
 
-# Définir la langue via variable d'environnement
+# Set language via environment variable
 export NASCODE_LANG=en
-bash nascode -s "/chemin/source"
+bash nascode -s "/path/source"
 ```
 
-Documentation disponible dans les deux langues :
-- Français : [docs/](docs/)
-- Anglais : [docs/en/](docs/en/)
+Documentation is available in both languages:
+- French: [docs/fr/](docs/fr/)
+- English: [docs/](docs/)
 
-## Ce que fait le script
+## 🎯 Decision Matrices (smart codec)
 
-- Convertit en **HEVC (x265)** ou **AV1** selon `--codec`.
-- Gère une **file d’attente** (index persistant) et peut **skip** les fichiers déjà “bons”.
-- Supporte un mode **video passthrough** (vidéo copiée, audio optimisé si pertinent).
-- Ajoute un **suffixe** (dynamique ou personnalisé) pour refléter le codec vidéo, la résolution de sortie et (optionnellement) le codec audio.
-- Optionnel : **VMAF** et **sample** pour tester rapidement.
-- Limitation : les vidéos **en mode portrait** (vertical / rotation metadata) ne sont pas prises en charge de manière effective ; la logique d’estimation résolution/bitrate est principalement conçue pour des sources “paysage”, et peut produire des paramètres peu adaptés.
+These tables summarize the most frequent decisions (skip / copy / convert / downscale).
+For the complete logic and details, see [docs/SMART_CODEC.md](docs/SMART_CODEC.md).
 
-## 🎯 Matrices de décision (smart codec)
+### Audio (default: `aac` stereo)
 
-Ces tableaux résument les décisions les plus fréquentes (skip / copy / convert / downscale).
-Pour la logique complète et les détails, voir [docs/SMART_CODEC.md](docs/SMART_CODEC.md).
+Reminders:
+- `--audio copy`: copies audio without modification.
+- `--force-audio`: forces conversion to target codec (bypass smart).
+- `--no-lossless`: forces conversion of premium codecs (DTS/DTS-HD/TrueHD/FLAC).
+- `--equiv-quality` / `--no-equiv-quality`: enables/disables "equivalent quality" mode (audio + video cap).
+	(Ignored in `adaptatif` mode: stays enabled.)
+- `--limit-fps` / `--no-limit-fps`: limits FPS to 29.97 for HFR content (>30 fps).
+	- `serie` mode: enabled by default (size optimization).
+	- `film` / `adaptatif` modes: disabled by default (max quality, increased bitrate if HFR).
+	- Note: VMAF is ignored if FPS is modified (frame-by-frame comparison impossible).
 
-### Audio (par défaut : `aac` stéréo)
+**Channel management (multichannel):**
+- **`serie` mode**: forced stereo (systematic downmix if 5.1/7.1+).
+- **`film` / `adaptatif` modes**: target layout stereo (2ch) or **5.1** (automatic downmix if 7.1).
+- **Default multichannel codec (film/adaptatif)**: EAC3 384k (TV/receiver compatible).
+- **Multichannel AAC**: only with `-a aac --force-audio` (320k cap).
+- **Multichannel Opus**: `-a opus` (224k cap).
+- **Anti-upscale**: no conversion if source < 256k (unless downmix required).
 
-Rappels :
-- `--audio copy` : copie l'audio sans modification.
-- `--force-audio` : force la conversion vers le codec cible (bypass smart).
-- `--no-lossless` : force la conversion des codecs premium (DTS/DTS-HD/TrueHD/FLAC).
-- `--equiv-quality` / `--no-equiv-quality` : active/désactive le mode "qualité équivalente" (audio + cap vidéo).
-	(Ignoré en mode `adaptatif` : reste activé.)
-- `--limit-fps` / `--no-limit-fps` : limite le FPS à 29.97 pour le contenu HFR (>30 fps).
-	- Mode `serie` : activé par défaut (optimisation taille).
-	- Modes `film` / `adaptatif` : désactivé par défaut (qualité max, bitrate majoré si HFR).
-	- Note : VMAF est ignoré si le FPS est modifié (comparaison frame-à-frame impossible).
+**Premium codecs (DTS/DTS-HD/TrueHD/FLAC):**
+- **Without `--no-lossless`**: passthrough (preserved if already 5.1, otherwise downmix → EAC3 384k).
+- **With `--no-lossless`**: forced conversion (stereo → target codec, multichannel → EAC3 384k).
 
-**Gestion des canaux (multicanal) :**
-- **Mode `serie`** : stéréo forcée (downmix systématique si 5.1/7.1+).
-- **Modes `film` / `adaptatif`** : layout cible stéréo (2ch) ou **5.1** (downmix automatique si 7.1).
-- **Codec par défaut multichannel (film/adaptatif)** : EAC3 384k (compatible TV/receivers).
-- **AAC multichannel** : uniquement avec `-a aac --force-audio` (plafond 320k).
-- **Opus multichannel** : `-a opus` (plafond 224k).
-- **Anti-upscale** : pas de conversion si source < 256k (sauf downmix requis).
+Note: in `serie` mode, forced stereo may convert cases otherwise in `copy` (including premium) to guarantee 2.0 output.
 
-**Codecs premium (DTS/DTS-HD/TrueHD/FLAC) :**
-- **Sans `--no-lossless`** : passthrough (conservés si déjà 5.1, sinon downmix → EAC3 384k).
-- **Avec `--no-lossless`** : conversion forcée (stéréo → codec cible, multichannel → EAC3 384k).
-
-Note : en mode `serie`, la stéréo forcée peut convertir des cas autrement en `copy` (y compris premium) afin de garantir une sortie 2.0.
-
-| Codec source | Statut | Channels | Bitrate source | Action | Résultat |
-|-------------|--------|----------|----------------|--------|----------|
-| DTS / DTS-HD / TrueHD | Premium | 5.1 | * | `copy` | Conservé (passthrough) |
+| Source codec | Status | Channels | Source bitrate | Action | Result |
+|-------------|--------|----------|----------------|--------|--------|
+| DTS / DTS-HD / TrueHD | Premium | 5.1 | * | `copy` | Preserved (passthrough) |
 | DTS / DTS-HD / TrueHD | Premium | 7.1 | * | `convert` | → EAC3 384k 5.1 (downmix) |
-| FLAC | Lossless | * | * | `copy` | Conservé (qualité max) |
-| Opus | Efficace | stéréo | $\le$ 128k | `copy` | Conservé tel quel |
-| Opus | Efficace | 5.1+ | $\le$ 224k | `copy` | Conservé tel quel |
-| AAC | Efficace | stéréo | $\le$ 160k | `copy` | Conservé tel quel |
-| AAC | Efficace | 5.1 | $\le$ 320k | `copy` | Conservé tel quel |
-| EAC3 | Standard | 5.1 | $\le$ 384k | `copy` | Conservé tel quel |
+| FLAC | Lossless | * | * | `copy` | Preserved (max quality) |
+| Opus | Efficient | stereo | $\le$ 128k | `copy` | Preserved as-is |
+| Opus | Efficient | 5.1+ | $\le$ 224k | `copy` | Preserved as-is |
+| AAC | Efficient | stereo | $\le$ 160k | `copy` | Preserved as-is |
+| AAC | Efficient | 5.1 | $\le$ 320k | `copy` | Preserved as-is |
+| EAC3 | Standard | 5.1 | $\le$ 384k | `copy` | Preserved as-is |
 | EAC3 | Standard | 5.1 | $>$ 384k | `downscale` | EAC3 → 384k |
-| AC3 | Inefficace | 5.1 | * | `convert` | → EAC3 384k |
-| MP3 / PCM / autres | Inefficace | * | * | `convert` | → codec cible |
+| AC3 | Inefficient | 5.1 | * | `convert` | → EAC3 384k |
+| MP3 / PCM / others | Inefficient | * | * | `convert` | → target codec |
 
-### Vidéo (cible par défaut : `hevc`)
+### Video (default target: `hevc`)
 
-Rappels :
-- Hiérarchie (efficacité) : AV1 > HEVC > VP9 > H.264 > MPEG4
-- Le “skip” dépend d’un seuil dérivé de `MAXRATE_KBPS` et d’une tolérance :
-	- $\text{seuil} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times (1 + \text{tolérance})$
-	- Par défaut : tolérance 10%
-	- Si la source est dans un codec **plus efficace** que la cible (ex: AV1 alors que la cible est HEVC), le seuil est **traduit** dans l’espace du codec source via l’efficacité codec.
-	- Exemple (mode `serie`, cible HEVC) : seuil HEVC 2772k → seuil AV1 ≈ $2772 \times 50/70 \approx 1980$k
-- `--force-video` : force le ré-encodage vidéo (bypass smart).
-- `--equiv-quality` / `--no-equiv-quality` : active/désactive le mode "qualité équivalente" (audio + cap vidéo).
-	(Ignoré en mode `adaptatif` : reste activé.)
+Reminders:
+- Hierarchy (efficiency): AV1 > HEVC > VP9 > H.264 > MPEG4
+- "Skip" depends on a threshold derived from `MAXRATE_KBPS` and tolerance:
+	- $\text{threshold} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times (1 + \text{tolerance})$
+	- Default: 10% tolerance
+	- If the source is in a **more efficient** codec than the target (e.g., AV1 when target is HEVC), the threshold is **translated** into the source codec space via codec efficiency.
+	- Example (`serie` mode, target HEVC): HEVC threshold 2772k → AV1 threshold ≈ $2772 \times 50/70 \approx 1980$k
+- `--force-video`: forces video re-encoding (bypass smart).
+- `--equiv-quality` / `--no-equiv-quality`: enables/disables "equivalent quality" mode (audio + video cap).
+	(Ignored in `adaptatif` mode: stays enabled.)
 
-| Codec source | vs cible | Bitrate (vs seuil) | Action | Résultat |
-|-------------|----------|--------------------|--------|----------|
-| AV1 | > HEVC | $\le$ seuil (traduit) | `skip` | Conservé (meilleur codec, bitrate OK) |
-| AV1 | > HEVC | $>$ seuil (traduit) | `encode` | Ré-encodage **en AV1** (pas de downgrade) |
-| HEVC | = HEVC | $\le$ seuil HEVC | `skip` | Conservé (déjà optimisé) |
-| HEVC | = HEVC | $>$ seuil HEVC | `encode` | Ré-encodage (bitrate trop élevé) |
+| Source codec | vs target | Bitrate (vs threshold) | Action | Result |
+|-------------|----------|--------------------|--------|--------|
+| AV1 | > HEVC | $\le$ threshold (translated) | `skip` | Preserved (better codec, OK bitrate) |
+| AV1 | > HEVC | $>$ threshold (translated) | `encode` | Re-encoding **in AV1** (no downgrade) |
+| HEVC | = HEVC | $\le$ HEVC threshold | `skip` | Preserved (already optimized) |
+| HEVC | = HEVC | $>$ HEVC threshold | `encode` | Re-encoding (bitrate too high) |
 | VP9 / H.264 / MPEG4 | < HEVC | * | `encode` | Conversion → HEVC |
-| Source > 1080p (ex: 4K) | * | * | `encode + scale` | Downscale → 1080p + codec cible |
-| Vidéo OK mais audio perfectible | * | * | `passthrough` | Vidéo copiée + audio traité |
+| Source > 1080p (e.g., 4K) | * | * | `encode + scale` | Downscale → 1080p + target codec |
+| Video OK but audio improvable | * | * | `passthrough` | Video copied + audio processed |
 
-## Utilisation
+## Usage
 
-Commande :
+Command:
 ```bash
 bash nascode [options]
 ```
 
-Pour la liste complète des options :
+For the complete list of options:
 ```bash
 bash nascode --help
 ```
 
-Guides détaillés :
+Detailed guides:
 - [docs/DOCS.md](docs/DOCS.md)
 - [docs/USAGE.md](docs/USAGE.md)
 - [docs/CONFIG.md](docs/CONFIG.md)
 
-Référence code (audio) :
-- Décision “smart codec” : [lib/audio_decision.sh](lib/audio_decision.sh)
-- Construction FFmpeg/layout : [lib/audio_params.sh](lib/audio_params.sh)
+Code reference (audio):
+- "Smart codec" decision: [lib/audio_decision.sh](lib/audio_decision.sh)
+- FFmpeg/layout construction: [lib/audio_params.sh](lib/audio_params.sh)
 
-## Logs & sortie
+## Logs & Output
 
-- Sortie par défaut : `Converted/` (dans le dossier du script)
-- Logs : `logs/` (dans le dossier du script)
-- Si une conversion produit un fichier plus lourd (ou un gain < seuil), la sortie est redirigée vers `Converted_Heavier/` (configurable) pour éviter les boucles de re-traitement.
+- Default output: `Converted/` (in script folder)
+- Logs: `logs/` (in script folder)
+- If a conversion produces a heavier file (or gain < threshold), the output is redirected to `Converted_Heavier/` (configurable) to avoid reprocessing loops.
 
-Détails : [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
+Details: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
 
-### Dépannage rapide (cas fréquents)
+### Quick Troubleshooting (common cases)
 
-- **Aucun fichier à traiter** : tes filtres/exclusions ont probablement tout éliminé (ex: `--min-size`, `EXCLUDES`, mauvaise `-s`). Réessaie sans filtre, ou force une régénération : `bash nascode -R -s "..."`.
-- **Queue invalide (séparateur NUL)** : si tu fournis une queue custom, elle doit être *null-separated*. Sinon, supprime `logs/Queue` et relance avec `-R`.
-- **Source exclue par la config** : si tu vois une erreur indiquant que `SOURCE` est dans `EXCLUDES`, change `-s` ou retire l’exclusion (dans la config).
+- **No files to process**: your filters/exclusions probably eliminated everything (e.g., `--min-size`, `EXCLUDES`, wrong `-s`). Retry without filter, or force regeneration: `bash nascode -R -s "..."`.
+- **Invalid queue (NUL separator)**: if you provide a custom queue, it must be *null-separated*. Otherwise, delete `logs/Queue` and rerun with `-R`.
+- **Source excluded by config**: if you see an error indicating `SOURCE` is in `EXCLUDES`, change `-s` or remove the exclusion (in config).
 
-## Notifications Discord (optionnel)
+## Discord Notifications (optional)
 
-NAScode peut envoyer des notifications via un **webhook Discord** (format Markdown) :
+NAScode can send notifications via a **Discord webhook** (Markdown format):
 
-- au démarrage : **paramètres actifs** + aperçu de la queue (jusqu’à 20 éléments, avec troncature)
-- pendant le run : **début/fin de chaque fichier** (préfixe `[i/N]`, durée, tailles `avant → après`)
-- pendant le run : **skip d’un fichier** (ignoré + raison)
-- transferts : **en attente** puis **terminés** (si applicable)
-- VMAF (si activé) : démarrage + **résultat par fichier** (note/qualité) + fin globale
-- en entrée/sortie des heures pleines quand `--off-peak` est actif
-- à la fin : résumé (si disponible) puis un message de **fin avec horodatage**
+- at startup: **active parameters** + queue preview (up to 20 items, with truncation)
+- during run: **start/end of each file** (`[i/N]` prefix, duration, sizes `before → after`)
+- during run: **file skip** (ignored + reason)
+- transfers: **pending** then **completed** (if applicable)
+- VMAF (if enabled): start + **result per file** (score/quality) + global end
+- entering/exiting peak hours when `--off-peak` is active
+- at the end: summary (if available) then an **end message with timestamp**
 
-Configuration (via variables d’environnement) :
+Configuration (via environment variables):
 
-- `NASCODE_DISCORD_WEBHOOK_URL` (obligatoire) : URL du webhook (secret)
-- `NASCODE_DISCORD_NOTIFY` (optionnel) : `true/false` (par défaut `true` si l’URL est définie)
+- `NASCODE_DISCORD_WEBHOOK_URL` (required): webhook URL (secret)
+- `NASCODE_DISCORD_NOTIFY` (optional): `true/false` (default `true` if URL is defined)
 
-Recommandé (local, non versionné) :
+Recommended (local, not versioned):
 
 ```bash
 cp .env.example .env.local
-# puis édite .env.local (NE PAS commiter)
-bash nascode -s "/chemin/vers/series"
+# then edit .env.local (DO NOT commit)
+bash nascode -s "/path/to/series"
 ```
 
-Par défaut, `nascode` charge automatiquement `./.env.local` (si présent) au démarrage.
+By default, `nascode` automatically loads `./.env.local` (if present) at startup.
 
-- Désactiver : `NASCODE_ENV_AUTOLOAD=false`
-- Utiliser un autre fichier : `NASCODE_ENV_FILE=/chemin/vers/mon.env`
+- Disable: `NASCODE_ENV_AUTOLOAD=false`
+- Use another file: `NASCODE_ENV_FILE=/path/to/my.env`
 
-Sécurité : ne commit jamais le webhook. Si tu l’as posté dans un chat/log/issue, considère-le compromis et régénère-le côté Discord.
+Security: never commit the webhook. If you posted it in a chat/log/issue, consider it compromised and regenerate it on Discord's side.
 
 ## Documentation
 
-- Index docs : [docs/DOCS.md](docs/DOCS.md)
-- Configuration avancée & constantes : [docs/CONFIG.md](docs/CONFIG.md)
-- Ajouter un nouveau codec : [docs/ADDING_NEW_CODEC.md](docs/ADDING_NEW_CODEC.md)
-- Instructions macOS : [docs/Instructions-Mac.txt](docs/Instructions-Mac.txt)
-- Critères de conversion : [docs/SMART_CODEC.md](docs/SMART_CODEC.md)
+- Docs index: [docs/DOCS.md](docs/DOCS.md)
+- Advanced configuration & constants: [docs/CONFIG.md](docs/CONFIG.md)
+- Adding a new codec: [docs/ADDING_NEW_CODEC.md](docs/ADDING_NEW_CODEC.md)
+- macOS instructions: [docs/fr/Instructions-Mac.txt](docs/fr/Instructions-Mac.txt)
+- Conversion criteria: [docs/SMART_CODEC.md](docs/SMART_CODEC.md)
 
 ## Tests
 
-Le repo utilise **Bats** :
+The repo uses **Bats**:
 
 ```bash
 bash run_tests.sh
@@ -221,21 +221,21 @@ bash run_tests.sh
 # Verbose
 bash run_tests.sh -v
 
-# Filtrer
-bash run_tests.sh -f "queue"  # exemple
+# Filter
+bash run_tests.sh -f "queue"  # example
 ```
 
-Sur Git Bash / Windows, [run_tests.sh](run_tests.sh) tente aussi `${HOME}/.local/bin/bats` si `bats` n’est pas sur le PATH.
+On Git Bash / Windows, [run_tests.sh](run_tests.sh) also tries `${HOME}/.local/bin/bats` if `bats` is not in PATH.
 
-## Contribution
+## Contributing
 
-- Règles de travail : [agent.md](.ai/agent.md)
-- Copilot (repo-level) : [.github/copilot-instructions.md](.github/copilot-instructions.md)
+- Work rules: [agent.md](.ai/agent.md)
+- Copilot (repo-level): [.github/copilot-instructions.md](.github/copilot-instructions.md)
 
 ## Changelog
 
-Voir : [docs/CHANGELOG.md](docs/CHANGELOG.md)
+See: [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
-## Licence
+## License
 
-MIT License - Libre d'utilisation et de modification.
+MIT License - Free to use and modify.

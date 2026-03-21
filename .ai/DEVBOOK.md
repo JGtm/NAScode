@@ -13,6 +13,24 @@ Objectifs :
 
 ## Journal
 
+### 2026-03-21
+
+#### Refonte structure documentation : anglais langue principale
+
+- **Quoi** : inversion de la logique de langue principale pour la documentation.
+  - `README.md` (ex `README.en.md`) : README anglais devient le principal.
+  - `README.fr.md` (ex `README.md`) : README français renommé.
+  - `docs/*.md` (10 fichiers) : docs anglaises promues au niveau racine de `docs/` (ex `docs/en/`).
+  - `docs/fr/` (nouveau dossier) : docs françaises déplacées ici (ex `docs/`).
+  - `docs/fr/Instructions-Mac.txt` et `docs/fr/📋 Tableau récapitulatif...csv` également déplacés.
+- **Où** :
+  - `README.md`, `README.fr.md` (renommages)
+  - `docs/*.md` (10 fichiers EN, corrigés `../../` → `../`)
+  - `docs/fr/*.md` (10 fichiers FR, corrigés `../` → `../../`, liens README → `README.fr.md`)
+  - `docs/fr/Instructions-Mac.txt`, `docs/fr/📋 Tableau récapitulatif - Critères de conversion.csv`
+- **Pourquoi** : anglais devient la langue principale du projet ; le français passe en sous-dossier `docs/fr/`, symétrique à l'ancienne organisation `docs/en/`.
+- **Impact** : aucun changement de code `.sh` — documentation pure. Tous les liens internes mis à jour. Tests non impactés.
+
 ### 2026-03-10
 
 #### Fix segfault x265 4.x avec -tune fastdecode (régression Windows)

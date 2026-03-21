@@ -1,60 +1,60 @@
-# Samples FFmpeg (edge cases)
+# FFmpeg Samples (edge cases)
 
-Ce guide permet de générer des fichiers **courts** et **reproductibles** via `ffmpeg` (sources `lavfi`) pour tester des cas un peu "edge".
+This guide allows generating **short** and **reproducible** files via `ffmpeg` (`lavfi` sources) to test somewhat "edge" cases.
 
-> Les fichiers générés vont dans `samples/_generated/` (ignoré par git).
+> Generated files go in `samples/_generated/` (ignored by git).
 
-## Prérequis
+## Prerequisites
 
-- `ffmpeg` sur le PATH
-- Encoders :
-  - `libx264` pour la plupart des samples
-  - `libx265` pour le sample HEVC 10-bit
-  - `dca` (DTS) et `truehd` pour les samples premium (si disponibles)
+- `ffmpeg` in PATH
+- Encoders:
+  - `libx264` for most samples
+  - `libx265` for the HEVC 10-bit sample
+  - `dca` (DTS) and `truehd` for premium samples (if available)
 
-Note : selon ta build `ffmpeg`, `dca` et `truehd` peuvent être marqués *expérimentaux* et nécessiter `-strict -2` (le script le gère).
+Note: depending on your `ffmpeg` build, `dca` and `truehd` may be marked *experimental* and require `-strict -2` (the script handles this).
 
-## Générer les samples
+## Generate samples
 
-Depuis la racine du repo :
+From the repo root:
 
 ```bash
 bash tools/generate_ffmpeg_samples.sh
 ```
 
-Options utiles :
+Useful options:
 
 ```bash
-# Durée plus courte
+# Shorter duration
 bash tools/generate_ffmpeg_samples.sh -d 3
 
-# Écraser les fichiers existants
+# Overwrite existing files
 bash tools/generate_ffmpeg_samples.sh -f
 
-# Un sous-ensemble de cas
+# A subset of cases
 bash tools/generate_ffmpeg_samples.sh --only vfr_concat,multiaudio_aac_ac3
 ```
 
-## Cas générés
+## Generated Cases
 
-- `01_h264_yuv444p_high444.mkv` : H.264 4:4:4 (`yuv444p`), profil High 4:4:4
-- `02_av1_low_bitrate.mkv` : AV1 (si `libsvtav1` dispo), utile pour le cas “codec meilleur que HEVC”
-- `03_vp9_input.webm` : VP9 (si `libvpx-vp9` dispo), utile pour le cas “codec inférieur à HEVC”
-- `04_mpeg4_avi_input.avi` : MPEG4 (conteneur AVI), cas “ancien codec”
-- `05_hevc_10bit_bt2020_pq.mkv` : HEVC 10-bit (`yuv420p10le`) + metadata BT.2020/PQ
-- `06_hevc_high_bitrate.mkv` : HEVC volontairement très “lourd” pour tester le seuil de re-encodage
-- `07_h264_odd_dimensions_853x479.mp4` : dimensions impaires (scaling/alignement)
-- `08_h264_rotate90_metadata.mp4` : rotation via metadata (pas un vrai transpose)
-- `09_h264_interlaced_meta_tff.mkv` : flags interlaced (TFF) pour tester la détection
-- `10_vfr_concat.mkv` : concat 24fps + 30fps (VFR)
-- `11_aac_high_bitrate_stereo.mkv` : AAC stéréo à bitrate élevé (cas downscale audio)
-- `12_eac3_high_bitrate_5_1.mkv` : EAC3 5.1 à 640k (cas downscale vers 384k en mode film)
-- `13_flac_lossless_5_1.mkv` : FLAC 5.1 lossless (cas “lossless copié”, sauf `--no-lossless`)
-- `14_pcm_7_1.mkv` : PCM 7.1 (8 canaux) pour tester la réduction multicanal lors d'une conversion
-- `15_opus_5_1_224k.mkv` : Opus 5.1 à 224k (codec efficace multicanal, souvent copié)
-- `16_multiaudio_aac_stereo_ac3_5_1.mkv` : 2 pistes audio (AAC stéréo + AC3 5.1)
-- `17_subtitles_srt.mkv` : sous-titres SRT muxés (MKV)
-- `18_dts_5_1.mkv` : DTS 5.1 (premium)
-- `19_dts_7_1.mkv` : DTS 7.1 (premium, peut être skip si non supporté)
-- `20_truehd_5_1.mkv` : TrueHD 5.1 (premium)
-- `21_truehd_7_1.mkv` : TrueHD 7.1 (premium, peut être skip si non supporté)
+- `01_h264_yuv444p_high444.mkv`: H.264 4:4:4 (`yuv444p`), High 4:4:4 profile
+- `02_av1_low_bitrate.mkv`: AV1 (if `libsvtav1` available), useful for "codec better than HEVC" case
+- `03_vp9_input.webm`: VP9 (if `libvpx-vp9` available), useful for "codec inferior to HEVC" case
+- `04_mpeg4_avi_input.avi`: MPEG4 (AVI container), "old codec" case
+- `05_hevc_10bit_bt2020_pq.mkv`: HEVC 10-bit (`yuv420p10le`) + BT.2020/PQ metadata
+- `06_hevc_high_bitrate.mkv`: HEVC intentionally very "heavy" to test re-encoding threshold
+- `07_h264_odd_dimensions_853x479.mp4`: odd dimensions (scaling/alignment)
+- `08_h264_rotate90_metadata.mp4`: rotation via metadata (not a real transpose)
+- `09_h264_interlaced_meta_tff.mkv`: interlaced flags (TFF) to test detection
+- `10_vfr_concat.mkv`: concat 24fps + 30fps (VFR)
+- `11_aac_high_bitrate_stereo.mkv`: stereo AAC at high bitrate (audio downscale case)
+- `12_eac3_high_bitrate_5_1.mkv`: EAC3 5.1 at 640k (downscale to 384k case in film mode)
+- `13_flac_lossless_5_1.mkv`: FLAC 5.1 lossless ("lossless copied" case, unless `--no-lossless`)
+- `14_pcm_7_1.mkv`: PCM 7.1 (8 channels) to test multichannel reduction during conversion
+- `15_opus_5_1_224k.mkv`: Opus 5.1 at 224k (efficient multichannel codec, often copied)
+- `16_multiaudio_aac_stereo_ac3_5_1.mkv`: 2 audio tracks (stereo AAC + 5.1 AC3)
+- `17_subtitles_srt.mkv`: muxed SRT subtitles (MKV)
+- `18_dts_5_1.mkv`: DTS 5.1 (premium)
+- `19_dts_7_1.mkv`: DTS 7.1 (premium, may be skipped if unsupported)
+- `20_truehd_5_1.mkv`: TrueHD 5.1 (premium)
+- `21_truehd_7_1.mkv`: TrueHD 7.1 (premium, may be skipped if unsupported)

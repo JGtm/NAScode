@@ -1,120 +1,120 @@
-# Logique “smart codec” (audio & vidéo)
+# "Smart Codec" Logic (audio & video)
 
-Ce document explique *pourquoi* le script peut **skip**, **copier** (passthrough) ou **convertir**.
+This document explains *why* the script may **skip**, **copy** (passthrough), or **convert**.
 
-## Audio (cible par défaut : AAC)
+## Audio (default target: AAC)
 
-- Le codec audio cible par défaut est `aac`.
-- Le script évite les conversions inutiles (anti-upscaling) : il ne convertit que si le gain est réel.
+- The default target audio codec is `aac`.
+- The script avoids unnecessary conversions (anti-upscaling): it only converts if the gain is real.
 
-### Décisions (résumé fidèle au comportement)
+### Decisions (summary faithful to behavior)
 
-Règles principales :
+Main rules:
 
-- Si `--audio copy` : l’audio est copié **sauf** si un downmix est explicitement requis (ex: stéréo forcée en mode `serie`).
-- Si la source est **lossless** (FLAC, TrueHD) : copiée par défaut, sauf si un downmix/conversion est requis (ex: `--no-lossless`, 7.1→5.1 en mode film, ou stéréo forcée en mode `serie`).
-- Si la source est déjà le **même codec** que la cible :
-	- copié si bitrate $\le$ cible,
-	- downscale si bitrate $>$ 110% de la cible,
-	- sinon copié (marge anti “micro-conversions”).
-- Si la source est un codec jugé **efficace** (Opus/AAC/Vorbis) : copié, avec downscale possible si trop haut.
-- Sinon : conversion vers le codec cible (par défaut `aac`).
+- If `--audio copy`: audio is copied **unless** a downmix is explicitly required (e.g., forced stereo in `serie` mode).
+- If the source is **lossless** (FLAC, TrueHD): copied by default, unless a downmix/conversion is required (e.g., `--no-lossless`, 7.1→5.1 in film mode, or forced stereo in `serie` mode).
+- If the source is already the **same codec** as the target:
+	- copied if bitrate $\le$ target,
+	- downscaled if bitrate $>$ 110% of target,
+	- otherwise copied (margin against "micro-conversions").
+- If the source is a codec deemed **efficient** (Opus/AAC/Vorbis): copied, with possible downscale if too high.
+- Otherwise: conversion to target codec (default `aac`).
 
-Pour forcer la conversion (bypass smart) : `--force-audio`.
+To force conversion (bypass smart): `--force-audio`.
 
-### Gestion des canaux audio (multicanal)
+### Audio Channel Management (multichannel)
 
-Le script gère automatiquement le nombre de canaux audio selon le mode :
+The script automatically manages the number of audio channels according to mode:
 
-| Mode | Source | Résultat |
-|------|--------|----------|
-| `serie` | Stéréo (2ch) | Stéréo |
-| `serie` | 5.1 (6ch) | **Downmix → Stéréo** |
-| `serie` | 7.1 (8ch) | **Downmix → Stéréo** |
-| `film` / `adaptatif` | Stéréo (2ch) | Stéréo |
-| `film` / `adaptatif` | 5.1 (6ch) | **Layout conservé (pas de downmix stéréo)** |
-| `film` / `adaptatif` | 7.1 (8ch) | **Réduit → 5.1** |
+| Mode | Source | Result |
+|------|--------|--------|
+| `serie` | Stereo (2ch) | Stereo |
+| `serie` | 5.1 (6ch) | **Downmix → Stereo** |
+| `serie` | 7.1 (8ch) | **Downmix → Stereo** |
+| `film` / `adaptatif` | Stereo (2ch) | Stereo |
+| `film` / `adaptatif` | 5.1 (6ch) | **Layout preserved (no stereo downmix)** |
+| `film` / `adaptatif` | 7.1 (8ch) | **Reduced → 5.1** |
 
-**Pourquoi ?**
-- **Mode série** : priorité à l'économie d'espace. La stéréo suffit pour un visionnage sur PC/tablette/mobile.
-- **Mode film** : priorité à la qualité. Le 5.1 permet de profiter d'un système home cinema.
+**Why?**
+- **Series mode**: priority on space savings. Stereo is sufficient for viewing on PC/tablet/mobile.
+- **Film mode**: priority on quality. 5.1 allows enjoying a home theater system.
 
-Note : si une décision `copy` est retenue, les canaux sont conservés tels quels. En mode `serie`, une source multicanal force une décision de conversion/downmix afin de garantir une sortie stéréo.
+Note: if a `copy` decision is retained, channels are kept as-is. In `serie` mode, a multichannel source forces a conversion/downmix decision to guarantee stereo output.
 
-### Hiérarchie (efficacité)
+### Hierarchy (efficiency)
 
-La logique s’appuie sur un rang d’efficacité (voir `get_audio_codec_rank()` dans [lib/audio_decision.sh](../lib/audio_decision.sh)) :
+The logic relies on an efficiency rank (see `get_audio_codec_rank()` in [lib/audio_decision.sh](../lib/audio_decision.sh)):
 
-- Opus (très efficace, rang 5)
-- AAC (efficace, rang 4)
-- Vorbis (efficace, rang 3)
-- E-AC3 (rang 2) / AC3 (rang 1) / DTS / MP3 / PCM… (moins efficaces, rang 0)
+- Opus (very efficient, rank 5)
+- AAC (efficient, rank 4)
+- Vorbis (efficient, rank 3)
+- E-AC3 (rank 2) / AC3 (rank 1) / DTS / MP3 / PCM… (less efficient, rank 0)
 
-Le seuil `AUDIO_CODEC_EFFICIENT_THRESHOLD` (défaut 3) détermine quels codecs sont considérés "efficaces" et donc préservés plutôt que ré-encodés. Ce seuil est configurable via [lib/constants.sh](../lib/constants.sh).
+The `AUDIO_CODEC_EFFICIENT_THRESHOLD` threshold (default 3) determines which codecs are considered "efficient" and thus preserved rather than re-encoded. This threshold is configurable via [lib/constants.sh](../lib/constants.sh).
 
-### Traduction des bitrates par efficacité
+### Bitrate Translation by Efficiency
 
-Quand le codec source est différent du codec cible, les seuils de bitrate sont **traduits** pour comparer des pommes avec des pommes :
+When the source codec differs from the target codec, bitrate thresholds are **translated** to compare apples to apples:
 
-$$\text{seuil}_{source} = \text{seuil}_{cible} \times \frac{\mathrm{eff}(source)}{\mathrm{eff}(cible)}$$
+$$\text{threshold}_{source} = \text{threshold}_{target} \times \frac{\mathrm{eff}(source)}{\mathrm{eff}(target)}$$
 
-Cette logique (fonction `_translate_bitrate_by_efficiency()` dans [lib/codec_profiles.sh](../lib/codec_profiles.sh)) est centralisée et réutilisée pour :
-- Les décisions audio (anti-upscaling)
-- Les décisions vidéo (skip/encode)
+This logic (function `_translate_bitrate_by_efficiency()` in [lib/codec_profiles.sh](../lib/codec_profiles.sh)) is centralized and reused for:
+- Audio decisions (anti-upscaling)
+- Video decisions (skip/encode)
 
-## Vidéo (cible par défaut : HEVC)
+## Video (default target: HEVC)
 
-- Codec vidéo cible par défaut : `hevc`.
-- Un codec “meilleur ou égal” au codec cible peut être conservé si le bitrate est raisonnable.
-- Si la source est dans un codec plus efficace que la cible (ex: AV1 vs cible HEVC), le seuil est **traduit** dans l’espace du codec source via l’efficacité codec (cf. `get_codec_efficiency()` dans `lib/codec_profiles.sh`).
-- Politique par défaut : **ne pas downgrade** le codec vidéo (ex: un AV1 trop haut débit est ré-encodé en AV1 pour plafonner le bitrate, pas en HEVC).
-- Si la source est dans un codec **moins efficace** que le codec d’encodage (ex: H.264 → HEVC) et que son bitrate est déjà bas, le budget bitrate peut être **plafonné** à une valeur “qualité équivalente” pour éviter d’augmenter inutilement le bitrate lors du ré-encodage (anti-upscaling).
-- Si la vidéo est OK mais l’audio peut être optimisé, le script peut faire du **video passthrough**.
+- Default target video codec: `hevc`.
+- A codec "better or equal" to the target codec can be preserved if the bitrate is reasonable.
+- If the source is in a more efficient codec than the target (e.g., AV1 vs target HEVC), the threshold is **translated** into the source codec space via codec efficiency (cf. `get_codec_efficiency()` in `lib/codec_profiles.sh`).
+- Default policy: **don't downgrade** the video codec (e.g., an AV1 with too high bitrate is re-encoded in AV1 to cap the bitrate, not in HEVC).
+- If the source is in a **less efficient** codec than the encoding codec (e.g., H.264 → HEVC) and its bitrate is already low, the bitrate budget can be **capped** at an "equivalent quality" value to avoid unnecessarily increasing bitrate during re-encoding (anti-upscaling).
+- If the video is OK but audio can be optimized, the script can do **video passthrough**.
 
-Pour forcer le ré-encodage : `--force-video`.
+To force re-encoding: `--force-video`.
 
-### Hiérarchie des codecs vidéo (règle générale)
+### Video Codec Hierarchy (general rule)
 
-Le script compare le codec source au codec cible via une hiérarchie d’efficacité :
+The script compares source codec to target codec via an efficiency hierarchy:
 
 AV1 > HEVC > VP9 > H.264 > MPEG4
 
-### Seuils & tolérance de skip
+### Skip Thresholds & Tolerance
 
-La décision “skip car déjà optimisé” utilise une tolérance :
+The "skip because already optimized" decision uses a tolerance:
 
-$$\text{seuil} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times \left(1 + \frac{\text{SKIP\\_TOLERANCE\\_PERCENT}}{100}\right)$$
+$$\text{threshold} = \mathrm{MAXRATE}_{\mathrm{KBPS}} \times \left(1 + \frac{\text{SKIP\\_TOLERANCE\\_PERCENT}}{100}\right)$$
 
-`MAXRATE_KBPS` dépend :
-- du mode (`serie` / `film`),
-- du codec cible (efficacité codec),
-- et éventuellement d’une adaptation par résolution (voir [CONFIG.md](CONFIG.md)).
+`MAXRATE_KBPS` depends on:
+- the mode (`serie` / `film`),
+- the target codec (codec efficiency),
+- and possibly a resolution adaptation (see [CONFIG.md](CONFIG.md)).
 
-Quand la source est dans un codec “meilleur ou égal” à la cible, le seuil est comparé dans le codec source :
+When the source is in a codec "better or equal" to the target, the threshold is compared in the source codec:
 
-$$\text{seuil}_{source} = \text{seuil}_{cible} \times \frac{\mathrm{eff}(source)}{\mathrm{eff}(cible)}$$
+$$\text{threshold}_{source} = \text{threshold}_{target} \times \frac{\mathrm{eff}(source)}{\mathrm{eff}(target)}$$
 
-Exemple (cible HEVC, source AV1) : $2772k \times 50/70 \approx 1980k$.
+Example (target HEVC, source AV1): $2772k \times 50/70 \approx 1980k$.
 
-### Cas usuels (simplifiés)
+### Common Cases (simplified)
 
-- Source meilleur ou égal au codec cible + bitrate raisonnable : **skip** (conserver)
-- Source meilleur ou égal mais bitrate trop élevé : **encode** (dans le **codec source** si celui-ci est supérieur)
-- Source moins bon que cible : **encode**
-- Vidéo conforme mais audio perfectible : **video passthrough** (vidéo copiée, audio traité)
+- Source better or equal to target codec + reasonable bitrate: **skip** (preserve)
+- Source better or equal but bitrate too high: **encode** (in the **source codec** if it's superior)
+- Source worse than target: **encode**
+- Video compliant but audio improvable: **video passthrough** (video copied, audio processed)
 
-Pour forcer : `--force-video`.
+To force: `--force-video`.
 
-## Options `--force`
+## `--force` Options
 
-- `--force-audio` : bypass des décisions smart audio
-- `--force-video` : bypass des décisions smart vidéo
-- `--force` : active les deux
+- `--force-audio`: bypass smart audio decisions
+- `--force-video`: bypass smart video decisions
+- `--force`: enables both
 
 ## Notes
 
-Les seuils exacts et la logique fine dépendent du mode, de la résolution et des paramètres d’encodage.
+Exact thresholds and fine logic depend on mode, resolution, and encoding parameters.
 
-Pour une lecture “code source” :
-- Audio : [lib/audio_decision.sh](../lib/audio_decision.sh) (décision) + [lib/audio_params.sh](../lib/audio_params.sh) (FFmpeg/layout)
-- Vidéo : [lib/video_params.sh](../lib/video_params.sh), [lib/transcode_video.sh](../lib/transcode_video.sh)
+For "source code" reading:
+- Audio: [lib/audio_decision.sh](../lib/audio_decision.sh) (decision) + [lib/audio_params.sh](../lib/audio_params.sh) (FFmpeg/layout)
+- Video: [lib/video_params.sh](../lib/video_params.sh), [lib/transcode_video.sh](../lib/transcode_video.sh)
