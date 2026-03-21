@@ -1,17 +1,17 @@
-# Guide : Ajouter un nouveau codec
+# Guide: Adding a New Codec
 
-Ce document décrit les étapes pour ajouter le support d'un nouveau codec vidéo (ex: H.266/VVC).
+This document describes the steps to add support for a new video codec (e.g., H.266/VVC).
 
 ---
 
-## 📋 Checklist rapide
+## 📋 Quick Checklist
 
-- [ ] `lib/codec_profiles.sh` — Fonctions codec/encoder + efficacité
-- [ ] `lib/args.sh` — Validation CLI `--codec`
-- [ ] `tests/test_codec_profiles.bats` — Tests unitaires codec
-- [ ] `tests/test_transcode_video.bats` — Tests encoding
-- [ ] `tests/test_args.bats` — Tests validation CLI
-- [ ] `README.md` — Documentation utilisateur
+- [ ] `lib/codec_profiles.sh` — Codec/encoder functions + efficiency
+- [ ] `lib/args.sh` — CLI `--codec` validation
+- [ ] `tests/test_codec_profiles.bats` — Codec unit tests
+- [ ] `tests/test_transcode_video.bats` — Encoding tests
+- [ ] `tests/test_args.bats` — CLI validation tests
+- [ ] `README.md` — User documentation
 
 ---
 
@@ -19,14 +19,14 @@ Ce document décrit les étapes pour ajouter le support d'un nouveau codec vidé
 
 ### 1.1 `get_codec_encoder()`
 
-Ajouter le mapping codec → encoder FFmpeg.
+Add the codec → FFmpeg encoder mapping.
 
 ```bash
 get_codec_encoder() {
     case "${1:-hevc}" in
         hevc|h265) echo "libx265" ;;
         av1)       echo "libsvtav1" ;;
-        vvc|h266)  echo "libvvenc" ;;  # ← AJOUTER
+        vvc|h266)  echo "libvvenc" ;;  # ← ADD
         *)         echo "libx265" ;;
     esac
 }
@@ -34,14 +34,14 @@ get_codec_encoder() {
 
 ### 1.2 `get_codec_suffix()`
 
-Définir le suffixe de fichier utilisé dans le nom de sortie.
+Define the file suffix used in output name.
 
 ```bash
 get_codec_suffix() {
     case "${1:-hevc}" in
         hevc|h265) echo "x265" ;;
         av1)       echo "av1" ;;
-        vvc|h266)  echo "vvc" ;;  # ← AJOUTER
+        vvc|h266)  echo "vvc" ;;  # ← ADD
         *)         echo "x265" ;;
     esac
 }
@@ -49,22 +49,22 @@ get_codec_suffix() {
 
 ### 1.3 `is_codec_match()`
 
-Ajouter les variantes de nommage.
+Add naming variants.
 
-Dans le code, `is_codec_match()` s'appuie sur `get_codec_ffmpeg_names()` : pour ajouter des alias (ex: `h266`, `vvenc`, etc.), il faut d'abord les déclarer dans `get_codec_ffmpeg_names()`.
+In the code, `is_codec_match()` relies on `get_codec_ffmpeg_names()`: to add aliases (e.g., `h266`, `vvenc`, etc.), you must first declare them in `get_codec_ffmpeg_names()`.
 
 ```bash
 get_codec_ffmpeg_names() {
     case "${1:-hevc}" in
         hevc|h265) echo "hevc h265" ;;
         av1)       echo "av1" ;;
-        vvc|h266)  echo "vvc h266 vvenc" ;;  # ← AJOUTER (adapter si besoin)
+        vvc|h266)  echo "vvc h266 vvenc" ;;  # ← ADD (adapt if needed)
         *)         echo "" ;;
     esac
 }
 ```
 
-Puis `is_codec_match()` n'a généralement pas besoin de changer :
+Then `is_codec_match()` generally doesn't need to change:
 
 ```bash
 is_codec_match() {
@@ -83,12 +83,12 @@ is_codec_match() {
 
 ### 1.4 `is_codec_supported()`
 
-Ajouter le codec à la liste.
+Add the codec to the list.
 
 ```bash
 is_codec_supported() {
     case "$1" in
-        hevc|h265|av1|vvc|h266) return 0 ;;  # ← AJOUTER vvc|h266
+        hevc|h265|av1|vvc|h266) return 0 ;;  # ← ADD vvc|h266
         *) return 1 ;;
     esac
 }
@@ -96,17 +96,17 @@ is_codec_supported() {
 
 ### 1.5 `list_supported_codecs()`
 
-Mettre à jour la liste affichée.
+Update the displayed list.
 
 ```bash
 list_supported_codecs() {
-    echo "hevc av1 vvc"  # ← AJOUTER vvc
+    echo "hevc av1 vvc"  # ← ADD vvc
 }
 ```
 
 ### 1.6 `get_codec_rank()`
 
-Définir le rang qualité (plus haut = meilleur codec, utilisé pour skip intelligent).
+Define the quality rank (higher = better codec, used for intelligent skip).
 
 ```bash
 get_codec_rank() {
@@ -114,7 +114,7 @@ get_codec_rank() {
         h264|avc)     echo 1 ;;
         hevc|h265)    echo 2 ;;
         av1)          echo 3 ;;
-        vvc|h266)     echo 4 ;;  # ← AJOUTER (VVC > AV1 en qualité/compression)
+        vvc|h266)     echo 4 ;;  # ← ADD (VVC > AV1 in quality/compression)
         *)            echo 0 ;;
     esac
 }
@@ -122,44 +122,44 @@ get_codec_rank() {
 
 ### 1.7 `get_codec_efficiency()`
 
-**⚠️ IMPORTANT** : Définir le facteur d'efficacité du codec.
+**⚠️ IMPORTANT**: Define the codec efficiency factor.
 
-Cette valeur est utilisée pour **ajuster automatiquement les bitrates** selon l'efficacité de compression du codec. Les bitrates de référence sont définis pour HEVC (70%), et sont automatiquement ajustés.
+This value is used to **automatically adjust bitrates** according to the codec's compression efficiency. Reference bitrates are defined for HEVC (70%), and are automatically adjusted.
 
 ```bash
 get_codec_efficiency() {
     case "$1" in
-        h264|avc)  echo 100 ;;  # Référence
-        hevc|h265) echo 70 ;;   # ~30% plus efficace que H.264
-        av1)       echo 50 ;;   # ~50% plus efficace que H.264
-        vvc|h266)  echo 35 ;;   # ← AJOUTER (~65% plus efficace)
-        *)         echo 100 ;;  # Inconnu → prudent
+        h264|avc)  echo 100 ;;  # Reference
+        hevc|h265) echo 70 ;;   # ~30% more efficient than H.264
+        av1)       echo 50 ;;   # ~50% more efficient than H.264
+        vvc|h266)  echo 35 ;;   # ← ADD (~65% more efficient)
+        *)         echo 100 ;;  # Unknown → conservative
     esac
 }
 ```
 
-**Impact** : Pour un bitrate de référence HEVC de 2520 kbps :
-- HEVC : 2520 × 70/70 = **2520 kbps**
-- AV1 : 2520 × 50/70 = **1800 kbps**
-- VVC : 2520 × 35/70 = **1260 kbps**
+**Impact**: For an HEVC reference bitrate of 2520 kbps:
+- HEVC: 2520 × 70/70 = **2520 kbps**
+- AV1: 2520 × 50/70 = **1800 kbps**
+- VVC: 2520 × 35/70 = **1260 kbps**
 
 ### 1.8 `get_encoder_mode_params()`
 
-Définir les paramètres spécifiques par mode (serie/film).
+Define mode-specific parameters (serie/film).
 
 ```bash
 get_encoder_mode_params() {
     local encoder="$1" mode="$2"
     case "$encoder" in
         libx265)
-            # ... existant ...
+            # ... existing ...
             ;;
         libsvtav1)
-            # ... existant ...
+            # ... existing ...
             ;;
-        libvvenc)  # ← AJOUTER BLOC
+        libvvenc)  # ← ADD BLOCK
             case "$mode" in
-                serie) echo "passes=1" ;;  # Exemple - adapter selon doc vvenc
+                serie) echo "passes=1" ;;  # Example - adapt according to vvenc doc
                 film)  echo "passes=2" ;;
                 *)     echo "" ;;
             esac
@@ -170,14 +170,14 @@ get_encoder_mode_params() {
 
 ### 1.8 `get_encoder_params_flag()`
 
-Définir le flag CLI FFmpeg pour les params encoder.
+Define the FFmpeg CLI flag for encoder params.
 
 ```bash
 get_encoder_params_flag() {
     case "$1" in
         libx265)   echo "-x265-params" ;;
         libsvtav1) echo "-svtav1-params" ;;
-        libvvenc)  echo "-vvenc-params" ;;  # ← AJOUTER (vérifier doc FFmpeg)
+        libvvenc)  echo "-vvenc-params" ;;  # ← ADD (check FFmpeg doc)
         *)         echo "-x265-params" ;;
     esac
 }
@@ -185,15 +185,15 @@ get_encoder_params_flag() {
 
 ### 1.9 `build_vbv_params()`
 
-Définir comment construire les params VBV (ou vide si géré autrement).
+Define how to build VBV params (or empty if handled differently).
 
 ```bash
 build_vbv_params() {
     local encoder="$1" maxrate="$2" bufsize="$3"
     case "$encoder" in
         libx265)   echo "vbv-maxrate=${maxrate}:vbv-bufsize=${bufsize}" ;;
-        libsvtav1) echo "" ;;  # VBV via -maxrate/-bufsize FFmpeg
-        libvvenc)  echo "" ;;  # ← AJOUTER (adapter selon encoder)
+        libsvtav1) echo "" ;;  # VBV via FFmpeg -maxrate/-bufsize
+        libvvenc)  echo "" ;;  # ← ADD (adapt according to encoder)
         *)         echo "vbv-maxrate=${maxrate}:vbv-bufsize=${bufsize}" ;;
     esac
 }
@@ -201,7 +201,7 @@ build_vbv_params() {
 
 ### 1.10 `convert_preset()`
 
-Mapper les presets x265 vers le nouveau encoder.
+Map x265 presets to the new encoder.
 
 ```bash
 convert_preset() {
@@ -214,8 +214,8 @@ convert_preset() {
                 # ...
             esac
             ;;
-        libvvenc)  # ← AJOUTER BLOC
-            # x265 preset → vvenc preset (adapter selon doc)
+        libvvenc)  # ← ADD BLOCK
+            # x265 preset → vvenc preset (adapt according to doc)
             case "$preset" in
                 ultrafast) echo "faster" ;;
                 fast)      echo "fast" ;;
@@ -232,7 +232,7 @@ convert_preset() {
 
 ### 1.11 `build_tune_option()`
 
-Définir l'option -tune si applicable.
+Define the -tune option if applicable.
 
 ```bash
 build_tune_option() {
@@ -241,8 +241,8 @@ build_tune_option() {
         libx265)
             [[ "$mode" == "serie" ]] && echo "-tune fastdecode" || echo ""
             ;;
-        libsvtav1|libvvenc)  # ← AJOUTER libvvenc
-            echo ""  # Tune via params encoder
+        libsvtav1|libvvenc)  # ← ADD libvvenc
+            echo ""  # Tune via encoder params
             ;;
         *) echo "" ;;
     esac
@@ -251,12 +251,12 @@ build_tune_option() {
 
 ### 1.12 `get_mode_keyint()`
 
-Définir le keyint par mode (peut varier selon encoder).
+Define keyint by mode (may vary by encoder).
 
 ```bash
 get_mode_keyint() {
     local encoder="$1" mode="$2"
-    # Si keyint identique pour tous encoders, pas de case sur $encoder
+    # If keyint is identical for all encoders, no case on $encoder
     case "$mode" in
         serie) echo 600 ;;
         film)  echo 240 ;;
@@ -269,25 +269,25 @@ get_mode_keyint() {
 
 ## 2. lib/args.sh
 
-### 2.1 Validation `--codec`
+### 2.1 `--codec` Validation
 
-Ajouter le codec dans la validation CLI.
+Add the codec in CLI validation.
 
 ```bash
 -c|--codec)
     if [[ -n "${2:-}" ]]; then
         case "$2" in
-            hevc|av1|vvc)  # ← AJOUTER vvc
+            hevc|av1|vvc)  # ← ADD vvc
                 VIDEO_CODEC="$2"
                 ;;
             *)
-                print_error "Codec invalide : '$2'. Valeurs acceptées : hevc, av1, vvc"  # ← MAJ message
+                print_error "Invalid codec: '$2'. Accepted values: hevc, av1, vvc"  # ← UPDATE message
                 exit 1
                 ;;
         esac
         shift 2
     else
-        print_error "--codec doit être suivi d'un nom de codec (hevc, av1, vvc)"
+        print_error "--codec must be followed by a codec name (hevc, av1, vvc)"
         exit 1
     fi
     ;;
@@ -295,48 +295,48 @@ Ajouter le codec dans la validation CLI.
 
 ---
 
-## 2bis. Logique vidéo & mapping (refacto)
+## 2bis. Video Logic & Mapping (refactor)
 
-- La logique "paramètres vidéo" (pix_fmt, downscale, bitrate adaptatif, suffixe effectif) est centralisée dans `lib/video_params.sh`.
-- Le mapping des streams (video/audio/subs) est centralisé dans `lib/stream_mapping.sh`.
-- `lib/transcode_video.sh` orchestre l'encodage et appelle ces helpers : évite d'y dupliquer des fonctions.
+- The "video parameters" logic (pix_fmt, downscale, adaptive bitrate, effective suffix) is centralized in `lib/video_params.sh`.
+- Stream mapping (video/audio/subs) is centralized in `lib/stream_mapping.sh`.
+- `lib/transcode_video.sh` orchestrates encoding and calls these helpers: avoid duplicating functions there.
 
 ---
 
-## 3. Tests unitaires
+## 3. Unit Tests
 
 ### 3.1 tests/test_codec_profiles.bats
 
-Ajouter les tests pour chaque fonction modifiée :
+Add tests for each modified function:
 
 ```bash
 # get_codec_encoder
-@test "get_codec_encoder: retourne libvvenc pour vvc" {
+@test "get_codec_encoder: returns libvvenc for vvc" {
     result=$(get_codec_encoder "vvc")
     [ "$result" = "libvvenc" ]
 }
 
 # get_codec_suffix
-@test "get_codec_suffix: retourne vvc pour vvc" {
+@test "get_codec_suffix: returns vvc for vvc" {
     result=$(get_codec_suffix "vvc")
     [ "$result" = "vvc" ]
 }
 
 # is_codec_match
-@test "is_codec_match: vvc matche vvc" {
+@test "is_codec_match: vvc matches vvc" {
     is_codec_match "vvc" "vvc"
 }
 
-@test "is_codec_match: h266 matche vvc" {
+@test "is_codec_match: h266 matches vvc" {
     is_codec_match "h266" "vvc"
 }
 
-@test "is_codec_match: vvc ne matche pas hevc" {
+@test "is_codec_match: vvc doesn't match hevc" {
     ! is_codec_match "vvc" "hevc"
 }
 
 # is_codec_supported
-@test "is_codec_supported: vvc est supporté" {
+@test "is_codec_supported: vvc is supported" {
     is_codec_supported "vvc"
 }
 
@@ -364,33 +364,33 @@ Ajouter les tests pour chaque fonction modifiée :
 }
 
 # get_encoder_mode_params
-@test "get_encoder_mode_params: libvvenc serie retourne des params" {
+@test "get_encoder_mode_params: libvvenc serie returns params" {
     result=$(get_encoder_mode_params "libvvenc" "serie")
-    # Adapter selon implémentation réelle
-    [[ -n "$result" ]] || [[ -z "$result" ]]  # Au minimum, pas d'erreur
+    # Adapt according to actual implementation
+    [[ -n "$result" ]] || [[ -z "$result" ]]  # At minimum, no error
 }
 
 # get_encoder_params_flag
-@test "get_encoder_params_flag: libvvenc retourne -vvenc-params" {
+@test "get_encoder_params_flag: libvvenc returns -vvenc-params" {
     result=$(get_encoder_params_flag "libvvenc")
     [ "$result" = "-vvenc-params" ]
 }
 
 # build_vbv_params
-@test "build_vbv_params: libvvenc retourne selon implémentation" {
+@test "build_vbv_params: libvvenc returns according to implementation" {
     result=$(build_vbv_params "libvvenc" 2520 3780)
-    # Adapter selon choix d'implémentation
+    # Adapt according to implementation choice
     [[ -z "$result" ]] || [[ "$result" =~ "maxrate" ]]
 }
 
 # convert_preset
 @test "convert_preset: medium -> libvvenc" {
     result=$(convert_preset "medium" "libvvenc")
-    [ "$result" = "medium" ]  # Adapter selon mapping choisi
+    [ "$result" = "medium" ]  # Adapt according to chosen mapping
 }
 
 # build_tune_option
-@test "build_tune_option: libvvenc retourne vide" {
+@test "build_tune_option: libvvenc returns empty" {
     result=$(build_tune_option "libvvenc" "serie")
     [ -z "$result" ]
 }
@@ -399,7 +399,7 @@ Ajouter les tests pour chaque fonction modifiée :
 ### 3.2 tests/test_args.bats
 
 ```bash
-@test "parse_arguments: --codec vvc accepté" {
+@test "parse_arguments: --codec vvc accepted" {
     parse_arguments --codec vvc
     [ "$VIDEO_CODEC" = "vvc" ]
 }
@@ -409,71 +409,71 @@ Ajouter les tests pour chaque fonction modifiée :
 
 ## 4. README.md
 
-### 4.1 Section "Codecs supportés"
+### 4.1 "Supported Codecs" Section
 
 ```markdown
-## Codecs supportés
+## Supported Codecs
 
-| Codec | Encoder FFmpeg | Suffixe | Qualité |
-|-------|----------------|---------|---------|
+| Codec | FFmpeg Encoder | Suffix | Quality |
+|-------|----------------|--------|---------|
 | HEVC/H.265 | libx265 | `_x265` | ⭐⭐ |
 | AV1 | libsvtav1 | `_av1` | ⭐⭐⭐ |
 | VVC/H.266 | libvvenc | `_vvc` | ⭐⭐⭐⭐ |
 ```
 
-### 4.2 Section "Options CLI"
+### 4.2 "CLI Options" Section
 
 ```markdown
--c, --codec CODEC    Codec cible : hevc (défaut), av1, vvc
+-c, --codec CODEC    Target codec: hevc (default), av1, vvc
 ```
 
-### 4.3 Section "Exemples"
+### 4.3 "Examples" Section
 
 ```bash
-# Conversion en VVC (H.266)
-bash nascode -c vvc -s "/chemin/source"
+# VVC (H.266) conversion
+bash nascode -c vvc -s "/path/source"
 ```
 
 ---
 
-## 5. Validation finale
+## 5. Final Validation
 
 ```bash
-# 1. Lancer tous les tests
+# 1. Run all tests
 bash run_tests.sh
 
-# 2. Test manuel rapide
-bash nascode -c vvc -d -s "/chemin/test"  # Mode dry-run
+# 2. Quick manual test
+bash nascode -c vvc -d -s "/path/test"  # Dry-run mode
 
-# 3. Vérifier la commande FFmpeg générée dans les logs
+# 3. Check generated FFmpeg command in logs
 ```
 
 ---
 
-## 📝 Notes spécifiques par codec
+## 📝 Codec-Specific Notes
 
 ### H.266/VVC (libvvenc)
 
-- **Statut FFmpeg** : Support expérimental (vérifier version FFmpeg)
-- **Presets** : `faster`, `fast`, `medium`, `slow`, `slower`
-- **Paramètres recommandés** : À documenter après tests
-- **Containers supportés** : MP4 (vérifier MKV)
+- **FFmpeg status**: Experimental support (check FFmpeg version)
+- **Presets**: `faster`, `fast`, `medium`, `slow`, `slower`
+- **Recommended parameters**: To be documented after testing
+- **Supported containers**: MP4 (check MKV)
 
-### Autres considérations
+### Other Considerations
 
-- **Dépendances** : Vérifier que l'encoder est compilé dans FFmpeg (`ffmpeg -encoders | grep vvenc`)
-- **Performance** : VVC est ~2-3x plus lent que HEVC à qualité égale
-- **Compatibilité** : Peu de lecteurs supportent VVC actuellement
+- **Dependencies**: Verify the encoder is compiled in FFmpeg (`ffmpeg -encoders | grep vvenc`)
+- **Performance**: VVC is ~2-3x slower than HEVC at equal quality
+- **Compatibility**: Few players currently support VVC
 
 ---
 
-## Estimation temps
+## Time Estimate
 
-| Étape | Durée |
-|-------|-------|
-| Implémentation codec_profiles.sh | 15-20 min |
-| Mise à jour args.sh | 5 min |
-| Tests unitaires | 15-20 min |
-| Documentation README | 10 min |
+| Step | Duration |
+|------|----------|
+| codec_profiles.sh implementation | 15-20 min |
+| args.sh update | 5 min |
+| Unit tests | 15-20 min |
+| README documentation | 10 min |
 | Validation / debug | 10-15 min |
 | **Total** | **~1h** |

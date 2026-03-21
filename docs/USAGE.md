@@ -1,122 +1,126 @@
 # Usage
 
-## Commande
+## Command
 
 ```bash
 bash nascode [options]
 ```
 
-Astuce : pour l’aide complète, utiliser :
+Tip: for full help, use:
 
 ```bash
-bash nascode --help
+bash nascode --lang en --help
 ```
 
-## Exemples (les plus utiles)
+## Examples (most useful)
 
 ```bash
-# Conversion standard d'un dossier (mode série par défaut)
-bash nascode -s "/chemin/vers/series"
+# Standard folder conversion (series mode by default)
+bash nascode -s "/path/to/series"
 
-# Mode film (plus orienté qualité)
-bash nascode -m film -s "/chemin/vers/films"
+# Film mode (more quality-oriented)
+bash nascode -m film -s "/path/to/films"
 
-# Conversion AV1
-bash nascode -c av1 -s "/chemin/vers/videos"
+# AV1 conversion
+bash nascode -c av1 -s "/path/to/videos"
 
-# VMAF (si ton ffmpeg a libvmaf)
-bash nascode -v -s "/chemin/vers/films"
+# VMAF (if your ffmpeg has libvmaf)
+bash nascode -v -s "/path/to/films"
 
-# Sample (segment ~30s) pour tester rapidement
-bash nascode -t -s "/chemin/vers/series"
+# Sample (segment ~30s) for quick testing
+bash nascode -t -s "/path/to/series"
 
-# Random + limite
-bash nascode -r -l 5 -s "/chemin/vers/series"
+# Random + limit
+bash nascode -r -l 5 -s "/path/to/series"
 
-# Heures creuses (plage par défaut 22:00-06:00)
-bash nascode -p -s "/chemin/vers/series"
+# Off-peak hours (default range 22:00-06:00)
+bash nascode -p -s "/path/to/series"
 
-# Heures creuses avec plage personnalisée
-bash nascode --off-peak=23:00-07:00 -s "/chemin/vers/series"
+# Off-peak hours with custom range
+bash nascode --off-peak=23:00-07:00 -s "/path/to/series"
 
-# Fichier unique (bypass index/queue)
-bash nascode -f "/chemin/vers/video.mkv"
+# Single file (bypass index/queue)
+bash nascode -f "/path/to/video.mkv"
 
 # Dry-run (simulation)
-bash nascode -d -s "/chemin/source"
+bash nascode -d -s "/path/source"
 
-# Quiet (warnings/erreurs uniquement)
-bash nascode --quiet -s "/chemin/vers/series"
+# Quiet (warnings/errors only)
+bash nascode --quiet -s "/path/to/series"
+
+# English interface
+bash nascode --lang en -s "/path/to/series"
 ```
 
-## Options principales (rappel)
+## Main options (reminder)
 
-Le script évolue : la table ci-dessous est un rappel, l’autorité reste `bash nascode --help`.
+The script evolves: the table below is a reminder, the authority remains `bash nascode --help`.
 
-- `-s, --source DIR` : dossier source
-- `-o, --output-dir DIR` : dossier de sortie
-- `-m, --mode MODE` : `serie` (défaut) ou `film`
-- `-c, --codec CODEC` : `hevc` (défaut) ou `av1`
-- `-a, --audio CODEC` : `aac` (défaut), `copy`, `ac3`, `eac3`, `opus`
-- `--min-size SIZE` : filtrer l’index/queue (ne garder que les fichiers >= SIZE, ex: `700M`, `1G`)
-- `-v, --vmaf` : activer VMAF
-- `-t, --sample` : encoder un segment de test
-- `-n, --no-progress` : désactiver l’affichage des indicateurs de progression
-- `-Q, --quiet` : mode silencieux (n’affiche que les warnings/erreurs)
-- `-p, --off-peak [HH:MM-HH:MM]` : n’exécuter que pendant les heures creuses
-- `--force-audio` / `--force-video` / `--force` : bypass de certaines décisions smart
+- `-s, --source DIR`: source folder
+- `-o, --output-dir DIR`: output folder
+- `-m, --mode MODE`: `serie` (default) or `film`
+- `-c, --codec CODEC`: `hevc` (default) or `av1`
+- `-a, --audio CODEC`: `aac` (default), `copy`, `ac3`, `eac3`, `opus`
+- `--min-size SIZE`: filter index/queue (keep only files >= SIZE, e.g., `700M`, `1G`)
+- `-v, --vmaf`: enable VMAF
+- `-t, --sample`: encode a test segment
+- `-n, --no-progress`: disable progress indicator display
+- `-Q, --quiet`: quiet mode (show only warnings/errors)
+- `-p, --off-peak [HH:MM-HH:MM]`: run only during off-peak hours
+- `--force-audio` / `--force-video` / `--force`: bypass certain smart decisions
+- `--lang LANG`: interface language (`fr` or `en`)
 
-Pour comprendre les décisions audio/vidéo (skip/passthrough/convert), voir [SMART_CODEC.md](SMART_CODEC.md).
+To understand audio/video decisions (skip/passthrough/convert), see [SMART_CODEC.md](SMART_CODEC.md).
 
-## Sorties plus lourdes / gain faible ("Heavier")
+## Heavier outputs / low savings ("Heavier")
 
-Si une conversion produit un fichier **plus lourd** (ou un gain inférieur à un seuil), NAScode peut rediriger la sortie vers un dossier séparé afin d’éviter les boucles de re-traitement.
+If a conversion produces a **heavier** file (or a savings below a threshold), NAScode can redirect the output to a separate folder to avoid reprocessing loops.
 
-- Dossier par défaut : `Converted_Heavier/` (à côté de `Converted/`), en conservant l'arborescence.
-- Anti-boucle : si une sortie "Heavier" existe déjà pour un fichier, NAScode **skip** ce fichier.
+- Default folder: `Converted_Heavier/` (next to `Converted/`), preserving the folder structure.
+- Anti-loop: if a "Heavier" output already exists for a file, NAScode **skips** that file.
 
-Réglages (dans la config) :
+Settings (in config):
 
-- `HEAVY_OUTPUT_ENABLED` : `true`/`false`
-- `HEAVY_MIN_SAVINGS_PERCENT` : gain minimum en %
-- `HEAVY_OUTPUT_DIR_SUFFIX` : suffixe de dossier (défaut `_Heavier`)
+- `HEAVY_OUTPUT_ENABLED`: `true`/`false`
+- `HEAVY_MIN_SAVINGS_PERCENT`: minimum savings in %
+- `HEAVY_OUTPUT_DIR_SUFFIX`: folder suffix (default `_Heavier`)
 
-Voir aussi : [CONFIG.md](CONFIG.md)
+See also: [CONFIG.md](CONFIG.md)
 
-## Notifications Discord (optionnel)
+## Discord notifications (optional)
 
-NAScode supporte des notifications via webhook Discord (Markdown). Elles sont **best-effort** : une erreur réseau ne doit pas interrompre la conversion.
+NAScode supports notifications via Discord webhook (Markdown). They are **best-effort**: a network error should not interrupt the conversion.
 
-Contenu typique des notifications :
+Typical notification content:
 
-- Démarrage : paramètres actifs + aperçu de la queue (format `[i/N]`, jusqu’à 20 éléments)
-- Par fichier : démarrage puis fin (durée + tailles `avant → après`)
-- Par fichier : skip (ignoré + raison)
-- Transferts : en attente puis terminés (si applicable)
-- VMAF (si activé) : démarrage + résultat par fichier (note/qualité) + fin globale
-- Fin : résumé (si disponible) puis message final avec horodatage
+- Startup: active parameters + queue preview (format `[i/N]`, up to 20 items)
+- Per file: start then end (duration + sizes `before → after`)
+- Per file: skip (ignored + reason)
+- Transfers: pending then completed (if applicable)
+- VMAF (if enabled): start + result per file (score/quality) + global end
+- End: summary (if available) then final message with timestamp
 
-Variables d’environnement :
+Environment variables:
 
-- `NASCODE_DISCORD_WEBHOOK_URL` : URL du webhook (secret)
-- `NASCODE_DISCORD_NOTIFY` : `true` / `false` (optionnel)
+- `NASCODE_DISCORD_WEBHOOK_URL`: webhook URL (secret)
+- `NASCODE_DISCORD_NOTIFY`: `true` / `false` (optional)
 
-### Exemple (Git Bash / WSL)
+### Example (Git Bash / WSL)
 
-	# Recommandé : fichier local ignoré par Git
+	# Recommended: local file ignored by Git
 	cp .env.example .env.local
 
-	bash nascode -p -s "/chemin/vers/series"
+	bash nascode -p -s "/path/to/series"
 
-	# Note : `nascode` charge automatiquement `./.env.local` (si présent).
-	# Désactiver : NASCODE_ENV_AUTOLOAD=false
-	# Autre fichier : NASCODE_ENV_FILE=/chemin/vers/mon.env
+	# Note: `nascode` automatically loads `./.env.local` (if present).
+	# Disable: NASCODE_ENV_AUTOLOAD=false
+	# Other file: NASCODE_ENV_FILE=/path/to/my.env
 
-### Exemple (PowerShell)
+### Example (PowerShell)
 
 	$env:NASCODE_DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/<id>/<token>"
 	$env:NASCODE_DISCORD_NOTIFY = "true"
 
-	bash .\nascode -s "C:\\chemin\\vers\\series"
+	bash .\nascode -s "C:\\path\\to\\series"
 
-Bonnes pratiques : ne mets jamais le webhook dans le repo. Si l’URL a été partagée publiquement, régénère le webhook.
+Best practices: never put the webhook in the repo. If the URL has been shared publicly, regenerate the webhook.

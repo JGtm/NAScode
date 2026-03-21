@@ -1,116 +1,116 @@
 # Architecture
 
-NAScode est un script Bash **modulaire** orienté batch : il indexe une source, construit une file d’attente, puis convertit (ou skip/passthrough) les fichiers selon des règles “smart codec”.
+NAScode is a **modular** Bash script oriented toward batch processing: it indexes a source, builds a queue, then converts (or skips/passthrough) files according to "smart codec" rules.
 
-## Vue d’ensemble
+## Overview
 
-- Point d’entrée : [../nascode](../nascode)
-- Modules : dossier [../lib/](../lib/)
-- Sortie par défaut : `Converted/`
-- Logs & artefacts de session : `logs/`
+- Entry point: [../nascode](../nascode)
+- Modules: [../lib/](../lib/) directory
+- Default output: `Converted/`
+- Logs & session artifacts: `logs/`
 
-## Flux d’exécution (mode dossier)
+## Execution Flow (folder mode)
 
 1. **Bootstrap & config**
-   - Charge les modules dans un ordre de dépendances (UI/config/utils/logging/…)
-   - Parse la CLI (source, mode, codec, options)
-   - Applique les paramètres du mode via `set_conversion_mode_parameters`
+   - Loads modules in dependency order (UI/config/utils/logging/…)
+   - Parses CLI (source, mode, codec, options)
+   - Applies mode parameters via `set_conversion_mode_parameters`
 
-2. **Pré-flight**
-   - Lock (évite plusieurs exécutions simultanées)
-   - Vérification dépendances (FFmpeg/ffprobe, etc.)
-   - Détection hwaccel (si dispo)
-   - Vérification VMAF (optionnel)
+2. **Pre-flight**
+   - Lock (prevents multiple simultaneous executions)
+   - Dependency verification (FFmpeg/ffprobe, etc.)
+   - Hwaccel detection (if available)
+   - VMAF verification (optional)
 
 3. **Index + queue**
-   - Construction / réutilisation d’un index persistant (`logs/Index`, `logs/Index_meta`)
-   - Construction de la queue (tri/filtre/limite/random)
+   - Building / reusing a persistent index (`logs/Index`, `logs/Index_meta`)
+   - Building the queue (sort/filter/limit/random)
 
-4. **Traitement parallèle**
-   - Démarre `convert_file` en parallèle (jusqu’à `PARALLEL_JOBS`)
-   - Progression via “slots” (affichage multi-workers)
-   - Mode `--off-peak` : ne lance pas de nouvelles conversions hors plage
+4. **Parallel processing**
+   - Starts `convert_file` in parallel (up to `PARALLEL_JOBS`)
+   - Progress via "slots" (multi-worker display)
+   - `--off-peak` mode: doesn't start new conversions outside the time range
 
-5. **Finalisation**
-   - Résumé final, logs, nettoyage des temporaires
-   - Dry-run : comparaison des noms au lieu d’encoder
+5. **Finalization**
+   - Final summary, logs, temporary cleanup
+   - Dry-run: filename comparison instead of encoding
 
-## Flux d’exécution (mode fichier unique)
+## Execution Flow (single file mode)
 
-Quand `-f/--file` est fourni, le script bypass index/queue et appelle directement `convert_file` sur un seul fichier.
+When `-f/--file` is provided, the script bypasses index/queue and directly calls `convert_file` on a single file.
 
-## Modules principaux (carte)
+## Main Modules (map)
 
-Le chargement est orchestré par [../nascode](../nascode). Les responsabilités sont globalement :
+Loading is orchestrated by [../nascode](../nascode). Responsibilities are generally:
 
-- **Constantes & fondations**
-  - `lib/constants.sh` : magic numbers centralisés (overridables via env)
-  - `lib/env.sh` : variables d'environnement
+- **Constants & foundations**
+  - `lib/constants.sh`: centralized magic numbers (overridable via env)
+  - `lib/env.sh`: environment variables
 
 - **CLI & UX**
-  - `lib/args.sh` : parsing options
-  - `lib/ui.sh` : couleurs/affichage
+  - `lib/args.sh`: option parsing
+  - `lib/ui.sh`: colors/display
 
-- **Configuration & profils**
-  - `lib/config.sh` : defaults + paramètres par mode
-  - `lib/codec_profiles.sh` : mapping codec→encodeur + profils + traduction bitrate
+- **Configuration & profiles**
+  - `lib/config.sh`: defaults + mode parameters
+  - `lib/codec_profiles.sh`: codec→encoder mapping + profiles + bitrate translation
 
-- **Index / queue / traitement**
-  - `lib/queue.sh` : index persistant, queue, tri, filtres (`--min-size`, random, limit)
-  - `lib/processing.sh` : exécution parallèle (simple / FIFO mode limite)
+- **Index / queue / processing**
+  - `lib/queue.sh`: persistent index, queue, sorting, filters (`--min-size`, random, limit)
+  - `lib/processing.sh`: parallel execution (simple / FIFO limit mode)
 
-- **Décision & paramètres média**
-  - `lib/media_probe.sh` : probes via ffprobe
-  - `lib/audio_decision.sh` : décision audio “smart codec” + multichannel
-  - `lib/audio_params.sh` : construit les paramètres FFmpeg audio (codec/layout/bitrate)
-  - `lib/video_params.sh` : pix_fmt, downscale, bitrate, suffixe effectif
-  - `lib/stream_mapping.sh` : mapping streams (ex: sous-titres)
-  - `lib/skip_decision.sh` : logique skip/passthrough/full (décision de conversion)
+- **Decision & media parameters**
+  - `lib/media_probe.sh`: probes via ffprobe
+  - `lib/audio_decision.sh`: "smart codec" audio decision + multichannel
+  - `lib/audio_params.sh`: builds FFmpeg audio parameters (codec/layout/bitrate)
+  - `lib/video_params.sh`: pix_fmt, downscale, bitrate, effective suffix
+  - `lib/stream_mapping.sh`: stream mapping (e.g., subtitles)
+  - `lib/skip_decision.sh`: skip/passthrough/full logic (conversion decision)
 
-- **Conversion & pipeline FFmpeg**
-  - `lib/conversion_prep.sh` : préparation fichiers, chemins, espace disque, transfert temporaire
-  - `lib/adaptive_mode.sh` : analyse complexité pour mode adaptatif
-  - `lib/transcode_video.sh` : exécution FFmpeg (passthrough / CRF / two-pass)
-  - `lib/conversion.sh` : orchestration par fichier (appelle les modules ci-dessus)
+- **Conversion & FFmpeg pipeline**
+  - `lib/conversion_prep.sh`: file preparation, paths, disk space, temporary transfer
+  - `lib/adaptive_mode.sh`: complexity analysis for adaptive mode
+  - `lib/transcode_video.sh`: FFmpeg execution (passthrough / CRF / two-pass)
+  - `lib/conversion.sh`: per-file orchestration (calls modules above)
 
-- **Qualité / analyse**
-  - `lib/vmaf.sh` : calcul VMAF (optionnel)
-  - `lib/complexity.sh` : analyse pour mode `adaptatif`
+- **Quality / analysis**
+  - `lib/vmaf.sh`: VMAF calculation (optional)
+  - `lib/complexity.sh`: analysis for `adaptatif` mode
 
-- **Robustesse & support**
-  - `lib/utils.sh` : helpers généraux (paths, tailles, parsing, construction commandes)
-  - `lib/logging.sh` : fichiers de log et helpers `log_*`
-  - `lib/lock.sh` : lockfile + stop flag
-  - `lib/system.sh` / `lib/detect.sh` : checks système, détection outils
-  - `lib/off_peak.sh` : logique heures creuses
-  - `lib/finalize.sh` : résumé, cleanup
-  - `lib/exports.sh` : export des fonctions/variables pour les sous-processus
+- **Robustness & support**
+  - `lib/utils.sh`: general helpers (paths, sizes, parsing, command building)
+  - `lib/logging.sh`: log files and `log_*` helpers
+  - `lib/lock.sh`: lockfile + stop flag
+  - `lib/system.sh` / `lib/detect.sh`: system checks, tool detection
+  - `lib/off_peak.sh`: off-peak hours logic
+  - `lib/finalize.sh`: summary, cleanup
+  - `lib/exports.sh`: function/variable exports for subprocesses
 
-## Artefacts (logs/Index/lock)
+## Artifacts (logs/Index/lock)
 
 - **Index**
-  - `logs/Index` : index (format interne)
-  - `logs/Index_meta` : métadonnées (SOURCE, date, etc.)
-  - `logs/Index_readable_*.txt` : versions lisibles
+  - `logs/Index`: index (internal format)
+  - `logs/Index_meta`: metadata (SOURCE, date, etc.)
+  - `logs/Index_readable_*.txt`: readable versions
 
 - **Queue**
-  - `logs/Queue` / `logs/Queue.full` : files null-separated
+  - `logs/Queue` / `logs/Queue.full`: null-separated queues
 
 - **Lock / stop**
-  - Lockfile : `/tmp/conversion_video.lock`
-  - Stop flag : `/tmp/conversion_stop_flag`
+  - Lockfile: `/tmp/conversion_video.lock`
+  - Stop flag: `/tmp/conversion_stop_flag`
 
 ## Tests
 
-- Harness : [../run_tests.sh](../run_tests.sh)
-- Tests : dossier [../tests/](../tests/)
-- Les tests sont principalement des tests Bats (unitaire + régressions + e2e).
+- Harness: [../run_tests.sh](../run_tests.sh)
+- Tests: [../tests/](../tests/) directory
+- Tests are primarily Bats tests (unit + regressions + e2e).
 
-## Pour aller plus loin
+## Further Reading
 
-- Usage : [USAGE.md](USAGE.md)
-- Config : [CONFIG.md](CONFIG.md)
-- Mode adaptatif : [ADAPTATIF.md](ADAPTATIF.md)
-- Smart codec : [SMART_CODEC.md](SMART_CODEC.md)
-- Dépannage : [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
-- Ajouter un codec : [ADDING_NEW_CODEC.md](ADDING_NEW_CODEC.md)
+- Usage: [USAGE.md](USAGE.md)
+- Config: [CONFIG.md](CONFIG.md)
+- Adaptive mode: [ADAPTATIF.md](ADAPTATIF.md)
+- Smart codec: [SMART_CODEC.md](SMART_CODEC.md)
+- Troubleshooting: [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+- Adding a codec: [ADDING_NEW_CODEC.md](ADDING_NEW_CODEC.md)
