@@ -49,16 +49,27 @@ _process_queue_simple() {
         convert_file "$file" "$OUTPUT_DIR" &
         _pids+=("$!")
         if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
-            if ! wait -n 2>/dev/null; then
-                wait "${_pids[0]}" 2>/dev/null || true
-            fi
-            local -a _still=()
-            for p in "${_pids[@]}"; do
-                if kill -0 "$p" 2>/dev/null; then
-                    _still+=("$p")
+            # Attendre qu'un des jobs trackés (convert_file) se termine, pas un
+            # sous-shell quelconque (ex. transfert asynchrone du fichier précédent).
+            # wait -n se réveille pour TOUT enfant, ce qui avancerait la boucle
+            # prématurément et lancerait le fichier suivant pendant que l'actuel
+            # encode encore.
+            local _any_finished=0
+            while [[ $_any_finished -eq 0 ]]; do
+                if ! wait -n 2>/dev/null; then
+                    wait "${_pids[0]}" 2>/dev/null || true
                 fi
+                local -a _still=()
+                for p in "${_pids[@]}"; do
+                    if kill -0 "$p" 2>/dev/null; then
+                        _still+=("$p")
+                    fi
+                done
+                if [[ "${#_still[@]}" -lt "${#_pids[@]}" ]]; then
+                    _any_finished=1
+                fi
+                _pids=("${_still[@]}")
             done
-            _pids=("${_still[@]}")
         fi
     done < "$QUEUE"
     
@@ -200,16 +211,24 @@ _process_queue_with_fifo() {
             convert_file "$file" "$OUTPUT_DIR" &
             _pids+=("$!")
             if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
-                if ! wait -n 2>/dev/null; then
-                    wait "${_pids[0]}" 2>/dev/null || true
-                fi
-                local -a _still=()
-                for p in "${_pids[@]}"; do
-                    if kill -0 "$p" 2>/dev/null; then
-                        _still+=("$p")
+                # Même correction que dans _process_queue_simple : attendre qu'un
+                # des jobs trackés se termine (pas un sous-shell de transfert).
+                local _any_finished=0
+                while [[ $_any_finished -eq 0 ]]; do
+                    if ! wait -n 2>/dev/null; then
+                        wait "${_pids[0]}" 2>/dev/null || true
                     fi
+                    local -a _still=()
+                    for p in "${_pids[@]}"; do
+                        if kill -0 "$p" 2>/dev/null; then
+                            _still+=("$p")
+                        fi
+                    done
+                    if [[ "${#_still[@]}" -lt "${#_pids[@]}" ]]; then
+                        _any_finished=1
+                    fi
+                    _pids=("${_still[@]}")
                 done
-                _pids=("${_still[@]}")
             fi
         done < "$WORKFIFO"
         for p in "${_pids[@]}"; do
