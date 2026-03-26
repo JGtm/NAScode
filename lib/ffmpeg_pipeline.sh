@@ -277,6 +277,7 @@ _execute_ffmpeg_pipeline() {
             fi
 
             cmd+=(ffmpeg -y -loglevel warning)
+            cmd+=(-probesize "${FFMPEG_PROBESIZE:-100M}" -analyzeduration "${FFMPEG_ANALYZEDURATION:-100M}")
 
             _cmd_append_words cmd "${SAMPLE_SEEK_PARAMS:-}"
 

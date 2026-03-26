@@ -570,6 +570,11 @@ _run_ffmpeg_encode() {
     ffmpeg_loglevel=$(_nascode_get_ffmpeg_loglevel_for_encoder "$encoder")
     cmd+=(ffmpeg -y -loglevel "$ffmpeg_loglevel")
 
+    # Augmenter probesize/analyzeduration pour les remux Blu-ray avec de nombreux streams
+    # (sous-titres PGS, plusieurs pistes audio) dont les paramètres nécessitent plus de données.
+    # Valeur configurable via FFMPEG_PROBESIZE (défaut : 100M).
+    cmd+=(-probesize "${FFMPEG_PROBESIZE:-100M}" -analyzeduration "${FFMPEG_ANALYZEDURATION:-100M}")
+
     # Ces variables sont historiquement des strings contenant plusieurs options.
     # On les split volontairement en mots (contrôlé en interne) pour éviter les expansions non-quotées.
     _cmd_append_words cmd "${SAMPLE_SEEK_PARAMS:-}"

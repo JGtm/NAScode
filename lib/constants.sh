@@ -20,6 +20,20 @@ fi
 _CONSTANTS_SH_LOADED=1
 
 ###########################################################
+# FFMPEG — ANALYSE DES STREAMS (transcode_video.sh, ffmpeg_pipeline.sh)
+###########################################################
+
+# Taille maximale de données analysées par FFmpeg pour détecter les paramètres
+# des streams (résolution, codec, canaux audio, etc.).
+# La valeur par défaut FFmpeg (5 Mo) est insuffisante pour les remux Blu-ray avec
+# de nombreux streams (8+), en particulier les sous-titres PGS.
+FFMPEG_PROBESIZE="${FFMPEG_PROBESIZE:-100M}"
+
+# Durée maximale analysée par FFmpeg pour détecter les paramètres des streams.
+# Augmenté pour éviter les erreurs "unspecified size" sur les remux Blu-ray.
+FFMPEG_ANALYZEDURATION="${FFMPEG_ANALYZEDURATION:-100M}"
+
+###########################################################
 # MODE ADAPTATIF (complexity.sh)
 ###########################################################
 

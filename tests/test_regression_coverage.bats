@@ -118,7 +118,7 @@ STUB
     # Créer un stub ffprobe qui simule un fichier avec subs FR+EN
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
-    
+
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
 # Simuler un fichier avec sous-titres FR (index 2) et EN (index 3)
@@ -133,23 +133,25 @@ fi
 exit 0
 STUB
     chmod +x "$stub_dir/ffprobe"
-    
+
     # Utiliser le stub
     PATH="$stub_dir:$PATH"
-    
+
     local result
     result=$(_build_stream_mapping "/fake/file.mkv")
-    
+
     # Doit mapper le sous-titre FR (index 2) mais pas EN (index 3)
     [[ "$result" =~ "-map 0:2" ]]
     [[ ! "$result" =~ "-map 0:3" ]]
+    # Doit toujours inclure -c:s copy pour éviter la transcodage PGS→SSA
+    [[ "$result" =~ "-c:s copy" ]]
 }
 
 @test "SUBTITLES: fichier sans sous-titres FR garde tous les sous-titres (fallback)" {
     # Créer un stub ffprobe qui simule un fichier avec subs EN+ES uniquement
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
-    
+
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
 # Simuler un fichier avec sous-titres EN (index 2) et ES (index 3) - pas de FR
@@ -164,22 +166,24 @@ fi
 exit 0
 STUB
     chmod +x "$stub_dir/ffprobe"
-    
+
     # Utiliser le stub
     PATH="$stub_dir:$PATH"
-    
+
     local result
     result=$(_build_stream_mapping "/fake/file.mkv")
-    
+
     # Aucun FR trouvé → doit garder tous les sous-titres avec -map 0:s?
     [[ "$result" =~ "-map 0:s?" ]]
+    # Doit toujours inclure -c:s copy pour éviter la transcodage PGS→SSA
+    [[ "$result" =~ "-c:s copy" ]]
 }
 
 @test "SUBTITLES: fichier avec plusieurs pistes FR les garde toutes" {
     # Créer un stub ffprobe qui simule un fichier avec 2 pistes FR
     local stub_dir="$TEST_TEMP_DIR/stub"
     mkdir -p "$stub_dir"
-    
+
     cat > "$stub_dir/ffprobe" << 'STUB'
 #!/bin/bash
 # Simuler un fichier avec 2 sous-titres FR (forced + full)
@@ -191,16 +195,50 @@ fi
 exit 0
 STUB
     chmod +x "$stub_dir/ffprobe"
-    
+
     PATH="$stub_dir:$PATH"
-    
+
     local result
     result=$(_build_stream_mapping "/fake/file.mkv")
-    
+
     # Doit mapper les deux pistes FR (index 2 et 4)
     [[ "$result" =~ "-map 0:2" ]]
     [[ "$result" =~ "-map 0:4" ]]
     [[ ! "$result" =~ "-map 0:3" ]]
+    # Doit toujours inclure -c:s copy pour éviter la transcodage PGS→SSA
+    [[ "$result" =~ "-c:s copy" ]]
+}
+
+@test "SUBTITLES: _build_stream_mapping inclut toujours -c:s copy (protection PGS Blu-ray)" {
+    # Vérification explicite que -c:s copy est présent dans tous les cas,
+    # pour éviter la régression "bitmap to bitmap" sur les remux Blu-ray.
+    local stub_dir="$TEST_TEMP_DIR/stub_pgs"
+    mkdir -p "$stub_dir"
+
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+# Simuler un remux Blu-ray : 1 vidéo, 1 audio, 3 sous-titres PGS (pas de FR)
+if [[ "$*" =~ "-select_streams v" ]]; then
+    echo "0,0"
+fi
+if [[ "$*" =~ "-select_streams s" ]]; then
+    echo "5,eng"
+    echo "6,eng"
+    echo "7,spa"
+fi
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+
+    PATH="$stub_dir:$PATH"
+
+    local result
+    result=$(_build_stream_mapping "/fake/bluray_remux.mkv")
+
+    # Fallback -map 0:s? car pas de FR
+    [[ "$result" =~ "-map 0:s?" ]]
+    # -c:s copy obligatoire pour ne pas tenter PGS→SSA
+    [[ "$result" =~ "-c:s copy" ]]
 }
 
 ###########################################################

@@ -217,5 +217,10 @@ _build_stream_mapping() {
         mapping="$mapping -map 0:s?"
     fi
 
+    # Toujours copier les sous-titres sans réencodage.
+    # Sans -c:s copy, FFmpeg tente de transcoder les sous-titres PGS (bitmap Blu-ray)
+    # en SSA (texte), ce qui est impossible et provoque une erreur fatale.
+    mapping="$mapping -c:s copy"
+
     echo "$mapping"
 }
