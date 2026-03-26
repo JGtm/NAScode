@@ -35,7 +35,7 @@ _convert_get_full_metadata() {
     # video_bitrate|video_codec|duration|width|height|pix_fmt|audio_codec|audio_bitrate
     if declare -f get_full_media_metadata &>/dev/null; then
         get_full_media_metadata "$file_original"
-        return 0
+        return $?
     fi
 
     # Fallback (pour tests ou si fonction manquante)

@@ -110,6 +110,15 @@ get_full_media_metadata() {
     }
     ')
     
+    # Valider que le champ codec vidéo est présent.
+    # Un codec vide indique que ffprobe n'a pas trouvé de stream vidéo valide
+    # (fichier corrompu, format non supporté, ou ffprobe silencieusement vide).
+    local _check_bitrate _check_codec
+    IFS='|' read -r _check_bitrate _check_codec _ <<< "$parsed"
+    if [[ -z "$_check_codec" ]]; then
+        return 1
+    fi
+
     echo "$parsed"
 }
 
@@ -317,7 +326,12 @@ detect_hwaccel() {
         # shellcheck disable=SC2034
         HWACCEL="videotoolbox"
     else
-        # shellcheck disable=SC2034
-        HWACCEL="cuda"
+        # Linux/autre : CUDA uniquement si nvidia-smi confirme un GPU disponible.
+        # Forcer cuda sans vérification provoque un pic RAM+VRAM simultané en mode
+        # adaptatif AV1 (SVT-AV1 + enable-overlays) → crash machine.
+        if command -v nvidia-smi &>/dev/null && nvidia-smi &>/dev/null; then
+            # shellcheck disable=SC2034
+            HWACCEL="cuda"
+        fi
     fi
 }
