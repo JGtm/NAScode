@@ -528,7 +528,7 @@ _get_smart_audio_decision() {
             _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_unknown_bitrate"
         elif [[ "$source_bitrate_kbps" -le "$target_bitrate" ]]; then
             _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_bitrate_ok"
-        elif [[ "$source_bitrate_kbps" -gt $((target_bitrate * 110 / 100)) ]]; then
+        elif [[ "$source_bitrate_kbps" -gt $((target_bitrate * AUDIO_BITRATE_MARGIN_PCT / 100)) ]]; then
             _emit_audio_decision "downscale" "${source_codec}" "${target_bitrate}" "same_codec_downscale"
         else
             _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_margin_ok"
@@ -557,7 +557,7 @@ _get_smart_audio_decision() {
             _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_unknown_bitrate"
         elif [[ "$source_bitrate_kbps" -le "$source_limit" ]]; then
             _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_bitrate_ok"
-        elif [[ "$source_bitrate_kbps" -gt $((source_limit * 110 / 100)) ]]; then
+        elif [[ "$source_bitrate_kbps" -gt $((source_limit * AUDIO_BITRATE_MARGIN_PCT / 100)) ]]; then
             _emit_audio_decision "downscale" "${source_codec}" "${source_limit}" "efficient_codec_downscale"
         else
             _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_margin_ok"

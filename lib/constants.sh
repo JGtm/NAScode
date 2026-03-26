@@ -20,6 +20,23 @@ fi
 _CONSTANTS_SH_LOADED=1
 
 ###########################################################
+# AUDIO — DÉCISION DE RÉENCODAGE (audio_decision.sh)
+###########################################################
+
+# Marge de tolérance au-dessus du bitrate cible avant de déclencher un downscale.
+# Valeur en pourcentage exprimée sous forme de multiplicateur entier /100.
+# 110 = 10% de marge : si source ≤ cible × 1,10, on copie plutôt que downscaler.
+AUDIO_BITRATE_MARGIN_PCT="${AUDIO_BITRATE_MARGIN_PCT:-110}"
+
+###########################################################
+# MODE ADAPTATIF — PLAFONDS (complexity.sh)
+###########################################################
+
+# Plafond du bitrate cible en mode adaptatif, exprimé en % du bitrate original.
+# Évite de dépasser 75% du bitrate source (pas de sens d'encoder plus cher que l'original).
+ADAPTIVE_MAX_ORIGINAL_PCT="${ADAPTIVE_MAX_ORIGINAL_PCT:-75}"
+
+###########################################################
 # FFMPEG — ANALYSE DES STREAMS (transcode_video.sh, ffmpeg_pipeline.sh)
 ###########################################################
 

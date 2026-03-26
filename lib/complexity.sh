@@ -590,7 +590,7 @@ compute_adaptive_target_bitrate() {
     # Garde-fou 1 : ne pas dépasser 75% du bitrate original
     if [[ -n "$original_bitrate_bps" ]] && [[ "$original_bitrate_bps" =~ ^[0-9]+$ ]] && [[ "$original_bitrate_bps" -gt 0 ]]; then
         local original_kbps=$(( original_bitrate_bps / 1000 ))
-        local max_from_original=$(( original_kbps * 75 / 100 ))
+        local max_from_original=$(( original_kbps * ADAPTIVE_MAX_ORIGINAL_PCT / 100 ))
         
         if [[ "$r_target" -gt "$max_from_original" ]]; then
             r_target="$max_from_original"
