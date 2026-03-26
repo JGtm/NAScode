@@ -30,6 +30,11 @@
 
 set -euo pipefail
 
+# Restreindre les permissions des fichiers temporaires créés par le processus.
+# Sans umask restrictif, les logs FFmpeg (chemins de fichiers) sont lisibles
+# par tous les utilisateurs du système.
+umask 0077
+
 ###########################################################
 # DÉTERMINATION DU RÉPERTOIRE DU SCRIPT
 ###########################################################

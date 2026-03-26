@@ -289,10 +289,16 @@ parse_arguments() {
         esac
     done
 
-    #if [[ "$OUTPUT_DIR" != /* ]]; then
-    #    OUTPUT_DIR="$SCRIPT_DIR/$OUTPUT_DIR"
-    #fi
-    
+    # Normaliser OUTPUT_DIR en chemin absolu.
+    # -m : ne requiert pas l'existence du répertoire (il sera créé plus tard).
+    # Sans normalisation, un chemin absolu passé via -o ou OUTPUT_DIR=... serait
+    # précédé de $SCRIPT_DIR si la logique de concaténation s'applique.
+    if command -v realpath &>/dev/null; then
+        OUTPUT_DIR=$(realpath -m "$OUTPUT_DIR")
+    elif [[ "$OUTPUT_DIR" != /* ]]; then
+        OUTPUT_DIR="$SCRIPT_DIR/$OUTPUT_DIR"
+    fi
+
     # En mode random, appliquer la limite par défaut si aucune limite n'a été spécifiée
     if [[ "$RANDOM_MODE" == true ]] && [[ "$LIMIT_FILES" -eq 0 ]]; then
         LIMIT_FILES=$RANDOM_MODE_DEFAULT_LIMIT
