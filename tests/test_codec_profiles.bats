@@ -286,6 +286,16 @@ teardown() {
     [[ "$result" =~ "film-grain" ]]
 }
 
+@test "get_encoder_mode_params: libsvtav1 adaptatif désactive enable-overlays" {
+    result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
+    [[ "$result" =~ "enable-overlays=0" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 adaptatif désactive film-grain" {
+    result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
+    [[ "$result" =~ "film-grain=0" ]]
+}
+
 ###########################################################
 # Tests get_encoder_params_flag()
 ###########################################################

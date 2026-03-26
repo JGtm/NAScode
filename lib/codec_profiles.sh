@@ -256,6 +256,9 @@ get_encoder_mode_params() {
                 serie) echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}" ;;
                 # Films : qualité max, film grain preservation
                 film)  echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}:film-grain=8:film-grain-denoise=0" ;;
+                # Adaptatif : overlays et film-grain désactivés (trop gourmands en RAM/CPU,
+                # combinés à HWACCEL provoquent un crash au démarrage de l'encodage)
+                adaptatif) echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=0:film-grain=0" ;;
                 *)     echo "" ;;
             esac
             ;;

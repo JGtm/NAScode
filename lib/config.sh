@@ -287,7 +287,9 @@ set_conversion_mode_parameters() {
             FILM_TUNE_FASTDECODE=false
             # Flag pour activer le calcul adaptatif dans video_params
             ADAPTIVE_COMPLEXITY_MODE=true
-            ENCODER_MODE_PROFILE="film"
+            # Profil "adaptatif" distinct de "film" : désactive les options coûteuses
+            # (enable-overlays, film-grain) qui provoquent un crash RAM/VRAM avec SVT-AV1
+            ENCODER_MODE_PROFILE="adaptatif"
             AUDIO_FORCE_STEREO=false
             AUDIO_TRANSLATE_EQUIV_QUALITY=true
             VIDEO_EQUIV_QUALITY_CAP=true
