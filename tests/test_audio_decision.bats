@@ -368,3 +368,18 @@ teardown() {
     result=$(_get_multichannel_target_bitrate "eac3")
     [ "$result" -eq 384 ]
 }
+
+@test "_emit_audio_decision: appelable directement au niveau module (copy sans contexte)" {
+    # Vérifie que la fonction est au niveau module et testable sans passer
+    # par _get_smart_audio_decision()
+    local result
+    result=$(_emit_audio_decision "copy" "aac" "0" "test_reason" "aac" "160" "2")
+    [ "$result" = "copy|aac|0|test_reason" ]
+}
+
+@test "_emit_audio_decision: convert sans equiv-quality → bitrate inchangé" {
+    AUDIO_TRANSLATE_EQUIV_QUALITY=false
+    local result
+    result=$(_emit_audio_decision "convert" "opus" "160" "test_convert" "aac" "192" "2")
+    [ "$result" = "convert|opus|160|test_convert" ]
+}

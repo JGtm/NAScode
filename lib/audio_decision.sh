@@ -279,6 +279,52 @@ _get_audio_target_bitrate() {
 # ANALYSE AUDIO - LOGIQUE SMART CODEC
 ###########################################################
 
+# Émet une décision audio au format "action|codec|bitrate|raison".
+# Appelé exclusivement depuis _get_smart_audio_decision().
+#
+# Usage: _emit_audio_decision <action> <dst_codec> <dst_kbps> <reason> \
+#                             <src_codec_norm> <src_bitrate_kbps> <channels>
+#
+# Les trois derniers paramètres (contexte source) évitent la capture de
+# variables du scope parent et permettent les tests unitaires directs.
+_emit_audio_decision() {
+    local action="$1"
+    local dst_codec="$2"
+    local dst_kbps="${3:-0}"
+    local reason="$4"
+    local source_codec_norm="${5:-}"
+    local source_bitrate_kbps="${6:-0}"
+    local channels="${7:-2}"
+
+    # Traduction bitrate : jamais au-dessus du bitrate source.
+    if [[ "$action" != "copy" ]] && [[ "${AUDIO_TRANSLATE_EQUIV_QUALITY:-false}" == true ]]; then
+        if [[ -n "$dst_codec" ]] && [[ "$dst_kbps" =~ ^[0-9]+$ ]] && [[ "$dst_kbps" -gt 0 ]] && \
+           [[ "$source_bitrate_kbps" =~ ^[0-9]+$ ]] && [[ "$source_bitrate_kbps" -gt 0 ]]; then
+            local dst_codec_norm
+            dst_codec_norm=$(_normalize_audio_codec "$dst_codec")
+
+            if [[ -n "$dst_codec_norm" && "$dst_codec_norm" != "$source_codec_norm" ]]; then
+                local translated
+                translated=$(translate_audio_bitrate_kbps_between_codecs "$source_codec_norm" "$dst_codec_norm" "$source_bitrate_kbps" "$channels" || true)
+
+                if [[ "$translated" =~ ^[0-9]+$ ]] && [[ "$translated" -gt 0 ]]; then
+                    local floor
+                    if _is_audio_multichannel "$channels"; then
+                        floor=128
+                    else
+                        floor=64
+                    fi
+
+                    translated=$(_clamp_min "$translated" "$floor")
+                    dst_kbps=$(_min3 "$translated" "$dst_kbps" "$source_bitrate_kbps")
+                fi
+            fi
+        fi
+    fi
+
+    echo "${action}|${dst_codec}|${dst_kbps}|${reason}"
+}
+
 # Retourne: action|codec_effectif|bitrate_cible|raison
 _get_smart_audio_decision() {
     local input_file="$1"
@@ -316,41 +362,6 @@ _get_smart_audio_decision() {
     local source_codec_norm
     source_codec_norm=$(_normalize_audio_codec "$source_codec")
 
-    _emit_audio_decision() {
-        local action="$1"
-        local dst_codec="$2"
-        local dst_kbps="${3:-0}"
-        local reason="$4"
-
-        # Traduction bitrate (option 1): jamais au-dessus du bitrate source.
-        if [[ "$action" != "copy" ]] && [[ "${AUDIO_TRANSLATE_EQUIV_QUALITY:-false}" == true ]]; then
-            if [[ -n "$dst_codec" ]] && [[ "$dst_kbps" =~ ^[0-9]+$ ]] && [[ "$dst_kbps" -gt 0 ]] && \
-               [[ "$source_bitrate_kbps" =~ ^[0-9]+$ ]] && [[ "$source_bitrate_kbps" -gt 0 ]]; then
-                local dst_codec_norm
-                dst_codec_norm=$(_normalize_audio_codec "$dst_codec")
-
-                if [[ -n "$dst_codec_norm" && "$dst_codec_norm" != "$source_codec_norm" ]]; then
-                    local translated
-                    translated=$(translate_audio_bitrate_kbps_between_codecs "$source_codec_norm" "$dst_codec_norm" "$source_bitrate_kbps" "$channels" || true)
-
-                    if [[ "$translated" =~ ^[0-9]+$ ]] && [[ "$translated" -gt 0 ]]; then
-                        local floor
-                        if _is_audio_multichannel "$channels"; then
-                            floor=128
-                        else
-                            floor=64
-                        fi
-
-                        translated=$(_clamp_min "$translated" "$floor")
-                        dst_kbps=$(_min3 "$translated" "$dst_kbps" "$source_bitrate_kbps")
-                    fi
-                fi
-            fi
-        fi
-
-        echo "${action}|${dst_codec}|${dst_kbps}|${reason}"
-    }
-
     # Mode stéréo forcé : si la source est multicanal, on downmix toujours en stéréo.
     # Important : on ne peut pas faire de downmix en mode "copy".
     if [[ "${AUDIO_FORCE_STEREO:-false}" == true ]] && [[ "$channels" -ge 6 ]]; then
@@ -368,9 +379,9 @@ _get_smart_audio_decision() {
         if [[ "$source_codec_norm" == "$forced_target_codec_norm" ]] && \
            [[ "$source_bitrate_kbps" -gt 0 ]] && [[ "$forced_target_bitrate" -gt 0 ]] && \
            [[ "$source_bitrate_kbps" -gt "$forced_target_bitrate" ]]; then
-            _emit_audio_decision "downscale" "${forced_target_codec}" "${forced_target_bitrate}" "force_stereo_downmix_downscale"
+            _emit_audio_decision "downscale" "${forced_target_codec}" "${forced_target_bitrate}" "force_stereo_downmix_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         else
-            _emit_audio_decision "convert" "${forced_target_codec}" "${forced_target_bitrate}" "force_stereo_downmix"
+            _emit_audio_decision "convert" "${forced_target_codec}" "${forced_target_bitrate}" "force_stereo_downmix" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         fi
         return 0
     fi
@@ -405,9 +416,9 @@ _get_smart_audio_decision() {
             if [[ "$is_multichannel" == true ]]; then
                 local eac3_bitrate
                 eac3_bitrate=$(_compute_eac3_target_bitrate_kbps "$source_bitrate_kbps")
-                _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "no_lossless_multichannel"
+                _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "no_lossless_multichannel" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             else
-                _emit_audio_decision "convert" "${target_codec}" "${target_bitrate}" "no_lossless_stereo"
+                _emit_audio_decision "convert" "${target_codec}" "${target_bitrate}" "no_lossless_stereo" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             fi
             return 0
         fi
@@ -416,18 +427,18 @@ _get_smart_audio_decision() {
     if [[ "${FORCE_AUDIO_CODEC:-false}" == true ]]; then
         if [[ "$source_codec_norm" == "$effective_target_codec_norm" ]]; then
             if [[ "$source_bitrate_kbps" -gt 0 && "$source_bitrate_kbps" -gt "$target_bitrate" ]]; then
-                _emit_audio_decision "downscale" "${effective_target_codec}" "${target_bitrate}" "force_downscale"
+                _emit_audio_decision "downscale" "${effective_target_codec}" "${target_bitrate}" "force_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             else
-                _emit_audio_decision "copy" "${source_codec}" "0" "force_same_codec_ok"
+                _emit_audio_decision "copy" "${source_codec}" "0" "force_same_codec_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             fi
         else
-            _emit_audio_decision "convert" "${effective_target_codec}" "${target_bitrate}" "force_convert"
+            _emit_audio_decision "convert" "${effective_target_codec}" "${target_bitrate}" "force_convert" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         fi
         return 0
     fi
 
     if [[ -z "$source_codec" ]]; then
-        _emit_audio_decision "convert" "${effective_target_codec}" "${target_bitrate}" "unknown_codec"
+        _emit_audio_decision "convert" "${effective_target_codec}" "${target_bitrate}" "unknown_codec" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         return 0
     fi
 
@@ -435,10 +446,10 @@ _get_smart_audio_decision() {
         if [[ "$channels" -gt 6 ]]; then
             local eac3_bitrate
             eac3_bitrate=$(_compute_eac3_target_bitrate_kbps "$source_bitrate_kbps")
-            _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "premium_downmix_required"
+            _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "premium_downmix_required" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             return 0
         fi
-        _emit_audio_decision "copy" "${source_codec}" "0" "premium_passthrough"
+        _emit_audio_decision "copy" "${source_codec}" "0" "premium_passthrough" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         return 0
     fi
 
@@ -449,22 +460,22 @@ _get_smart_audio_decision() {
             if [[ "$channels" -gt 6 ]]; then
                 local eac3_bitrate
                 eac3_bitrate=$(_compute_eac3_target_bitrate_kbps "$source_bitrate_kbps")
-                _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "eac3_downmix_required"
+                _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "eac3_downmix_required" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             elif [[ "$source_bitrate_kbps" -gt 0 && "$source_bitrate_kbps" -gt "${AUDIO_BITRATE_EAC3_MULTICHANNEL:-384}" ]]; then
-                _emit_audio_decision "downscale" "eac3" "${AUDIO_BITRATE_EAC3_MULTICHANNEL:-384}" "eac3_multichannel_downscale"
+                _emit_audio_decision "downscale" "eac3" "${AUDIO_BITRATE_EAC3_MULTICHANNEL:-384}" "eac3_multichannel_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             else
-                _emit_audio_decision "copy" "${source_codec}" "0" "eac3_multichannel_ok"
+                _emit_audio_decision "copy" "${source_codec}" "0" "eac3_multichannel_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             fi
             return 0
         fi
 
         if [[ "$source_codec_norm" == "ac3" ]]; then
             if [[ "$effective_target_codec" == "opus" ]]; then
-                _emit_audio_decision "convert" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "ac3_to_opus_multichannel"
+                _emit_audio_decision "convert" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "ac3_to_opus_multichannel" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             else
                 local eac3_bitrate
                 eac3_bitrate=$(_compute_eac3_target_bitrate_kbps "$source_bitrate_kbps")
-                _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "ac3_to_eac3_multichannel"
+                _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "ac3_to_eac3_multichannel" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
             fi
             return 0
         fi
@@ -472,19 +483,19 @@ _get_smart_audio_decision() {
         if [[ "$source_codec_norm" == "aac" ]]; then
             if [[ "$effective_target_codec" == "aac" ]]; then
                 if [[ "$source_bitrate_kbps" -gt 0 && "$source_bitrate_kbps" -gt "${AUDIO_BITRATE_AAC_MULTICHANNEL:-320}" ]]; then
-                    _emit_audio_decision "downscale" "aac" "${AUDIO_BITRATE_AAC_MULTICHANNEL:-320}" "aac_multichannel_downscale"
+                    _emit_audio_decision "downscale" "aac" "${AUDIO_BITRATE_AAC_MULTICHANNEL:-320}" "aac_multichannel_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 elif [[ "$channels" -gt 6 ]]; then
-                    _emit_audio_decision "convert" "aac" "${AUDIO_BITRATE_AAC_MULTICHANNEL:-320}" "aac_downmix_required"
+                    _emit_audio_decision "convert" "aac" "${AUDIO_BITRATE_AAC_MULTICHANNEL:-320}" "aac_downmix_required" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 else
-                    _emit_audio_decision "copy" "${source_codec}" "0" "aac_multichannel_ok"
+                    _emit_audio_decision "copy" "${source_codec}" "0" "aac_multichannel_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 fi
             else
                 if [[ "$source_bitrate_kbps" -gt 0 && "$source_bitrate_kbps" -lt "$anti_upscale_threshold" ]]; then
-                    _emit_audio_decision "copy" "${source_codec}" "0" "aac_multichannel_anti_upscale"
+                    _emit_audio_decision "copy" "${source_codec}" "0" "aac_multichannel_anti_upscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 else
                     local eac3_bitrate
                     eac3_bitrate=$(_compute_eac3_target_bitrate_kbps "$source_bitrate_kbps")
-                    _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "aac_to_eac3_multichannel"
+                    _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "aac_to_eac3_multichannel" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 fi
             fi
             return 0
@@ -493,45 +504,45 @@ _get_smart_audio_decision() {
         if [[ "$source_codec_norm" == "opus" ]]; then
             if [[ "$effective_target_codec" == "opus" ]]; then
                 if [[ "$source_bitrate_kbps" -gt 0 && "$source_bitrate_kbps" -gt "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" ]]; then
-                    _emit_audio_decision "downscale" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_multichannel_downscale"
+                    _emit_audio_decision "downscale" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_multichannel_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 elif [[ "$channels" -gt 6 ]]; then
-                    _emit_audio_decision "convert" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_downmix_required"
+                    _emit_audio_decision "convert" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_downmix_required" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 else
-                    _emit_audio_decision "copy" "${source_codec}" "0" "opus_multichannel_ok"
+                    _emit_audio_decision "copy" "${source_codec}" "0" "opus_multichannel_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 fi
             else
                 if [[ "$source_bitrate_kbps" -gt 0 && "$source_bitrate_kbps" -le "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" ]]; then
                     if [[ "$channels" -le 6 ]]; then
-                        _emit_audio_decision "copy" "${source_codec}" "0" "opus_multichannel_efficient"
+                        _emit_audio_decision "copy" "${source_codec}" "0" "opus_multichannel_efficient" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                     else
-                        _emit_audio_decision "convert" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_downmix_required"
+                        _emit_audio_decision "convert" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_downmix_required" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                     fi
                 else
-                    _emit_audio_decision "downscale" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_multichannel_downscale"
+                    _emit_audio_decision "downscale" "opus" "${AUDIO_BITRATE_OPUS_MULTICHANNEL:-224}" "opus_multichannel_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
                 fi
             fi
             return 0
         fi
 
         if [[ "$source_bitrate_kbps" -gt 0 && "$source_bitrate_kbps" -lt "$anti_upscale_threshold" ]]; then
-            _emit_audio_decision "copy" "${source_codec}" "0" "multichannel_anti_upscale"
+            _emit_audio_decision "copy" "${source_codec}" "0" "multichannel_anti_upscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         else
             local eac3_bitrate
             eac3_bitrate=$(_compute_eac3_target_bitrate_kbps "$source_bitrate_kbps")
-            _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "multichannel_to_eac3"
+            _emit_audio_decision "convert" "eac3" "${eac3_bitrate}" "multichannel_to_eac3" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         fi
         return 0
     fi
 
     if [[ "$source_codec_norm" == "$target_codec_norm" ]]; then
         if [[ "$source_bitrate_kbps" -eq 0 ]]; then
-            _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_unknown_bitrate"
+            _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_unknown_bitrate" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         elif [[ "$source_bitrate_kbps" -le "$target_bitrate" ]]; then
-            _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_bitrate_ok"
+            _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_bitrate_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         elif [[ "$source_bitrate_kbps" -gt $((target_bitrate * AUDIO_BITRATE_MARGIN_PCT / 100)) ]]; then
-            _emit_audio_decision "downscale" "${source_codec}" "${target_bitrate}" "same_codec_downscale"
+            _emit_audio_decision "downscale" "${source_codec}" "${target_bitrate}" "same_codec_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         else
-            _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_margin_ok"
+            _emit_audio_decision "copy" "${source_codec}" "0" "same_codec_margin_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         fi
         return 0
     fi
@@ -543,7 +554,7 @@ _get_smart_audio_decision() {
     target_rank=$(get_audio_codec_rank "$target_codec_norm")
     
     if [[ "$target_rank" -gt "$source_rank" ]]; then
-        _emit_audio_decision "convert" "${target_codec}" "${target_bitrate}" "target_more_efficient"
+        _emit_audio_decision "convert" "${target_codec}" "${target_bitrate}" "target_more_efficient" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         return 0
     fi
 
@@ -552,20 +563,20 @@ _get_smart_audio_decision() {
         source_limit=$(get_audio_codec_target_bitrate "$source_codec")
 
         if [[ "$source_limit" -eq 0 ]]; then
-            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_no_limit"
+            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_no_limit" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         elif [[ "$source_bitrate_kbps" -eq 0 ]]; then
-            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_unknown_bitrate"
+            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_unknown_bitrate" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         elif [[ "$source_bitrate_kbps" -le "$source_limit" ]]; then
-            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_bitrate_ok"
+            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_bitrate_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         elif [[ "$source_bitrate_kbps" -gt $((source_limit * AUDIO_BITRATE_MARGIN_PCT / 100)) ]]; then
-            _emit_audio_decision "downscale" "${source_codec}" "${source_limit}" "efficient_codec_downscale"
+            _emit_audio_decision "downscale" "${source_codec}" "${source_limit}" "efficient_codec_downscale" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         else
-            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_margin_ok"
+            _emit_audio_decision "copy" "${source_codec}" "0" "efficient_codec_margin_ok" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
         fi
         return 0
     fi
 
-    _emit_audio_decision "convert" "${target_codec}" "${target_bitrate}" "inefficient_codec_convert"
+    _emit_audio_decision "convert" "${target_codec}" "${target_bitrate}" "inefficient_codec_convert" "$source_codec_norm" "$source_bitrate_kbps" "$channels"
 }
 
 # RÉTRO-COMPATIBILITÉ : retourne source_codec|source_bitrate_kbps|should_convert

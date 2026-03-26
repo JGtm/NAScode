@@ -302,13 +302,13 @@ Error opening output file ...
 | ID | Titre | Priorité | Statut |
 |----|-------|----------|--------|
 | BUG-1 | Crash sous-titres PGS Blu-ray | — | ✅ Résolu |
-| P1-A | Propagation erreurs sous-shells | P1 | À faire |
-| P1-B | Hardening fichiers temporaires | P1 | À faire |
-| P1-C | Normalisation chemins de sortie | P1 | À faire |
+| P1-A | Propagation erreurs sous-shells | P1 | ✅ Résolu |
+| P1-B | Hardening fichiers temporaires | P1 | ✅ Résolu |
+| P1-C | Normalisation chemins de sortie | P1 | ✅ Résolu |
 | P2-A | Extraction `_emit_audio_decision` | P2 | À faire |
-| P2-B | Centralisation constantes magiques | P2 | À faire |
-| P2-C | Gardes parsing IFS | P2 | À faire |
-| P3-A | Validation format ffprobe | P3 | À faire |
+| P2-B | Centralisation constantes magiques | P2 | ✅ Résolu |
+| P2-C | Gardes parsing IFS | P2 | ✅ Déjà couvert (`processing.sh:42`, garde `if !` sur `_prepare_file_paths`) |
+| P3-A | Validation format ffprobe | P3 | ✅ Résolu (inclus dans P1-A) |
 | P3-B | Indexation incrémentale | P3 | À faire |
 | P3-C | Parallélisation VMAF | P3 | À faire |
 | P4-A | Tests chemins Windows | P4 | À faire |
