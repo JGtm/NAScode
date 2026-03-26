@@ -19,6 +19,26 @@ Derniers prompts :
 - "Oui garde l'esprit actuel…"
 - "ok commit et push puis tu merges dans main"
 
+### 2026-01-17 — Docs EN : harmonisation terminologie (movies/savings, series mode)
+
+Branche : `docs/en-terminology-harmonize`
+
+Contexte : revue comparative FR→EN pour valider les termes utilisés selon le contexte du script, puis harmonisation **uniquement** côté documentation anglaise.
+
+Changements principaux :
+
+- [README.en.md](README.en.md) : uniformise "series mode `serie`" et conserve les exemples en "movies".
+- [docs/en/USAGE.md](docs/en/USAGE.md) : exemples harmonisés vers "/path/to/movies" + libellé "series mode `serie`".
+- [docs/en/SMART_CODEC.md](docs/en/SMART_CODEC.md) : remplace "Serie mode" par "Series mode (`serie`)".
+- [docs/en/CONFIG.md](docs/en/CONFIG.md) : standardise "minimum savings" (au lieu de "minimum gain").
+- [docs/en/TROUBLESHOOTING.md](docs/en/TROUBLESHOOTING.md) : remplace "unified session journal" par "unified session log".
+- [docs/en/CHANGELOG.md](docs/en/CHANGELOG.md) : harmonise les occurrences restantes de "serie mode".
+
+Derniers prompts :
+
+- "Est ce que tu peux comparer les traductions anglaises de toute la documentation de mon projet depuis le français vers l'anglais ?"
+- "Oui vasy harmonise. je prefere movies savings du coup"
+
 ### 2026-01-16 — i18n : complétion EN (terminal + notifs Discord)
 
 Branche : `fix/i18n-en-discord`

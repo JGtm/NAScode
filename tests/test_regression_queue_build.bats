@@ -9,6 +9,8 @@ load 'test_helper'
 
 setup() {
     setup_test_env
+    command -v ffmpeg  >/dev/null 2>&1 || skip "ffmpeg requis"
+    command -v ffprobe >/dev/null 2>&1 || skip "ffprobe requis"
 
     export WORKDIR="$TEST_TEMP_DIR/work"
     export SRC_DIR="$TEST_TEMP_DIR/src"
@@ -16,9 +18,17 @@ setup() {
 
     mkdir -p "$WORKDIR" "$SRC_DIR/sub" "$OUT_DIR"
 
-    touch "$SRC_DIR/a.mkv" \
-          "$SRC_DIR/b.mkv" \
-          "$SRC_DIR/sub/c.mkv"
+    # Fichiers .mkv minimaux valides — get_full_media_metadata() valide
+    # maintenant la présence d'un codec vidéo (fichiers vides = rejetés).
+    _make_video() {
+        ffmpeg -y -loglevel error \
+            -f lavfi -i "nullsrc=size=64x64:rate=1" \
+            -t 1 -pix_fmt yuv420p -c:v libx264 -preset ultrafast \
+            "$1" 2>/dev/null
+    }
+    _make_video "$SRC_DIR/a.mkv"
+    _make_video "$SRC_DIR/b.mkv"
+    _make_video "$SRC_DIR/sub/c.mkv"
 }
 
 teardown() {

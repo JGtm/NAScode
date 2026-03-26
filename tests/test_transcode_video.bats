@@ -312,7 +312,7 @@ teardown() {
     [[ "$ENCODER_BASE_PARAMS" =~ "mbr=" ]]
     # Vérifier qu'on a bien une valeur numérique
     local mbr_value
-    mbr_value=$(echo "$ENCODER_BASE_PARAMS" | grep -oP 'mbr=\K[0-9]+')
+    mbr_value=$(echo "$ENCODER_BASE_PARAMS" | sed 's/.*mbr=\([0-9]*\).*/\1/')
     [[ -n "$mbr_value" ]]
     [[ "$mbr_value" -gt 0 ]]
 }
