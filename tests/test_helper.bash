@@ -30,6 +30,9 @@ teardown_test_env() {
     if [[ -n "${TEST_TEMP_DIR:-}" && -d "$TEST_TEMP_DIR" ]]; then
         rm -rf "$TEST_TEMP_DIR"
     fi
+    # Nettoyer les fichiers globaux créés par nascode pour éviter la contamination
+    # entre tests (le lockfile bloque les runs E2E suivants dans la même suite bats)
+    rm -f /tmp/conversion_video.lock /tmp/conversion_stop_flag
 }
 
 ###########################################################
