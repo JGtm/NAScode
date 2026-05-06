@@ -44,6 +44,7 @@ _reset_cli_state() {
     OFF_PEAK_END="06:00"
     SINGLE_FILE=""
     MIN_SIZE_BYTES=0
+    KEEP_METADATA=false
 
     # Override global du mode "qualité équivalente" (CLI)
     EQUIV_QUALITY_OVERRIDE=""
@@ -196,6 +197,16 @@ _reset_cli_state() {
     _reset_cli_state
     parse_arguments -2
     [ "$SINGLE_PASS_MODE" = "false" ]
+
+    # Test 9: --keep-metadata active KEEP_METADATA
+    _reset_cli_state
+    parse_arguments --keep-metadata
+    [ "$KEEP_METADATA" = "true" ]
+
+    # Test 10: KEEP_METADATA reste false par défaut
+    _reset_cli_state
+    parse_arguments --mode serie
+    [ "$KEEP_METADATA" = "false" ]
 }
 
 ###########################################################

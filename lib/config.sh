@@ -113,6 +113,13 @@ SORT_MODE="size_desc"
 # Conserver l'index existant sans demander confirmation
 KEEP_INDEX=false
 
+# Conserver les métadonnées du fichier source sur le fichier converti
+# - Métadonnées ffmpeg (titres, tags, chapitres) via -map_metadata 0 -map_chapters 0
+# - Date de modification (mtime) et d'accès (atime) via touch -r après le transfert
+# Note : la date de création (btime/crtime) n'est pas modifiable via les outils
+# userspace standards sur Linux, donc non préservée.
+KEEP_METADATA=false
+
 # ----- Constantes de configuration -----
 # Paramètre de nombre de fichiers à sélectionner aléatoirement par défaut
 readonly RANDOM_MODE_DEFAULT_LIMIT=10

@@ -228,3 +228,163 @@ teardown() {
     run grep -E "VMAF.*2" "$SUMMARY_FILE"
     [ "$status" -eq 0 ]
 }
+
+###########################################################
+# Tests --keep-metadata (préservation mtime/atime)
+###########################################################
+
+# Helper : retourne mtime epoch d'un fichier (portable Linux/macOS).
+_get_mtime() {
+    local f="$1"
+    stat -c %Y "$f" 2>/dev/null || stat -f %m "$f" 2>/dev/null
+}
+
+@test "_finalize_preserve_mtime: KEEP_METADATA=false → ne fait rien et retourne 1" {
+    export KEEP_METADATA=false
+
+    local src="$TEST_TEMP_DIR/source.mkv"
+    local dst="$TEST_TEMP_DIR/dest.mkv"
+    : > "$src"
+    sleep 1
+    : > "$dst"
+
+    local mtime_dst_before
+    mtime_dst_before=$(_get_mtime "$dst")
+
+    run _finalize_preserve_mtime "$src" "$dst"
+    [ "$status" -eq 1 ]
+
+    # mtime non modifié
+    local mtime_dst_after
+    mtime_dst_after=$(_get_mtime "$dst")
+    [ "$mtime_dst_before" = "$mtime_dst_after" ]
+
+    # Aucune trace KEEP_METADATA dans les logs
+    run grep -F "KEEP_METADATA" "$LOG_SESSION"
+    [ "$status" -ne 0 ]
+}
+
+@test "_finalize_preserve_mtime: KEEP_METADATA=true réplique le mtime de la source" {
+    export KEEP_METADATA=true
+
+    local src="$TEST_TEMP_DIR/source.mkv"
+    local dst="$TEST_TEMP_DIR/dest.mkv"
+    : > "$src"
+    # Forcer un mtime ancien sur la source
+    touch -t 202001011200.00 "$src"
+    sleep 1
+    : > "$dst"
+
+    local mtime_src
+    mtime_src=$(_get_mtime "$src")
+    local mtime_dst_before
+    mtime_dst_before=$(_get_mtime "$dst")
+    [ "$mtime_src" != "$mtime_dst_before" ]
+
+    run _finalize_preserve_mtime "$src" "$dst"
+    [ "$status" -eq 0 ]
+
+    local mtime_dst_after
+    mtime_dst_after=$(_get_mtime "$dst")
+    [ "$mtime_dst_after" = "$mtime_src" ]
+
+    # Trace OK loggée
+    run grep -F "| KEEP_METADATA |" "$LOG_SESSION"
+    [ "$status" -eq 0 ]
+    run grep -F "status:OK" "$LOG_SESSION"
+    [ "$status" -eq 0 ]
+}
+
+@test "_finalize_preserve_mtime: source manquante → SKIPPED loggé, pas d'erreur" {
+    export KEEP_METADATA=true
+
+    local src="$TEST_TEMP_DIR/missing_src.mkv"  # n'existe pas
+    local dst="$TEST_TEMP_DIR/dest.mkv"
+    : > "$dst"
+
+    run _finalize_preserve_mtime "$src" "$dst"
+    [ "$status" -eq 1 ]
+
+    run grep -E "KEEP_METADATA.*status:SKIPPED.*reason:source_missing" "$LOG_SESSION"
+    [ "$status" -eq 0 ]
+    # Pas de ligne ERROR KEEP_METADATA
+    run grep -F "ERROR KEEP_METADATA" "$LOG_SESSION"
+    [ "$status" -ne 0 ]
+}
+
+@test "_finalize_preserve_mtime: cible manquante → ERROR KEEP_METADATA loggé" {
+    export KEEP_METADATA=true
+
+    local src="$TEST_TEMP_DIR/source.mkv"
+    : > "$src"
+    local dst="$TEST_TEMP_DIR/missing_target.mkv"  # n'existe pas
+
+    run _finalize_preserve_mtime "$src" "$dst"
+    [ "$status" -eq 1 ]
+
+    run grep -E "ERROR KEEP_METADATA.*reason:target_missing" "$LOG_SESSION"
+    [ "$status" -eq 0 ]
+}
+
+@test "_finalize_log_and_verify: KEEP_METADATA=true propage le mtime sur le fichier final" {
+    export KEEP_METADATA=true
+
+    # Source de référence avec mtime ancien
+    local file_original="$TEST_TEMP_DIR/original.mkv"
+    dd if=/dev/zero of="$file_original" bs=1000 count=1 2>/dev/null
+    touch -t 202101011200.00 "$file_original"
+
+    # Fichier final déjà déplacé (taille identique pour éviter SIZE_MISMATCH)
+    local final_actual="$TEST_TEMP_DIR/converted.mkv"
+    dd if=/dev/zero of="$final_actual" bs=1000 count=1 2>/dev/null
+
+    local tmp_input="$TEST_TEMP_DIR/tmp_in.bin"
+    local ffmpeg_log_temp="$TEST_TEMP_DIR/ffmpeg.log"
+    touch "$tmp_input" "$ffmpeg_log_temp"
+
+    local mtime_src
+    mtime_src=$(_get_mtime "$file_original")
+
+    # Pas de checksum_before → verify_status="SKIPPED" (déclenche quand même la copie mtime)
+    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "" 1 1000 "$final_actual" 0
+
+    local mtime_dst
+    mtime_dst=$(_get_mtime "$final_actual")
+    [ "$mtime_dst" = "$mtime_src" ]
+
+    run grep -F "| KEEP_METADATA |" "$LOG_SESSION"
+    [ "$status" -eq 0 ]
+}
+
+@test "_finalize_log_and_verify: KEEP_METADATA=false n'altère pas le mtime du fichier final" {
+    export KEEP_METADATA=false
+
+    local file_original="$TEST_TEMP_DIR/original.mkv"
+    dd if=/dev/zero of="$file_original" bs=1000 count=1 2>/dev/null
+    touch -t 202101011200.00 "$file_original"
+
+    local final_actual="$TEST_TEMP_DIR/converted.mkv"
+    dd if=/dev/zero of="$final_actual" bs=1000 count=1 2>/dev/null
+
+    local tmp_input="$TEST_TEMP_DIR/tmp_in.bin"
+    local ffmpeg_log_temp="$TEST_TEMP_DIR/ffmpeg.log"
+    touch "$tmp_input" "$ffmpeg_log_temp"
+
+    local mtime_src
+    mtime_src=$(_get_mtime "$file_original")
+    local mtime_dst_before
+    mtime_dst_before=$(_get_mtime "$final_actual")
+
+    _finalize_log_and_verify "$file_original" "$final_actual" "$tmp_input" "$ffmpeg_log_temp" "" 1 1000 "$final_actual" 0
+
+    local mtime_dst_after
+    mtime_dst_after=$(_get_mtime "$final_actual")
+    # mtime n'a pas pris la valeur de la source
+    [ "$mtime_dst_after" != "$mtime_src" ] || [ "$mtime_dst_before" = "$mtime_src" ]
+    # Et n'a pas changé par effet de bord
+    [ "$mtime_dst_after" = "$mtime_dst_before" ]
+
+    # Aucune trace KEEP_METADATA
+    run grep -F "KEEP_METADATA" "$LOG_SESSION"
+    [ "$status" -ne 0 ]
+}

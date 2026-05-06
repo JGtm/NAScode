@@ -238,6 +238,8 @@ MSG_HELP_NO_LOSSLESS_HINT="Stereo → target codec, Multi-channel → EAC3 384k 
 MSG_HELP_EQUIV_QUALITY="Enable \"equivalent quality\" mode (audio + video cap)"
 MSG_HELP_NO_EQUIV_QUALITY="Disable \"equivalent quality\" mode (audio + video cap)"
 MSG_HELP_EQUIV_QUALITY_HINT="Ignored in adaptive mode (stays enabled)"
+MSG_HELP_KEEP_METADATA="Preserve source file metadata and modification date (FLAG)"
+MSG_HELP_KEEP_METADATA_HINT="ffmpeg: -map_metadata 0 -map_chapters 0 ; mtime/atime via touch -r"
 MSG_HELP_LANG="Interface language: fr, en (ARG) [default: fr]"
 
 MSG_HELP_SHORT_OPTIONS_TITLE="Note on grouped short options:"
@@ -288,6 +290,7 @@ MSG_UI_OPT_DEST="Destination"
 MSG_UI_OPT_FILE_COUNT="Files to process"
 MSG_UI_OPT_HFR_LIMITED="HFR videos: limited to %s fps"
 MSG_UI_OPT_HFR_BITRATE="HFR videos: adjusted bitrate (original fps preserved)"
+MSG_UI_OPT_KEEP_METADATA="Preserving source metadata and modification date"
 
 ###########################################################
 # UI MESSAGES (lib/ui.sh)

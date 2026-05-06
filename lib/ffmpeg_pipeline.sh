@@ -285,6 +285,10 @@ _execute_ffmpeg_pipeline() {
 
             _cmd_append_words cmd "${SAMPLE_DURATION_PARAMS:-}"
 
+            if [[ "${KEEP_METADATA:-false}" == true ]]; then
+                cmd+=(-map_metadata 0 -map_chapters 0)
+            fi
+
             cmd+=(-c:v copy)
 
             _cmd_append_words cmd "$audio_params"

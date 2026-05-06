@@ -258,6 +258,11 @@ parse_arguments() {
                 LIMIT_FPS=true
                 shift
                 ;;
+            --keep-metadata)
+                # Conserve les métadonnées (ffmpeg) + mtime/atime du fichier source
+                KEEP_METADATA=true
+                shift
+                ;;
             --no-limit-fps)
                 # Désactive la limitation FPS (garde le FPS original, majore le bitrate)
                 LIMIT_FPS=false
@@ -366,6 +371,8 @@ ${CYAN}$(msg MSG_HELP_OPTIONS)${NOCOLOR}
     ${GREEN}--equiv-quality${NOCOLOR}              $(msg MSG_HELP_EQUIV_QUALITY)
     ${GREEN}--no-equiv-quality${NOCOLOR}           $(msg MSG_HELP_NO_EQUIV_QUALITY)
                                  ${DIM}$(msg MSG_HELP_EQUIV_QUALITY_HINT)${NOCOLOR}
+    ${GREEN}--keep-metadata${NOCOLOR}              $(msg MSG_HELP_KEEP_METADATA)
+                                 ${DIM}$(msg MSG_HELP_KEEP_METADATA_HINT)${NOCOLOR}
     ${GREEN}--lang${NOCOLOR} LANG                  $(msg MSG_HELP_LANG)
 
 ${CYAN}$(msg MSG_HELP_SHORT_OPTIONS_TITLE)${NOCOLOR}

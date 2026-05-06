@@ -69,6 +69,52 @@ _finalize_try_move() {
 }
 
 ###########################################################
+# CONSERVATION DES MÉTADONNÉES (mtime/atime)
+###########################################################
+
+# Réplique la mtime + atime du fichier source sur le fichier final.
+# Utilise touch -r (POSIX). La date de création (btime/crtime) n'est pas
+# modifiable via les outils userspace standards sur Linux et n'est donc
+# pas préservée — seul le mtime intéresse les indexeurs courants (Plex,
+# Jellyfin, etc.).
+#
+# Usage: _finalize_preserve_mtime <file_original> <final_actual>
+# Retour : 0 si succès, 1 si l'option est désactivée ou si touch a échoué
+#          (cause loggée dans LOG_SESSION). N'interrompt jamais le pipeline.
+_finalize_preserve_mtime() {
+    local file_original="$1"
+    local final_actual="$2"
+
+    [[ "${KEEP_METADATA:-false}" != true ]] && return 1
+
+    if [[ ! -e "$file_original" ]]; then
+        if [[ -n "${LOG_SESSION:-}" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | KEEP_METADATA | $file_original → $final_actual | status:SKIPPED reason:source_missing" >> "$LOG_SESSION" 2>/dev/null || true
+        fi
+        return 1
+    fi
+
+    if [[ ! -e "$final_actual" ]]; then
+        if [[ -n "${LOG_SESSION:-}" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR KEEP_METADATA | $file_original → $final_actual | reason:target_missing" >> "$LOG_SESSION" 2>/dev/null || true
+        fi
+        return 1
+    fi
+
+    if touch -r "$file_original" "$final_actual" 2>/dev/null; then
+        if [[ -n "${LOG_SESSION:-}" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | KEEP_METADATA | $file_original → $final_actual | status:OK" >> "$LOG_SESSION" 2>/dev/null || true
+        fi
+        return 0
+    fi
+
+    if [[ -n "${LOG_SESSION:-}" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR KEEP_METADATA | $file_original → $final_actual | reason:touch_failed" >> "$LOG_SESSION" 2>/dev/null || true
+    fi
+    return 1
+}
+
+###########################################################
 # VÉRIFICATION D'INTÉGRITÉ ET LOGGING
 ###########################################################
 
@@ -146,6 +192,12 @@ _finalize_log_and_verify() {
     # Écrire uniquement dans les logs : VERIFY
     if [[ -n "$LOG_SESSION" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | VERIFY | $file_original → $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA} | status:${verify_status}" >> "$LOG_SESSION" 2>/dev/null || true
+    fi
+
+    # Conservation des dates fichier (mtime/atime) si --keep-metadata est actif.
+    # On ne tente la copie de mtime que si le fichier final est utilisable.
+    if [[ "$verify_status" == "OK" || "$verify_status" == "SKIPPED" ]]; then
+        _finalize_preserve_mtime "$file_original" "$final_actual" || true
     fi
 
     # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)

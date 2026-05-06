@@ -178,6 +178,12 @@ format_option_limit_fps() {
     fi
 }
 
+# Formate une option KEEP_METADATA pour print_active_options
+# Usage: format_option_keep_metadata
+format_option_keep_metadata() {
+    echo -e "🗂️   ${CYAN}$(msg MSG_UI_OPT_KEEP_METADATA)${NOCOLOR}"
+}
+
 ###########################################################
 # FONCTIONS LEGACY (POUR RÉTRO-COMPATIBILITÉ)
 ###########################################################

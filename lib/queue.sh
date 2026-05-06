@@ -238,7 +238,12 @@ _show_active_options() {
     if [[ "${CONVERSION_MODE:-serie}" != "adaptatif" ]]; then
         options+=("$(format_option_limit_fps)")
     fi
-    
+
+    # Option KEEP_METADATA (conservation des dates/métadonnées source)
+    if [[ "${KEEP_METADATA:-false}" == true ]]; then
+        options+=("$(format_option_keep_metadata)")
+    fi
+
     # Afficher seulement si au moins une option est active
     if [[ ${#options[@]} -gt 0 ]]; then
         print_active_options "${options[@]}"

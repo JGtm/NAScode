@@ -585,6 +585,12 @@ _run_ffmpeg_encode() {
     _cmd_append_words cmd "${SAMPLE_DURATION_PARAMS:-}"
     _cmd_append_words cmd "$VIDEO_FILTER_OPTS"
 
+    # Conservation des métadonnées (titres, tags, chapitres) du fichier source.
+    # On n'applique pas en pass1 car la sortie est /dev/null (analyse seule).
+    if [[ "${KEEP_METADATA:-false}" == true ]] && [[ "$mode" != "pass1" ]]; then
+        cmd+=(-map_metadata 0 -map_chapters 0)
+    fi
+
     cmd+=(-pix_fmt "$OUTPUT_PIX_FMT")
     cmd+=(-g "$keyint_value" -keyint_min "$keyint_value")
     cmd+=(-c:v "$encoder")
