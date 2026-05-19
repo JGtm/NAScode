@@ -252,7 +252,11 @@ convert_file() {
     
     # 7. Exécution de la conversion (fonctions dans transcode_video.sh / ffmpeg_pipeline.sh)
     local conversion_success=false
-    if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
+    if [[ "${AUTO_BOOST_ENABLED:-false}" == true ]]; then
+        # Mode `adaptatif-vmaf` (Phase C) : auto-boost par segment + mux audio
+        # source en copy. Cf. lib/auto_boost.sh.
+        _execute_auto_boost_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true
+    elif [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
         _execute_video_passthrough "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true
     else
         _execute_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true

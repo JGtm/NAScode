@@ -164,6 +164,51 @@ teardown() {
 # Test d'intégration end-to-end (skip si pas d'encodeur AV1)
 ###########################################################
 
+###########################################################
+# Tests du mode `adaptatif-vmaf` (branchement CLI)
+###########################################################
+
+@test "config: mode adaptatif-vmaf active AUTO_BOOST_ENABLED=true" {
+    CONVERSION_MODE="adaptatif-vmaf"
+    set_conversion_mode_parameters
+    [ "${AUTO_BOOST_ENABLED:-}" = "true" ]
+}
+
+@test "config: mode adaptatif-vmaf hérite du profil adaptatif (SVT-AV1 params)" {
+    CONVERSION_MODE="adaptatif-vmaf"
+    set_conversion_mode_parameters
+    [ "${ENCODER_MODE_PROFILE:-}" = "adaptatif" ]
+}
+
+@test "config: mode adaptatif-vmaf désactive ADAPTIVE_COMPLEXITY_MODE (auto-boost fait sa propre analyse)" {
+    CONVERSION_MODE="adaptatif-vmaf"
+    set_conversion_mode_parameters
+    [ "${ADAPTIVE_COMPLEXITY_MODE:-}" = "false" ]
+}
+
+@test "config: mode adaptatif-vmaf utilise CRF 21 single-pass" {
+    CONVERSION_MODE="adaptatif-vmaf"
+    set_conversion_mode_parameters
+    [ "${CRF_VALUE:-}" = "21" ]
+    [ "${SINGLE_PASS_MODE:-}" = "true" ]
+}
+
+@test "config: serie n'active PAS AUTO_BOOST_ENABLED" {
+    CONVERSION_MODE="serie"
+    # Reset au cas où un test précédent l'aurait mis à true.
+    AUTO_BOOST_ENABLED=false
+    set_conversion_mode_parameters
+    [ "${AUTO_BOOST_ENABLED:-false}" != "true" ]
+}
+
+@test "auto_boost: _execute_auto_boost_conversion est définie (intégration pipeline)" {
+    declare -f _execute_auto_boost_conversion >/dev/null
+}
+
+@test "conversion.sh: contient le routing AUTO_BOOST_ENABLED" {
+    grep -q 'AUTO_BOOST_ENABLED' "$LIB_DIR/conversion.sh"
+}
+
 @test "auto_boost: pipeline complet sur sample lavfi 30s" {
     if ! ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libsvtav1; then
         skip "libsvtav1 non disponible"

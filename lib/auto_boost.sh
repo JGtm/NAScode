@@ -207,6 +207,66 @@ _auto_boost_concat_escape() {
 }
 
 ###########################################################
+# INTÉGRATION PIPELINE NAScode — mode `adaptatif-vmaf`
+###########################################################
+
+# Wrapper d'intégration appelé depuis lib/conversion.sh quand le mode
+# `adaptatif-vmaf` est actif (`AUTO_BOOST_ENABLED=true`).
+# 1) auto_boost_encode produit une vidéo AV1 only.
+# 2) Mux final avec l'audio + sous-titres + metadata + chapters depuis
+#    la source (en COPY pour cette V1 — pas de réencodage audio smart).
+#
+# Signature alignée sur _execute_conversion :
+# Usage : _execute_auto_boost_conversion <tmp_input> <tmp_output> <ffmpeg_log> <duration> <base_name>
+# Retourne : 0 si OK, 1 sinon (les erreurs sont propagées au caller).
+_execute_auto_boost_conversion() {
+    local tmp_input="$1"
+    local tmp_output="$2"
+    local ffmpeg_log="$3"
+    local duration="$4"
+    local base_name="$5"
+
+    if [[ -z "$tmp_input" || -z "$tmp_output" ]]; then
+        echo "ERROR: _execute_auto_boost_conversion usage: <in> <out> <log> <duration> <base_name>" >&2
+        return 1
+    fi
+    if [[ ! -f "$tmp_input" ]]; then
+        echo "ERROR: _execute_auto_boost_conversion: input not found: $tmp_input" >&2
+        return 1
+    fi
+
+    # Fichier intermédiaire (vidéo only AV1 produite par auto_boost_encode).
+    local video_only
+    video_only="${tmp_output%.*}.vonly.mkv"
+
+    # 1) Encode vidéo auto-boost (segments + VMAF + ajustement CRF).
+    # CRF base : utiliser CRF_VALUE si défini, sinon AUTO_BOOST_BASE_CRF (21).
+    local base_crf="${CRF_VALUE:-${AUTO_BOOST_BASE_CRF:-21}}"
+    if ! auto_boost_encode "$tmp_input" "$video_only" "$base_crf" 2>>"$ffmpeg_log"; then
+        echo "ERROR: _execute_auto_boost_conversion: auto_boost_encode failed" >>"$ffmpeg_log"
+        rm -f "$video_only"
+        return 1
+    fi
+
+    # 2) Mux final : vidéo AV1 (depuis video_only) + audio/subs/metadata
+    # (depuis tmp_input). Tout en COPY pour rester rapide et neutre.
+    # -map 1:a? / -map 1:s? : optionnels, ignorés si absent.
+    if ! ffmpeg -hide_banner -loglevel error -y \
+        -i "$video_only" -i "$tmp_input" \
+        -map 0:v:0 -map 1:a? -map 1:s? \
+        -c:v copy -c:a copy -c:s copy \
+        -map_metadata 1 -map_chapters 1 \
+        "$tmp_output" 2>>"$ffmpeg_log"; then
+        echo "ERROR: _execute_auto_boost_conversion: final mux failed" >>"$ffmpeg_log"
+        rm -f "$video_only"
+        return 1
+    fi
+
+    rm -f "$video_only"
+    return 0
+}
+
+###########################################################
 # UTILITAIRES
 ###########################################################
 

@@ -303,6 +303,37 @@ set_conversion_mode_parameters() {
             # Adaptatif : pas de limitation FPS (bitrate ajusté automatiquement)
             [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=false
             ;;
+        adaptatif-vmaf)
+            # Phase C de la roadmap AV1 (docs/AV1_OPTIMIZATION_PLAN.md §C) :
+            # mode dérivé de `adaptatif` qui active le pipeline auto-boost-lite
+            # (segmentation + VMAF par segment + ajustement CRF par segment).
+            # Hérite des params perceptuels du profil `adaptatif` SVT-AV1.
+            #
+            # ATTENTION V1 : l'audio est muxé en COPY uniquement (pas de
+            # réencodage Opus/AAC). Pour un transcodage audio "smart" type
+            # NAScode standard, le branchement audio reste à enrichir.
+            base_target_kbps=2500
+            base_maxrate_kbps=3500
+            base_bufsize_kbps=6250
+            ENCODER_PRESET="medium"
+            X265_EXTRA_PARAMS=""
+            X265_PASS1_FAST=false
+            SINGLE_PASS_MODE=true
+            CRF_VALUE=21
+            FILM_KEYINT=240
+            FILM_TUNE_FASTDECODE=false
+            # NE PAS activer ADAPTIVE_COMPLEXITY_MODE : auto-boost fait sa
+            # propre analyse par segment via VMAF, on évite la double
+            # analyse stddev/SI/TI au niveau fichier.
+            ADAPTIVE_COMPLEXITY_MODE=false
+            ENCODER_MODE_PROFILE="adaptatif"
+            AUDIO_FORCE_STEREO=false
+            AUDIO_TRANSLATE_EQUIV_QUALITY=true
+            VIDEO_EQUIV_QUALITY_CAP=true
+            # Flag déclenchant le routage vers _execute_auto_boost_conversion.
+            AUTO_BOOST_ENABLED=true
+            [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=false
+            ;;
         serie)
             # Séries : bitrate optimisé pour ~1 Go/h (two-pass) ou CRF 21 (single-pass)
             # Bitrates de référence (HEVC)
@@ -342,7 +373,7 @@ set_conversion_mode_parameters() {
             ;;
         *)
             print_error "$(msg MSG_CFG_UNKNOWN_MODE "$CONVERSION_MODE")"
-            echo "  Modes disponibles : film, adaptatif, serie"
+            echo "  Modes disponibles : film, adaptatif, adaptatif-vmaf, serie"
             exit 1
             ;;
     esac

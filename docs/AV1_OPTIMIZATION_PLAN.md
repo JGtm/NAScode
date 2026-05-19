@@ -509,7 +509,7 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 | Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts ; film-grain banni après bisection |
 | A — Rétroportage défauts Essential | **Terminé** | 2026-05-19 | 2026-05-19 | Profils film + adaptatif enrichis (qm, ac-bias, perceptual params). 13 nouveaux tests bats. |
 | B — Intégration Essential .exe | **Scaffolding terminé** | 2026-05-19 | | Détection runtime, override env, mapping params, doc install. Reste : refactor pipe-based (§B.2) |
-| C — Auto-boost-lite per-segment | **Implémentation terminée** | 2026-05-19 | 2026-05-19 | 3 modules implémentés + sourcés dans nascode. 27 tests dont 1 intégration end-to-end sur sample lavfi. Reste : branchement dans le mode CLI (`adaptatif-vmaf`). |
+| C — Auto-boost-lite per-segment | **Branché en CLI (V1)** | 2026-05-19 | 2026-05-19 | Modules + mode `adaptatif-vmaf` opérationnel via `-m adaptatif-vmaf`. 34 tests verts. V1 avec audio en copy : transcodage audio smart à faire (cf. §C.9). |
 | Codecs successeurs (H.266) | Veille | | | Quand libvvenc est shipped Windows |
 
 ### Détail état des phases (au 2026-05-19)
@@ -575,6 +575,41 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
   - **Edge cases** : fichiers très courts (< AUTO_BOOST_SEGMENT_DURATION),
     fichiers sans keyframes alignées, segments avec VMAF=NA (libvmaf
     indispo).
+
+#### Branchement CLI V1 (2026-05-19) — `adaptatif-vmaf`
+- [lib/config.sh](../lib/config.sh) : nouveau mode `adaptatif-vmaf` qui
+  hérite du profil SVT-AV1 `adaptatif` (params perceptuels sans
+  film-grain), avec `ADAPTIVE_COMPLEXITY_MODE=false` (auto-boost a sa
+  propre analyse par segment via VMAF) et `AUTO_BOOST_ENABLED=true`.
+- [lib/args.sh](../lib/args.sh) : ligne mode ajoutée au help.
+- [lib/conversion.sh](../lib/conversion.sh) : routage étape 7 vers
+  `_execute_auto_boost_conversion` quand `AUTO_BOOST_ENABLED=true`.
+- [lib/auto_boost.sh](../lib/auto_boost.sh) : nouveau
+  `_execute_auto_boost_conversion` wrapper d'intégration :
+  1. `auto_boost_encode` → vidéo AV1 only (`*.vonly.mkv`).
+  2. Mux ffmpeg final : vidéo copy + audio/subs/metadata/chapters
+     depuis l'input source (tout en COPY pour cette V1).
+- Tests bats : 8 nouveaux dans `tests/test_phase_c_scaffolding.bats`.
+
+##### §C.9 — Ce qui reste à faire pour une V2 complète
+- **Transcodage audio "smart"** : actuellement `-c:a copy` simple.
+  Pour aligner sur le standard NAScode (Opus pour AV1, AAC pour HEVC,
+  channel layout normalisé, équivalent-qualité), il faut intégrer la
+  logique de `lib/audio_decision.sh` + `lib/audio_params.sh` dans le
+  mux final. Estimation 1-2 jours avec tests sur fichiers variés.
+- **Progress reporting NAScode-style** : actuellement les `echo` de
+  `auto_boost_encode` sortent en raw stdout. À canaliser via le système
+  de slots `lib/progress.sh` pour un affichage cohérent avec les autres
+  modes.
+- **Notifications Discord** : `notify_event "analysis_started"` /
+  `"analysis_completed"` doivent être déclenchées au début / fin du
+  pipeline auto-boost pour cohérence avec mode `adaptatif`.
+- **VMAF final** : actuellement chaque segment a son VMAF par rapport
+  à un proxy, pas par rapport à l'encode final. Mesurer le VMAF
+  global de l'output vs source pour reporting (comme les autres modes).
+- **Sample mode** : tester l'interaction `--sample` / `-S` (encode d'un
+  échantillon court pour VMAF), à vérifier si le découpage est cohérent
+  avec la segmentation auto-boost.
 
 ---
 
