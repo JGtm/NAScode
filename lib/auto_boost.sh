@@ -213,8 +213,13 @@ _auto_boost_concat_escape() {
 # Wrapper d'intégration appelé depuis lib/conversion.sh quand le mode
 # `adaptatif-vmaf` est actif (`AUTO_BOOST_ENABLED=true`).
 # 1) auto_boost_encode produit une vidéo AV1 only.
-# 2) Mux final avec l'audio + sous-titres + metadata + chapters depuis
-#    la source (en COPY pour cette V1 — pas de réencodage audio smart).
+# 2) Mux final avec audio (transcodage smart NAScode), sous-titres,
+#    metadata et chapters depuis la source.
+#
+# Le transcodage audio passe par `_build_audio_params` (lib/audio_params.sh)
+# qui décide entre copy, conversion (Opus/AAC/E-AC3...) et downscale selon
+# les règles smart codec NAScode standard. Fallback `-c:a copy` si la
+# fonction n'est pas chargée.
 #
 # Signature alignée sur _execute_conversion :
 # Usage : _execute_auto_boost_conversion <tmp_input> <tmp_output> <ffmpeg_log> <duration> <base_name>
@@ -248,13 +253,28 @@ _execute_auto_boost_conversion() {
         return 1
     fi
 
-    # 2) Mux final : vidéo AV1 (depuis video_only) + audio/subs/metadata
-    # (depuis tmp_input). Tout en COPY pour rester rapide et neutre.
+    # 2) Construire les options audio smart NAScode (sinon fallback copy).
+    # _build_audio_params retourne une chaîne d'options ffmpeg, ex. :
+    #   "-c:a copy"
+    #   "-c:a libopus -b:a 192k -ac 6"
+    # Le split en array via `read -ra` est correct ici car les options
+    # générées ne contiennent pas de guillemets/spaces dans les valeurs.
+    local audio_opts_str="-c:a copy"
+    if declare -f _build_audio_params >/dev/null; then
+        audio_opts_str=$(_build_audio_params "$tmp_input" 2>/dev/null) || audio_opts_str="-c:a copy"
+        [[ -z "$audio_opts_str" ]] && audio_opts_str="-c:a copy"
+    fi
+    local -a audio_opts
+    # shellcheck disable=SC2206
+    audio_opts=( $audio_opts_str )
+
+    # 3) Mux final : vidéo AV1 (depuis video_only) + audio (transcodé selon
+    # decision smart) + sous-titres (copy) + metadata/chapters (source).
     # -map 1:a? / -map 1:s? : optionnels, ignorés si absent.
     if ! ffmpeg -hide_banner -loglevel error -y \
         -i "$video_only" -i "$tmp_input" \
         -map 0:v:0 -map 1:a? -map 1:s? \
-        -c:v copy -c:a copy -c:s copy \
+        -c:v copy "${audio_opts[@]}" -c:s copy \
         -map_metadata 1 -map_chapters 1 \
         "$tmp_output" 2>>"$ffmpeg_log"; then
         echo "ERROR: _execute_auto_boost_conversion: final mux failed" >>"$ffmpeg_log"

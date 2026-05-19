@@ -509,7 +509,7 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 | Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts ; film-grain banni après bisection |
 | A — Rétroportage défauts Essential | **Terminé** | 2026-05-19 | 2026-05-19 | Profils film + adaptatif enrichis (qm, ac-bias, perceptual params). 13 nouveaux tests bats. |
 | B — Intégration Essential .exe | **Scaffolding terminé** | 2026-05-19 | | Détection runtime, override env, mapping params, doc install. Reste : refactor pipe-based (§B.2) |
-| C — Auto-boost-lite per-segment | **Branché en CLI (V1)** | 2026-05-19 | 2026-05-19 | Modules + mode `adaptatif-vmaf` opérationnel via `-m adaptatif-vmaf`. 34 tests verts. V1 avec audio en copy : transcodage audio smart à faire (cf. §C.9). |
+| C — Auto-boost-lite per-segment | **Branché en CLI + audio smart** | 2026-05-19 | 2026-05-19 | Mode `adaptatif-vmaf` opérationnel. Pipeline complet : segment → VMAF → CRF adapté → mux audio smart (Opus/AAC/EAC3 selon source). 34 tests verts. |
 | Codecs successeurs (H.266) | Veille | | | Quand libvvenc est shipped Windows |
 
 ### Détail état des phases (au 2026-05-19)
@@ -592,11 +592,12 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 - Tests bats : 8 nouveaux dans `tests/test_phase_c_scaffolding.bats`.
 
 ##### §C.9 — Ce qui reste à faire pour une V2 complète
-- **Transcodage audio "smart"** : actuellement `-c:a copy` simple.
-  Pour aligner sur le standard NAScode (Opus pour AV1, AAC pour HEVC,
-  channel layout normalisé, équivalent-qualité), il faut intégrer la
-  logique de `lib/audio_decision.sh` + `lib/audio_params.sh` dans le
-  mux final. Estimation 1-2 jours avec tests sur fichiers variés.
+- ~~**Transcodage audio "smart"**~~ — **FAIT 2026-05-19** :
+  `_execute_auto_boost_conversion` appelle `_build_audio_params` du module
+  audio standard. Décision smart codec NAScode appliquée (copy / Opus /
+  AAC / EAC3 / FLAC selon source + cible vidéo). Smoke test validé :
+  AC3 5.1 → E-AC3 5.1 avec layout normalisé. Fallback `-c:a copy` si
+  le module audio n'est pas chargé.
 - **Progress reporting NAScode-style** : actuellement les `echo` de
   `auto_boost_encode` sortent en raw stdout. À canaliser via le système
   de slots `lib/progress.sh` pour un affichage cohérent avec les autres
