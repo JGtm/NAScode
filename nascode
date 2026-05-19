@@ -75,6 +75,7 @@ source "$LIB_DIR/ui_options.sh"   # Formatage options UI (dépend de ui.sh)
 source "$LIB_DIR/detect.sh"       # Détection outils/système (dépend de rien, modifie PATH)
 source "$LIB_DIR/config.sh"       # Configuration (dépend de colors pour erreurs)
 source "$LIB_DIR/codec_profiles.sh" # Profils codecs (dépend de config pour VIDEO_CODEC)
+source "$LIB_DIR/svtav1_essential.sh" # SVT-AV1-Essential détection (Phase B, scaffolding)
 source "$LIB_DIR/utils.sh"        # Utilitaires (dépend de detect pour HAS_*)
 source "$LIB_DIR/logging.sh"      # Logs (dépend de config pour EXECUTION_TIMESTAMP)
 source "$LIB_DIR/notify.sh"       # Notifications externes (Discord, etc.) — best-effort

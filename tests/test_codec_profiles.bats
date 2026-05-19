@@ -308,14 +308,69 @@ teardown() {
     [[ "$result" =~ "sharpness=1" ]]
 }
 
+@test "get_encoder_mode_params: libsvtav1 serie active enable-qm=1 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ "$result" =~ "enable-qm=1" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 serie active ac-bias=0.25 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ "$result" =~ "ac-bias=0.25" ]]
+}
+
 @test "get_encoder_mode_params: libsvtav1 film retourne film-grain" {
     result=$(get_encoder_mode_params "libsvtav1" "film")
     [[ "$result" =~ "film-grain" ]]
 }
 
+@test "get_encoder_mode_params: libsvtav1 film active variance-boost-strength=2 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "film")
+    [[ "$result" =~ "variance-boost-strength=2" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 film active luminance-qp-bias=15 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "film")
+    [[ "$result" =~ "luminance-qp-bias=15" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 film active sharpness=1 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "film")
+    [[ "$result" =~ "sharpness=1" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 film active enable-qm=1 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "film")
+    [[ "$result" =~ "enable-qm=1" ]]
+}
+
 @test "get_encoder_mode_params: libsvtav1 adaptatif désactive enable-overlays" {
     result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
     [[ "$result" =~ "enable-overlays=0" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 adaptatif garde film-grain=0 (protection crash HWACCEL)" {
+    result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
+    [[ "$result" =~ "film-grain=0" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 adaptatif active variance-boost-strength=3 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
+    [[ "$result" =~ "variance-boost-strength=3" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 adaptatif active luminance-qp-bias=15 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
+    [[ "$result" =~ "luminance-qp-bias=15" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 adaptatif active sharpness=1 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
+    [[ "$result" =~ "sharpness=1" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 adaptatif active enable-qm=1 (Phase A)" {
+    result=$(get_encoder_mode_params "libsvtav1" "adaptatif")
+    [[ "$result" =~ "enable-qm=1" ]]
 }
 
 @test "get_encoder_mode_params: libsvtav1 adaptatif désactive film-grain" {

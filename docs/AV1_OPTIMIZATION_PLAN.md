@@ -506,11 +506,58 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 
 | Phase | État | Date début | Date fin | Notes |
 |---|---|---|---|---|
-| Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts |
-| A — Rétroportage défauts Essential | À démarrer | | | |
-| B — Intégration Essential .exe | Planifié | | | Pré-requis : valider que le .exe tourne |
-| C — Auto-boost-lite per-segment | Planifié | | | Pré-requis : aucun, indépendant de B |
+| Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts ; film-grain banni après bisection |
+| A — Rétroportage défauts Essential | **Terminé** | 2026-05-19 | 2026-05-19 | Profils film + adaptatif enrichis (qm, ac-bias, perceptual params). 13 nouveaux tests bats. |
+| B — Intégration Essential .exe | **Scaffolding terminé** | 2026-05-19 | | Détection runtime, override env, mapping params, doc install. Reste : refactor pipe-based (§B.2) |
+| C — Auto-boost-lite per-segment | **Scaffolding terminé** | 2026-05-19 | | 3 modules stubs créés (segmenter, vmaf_predictive, auto_boost). 15 tests structure verts. Reste : implémentation des briques |
 | Codecs successeurs (H.266) | Veille | | | Quand libvvenc est shipped Windows |
+
+### Détail état des phases (au 2026-05-19)
+
+**Phase A — TERMINÉE.**
+- [lib/codec_profiles.sh:268-300](../lib/codec_profiles.sh#L268) : profils
+  `serie`, `film`, `adaptatif` enrichis avec base commune
+  `enable-qm=1:qm-min=0:ac-bias=0.25` + params perceptuels spécifiques par
+  mode.
+- 13 tests bats ajoutés ; suite codec_profiles : 91/91 OK.
+- Décisions actées : `film-grain` reste BANNI du profil série (coût 10×),
+  conservé sur `film` (one-shot d'archive), désactivé sur `adaptatif`
+  (crash HWACCEL documenté).
+
+**Phase B — SCAFFOLDING TERMINÉ. Refactor pipe RESTE À FAIRE.**
+- [lib/svtav1_essential.sh](../lib/svtav1_essential.sh) : module créé
+  avec détection runtime (`detect_svtav1_essential`), helpers
+  (`should_use_svtav1_essential`, `get_essential_mode_params`) et stub
+  pour le pipeline pipe-based (`_essential_pipe_encode`).
+- Mapping params mainline → Essential : OK (photon-noise remplace film-grain,
+  ajout de enable-tf=3 / alt-cdef / alt-dlf).
+- Documentation install Windows : [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+  section "SVT-AV1-Essential (optional, Phase B)".
+- Tests bats : 18 tests dans `tests/test_svtav1_essential.bats`.
+- **Ce qui reste à faire** : refactor de `_execute_ffmpeg_pipeline` pour
+  utiliser le binaire standalone via pipe YUV4MPEG (§B.2). Estimation
+  1-2 semaines de boulot incluant validation manuelle sur les 3 modes,
+  gestion two-pass, progress reporting via stderr SvtAv1EncApp.
+
+**Phase C — SCAFFOLDING TERMINÉ. Implémentation RESTE À FAIRE.**
+- [lib/segmenter.sh](../lib/segmenter.sh) : stubs `_segment_video`,
+  `_concat_segments`, `_list_keyframes` avec implémentations prévues
+  documentées en commentaires (ffmpeg `-f segment` + concat demuxer).
+- [lib/vmaf_predictive.sh](../lib/vmaf_predictive.sh) : stubs
+  `_quick_encode_segment`, `_measure_vmaf_segment`,
+  `_compute_crf_adjustment` + table d'ajustement CRF par défaut
+  (VMAF≥92 → +2, 85-91 → 0, 75-84 → -2, <75 → -4).
+- [lib/auto_boost.sh](../lib/auto_boost.sh) : orchestration
+  `auto_boost_encode` (stub) + `auto_boost_check_prereqs` (réel).
+- Tests bats : 15 tests de structure dans
+  `tests/test_phase_c_scaffolding.bats` (vérification signatures + codes
+  d'erreur stubs).
+- **Ce qui reste à faire** : implémentation des 7 fonctions stubs (toutes
+  retournent code 99 actuellement). Estimation 3 jours incluant
+  validation sur sample. Ne PAS oublier :
+  - Création du mode `adaptatif-vmaf` dans `lib/config.sh`.
+  - Sourcer les 3 nouveaux modules dans `nascode` quand prêts.
+  - Tests d'intégration avec sample court (<5 min).
 
 ---
 
