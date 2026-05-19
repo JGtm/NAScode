@@ -152,6 +152,7 @@ wait_all_transfers() {
     # Si des transferts ont été lancés mais sont déjà terminés
     if [[ "$active_count" -eq 0 ]] && [[ "$had_transfers" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
+            echo ""
             print_transfer_complete
         fi
 
@@ -169,23 +170,31 @@ wait_all_transfers() {
     if [[ "$NO_PROGRESS" != true ]]; then
         print_transfer_start "$active_count"
     fi
-    
+
     # Attendre tous les transferts
+    local has_status_updates=false
     while [[ "$active_count" -gt 0 ]]; do
         sleep 0.5
         local new_count
         new_count=$(_count_active_transfers)
-        
+
         # Afficher la progression si le nombre a changé
         if [[ "$new_count" -ne "$active_count" ]] && [[ "$NO_PROGRESS" != true ]]; then
             if [[ "$new_count" -gt 0 ]]; then
                 print_status "$(msg MSG_TRANSFER_REMAINING "$new_count")" "$MAGENTA"
+                has_status_updates=true
             fi
         fi
         active_count="$new_count"
     done
-    
+
     if [[ "$NO_PROGRESS" != true ]]; then
+        # Si des lignes de progression ont été affichées, ajouter un saut pour
+        # séparer de la box finale. Sinon, le saut de print_transfer_start
+        # suffit déjà — éviterait sinon un double saut de ligne disgracieux.
+        if [[ "$has_status_updates" == true ]]; then
+            echo ""
+        fi
         print_transfer_complete
     fi
 
