@@ -208,11 +208,14 @@ _execute_ffmpeg_pipeline() {
     # ===== PRÉPARATION COMMUNE =====
     
     # Script AWK pour progression (gawk vs BSD awk)
+    # format_time() respecte le fuseau horaire système (strftime gawk ou `date` shell).
     local awk_time_func
     if [[ "$HAS_GAWK" -eq 1 ]]; then
-        awk_time_func='function get_time() { return systime() }'
+        awk_time_func='function get_time() { return systime() }
+function format_time(ts) { return strftime("%H:%M:%S", ts) }'
     else
-        awk_time_func='function get_time() { cmd="date +%s"; cmd | getline t; close(cmd); return t }'
+        awk_time_func='function get_time(   cmd,t) { cmd="date +%s"; cmd | getline t; close(cmd); return t }
+function format_time(ts,   cmd,t) { cmd="date -d @" ts " +%H:%M:%S"; cmd | getline t; close(cmd); return t }'
     fi
 
     # Acquérir un slot pour affichage de progression

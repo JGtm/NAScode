@@ -404,15 +404,6 @@ parse_human_size_to_bytes() {
 # Usage: awk -v DURATION=... -v ... "$AWK_TIME_FUNC $AWK_FFMPEG_PROGRESS_SCRIPT"
 # shellcheck disable=SC2034
 readonly AWK_FFMPEG_PROGRESS_SCRIPT='
-function format_time(ts,   cmd,result,h,m,s) {
-    # Formater un timestamp Unix en HH:MM:SS
-    h = int((ts % 86400) / 3600);
-    m = int((ts % 3600) / 60);
-    s = int(ts % 60);
-    # Ajuster pour le fuseau horaire local (approximation +1h pour CET)
-    h = (h + 1) % 24;
-    return sprintf("%02d:%02d:%02d", h, m, s);
-}
 BEGIN {
     duration = DURATION + 0;
     if (duration < 1) exit;
