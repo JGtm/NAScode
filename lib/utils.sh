@@ -429,12 +429,13 @@ BEGIN {
     marker_delay = PROGRESS_MARKER_DELAY + 0;
     if (marker_delay < 1) marker_delay = 15;
     marker_written = 0;
-    # Mode séquentiel : on se contente de \r\033[K à chaque update
-    # (retour début de ligne + effacement). Pas de sauvegarde curseur via
-    # \033[s/\033[u : ces séquences SCO ne sont pas reconnues par tous les
-    # terminaux (mintty / git bash en particulier) et provoquent l affichage
-    # de la barre sur une nouvelle ligne à chaque update.
-    # Prérequis : rien d autre n écrit sur stderr entre deux updates.
+    # Mode séquentiel : on imprime chaque update avec un \n final, puis on
+    # remonte d une ligne (\033[A) avant l update suivante et on efface
+    # (\033[K). On évite \r qui peut être traduit en \r\n par la couche
+    # MSYS/gawk sous git bash et faire défiler la barre.
+    # first_update sera mis à 0 après le premier print pour activer la
+    # remontée de curseur (\033[A) sur les updates suivants.
+    first_seq_update = 1;
 }
 
 /out_time_us=/ {
@@ -478,8 +479,16 @@ BEGIN {
             printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s %5.1f%% | %s | ETA: %s | x%.2f\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-25.25s %s %5.1f%% | %s | ETA: %s | x%.2f",
-                   EMOJI, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed > "/dev/stderr";
+            # Mode séquentiel : monter d une ligne pour écraser, sauf au
+            # premier update (rien à écraser au-dessus).
+            if (first_seq_update) {
+                first_seq_update = 0;
+                printf "  %s %-25.25s %s %5.1f%% | %s | ETA: %s | x%.2f\n",
+                       EMOJI, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed > "/dev/stderr";
+            } else {
+                printf "\033[A\033[K  %s %-25.25s %s %5.1f%% | %s | ETA: %s | x%.2f\n",
+                       EMOJI, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed > "/dev/stderr";
+            }
         }
         fflush("/dev/stderr");
         last_update = now;
@@ -496,8 +505,16 @@ BEGIN {
             printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s | %s | %s\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str, lines_up > "/dev/stderr";
         } else {
-            printf "\r\033[K  %s %-25.25s %s 100.0%% | %s | %s | %s\n",
-                   EMOJI, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str > "/dev/stderr";
+            # Si au moins un update intermédiaire a été émis, on remonte
+            # pour écraser la dernière barre. Sinon (fichier ultra-court),
+            # on imprime directement la barre finale.
+            if (first_seq_update) {
+                printf "  %s %-25.25s %s 100.0%% | %s | %s | %s\n",
+                       EMOJI, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str > "/dev/stderr";
+            } else {
+                printf "\033[A\033[K  %s %-25.25s %s 100.0%% | %s | %s | %s\n",
+                       EMOJI, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str > "/dev/stderr";
+            }
         }
         fflush("/dev/stderr");
     }
