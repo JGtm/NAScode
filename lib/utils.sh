@@ -429,13 +429,19 @@ BEGIN {
     marker_delay = PROGRESS_MARKER_DELAY + 0;
     if (marker_delay < 1) marker_delay = 15;
     marker_written = 0;
-    # Mode séquentiel : on imprime chaque update avec un \n final, puis on
-    # remonte d une ligne (\033[A) avant l update suivante et on efface
-    # (\033[K). On évite \r qui peut être traduit en \r\n par la couche
-    # MSYS/gawk sous git bash et faire défiler la barre.
-    # first_update sera mis à 0 après le premier print pour activer la
-    # remontée de curseur (\033[A) sur les updates suivants.
+    # Mode séquentiel : on imprime chaque update + \n, puis on remonte d une
+    # ligne (\033[A) et on efface (\033[K) avant la suivante.
+    # CRITIQUE : on désactive le line-wrap (\033[?7l) pendant la session.
+    # Sans ça, si la ligne déborde de la largeur du terminal, mintty wrap
+    # sur 2 lignes physiques et \033[A ne remonte que d une ligne visuelle
+    # (au milieu du wrap), provoquant l empilement des updates.
+    # Restauration (\033[?7h) à la fin via le bloc /progress=end/.
+    # Filet de sécurité : trap dans le shell qui lance awk (cf. progress.sh).
     first_seq_update = 1;
+    if (NOPROG != "true" && !is_parallel) {
+        printf "\033[?7l" > "/dev/stderr";
+        fflush("/dev/stderr");
+    }
 }
 
 /out_time_us=/ {
@@ -516,6 +522,18 @@ BEGIN {
                        EMOJI, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str > "/dev/stderr";
             }
         }
+        # Restaurer le line-wrap (désactivé en BEGIN pour le mode séquentiel)
+        if (!is_parallel) {
+            printf "\033[?7h" > "/dev/stderr";
+        }
+        fflush("/dev/stderr");
+    }
+}
+END {
+    # Filet de sécurité : si awk se termine sans avoir vu progress=end
+    # (ex. ffmpeg interrompu / killed), on restaure le line-wrap quand même.
+    if (NOPROG != "true" && !is_parallel) {
+        printf "\033[?7h" > "/dev/stderr";
         fflush("/dev/stderr");
     }
 }
