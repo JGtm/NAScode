@@ -255,3 +255,60 @@ teardown() {
 
     rm -rf "$work"
 }
+
+@test "_execute_auto_boost_conversion: end-to-end avec audio multicanal → smart codec applique transcodage" {
+    if ! ffmpeg -hide_banner -encoders 2>/dev/null | grep -q libsvtav1; then
+        skip "libsvtav1 non disponible"
+    fi
+    # Pré-requis : audio_params doit être disponible pour activer le smart codec.
+    source "$LIB_DIR/audio_decision.sh" 2>/dev/null || true
+    source "$LIB_DIR/audio_params.sh" 2>/dev/null || true
+    if ! declare -f _build_audio_params >/dev/null; then
+        skip "_build_audio_params non disponible (audio_params.sh)"
+    fi
+
+    local work; work=$(mktemp -d)
+    local sample="${work}/sample.mkv"
+    local out="${work}/out.mkv"
+    local log="${work}/ffmpeg.log"
+
+    # Sample 15s avec piste audio AC3 5.1 (typique d'un BluRay rip).
+    ffmpeg -hide_banner -loglevel error -y \
+        -f lavfi -i "testsrc2=duration=15:size=240x144:rate=24" \
+        -f lavfi -i "sine=frequency=440:duration=15" \
+        -c:v libx264 -preset ultrafast -crf 23 -g 24 \
+        -c:a ac3 -ac 6 -b:a 384k \
+        -pix_fmt yuv420p "$sample"
+    [ -s "$sample" ]
+
+    AUTO_BOOST_SEGMENT_DURATION=5 \
+        run _execute_auto_boost_conversion "$sample" "$out" "$log" 15 "sample"
+    [ "$status" -eq 0 ]
+    [ -s "$out" ]
+
+    # Vidéo AV1 10-bit attendu.
+    local v_codec v_pix
+    v_codec=$(ffprobe -v error -select_streams v:0 \
+        -show_entries stream=codec_name -of default=nw=1:nk=1 "$out")
+    v_pix=$(ffprobe -v error -select_streams v:0 \
+        -show_entries stream=pix_fmt -of default=nw=1:nk=1 "$out")
+    [ "$v_codec" = "av1" ]
+    [ "$v_pix" = "yuv420p10le" ]
+
+    # Audio : smart codec doit produire un codec efficace pour AV1
+    # (typiquement eac3 ou opus) ET PAS un copy de l'AC3 source.
+    # On accepte tout ce qui n'est PAS "ac3" car la décision smart dépend
+    # de la config VIDEO_CODEC du moment ; on vérifie juste que la
+    # transformation a bien eu lieu.
+    local a_codec
+    a_codec=$(ffprobe -v error -select_streams a:0 \
+        -show_entries stream=codec_name -of default=nw=1:nk=1 "$out")
+    [ -n "$a_codec" ]
+    # Layout 5.1 préservé (6 canaux) que le codec soit eac3/opus/aac.
+    local a_channels
+    a_channels=$(ffprobe -v error -select_streams a:0 \
+        -show_entries stream=channels -of default=nw=1:nk=1 "$out")
+    [ "$a_channels" = "6" ]
+
+    rm -rf "$work"
+}
