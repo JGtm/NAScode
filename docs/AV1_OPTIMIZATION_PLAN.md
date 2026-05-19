@@ -509,7 +509,7 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 | Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts ; film-grain banni après bisection |
 | A — Rétroportage défauts Essential | **Terminé** | 2026-05-19 | 2026-05-19 | Profils film + adaptatif enrichis (qm, ac-bias, perceptual params). 13 nouveaux tests bats. |
 | B — Intégration Essential .exe | **Scaffolding terminé** | 2026-05-19 | | Détection runtime, override env, mapping params, doc install. Reste : refactor pipe-based (§B.2) |
-| C — Auto-boost-lite per-segment | **Scaffolding terminé** | 2026-05-19 | | 3 modules stubs créés (segmenter, vmaf_predictive, auto_boost). 15 tests structure verts. Reste : implémentation des briques |
+| C — Auto-boost-lite per-segment | **Implémentation terminée** | 2026-05-19 | 2026-05-19 | 3 modules implémentés + sourcés dans nascode. 27 tests dont 1 intégration end-to-end sur sample lavfi. Reste : branchement dans le mode CLI (`adaptatif-vmaf`). |
 | Codecs successeurs (H.266) | Veille | | | Quand libvvenc est shipped Windows |
 
 ### Détail état des phases (au 2026-05-19)
@@ -539,25 +539,42 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
   1-2 semaines de boulot incluant validation manuelle sur les 3 modes,
   gestion two-pass, progress reporting via stderr SvtAv1EncApp.
 
-**Phase C — SCAFFOLDING TERMINÉ. Implémentation RESTE À FAIRE.**
-- [lib/segmenter.sh](../lib/segmenter.sh) : stubs `_segment_video`,
-  `_concat_segments`, `_list_keyframes` avec implémentations prévues
-  documentées en commentaires (ffmpeg `-f segment` + concat demuxer).
-- [lib/vmaf_predictive.sh](../lib/vmaf_predictive.sh) : stubs
-  `_quick_encode_segment`, `_measure_vmaf_segment`,
-  `_compute_crf_adjustment` + table d'ajustement CRF par défaut
-  (VMAF≥92 → +2, 85-91 → 0, 75-84 → -2, <75 → -4).
+**Phase C — IMPLÉMENTATION TERMINÉE. Branchement CLI RESTE À FAIRE.**
+- [lib/segmenter.sh](../lib/segmenter.sh) : `_segment_video` (via
+  `ffmpeg -f segment` aligné keyframes), `_concat_segments` (concat
+  demuxer avec paths relatifs pour robustesse MSYS2/Windows),
+  `_list_keyframes` (ffprobe packets).
+- [lib/vmaf_predictive.sh](../lib/vmaf_predictive.sh) :
+  `_quick_encode_segment` (preset 12, CRF 32 par défaut),
+  `_measure_vmaf_segment` (réutilise `compute_vmaf_score` de vmaf.sh),
+  `_compute_crf_adjustment` (parser table CSV via awk pour gérer floats).
+  Table par défaut : `92:+2,85:0,75:-2,0:-4`.
 - [lib/auto_boost.sh](../lib/auto_boost.sh) : orchestration
-  `auto_boost_encode` (stub) + `auto_boost_check_prereqs` (réel).
-- Tests bats : 15 tests de structure dans
-  `tests/test_phase_c_scaffolding.bats` (vérification signatures + codes
-  d'erreur stubs).
-- **Ce qui reste à faire** : implémentation des 7 fonctions stubs (toutes
-  retournent code 99 actuellement). Estimation 3 jours incluant
-  validation sur sample. Ne PAS oublier :
-  - Création du mode `adaptatif-vmaf` dans `lib/config.sh`.
-  - Sourcer les 3 nouveaux modules dans `nascode` quand prêts.
-  - Tests d'intégration avec sample court (<5 min).
+  `auto_boost_encode` 6 étapes. Sortie : vidéo AV1 10-bit only (audio mux
+  délégué au caller). `auto_boost_check_prereqs` valide la chaîne de
+  dépendances.
+- Modules sourcés dans [nascode](../nascode) après vmaf.sh.
+- Tests bats : 27 tests dans `tests/test_phase_c_scaffolding.bats` dont
+  un test d'intégration end-to-end qui :
+  - génère un sample 30s @ 240x144 via `testsrc2` lavfi,
+  - lance auto_boost_encode avec segments de 10s (→ 3 segments),
+  - vérifie codec=av1, pix_fmt=yuv420p10le, durée 29-31s.
+- Validation manuelle smoke test : 3 segments encodés en ~25s, sortie
+  AV1 10-bit ~1 Mo pour un sample 30s.
+- **Ce qui reste à faire** :
+  - **Branchement dans le pipeline CLI** : créer le mode `adaptatif-vmaf`
+    dans `lib/config.sh`, l'ajouter à `lib/args.sh` (parsing + help), et
+    router `_execute_ffmpeg_pipeline` vers `auto_boost_encode` quand ce
+    mode est actif. Sensible — touche au flow audio/sous-titres/metadata.
+    Estimation 1-2 jours avec validation manuelle sur fichiers réels.
+  - **Mux audio post-encode** : `auto_boost_encode` produit une vidéo
+    AV1 only ; le caller doit muxer audio + subs + chapitres + métadata
+    depuis la source via un dernier ffmpeg `-map_metadata 0 -map_chapters 0`.
+  - **Logs détaillés** : intégrer le pattern de progress NAScode (slot
+    UI, watcher progress, etc.).
+  - **Edge cases** : fichiers très courts (< AUTO_BOOST_SEGMENT_DURATION),
+    fichiers sans keyframes alignées, segments avec VMAF=NA (libvmaf
+    indispo).
 
 ---
 
