@@ -97,7 +97,10 @@ else
         return 1
     }
     
-    FFMPEG_VMAF=$(_find_ffmpeg_with_vmaf)
+    # `|| true` requis : sans alt ffmpeg trouvé la fonction renvoie 1, et
+    # FFMPEG_VMAF=$(...) propage ce code de retour, ce qui trippait `set -e`
+    # quand detect.sh est sourcé depuis un contexte strict (CI, tests).
+    FFMPEG_VMAF=$(_find_ffmpeg_with_vmaf || true)
     if [[ -n "$FFMPEG_VMAF" ]]; then
         HAS_LIBVMAF=1
     fi
