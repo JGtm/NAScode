@@ -43,14 +43,20 @@ HAS_SHA256SUM=$(command -v sha256sum >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_SHASUM=$(command -v shasum >/dev/null 2>&1 && echo 1 || echo 0)
 HAS_OPENSSL=$(command -v openssl >/dev/null 2>&1 && echo 1 || echo 0)
 
+# ----- Cache des capacités FFmpeg (1 appel pour toute la durée du run) -----
+# Évite de réinvoquer `ffmpeg -filters` / `ffmpeg -version` depuis
+# system.sh, complexity.sh, etc. Chaque invocation coûte ~50-200ms.
+FFMPEG_FILTERS_OUTPUT=$(ffmpeg -hide_banner -filters 2>/dev/null || true)
+FFMPEG_VERSION_LINE=$(ffmpeg -version 2>/dev/null | head -n1 || true)
+
 # ----- Détection de libvmaf dans FFmpeg -----
 # Le FFmpeg principal peut ne pas avoir libvmaf (ex: MSYS2 avec SVT-AV1)
 # On cherche un FFmpeg alternatif qui a libvmaf si nécessaire
 HAS_LIBVMAF=0
 FFMPEG_VMAF=""  # FFmpeg à utiliser pour VMAF (peut être différent du principal)
 
-# 1. Vérifier si le FFmpeg principal a libvmaf
-if ffmpeg -hide_banner -filters 2>/dev/null | grep -q libvmaf; then
+# 1. Vérifier si le FFmpeg principal a libvmaf (via cache)
+if [[ "$FFMPEG_FILTERS_OUTPUT" == *libvmaf* ]]; then
     HAS_LIBVMAF=1
     FFMPEG_VMAF="ffmpeg"
 else

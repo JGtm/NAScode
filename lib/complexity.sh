@@ -194,9 +194,10 @@ _compute_siti() {
     echo "${si}|${ti}"
 }
 
-# Vérifie si le filtre siti est disponible dans FFmpeg
+# Vérifie si le filtre siti est disponible dans FFmpeg.
+# Utilise FFMPEG_FILTERS_OUTPUT mis en cache par detect.sh au boot.
 _is_siti_available() {
-    ffmpeg -hide_banner -filters 2>/dev/null | grep -q "siti"
+    [[ "${FFMPEG_FILTERS_OUTPUT:-}" == *siti* ]]
 }
 
 # Normalise une valeur SI entre 0 et 1
