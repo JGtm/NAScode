@@ -32,9 +32,15 @@ teardown() {
 ###########################################################
 
 @test "HWACCEL: detect_hwaccel définit une valeur par défaut" {
+    # Sur Linux/Windows sans nvidia-smi (runners CI headless), detect_hwaccel
+    # laisse HWACCEL vide volontairement — pas un bug. On skip dans ce cas.
+    if [[ "$(uname -s)" != "Darwin" ]] && ! command -v nvidia-smi &>/dev/null; then
+        skip "no GPU acceleration available on this host"
+    fi
+
     detect_hwaccel
-    
-    # HWACCEL doit être défini (videotoolbox sur Mac, cuda sinon)
+
+    # HWACCEL doit être défini (videotoolbox sur Mac, cuda si nvidia-smi)
     [ -n "$HWACCEL" ]
 }
 

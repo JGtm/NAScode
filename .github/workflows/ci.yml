@@ -42,8 +42,8 @@ jobs:
         run: make doctor || true
 
       - name: Run tests
-        env:
-          NASCODE_LANG: en
+        # NASCODE_LANG left at default (fr) — tests assert on French
+        # string contents (msg() keys, summary labels, etc.).
         run: make test ARGS='-v'
 
       - name: Upload test logs
