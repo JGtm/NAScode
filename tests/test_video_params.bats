@@ -54,6 +54,24 @@ teardown() {
     [ "$result" = "yuv420p" ]
 }
 
+@test "_select_output_pix_fmt: libsvtav1 force 10-bit même sur source 8-bit (2e arg)" {
+    local result
+    result=$(_select_output_pix_fmt "yuv420p" "libsvtav1")
+    [ "$result" = "yuv420p10le" ]
+}
+
+@test "_select_output_pix_fmt: libsvtav1 force 10-bit via VIDEO_ENCODER global" {
+    local result
+    VIDEO_ENCODER="libsvtav1" result=$(VIDEO_ENCODER="libsvtav1" _select_output_pix_fmt "yuv420p")
+    [ "$result" = "yuv420p10le" ]
+}
+
+@test "_select_output_pix_fmt: libx265 ne force pas le 10-bit (source 8-bit reste 8-bit)" {
+    local result
+    result=$(_select_output_pix_fmt "yuv420p" "libx265")
+    [ "$result" = "yuv420p" ]
+}
+
 ###########################################################
 # Tests de _build_downscale_filter_if_needed()
 ###########################################################

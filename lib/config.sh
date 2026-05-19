@@ -324,8 +324,11 @@ set_conversion_mode_parameters() {
             if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
                 CRF_VALUE=21
             fi
-            # GOP long pour meilleure compression (600 frames ~25s @ 24fps)
-            FILM_KEYINT=600
+            # GOP modéré : 360 frames ~15s @ 24fps. On a raccourci depuis 600 pour
+            # limiter la dérive de qualité sur les longues scènes sombres / nocturnes
+            # (plus de keyframes = moins d'erreur accumulée en P/B-frames). Coût taille
+            # ~+3-8% en AV1, accepté car les séries restent largement sous le budget.
+            FILM_KEYINT=360
             # NOTE: FILM_TUNE_FASTDECODE désactivé car -tune fastdecode active dhdr10-info
             # dans x265 4.x (Windows), ce qui provoque un segfault si aucun fichier de
             # tone-map n'est fourni (x265 bug : https://bitbucket.org/multicoreware/x265_git/issues).

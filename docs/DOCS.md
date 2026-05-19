@@ -25,3 +25,8 @@ Code reference (audio):
 
 - Adding a codec: [ADDING_NEW_CODEC.md](ADDING_NEW_CODEC.md)
 - macOS notes: [Instructions-Mac.txt](fr/Instructions-Mac.txt)
+
+## Roadmap / planification
+
+- AV1 perceptual optimization plan (3 phases, transférabilité H.266/AV2) :
+  [AV1_OPTIMIZATION_PLAN.md](AV1_OPTIMIZATION_PLAN.md)

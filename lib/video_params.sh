@@ -23,13 +23,23 @@
 # Détermine le pixel format de sortie.
 # - Si la source est 10-bit (Main10 etc.), on garde du 10-bit (yuv420p10le)
 # - Sinon on reste en 8-bit (yuv420p)
+# - Exception : AV1 (libsvtav1) force toujours le 10-bit, y compris depuis une
+#   source 8-bit. Le coût taille est marginal (~+1-2%) et le gain anti-banding
+#   sur les scènes sombres / dégradés nocturnes est net. L'encodeur cible est
+#   lu depuis la globale VIDEO_ENCODER (ou un 2e argument optionnel pour les tests).
 _select_output_pix_fmt() {
     local input_pix_fmt="$1"
+    local encoder="${2:-${VIDEO_ENCODER:-}}"
     local out_pix_fmt="yuv420p"
 
     # Heuristique simple et robuste : les pix_fmt 10-bit contiennent généralement "10".
     # Ex: yuv420p10le, yuv422p10le, yuv444p10le
     if [[ "$input_pix_fmt" == *"10"* ]]; then
+        out_pix_fmt="yuv420p10le"
+    fi
+
+    # AV1 (SVT-AV1) : forcer 10-bit même sur source 8-bit (anti-banding low-light).
+    if [[ "$encoder" == "libsvtav1" ]]; then
         out_pix_fmt="yuv420p10le"
     fi
 

@@ -31,6 +31,15 @@ SVTAV1_TUNE_DEFAULT="${SVTAV1_TUNE_DEFAULT:-0}"
 SVTAV1_ENABLE_OVERLAYS_DEFAULT="${SVTAV1_ENABLE_OVERLAYS_DEFAULT:-1}"
 SVTAV1_PRESET_DEFAULT="${SVTAV1_PRESET_DEFAULT:-8}"
 SVTAV1_CRF_DEFAULT="${SVTAV1_CRF_DEFAULT:-32}"
+# Level of Parallelism (lp) : niveau abstrait SVT-AV1, range [0-6].
+# ATTENTION : ce N'EST PAS un nombre de threads. SVT-AV1 v3.x ne permet plus
+# de forcer "N processors" — c'est un niveau d'agressivité du parallelism que
+# l'encodeur interprète selon le hardware détecté.
+# Défaut fixé à 6 (max) : sur la machine de référence (9000-series X3D),
+# l'auto-détection donnait lp=5. Forcer 6 amène la température CPU de ~67°C
+# à ~80°C en exploitant un peu mieux la marge thermique. Override possible
+# via env (`export SVTAV1_LP_DEFAULT=0` pour rendre la main à l'auto-détection).
+SVTAV1_LP_DEFAULT="${SVTAV1_LP_DEFAULT:-6}"
 
 ###########################################################
 # FONCTIONS D'ACCÈS AUX PROFILS
@@ -251,14 +260,29 @@ get_encoder_mode_params() {
             esac
             ;;
         libsvtav1)
+            # Suffixe lp=N appliqué à tous les profils si SVTAV1_LP_DEFAULT est défini.
+            # `lp` est un niveau abstrait [0-6] (pas un thread count). Forcer à 6 si
+            # l'auto-détection sous-évalue le CPU disponible. Cf. doc SVT-AV1
+            # Parameters.md et docs/AV1_OPTIMIZATION_PLAN.md §T.2.
+            local lp_suffix="${SVTAV1_LP_DEFAULT:+:lp=${SVTAV1_LP_DEFAULT}}"
             case "$mode" in
-                # Séries : preset rapide, grain synthétique désactivé
-                serie) echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}" ;;
+                # Séries : preset rapide, optimisé pour les scènes sombres / nocturnes.
+                # - variance-boost-strength=3 : pousse le défaut SVT-AV1 (2) d'un cran
+                #   pour mieux préserver le détail dans les zones à faible variance.
+                # - luminance-qp-bias=20 : alloue plus de bits aux blocs sombres,
+                #   où l'œil détecte le mieux le banding (loi de Weber). Coût taille
+                #   ciblé (~+2-5%), invisible sur les hautes lumières à cette valeur.
+                # - sharpness=1 : préserve un poil plus de détail fin.
+                # Note : `film-grain=N` est volontairement absent du profil série.
+                # Bisection 2026-05-19 sur 9X3D : son ajout multiplie le temps
+                # d'encodage par ~10× (analyse coûteuse de la grain table côté
+                # encodeur). Réservé au profil `film` où le compromis est accepté.
+                serie) echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}:variance-boost-strength=3:luminance-qp-bias=20:sharpness=1${lp_suffix}" ;;
                 # Films : qualité max, film grain preservation
-                film)  echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}:film-grain=8:film-grain-denoise=0" ;;
+                film)  echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}:film-grain=8:film-grain-denoise=0${lp_suffix}" ;;
                 # Adaptatif : overlays et film-grain désactivés (trop gourmands en RAM/CPU,
                 # combinés à HWACCEL provoquent un crash au démarrage de l'encodage)
-                adaptatif) echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=0:film-grain=0" ;;
+                adaptatif) echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=0:film-grain=0${lp_suffix}" ;;
                 *)     echo "" ;;
             esac
             ;;
@@ -330,7 +354,7 @@ build_tune_option() {
 get_mode_keyint() {
     local mode="${1:-serie}"
     case "$mode" in
-        serie) echo "600" ;;   # ~25s @ 24fps (compression optimale)
+        serie) echo "360" ;;   # ~15s @ 24fps (compromis compression / qualité scènes sombres)
         film)  echo "240" ;;   # ~10s @ 24fps (seeking rapide)
         *)     echo "600" ;;
     esac

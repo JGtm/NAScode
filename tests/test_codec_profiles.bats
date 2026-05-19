@@ -281,6 +281,33 @@ teardown() {
     [[ "$result" =~ "enable-overlays=1" ]]
 }
 
+@test "get_encoder_mode_params: libsvtav1 serie active variance-boost-strength=3" {
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ "$result" =~ "variance-boost-strength=3" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 serie active luminance-qp-bias=20" {
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ "$result" =~ "luminance-qp-bias=20" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 serie n'active PAS film-grain (slowdown 10x)" {
+    # Bisection 2026-05-19 : film-grain=N retiré du profil série, multipliait
+    # le temps d'encodage par ~10× sur 9X3D mainline SVT-AV1 v3.1.
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ ! "$result" =~ "film-grain" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 serie active lp=6 par défaut" {
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ "$result" =~ "lp=6" ]]
+}
+
+@test "get_encoder_mode_params: libsvtav1 serie active sharpness=1" {
+    result=$(get_encoder_mode_params "libsvtav1" "serie")
+    [[ "$result" =~ "sharpness=1" ]]
+}
+
 @test "get_encoder_mode_params: libsvtav1 film retourne film-grain" {
     result=$(get_encoder_mode_params "libsvtav1" "film")
     [[ "$result" =~ "film-grain" ]]
@@ -353,9 +380,9 @@ teardown() {
 # Tests get_mode_keyint()
 ###########################################################
 
-@test "get_mode_keyint: serie retourne 600" {
+@test "get_mode_keyint: serie retourne 360" {
     result=$(get_mode_keyint "serie")
-    [ "$result" -eq 600 ]
+    [ "$result" -eq 360 ]
 }
 
 @test "get_mode_keyint: film retourne 240" {
@@ -432,6 +459,10 @@ teardown() {
 
 @test "SVTAV1_TUNE_DEFAULT: défaut est 0" {
     [ "${SVTAV1_TUNE_DEFAULT:-}" = "0" ]
+}
+
+@test "SVTAV1_LP_DEFAULT: défaut est 6" {
+    [ "${SVTAV1_LP_DEFAULT:-}" = "6" ]
 }
 
 @test "SVTAV1_ENABLE_OVERLAYS_DEFAULT: défaut est 1" {
