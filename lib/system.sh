@@ -26,8 +26,11 @@ check_dependencies() {
     fi
 
     # Vérification de la version de ffmpeg (si disponible)
-    local ffmpeg_version
-    ffmpeg_version=$(ffmpeg -version 2>/dev/null | head -n1 | grep -oE 'version [0-9]+' | cut -d ' ' -f2 || true)
+    # FFMPEG_VERSION_LINE est mis en cache au boot par detect.sh.
+    local ffmpeg_version=""
+    if [[ "${FFMPEG_VERSION_LINE:-}" =~ version[[:space:]]+([0-9]+) ]]; then
+        ffmpeg_version="${BASH_REMATCH[1]}"
+    fi
 
     if [[ -z "$ffmpeg_version" ]]; then
         print_warning "$(msg MSG_SYS_FFMPEG_VERSION_UNKNOWN)"

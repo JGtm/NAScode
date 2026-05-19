@@ -140,19 +140,26 @@ get_video_metadata() {
         -show_entries format=bit_rate,duration \
         "$file" 2>/dev/null || true)
     
-    # Parsing des résultats stream (format: key=value)
-    local bitrate_stream
-    bitrate_stream=$(echo "$metadata_output" | awk -F= '/^bit_rate=/{print $2; exit}')
-    local bitrate_bps
-    bitrate_bps=$(echo "$metadata_output" | awk -F= '/^TAG:BPS=/{print $2}')
-    local codec
-    codec=$(echo "$metadata_output" | awk -F= '/^codec_name=/{print $2}')
-    
-    # Parsing des résultats format (container)
-    local bitrate_container
-    bitrate_container=$(echo "$format_output" | awk -F= '/^bit_rate=/{print $2}')
-    local duration
-    duration=$(echo "$format_output" | awk -F= '/^duration=/{print $2}')
+    # Single-pass awk : 1 fork au lieu de 3 pour le stream.
+    local stream_parsed
+    stream_parsed=$(awk -F= '
+        /^bit_rate=/   { if (br == "") br = $2 }
+        /^codec_name=/ { codec = $2 }
+        /^TAG:BPS=/    { bps = $2 }
+        END { print br "|" codec "|" bps }
+    ' <<< "$metadata_output")
+    local bitrate_stream codec bitrate_bps
+    IFS='|' read -r bitrate_stream codec bitrate_bps <<< "$stream_parsed"
+
+    # Single-pass awk : 1 fork au lieu de 2 pour le format.
+    local format_parsed
+    format_parsed=$(awk -F= '
+        /^bit_rate=/ { br = $2 }
+        /^duration=/ { dur = $2 }
+        END { print br "|" dur }
+    ' <<< "$format_output")
+    local bitrate_container duration
+    IFS='|' read -r bitrate_container duration <<< "$format_parsed"
     
     # Nettoyage des valeurs
     bitrate_stream=$(clean_number "$bitrate_stream")
@@ -200,16 +207,22 @@ _probe_audio_info() {
         -of default=noprint_wrappers=1 \
         "$file" 2>/dev/null || true)
     
+    # Single-pass awk : 1 fork au lieu de 3 par appel.
+    local parsed
+    parsed=$(awk -F= '
+        /^codec_name=/ { if (codec == "") codec = $2 }
+        /^bit_rate=/   { if (br == "")    br = $2 }
+        /^TAG:BPS=/    { if (bps == "")   bps = $2 }
+        END { print codec "|" br "|" bps }
+    ' <<< "$audio_info")
     local codec bitrate bitrate_tag bitrate_kbps
-    codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
-    bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
-    bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
-    
+    IFS='|' read -r codec bitrate bitrate_tag <<< "$parsed"
+
     # Utiliser le tag BPS si bitrate direct non disponible
     if [[ -z "$bitrate" || "$bitrate" == "N/A" ]]; then
         bitrate="$bitrate_tag"
     fi
-    
+
     # Convertir en kbps
     if declare -f clean_number &>/dev/null; then
         bitrate=$(clean_number "$bitrate")
@@ -218,7 +231,7 @@ _probe_audio_info() {
     if [[ -n "$bitrate" && "$bitrate" =~ ^[0-9]+$ ]]; then
         bitrate_kbps=$((bitrate / 1000))
     fi
-    
+
     echo "${codec}|${bitrate_kbps}"
 }
 
@@ -235,14 +248,20 @@ _probe_audio_channels() {
         -of default=noprint_wrappers=1 \
         "$file" 2>/dev/null || true)
     
+    # Single-pass awk : 1 fork au lieu de 2 par appel.
+    local parsed
+    parsed=$(awk -F= '
+        /^channels=/       { if (ch == "")  ch = $2 }
+        /^channel_layout=/ { if (lay == "") lay = $2 }
+        END { print ch "|" lay }
+    ' <<< "$audio_info")
     local channels channel_layout
-    channels=$(echo "$audio_info" | awk -F= '/^channels=/{print $2; exit}')
-    channel_layout=$(echo "$audio_info" | awk -F= '/^channel_layout=/{print $2; exit}')
-    
+    IFS='|' read -r channels channel_layout <<< "$parsed"
+
     # Valeurs par défaut si non disponibles
     [[ -z "$channels" || "$channels" == "N/A" ]] && channels="2"
     [[ "$channel_layout" == "N/A" ]] && channel_layout=""
-    
+
     echo "${channels}|${channel_layout}"
 }
 
@@ -259,12 +278,18 @@ _probe_audio_full() {
         -of default=noprint_wrappers=1 \
         "$file" 2>/dev/null || true)
     
+    # Single-pass awk : 1 fork au lieu de 5 par appel.
+    local parsed
+    parsed=$(awk -F= '
+        /^codec_name=/     { if (codec == "") codec = $2 }
+        /^bit_rate=/       { if (br == "")    br = $2 }
+        /^TAG:BPS=/        { if (bps == "")   bps = $2 }
+        /^channels=/       { if (ch == "")    ch = $2 }
+        /^channel_layout=/ { if (lay == "")   lay = $2 }
+        END { print codec "|" br "|" bps "|" ch "|" lay }
+    ' <<< "$audio_info")
     local codec bitrate bitrate_tag bitrate_kbps channels channel_layout
-    codec=$(echo "$audio_info" | awk -F= '/^codec_name=/{print $2; exit}')
-    bitrate=$(echo "$audio_info" | awk -F= '/^bit_rate=/{print $2; exit}')
-    bitrate_tag=$(echo "$audio_info" | awk -F= '/^TAG:BPS=/{print $2; exit}')
-    channels=$(echo "$audio_info" | awk -F= '/^channels=/{print $2; exit}')
-    channel_layout=$(echo "$audio_info" | awk -F= '/^channel_layout=/{print $2; exit}')
+    IFS='|' read -r codec bitrate bitrate_tag channels channel_layout <<< "$parsed"
     
     # Utiliser le tag BPS si bitrate direct non disponible
     if [[ -z "$bitrate" || "$bitrate" == "N/A" ]]; then
@@ -303,10 +328,16 @@ get_video_stream_props() {
         -of default=noprint_wrappers=1 \
         "$file" 2>/dev/null || true)
 
+    # Single-pass awk : 1 fork au lieu de 3 par appel.
+    local parsed
+    parsed=$(awk -F= '
+        /^width=/   { if (w == "")  w = $2 }
+        /^height=/  { if (h == "")  h = $2 }
+        /^pix_fmt=/ { if (pf == "") pf = $2 }
+        END { print w "|" h "|" pf }
+    ' <<< "$out")
     local width height pix_fmt
-    width=$(echo "$out" | awk -F= '/^width=/{print $2; exit}')
-    height=$(echo "$out" | awk -F= '/^height=/{print $2; exit}')
-    pix_fmt=$(echo "$out" | awk -F= '/^pix_fmt=/{print $2; exit}')
+    IFS='|' read -r width height pix_fmt <<< "$parsed"
 
     echo "${width}|${height}|${pix_fmt}"
 }
