@@ -114,9 +114,17 @@ _auto_boost_run_pipeline() {
     local proxy_dir="$5"
     local final_dir="$6"
 
+    _auto_boost_say "Pipeline auto-boost démarré (segments ~${AUTO_BOOST_SEGMENT_DURATION}s, CRF base ${base_crf})"
+    # Notification Discord best-effort. On réutilise l'évent du mode adaptatif
+    # pour ne pas avoir à créer un canal dédié. Si l'évent n'est pas géré
+    # côté notify, c'est silencieux.
+    if declare -f notify_event >/dev/null 2>&1; then
+        notify_event "analysis_started" 2>/dev/null || true
+    fi
+
     # Étape 1 : segmentation.
     if ! _segment_video "$input" "$AUTO_BOOST_SEGMENT_DURATION" "$raw_dir"; then
-        echo "ERROR: auto_boost: segmentation failed" >&2
+        _auto_boost_say_err "segmentation failed"
         return 10
     fi
 
@@ -124,9 +132,10 @@ _auto_boost_run_pipeline() {
     # grâce au pattern seg_%03d).
     local raw_segments=("$raw_dir"/seg_*)
     if [[ ${#raw_segments[@]} -eq 0 ]] || [[ ! -f "${raw_segments[0]}" ]]; then
-        echo "ERROR: auto_boost: no segments produced" >&2
+        _auto_boost_say_err "no segments produced"
         return 11
     fi
+    _auto_boost_say "${#raw_segments[@]} segments à traiter"
 
     local final_list="${final_dir}/concat.list"
     : > "$final_list"
@@ -141,7 +150,7 @@ _auto_boost_run_pipeline() {
 
         # 2. Proxy rapide
         if ! _quick_encode_segment "$seg" "$proxy_path"; then
-            echo "ERROR: auto_boost: proxy encode failed for $seg_basename" >&2
+            _auto_boost_say_err "proxy encode failed for $seg_basename"
             return 20
         fi
 
@@ -156,11 +165,11 @@ _auto_boost_run_pipeline() {
         if [[ $final_crf -lt 10 ]]; then final_crf=10; fi
         if [[ $final_crf -gt 50 ]]; then final_crf=50; fi
 
-        echo "[auto_boost] seg ${idx}: vmaf=${vmaf} delta=${delta} crf=${final_crf}"
+        _auto_boost_say "seg ${idx}: vmaf=${vmaf} delta=${delta} crf=${final_crf}"
 
         # 5. Encode qualité final
         if ! _auto_boost_quality_encode "$seg" "$final_path" "$final_crf"; then
-            echo "ERROR: auto_boost: quality encode failed for $seg_basename" >&2
+            _auto_boost_say_err "quality encode failed for $seg_basename"
             return 30
         fi
 
@@ -174,12 +183,33 @@ _auto_boost_run_pipeline() {
 
     # Étape 6 : concat.
     if ! _concat_segments "$final_list" "$output"; then
-        echo "ERROR: auto_boost: final concat failed" >&2
+        _auto_boost_say_err "final concat failed"
         return 40
     fi
 
-    echo "[auto_boost] OK — ${idx} segments encodés, sortie: $output"
+    _auto_boost_say "OK — ${idx} segments encodés, sortie: $output"
     return 0
+}
+
+# Helpers d'affichage : préfèrent print_status (couleur magenta, cohérent
+# avec le reste de NAScode) quand l'UI est chargée, fallback echo sinon
+# (sourcing isolé pour tests, scripts externes).
+_auto_boost_say() {
+    local msg="$1"
+    if declare -f print_status >/dev/null 2>&1; then
+        print_status "[auto-boost] ${msg}" "${MAGENTA:-}"
+    else
+        echo "[auto-boost] ${msg}"
+    fi
+}
+
+_auto_boost_say_err() {
+    local msg="$1"
+    if declare -f print_error >/dev/null 2>&1; then
+        print_error "[auto-boost] ${msg}"
+    else
+        echo "ERROR: [auto-boost] ${msg}" >&2
+    fi
 }
 
 # Encode "qualité" d'un segment avec les params perceptuels finaux.

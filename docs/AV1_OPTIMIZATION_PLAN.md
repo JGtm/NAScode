@@ -598,16 +598,22 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
   AAC / EAC3 / FLAC selon source + cible vidéo). Smoke test validé :
   AC3 5.1 → E-AC3 5.1 avec layout normalisé. Fallback `-c:a copy` si
   le module audio n'est pas chargé.
-- **Progress reporting NAScode-style** : actuellement les `echo` de
-  `auto_boost_encode` sortent en raw stdout. À canaliser via le système
-  de slots `lib/progress.sh` pour un affichage cohérent avec les autres
-  modes.
-- **Notifications Discord** : `notify_event "analysis_started"` /
-  `"analysis_completed"` doivent être déclenchées au début / fin du
-  pipeline auto-boost pour cohérence avec mode `adaptatif`.
-- **VMAF final** : actuellement chaque segment a son VMAF par rapport
-  à un proxy, pas par rapport à l'encode final. Mesurer le VMAF
-  global de l'output vs source pour reporting (comme les autres modes).
+- ~~**Progress reporting NAScode-style**~~ — **FAIT 2026-05-19** :
+  `auto_boost_encode` utilise désormais `print_status` (couleur magenta)
+  pour les étapes intermédiaires et `print_error` pour les erreurs.
+  Fallback `echo` quand l'UI n'est pas chargée (tests / scripts).
+  Le progress per-frame ffmpeg n'est pas encore canalisé via les slots
+  `lib/progress.sh` (TODO mineur, peu d'impact UX en mode CLI).
+- ~~**Notifications Discord** : `analysis_started` / `analysis_completed`~~
+  — **PARTIELLEMENT FAIT** : `analysis_started` émis au début du
+  pipeline auto-boost. `analysis_completed` reste à implémenter avec un
+  payload pertinent (nombre de segments, deltas CRF moyens, etc.).
+- ~~**VMAF final**~~ — **GRATUIT** : `_finalize_conversion_success`
+  appelle déjà `_queue_vmaf_analysis "$file_original" "$final_actual"`
+  pour tous les modes. Le VMAF global de la sortie auto-boost est donc
+  mesuré automatiquement, comme pour les autres modes. Le VMAF par
+  segment du pipeline est une métrique interne distincte (qualité
+  par scène pour ajuster le CRF).
 - **Sample mode** : tester l'interaction `--sample` / `-S` (encode d'un
   échantillon court pour VMAF), à vérifier si le découpage est cohérent
   avec la segmentation auto-boost.
