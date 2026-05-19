@@ -300,7 +300,129 @@ teardown() {
     
     local result
     result=$(_build_effective_suffix_for_dims "1280" "720")
-    
+
     [[ "$result" =~ "_720p" ]]
     [[ ! "$result" =~ "_k" ]]
+}
+
+###########################################################
+# Tests _execute_conversion : SVT-AV1 force toujours single-pass CRF
+# (le wrapper FFmpeg libsvtav1 ne supporte pas le multi-pass entre
+#  invocations ffmpeg séparées — RC buffer en mémoire).
+###########################################################
+
+# Helper: capture l'argument "mode" passé à _execute_ffmpeg_pipeline
+# en remplaçant la fonction par un mock qui écrit dans un fichier.
+_setup_pipeline_mock() {
+    PIPELINE_CALL_LOG=$(mktemp)
+    _execute_ffmpeg_pipeline() {
+        echo "mode=$1" > "$PIPELINE_CALL_LOG"
+        return 0
+    }
+}
+
+_teardown_pipeline_mock() {
+    [[ -n "${PIPELINE_CALL_LOG:-}" && -f "$PIPELINE_CALL_LOG" ]] && rm -f "$PIPELINE_CALL_LOG"
+    unset PIPELINE_CALL_LOG
+    unset _SVTAV1_TWOPASS_DOWNGRADE_WARNED
+}
+
+@test "_execute_conversion: libsvtav1 + SINGLE_PASS_MODE=false → bascule en crf" {
+    _setup_pipeline_mock
+    SINGLE_PASS_MODE=false
+    VIDEO_ENCODER="libsvtav1"
+    EFFECTIVE_VIDEO_ENCODER="libsvtav1"
+
+    _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$(cat "$PIPELINE_CALL_LOG")" = "mode=crf" ]
+    _teardown_pipeline_mock
+}
+
+@test "_execute_conversion: libsvtav1 + SINGLE_PASS_MODE=false force SINGLE_PASS_MODE=true pendant l'appel (capped CRF)" {
+    PIPELINE_CALL_LOG=$(mktemp)
+    _execute_ffmpeg_pipeline() {
+        echo "single_pass_inside=${SINGLE_PASS_MODE}" > "$PIPELINE_CALL_LOG"
+        return 0
+    }
+    SINGLE_PASS_MODE=false
+    VIDEO_ENCODER="libsvtav1"
+    EFFECTIVE_VIDEO_ENCODER="libsvtav1"
+
+    _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$(cat "$PIPELINE_CALL_LOG")" = "single_pass_inside=true" ]
+    _teardown_pipeline_mock
+}
+
+@test "_execute_conversion: libsvtav1 restaure SINGLE_PASS_MODE après l'appel" {
+    _setup_pipeline_mock
+    SINGLE_PASS_MODE=false
+    VIDEO_ENCODER="libsvtav1"
+    EFFECTIVE_VIDEO_ENCODER="libsvtav1"
+
+    _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$SINGLE_PASS_MODE" = "false" ]
+    _teardown_pipeline_mock
+}
+
+@test "_execute_conversion: libx265 + SINGLE_PASS_MODE=false → reste en twopass (pas de downgrade x265)" {
+    _setup_pipeline_mock
+    SINGLE_PASS_MODE=false
+    VIDEO_ENCODER="libx265"
+    EFFECTIVE_VIDEO_ENCODER="libx265"
+
+    _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$(cat "$PIPELINE_CALL_LOG")" = "mode=twopass" ]
+    _teardown_pipeline_mock
+}
+
+@test "_execute_conversion: libsvtav1 + SINGLE_PASS_MODE=true → crf direct, pas de downgrade nécessaire" {
+    _setup_pipeline_mock
+    SINGLE_PASS_MODE=true
+    VIDEO_ENCODER="libsvtav1"
+    EFFECTIVE_VIDEO_ENCODER="libsvtav1"
+
+    _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$(cat "$PIPELINE_CALL_LOG")" = "mode=crf" ]
+    _teardown_pipeline_mock
+}
+
+@test "_execute_conversion: libx265 + SINGLE_PASS_MODE=true → crf" {
+    _setup_pipeline_mock
+    SINGLE_PASS_MODE=true
+    VIDEO_ENCODER="libx265"
+    EFFECTIVE_VIDEO_ENCODER="libx265"
+
+    _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$(cat "$PIPELINE_CALL_LOG")" = "mode=crf" ]
+    _teardown_pipeline_mock
+}
+
+@test "_execute_conversion: libaom-av1 + SINGLE_PASS_MODE=false → reste en twopass" {
+    _setup_pipeline_mock
+    SINGLE_PASS_MODE=false
+    VIDEO_ENCODER="libaom-av1"
+    EFFECTIVE_VIDEO_ENCODER="libaom-av1"
+
+    _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$(cat "$PIPELINE_CALL_LOG")" = "mode=twopass" ]
+    _teardown_pipeline_mock
+}
+
+@test "_execute_conversion: libsvtav1 propage le code de retour de _execute_ffmpeg_pipeline" {
+    _execute_ffmpeg_pipeline() { return 42; }
+    SINGLE_PASS_MODE=false
+    VIDEO_ENCODER="libsvtav1"
+    EFFECTIVE_VIDEO_ENCODER="libsvtav1"
+
+    run _execute_conversion in.mkv out.mkv log 100 base
+
+    [ "$status" -eq 42 ]
+    unset _SVTAV1_TWOPASS_DOWNGRADE_WARNED
 }

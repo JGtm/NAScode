@@ -265,6 +265,124 @@ teardown() {
 }
 
 ###########################################################
+# Tests de compatibilité SVT-AV1 multi-pass
+# (cf. erreur "The overlay frames feature is currently not supported
+#  with multi-pass encoding" — film-grain est dans le même cas)
+###########################################################
+
+@test "_build_encoder_params_internal: libsvtav1 pass1 force enable-overlays=0" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass1" "tune=0:enable-overlays=1:keyint=240")
+    [[ "$result" =~ "pass=1" ]]
+    [[ "$result" =~ "enable-overlays=0" ]]
+    [[ ! "$result" =~ "enable-overlays=1" ]]
+}
+
+@test "_build_encoder_params_internal: libsvtav1 pass2 force enable-overlays=0" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass2" "tune=0:enable-overlays=1:keyint=240")
+    [[ "$result" =~ "pass=2" ]]
+    [[ "$result" =~ "enable-overlays=0" ]]
+    [[ ! "$result" =~ "enable-overlays=1" ]]
+}
+
+@test "_build_encoder_params_internal: libsvtav1 pass1 supprime film-grain et film-grain-denoise" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass1" "tune=0:enable-overlays=1:film-grain=8:film-grain-denoise=0:keyint=240")
+    [[ "$result" =~ "pass=1" ]]
+    [[ ! "$result" =~ "film-grain=" ]]
+    [[ ! "$result" =~ "film-grain-denoise=" ]]
+    # Les autres clés restent intactes
+    [[ "$result" =~ "tune=0" ]]
+    [[ "$result" =~ "keyint=240" ]]
+}
+
+@test "_build_encoder_params_internal: libsvtav1 crf conserve enable-overlays et film-grain" {
+    # En CRF (single-pass), SVT-AV1 accepte overlays et film-grain : on ne touche à rien.
+    result=$(_build_encoder_params_internal "libsvtav1" "crf" "tune=0:enable-overlays=1:film-grain=8:keyint=240")
+    [[ "$result" =~ "enable-overlays=1" ]]
+    [[ "$result" =~ "film-grain=8" ]]
+}
+
+@test "_build_encoder_params_internal: libx265 pass1 ne touche pas aux params (overlays N/A)" {
+    # Garde-fou : la sanitization ne doit pas s'appliquer aux autres encodeurs.
+    result=$(_build_encoder_params_internal "libx265" "pass1" "vbv-maxrate=2520:vbv-bufsize=3780:amp=0")
+    [[ "$result" =~ "pass=1" ]]
+    [[ "$result" =~ "vbv-maxrate=2520" ]]
+    [[ "$result" =~ "vbv-bufsize=3780" ]]
+    [[ "$result" =~ "amp=0" ]]
+}
+
+###########################################################
+# Tests SVT-AV1 multi-pass : on n'émet AUCUNE clé interdite par
+# le wrapper FFmpeg libsvtav1 (qui rejette stats=, passes=).
+# Garde-fou : même si _execute_conversion force "crf", si quelqu'un
+# appelle directement _build_encoder_params_internal en pass1/pass2
+# la sortie ne doit pas contenir de clé qui ferait planter FFmpeg.
+###########################################################
+
+@test "_build_encoder_params_internal: libsvtav1 pass1 n'émet jamais stats= (rejeté par FFmpeg wrapper)" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass1" "tune=0:keyint=240")
+    [[ ! "$result" =~ "stats=" ]]
+}
+
+@test "_build_encoder_params_internal: libsvtav1 pass2 n'émet jamais stats=" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass2" "tune=0:keyint=240")
+    [[ ! "$result" =~ "stats=" ]]
+}
+
+@test "_build_encoder_params_internal: libsvtav1 pass1 n'émet jamais passes= (rejeté par FFmpeg wrapper)" {
+    result=$(_build_encoder_params_internal "libsvtav1" "pass1" "tune=0:keyint=240")
+    [[ ! "$result" =~ "passes=" ]]
+}
+
+@test "_nascode_strip_svtav1_multipass_incompat: chaîne vide" {
+    result=$(_nascode_strip_svtav1_multipass_incompat "")
+    [ -z "$result" ]
+}
+
+@test "_nascode_strip_svtav1_multipass_incompat: pas de double colon en sortie" {
+    result=$(_nascode_strip_svtav1_multipass_incompat "tune=0:film-grain=8:keyint=240")
+    [[ ! "$result" =~ "::" ]]
+    [[ ! "$result" =~ ^: ]]
+    [[ ! "$result" =~ :$ ]]
+}
+
+@test "_should_emit_maxrate_flag: libsvtav1 + pass1 -> non" {
+    run _should_emit_maxrate_flag "libsvtav1" "pass1"
+    [ "$status" -ne 0 ]
+}
+
+@test "_should_emit_maxrate_flag: libsvtav1 + pass2 -> non" {
+    run _should_emit_maxrate_flag "libsvtav1" "pass2"
+    [ "$status" -ne 0 ]
+}
+
+@test "_should_emit_maxrate_flag: libsvtav1 + crf -> oui (capped CRF)" {
+    run _should_emit_maxrate_flag "libsvtav1" "crf"
+    [ "$status" -eq 0 ]
+}
+
+@test "_should_emit_maxrate_flag: libx265 + pass1 -> oui" {
+    # x265 supporte -maxrate en multi-pass ; on ne change pas son comportement.
+    run _should_emit_maxrate_flag "libx265" "pass1"
+    [ "$status" -eq 0 ]
+}
+
+@test "_should_emit_maxrate_flag: libx265 + pass2 -> oui" {
+    run _should_emit_maxrate_flag "libx265" "pass2"
+    [ "$status" -eq 0 ]
+}
+
+@test "_should_emit_maxrate_flag: libx265 + crf -> oui" {
+    run _should_emit_maxrate_flag "libx265" "crf"
+    [ "$status" -eq 0 ]
+}
+
+@test "_should_emit_maxrate_flag: libaom-av1 + pass1 -> oui" {
+    # libaom-av1 supporte les contraintes VBV en two-pass.
+    run _should_emit_maxrate_flag "libaom-av1" "pass1"
+    [ "$status" -eq 0 ]
+}
+
+###########################################################
 # Tests cap CRF pour SVT-AV1 (rc + mbr)
 ###########################################################
 

@@ -245,15 +245,49 @@ _setup_video_encoding_params() {
 # Note: get_encoder_params_flag() est définie dans codec_profiles.sh et exportée.
 # Ne pas dupliquer ici.
 
+# Retire/désactive les options SVT-AV1 incompatibles avec un encodage multi-pass.
+# Usage: _nascode_strip_svtav1_multipass_incompat "tune=0:enable-overlays=1:film-grain=8:keyint=240"
+# SVT-AV1 refuse explicitement enable-overlays=1 et film-grain=N (>0) en multi-pass
+# ("The overlay frames feature is currently not supported with multi-pass encoding").
+# On force enable-overlays=0 et on supprime film-grain/film-grain-denoise plutôt que
+# de planter l'encodage avant la pass1.
+_nascode_strip_svtav1_multipass_incompat() {
+    local params="${1:-}"
+    [[ -z "$params" ]] && { echo ""; return 0; }
+    params=$(printf '%s' "$params" | sed -E \
+        -e 's/(^|:)enable-overlays=[^:]*/\1enable-overlays=0/g' \
+        -e 's/(^|:)film-grain=[^:]*//g' \
+        -e 's/(^|:)film-grain-denoise=[^:]*//g' \
+        -e 's/::+/:/g' \
+        -e 's/^://' \
+        -e 's/:$//')
+    echo "$params"
+}
+
+# Indique si l'on doit ajouter les options FFmpeg de premier niveau
+# `-maxrate <X> -bufsize <Y>` pour ce couple (encodeur, mode).
+# Usage: _should_emit_maxrate_flag "libsvtav1" "pass1" -> retourne 1 (non)
+# SVT-AV1 rejette -maxrate hors mode CRF ("Max Bitrate only supported with CRF mode") :
+# en two-pass on est en ABR avec -b:v, le couple est incompatible.
+# x265 et libaom acceptent -maxrate en multi-pass, on garde le comportement.
+_should_emit_maxrate_flag() {
+    local encoder="${1:-libx265}"
+    local mode="${2:-crf}"
+    if [[ "$encoder" == "libsvtav1" && "$mode" != "crf" ]]; then
+        return 1
+    fi
+    return 0
+}
+
 # Construit les paramètres internes de l'encodeur
 # Usage: _build_encoder_params_internal "libx265" "pass1" "vbv-maxrate=2520:vbv-bufsize=3780"
 _build_encoder_params_internal() {
     local encoder="${1:-libx265}"
     local mode="$2"           # pass1, pass2, crf
     local base_params="$3"    # VBV params et extras
-    
+
     local full_params=""
-    
+
     case "$encoder" in
         libx265)
             # x265 : paramètres classiques avec pass=N pour two-pass
@@ -272,18 +306,22 @@ _build_encoder_params_internal() {
                     ;;
             esac
             ;;
-            
+
         libsvtav1)
-            # SVT-AV1 : paramètres via -svtav1-params
-            # Le two-pass SVT-AV1 utilise --pass 1/2 dans les params
+            # SVT-AV1 : paramètres via -svtav1-params.
+            # IMPORTANT : le multi-pass entre invocations ffmpeg séparées N'EST PAS
+            # supporté par le wrapper libsvtav1 (RC stats gardées en mémoire ; les
+            # clés `stats=`, `passes=` sont rejetées ; `pass=` n'écrit rien).
+            # → `_execute_conversion` force le mode "crf" pour cet encodeur ;
+            #   les branches pass1/pass2 ci-dessous sont conservées en garde-fou
+            #   défensif au cas où l'appelant outrepasserait la décision.
             case "$mode" in
-                "pass1")
-                    full_params="pass=1"
-                    [[ -n "$base_params" ]] && full_params="${full_params}:${base_params}"
-                    ;;
-                "pass2")
-                    full_params="pass=2"
-                    [[ -n "$base_params" ]] && full_params="${full_params}:${base_params}"
+                "pass1"|"pass2")
+                    local pass_num="${mode#pass}"
+                    local sanitized
+                    sanitized=$(_nascode_strip_svtav1_multipass_incompat "$base_params")
+                    full_params="pass=${pass_num}"
+                    [[ -n "$sanitized" ]] && full_params="${full_params}:${sanitized}"
                     ;;
                 "crf")
                     full_params="${base_params}"
@@ -600,7 +638,9 @@ _run_ffmpeg_encode() {
     _cmd_append_words cmd "$bitrate_opt"
     _cmd_append_words cmd "$encoder_specific_opts"
 
-    cmd+=(-maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE")
+    if _should_emit_maxrate_flag "$encoder" "$mode"; then
+        cmd+=(-maxrate "$VIDEO_MAXRATE" -bufsize "$VIDEO_BUFSIZE")
+    fi
 
     _cmd_append_words cmd "$audio_opt"
     _cmd_append_words cmd "$stream_opt"

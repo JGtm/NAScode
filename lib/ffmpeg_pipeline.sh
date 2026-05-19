@@ -420,5 +420,36 @@ _execute_conversion() {
     if [[ "${SINGLE_PASS_MODE:-false}" == true ]]; then
         mode="crf"
     fi
+
+    # SVT-AV1 : le wrapper libsvtav1 de FFmpeg ne supporte pas le multi-pass
+    # entre invocations ffmpeg séparées :
+    #   - les RC stats sont gardées en mémoire (perdues entre processus)
+    #   - `stats=` et `passes=` sont rejetés dans -svtav1-params
+    #   - `pass=` est accepté mais n'écrit aucun fichier sur disque
+    # Recommandation officielle SVT-AV1 = single-pass CRF (capped CRF si maxrate).
+    # On bascule donc en CRF + SINGLE_PASS_MODE pour activer rc=0:mbr=<maxrate>
+    # (capped CRF) dans _setup_video_encoding_params.
+    local _restore_single_pass=""
+    if [[ "$mode" == "twopass" ]]; then
+        local _enc="${EFFECTIVE_VIDEO_ENCODER:-${VIDEO_ENCODER:-libx265}}"
+        if [[ "$_enc" == "libsvtav1" ]]; then
+            if [[ "${_SVTAV1_TWOPASS_DOWNGRADE_WARNED:-0}" != "1" ]]; then
+                log_warning "libsvtav1: two-pass non supporté entre invocations ffmpeg, bascule en single-pass (capped CRF)" 2>/dev/null \
+                    || echo "[WARN] libsvtav1: two-pass non supporté, bascule en single-pass (capped CRF)" >&2
+                _SVTAV1_TWOPASS_DOWNGRADE_WARNED=1
+            fi
+            mode="crf"
+            _restore_single_pass="${SINGLE_PASS_MODE:-false}"
+            SINGLE_PASS_MODE=true
+        fi
+    fi
+
     _execute_ffmpeg_pipeline "$mode" "$@"
+    local rc=$?
+
+    if [[ -n "$_restore_single_pass" ]]; then
+        SINGLE_PASS_MODE="$_restore_single_pass"
+    fi
+
+    return $rc
 }

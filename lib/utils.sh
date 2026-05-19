@@ -429,13 +429,12 @@ BEGIN {
     marker_delay = PROGRESS_MARKER_DELAY + 0;
     if (marker_delay < 1) marker_delay = 15;
     marker_written = 0;
-    # Sauvegarde de la position du curseur pour le mode non-parallèle :
-    # permet de revenir toujours sur la même ligne même si une autre sortie
-    # a déplacé le curseur entre deux mises à jour (ex. sortie parasite sur stderr).
-    if (NOPROG != "true" && !is_parallel) {
-        printf "\033[s" > "/dev/stderr";
-        fflush("/dev/stderr");
-    }
+    # Mode séquentiel : on se contente de \r\033[K à chaque update
+    # (retour début de ligne + effacement). Pas de sauvegarde curseur via
+    # \033[s/\033[u : ces séquences SCO ne sont pas reconnues par tous les
+    # terminaux (mintty / git bash en particulier) et provoquent l affichage
+    # de la barre sur une nouvelle ligne à chaque update.
+    # Prérequis : rien d autre n écrit sur stderr entre deux updates.
 }
 
 /out_time_us=/ {
@@ -479,7 +478,7 @@ BEGIN {
             printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s %5.1f%% | %s | ETA: %s | x%.2f\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed, lines_up > "/dev/stderr";
         } else {
-            printf "\033[u\r\033[K  %s %-25.25s %s %5.1f%% | %s | ETA: %s | x%.2f",
+            printf "\r\033[K  %s %-25.25s %s %5.1f%% | %s | ETA: %s | x%.2f",
                    EMOJI, CURRENT_FILE_NAME, bar, percent, start_time_str, eta_str, speed > "/dev/stderr";
         }
         fflush("/dev/stderr");
@@ -497,7 +496,7 @@ BEGIN {
             printf "\033[%dA\r\033[K  %s [%d] %-25.25s %s 100.0%% | %s | %s | %s\033[%dB\r",
                    lines_up, EMOJI, slot, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str, lines_up > "/dev/stderr";
         } else {
-            printf "\033[u\r\033[K  %s %-25.25s %s 100.0%% | %s | %s | %s\n",
+            printf "\r\033[K  %s %-25.25s %s 100.0%% | %s | %s | %s\n",
                    EMOJI, CURRENT_FILE_NAME, bar_complete, start_time_str, END_MSG, end_time_str > "/dev/stderr";
         }
         fflush("/dev/stderr");
