@@ -232,6 +232,18 @@ _essential_pipe_encode() {
     # bufferise stderr lentement.
     local svt_log
     svt_log=$(mktemp -t svtav1_essential.XXXXXX.log)
+
+    # Trap cleanup : si le shell parent est tué (Ctrl+C, kill, exit erreur),
+    # le pipe ffmpeg|SvtAv1EncApp ne propage pas le signal au process Windows
+    # natif de SvtAv1EncApp.exe, qui continue à tourner en zombie et consomme
+    # le CPU jusqu'à la fin de son encode courant. On force `taskkill //F //IM`
+    # à la sortie pour nettoyer.
+    # Limite : si plusieurs encodes Essential tournent en parallèle (xargs -P),
+    # ce trap tue tous les SvtAv1EncApp.exe — pas seulement le nôtre. Acceptable
+    # vu que NAScode ne parallélise pas à ce niveau aujourd'hui.
+    # shellcheck disable=SC2064 (svt_log expanded volontairement au moment du trap)
+    trap "_essential_kill_orphans 2>/dev/null; rm -f \"$svt_log\" 2>/dev/null; exit 130" INT TERM
+
     # shellcheck disable=SC2086 (cli_params expansion volontaire)
     ffmpeg -hide_banner -loglevel error \
             -i "$input" \
@@ -240,6 +252,9 @@ _essential_pipe_encode() {
         | "$bin" -i - \
             --preset "$preset" --crf "$crf" $cli_params \
             -b "$output_ivf" > /dev/null 2>"$svt_log"
+
+    # Désarmer le trap (sinon le handler s'applique au shell appelant ensuite).
+    trap - INT TERM
 
     # Vérifier la sortie : IVF non vide = succès, sinon on remonte le log.
     if [[ ! -s "$output_ivf" ]]; then
@@ -251,6 +266,22 @@ _essential_pipe_encode() {
         return 4
     fi
     rm -f "$svt_log"
+    return 0
+}
+
+# Tue les process SvtAv1EncApp.exe orphelins côté Windows.
+# Utilisé par le trap de _essential_pipe_encode mais aussi appelable
+# manuellement si une session crash a laissé des zombies.
+#
+# Usage : _essential_kill_orphans
+# Retourne : toujours 0 (best-effort).
+_essential_kill_orphans() {
+    if command -v taskkill >/dev/null 2>&1; then
+        taskkill //F //IM SvtAv1EncApp.exe 2>/dev/null || true
+    elif command -v pkill >/dev/null 2>&1; then
+        # Fallback Linux/macOS si on s'y aventure un jour.
+        pkill -9 -x SvtAv1EncApp 2>/dev/null || true
+    fi
     return 0
 }
 

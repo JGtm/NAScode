@@ -48,6 +48,15 @@ teardown() {
     declare -f _execute_essential_conversion >/dev/null
 }
 
+@test "svtav1_essential: _essential_kill_orphans est définie (cleanup zombie)" {
+    declare -f _essential_kill_orphans >/dev/null
+}
+
+@test "_essential_kill_orphans: ne crashe pas même sans process à tuer" {
+    run _essential_kill_orphans
+    [ "$status" -eq 0 ]
+}
+
 ###########################################################
 # Tests detect_svtav1_essential() — comportement par défaut
 ###########################################################
