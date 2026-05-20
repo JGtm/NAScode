@@ -557,11 +557,27 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 - **Progress reporting** : SvtAv1EncApp émet sur stderr un format
   différent de ffmpeg. Le watcher progress NAScode (`lib/progress.sh`)
   ne le parse pas → pas d'affichage temps réel pendant l'encode.
-  Workaround : afficher au moins un "encoding..." spinner.
+  Workaround V1 : `_essential_say` affiche "Démarrage encode..." et
+  "Mux final..." aux étapes clés. Pas de progress per-frame.
 - **Two-pass** : pas implémenté (single-pass CRF uniquement). Essential
   supporte `--pass 1/2 --stats <file>`, mais peu rentable vs CRF capped.
 - **Tile auto-detection** : Essential expose `--tile-rows/columns`,
   pour 4K on pourrait calibrer. Actuellement laissé à l'auto.
+- **Combinaison `--essential` + `-m adaptatif-vmaf`** : actuellement le
+  routing donne la priorité à auto-boost (mode adaptatif-vmaf), qui
+  utilise ffmpeg-libsvtav1 mainline pour ses encodes de segments. Le
+  flag `--essential` est donc ignoré silencieusement dans ce cas. Pour
+  les combiner, il faudrait modifier `_quick_encode_segment` et
+  `_auto_boost_quality_encode` (lib/vmaf_predictive.sh et auto_boost.sh)
+  pour router vers SvtAv1EncApp standalone via pipe. Valeur ajoutée
+  modeste (qualité équivalente à preset/crf identiques), mérite qu'on
+  attende le retour utilisateur sur les forces propres à chaque mode.
+- **Bats E2E `_execute_essential_conversion` hang** : non résolu malgré
+  capture stderr dans log temp file (commit e70cfe3). Hypothèse :
+  interaction `run` bats + double process ffmpeg|SvtAv1EncApp + mux
+  ffmpeg séparé qui ne libère pas correctement les pipes. Le pipe
+  encode IVF seul est verrouillé par tests bats ; le smoke manuel
+  confirme l'E2E (audio multicanal smart codec) en ~10s.
 
 **Phase C — IMPLÉMENTATION TERMINÉE. Branchement CLI RESTE À FAIRE.**
 - [lib/segmenter.sh](../lib/segmenter.sh) : `_segment_video` (via
