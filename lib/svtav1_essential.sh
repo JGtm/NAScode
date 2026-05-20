@@ -227,26 +227,30 @@ _essential_pipe_encode() {
     # Construction du pipe.
     # ffmpeg : input → yuv4mpegpipe 10-bit → stdout.
     # SvtAv1EncApp : stdin (y4m auto-detect) → IVF.
-    # On capture stderr de SvtAv1EncApp pour récupérer ses logs.
-    #
+    # On capture stderr de SvtAv1EncApp dans un log temp séparé pour
+    # éviter les blocages d'écriture quand le caller (ex. bats `run`)
+    # bufferise stderr lentement.
+    local svt_log
+    svt_log=$(mktemp -t svtav1_essential.XXXXXX.log)
     # shellcheck disable=SC2086 (cli_params expansion volontaire)
-    if ! ffmpeg -hide_banner -loglevel error \
+    ffmpeg -hide_banner -loglevel error \
             -i "$input" \
             -map 0:v:0 -an -sn \
             -f yuv4mpegpipe -pix_fmt yuv420p10le -strict -1 pipe:1 2>/dev/null \
         | "$bin" -i - \
             --preset "$preset" --crf "$crf" $cli_params \
-            -b "$output_ivf" 2>&1 | grep -iE 'svt \[error\]'; then
-        # grep -E error trouve rien → tout va bien. Mais on doit vérifier
-        # autrement car pipefail + grep no-match donne exit 1.
-        :
-    fi
+            -b "$output_ivf" > /dev/null 2>"$svt_log"
 
-    # Vérifier que la sortie existe et n'est pas vide.
+    # Vérifier la sortie : IVF non vide = succès, sinon on remonte le log.
     if [[ ! -s "$output_ivf" ]]; then
         echo "ERROR: _essential_pipe_encode: IVF output empty or missing: $output_ivf" >&2
+        if [[ -s "$svt_log" ]]; then
+            grep -iE 'svt ?\[error\]|error' "$svt_log" | head -5 >&2
+        fi
+        rm -f "$svt_log"
         return 4
     fi
+    rm -f "$svt_log"
     return 0
 }
 

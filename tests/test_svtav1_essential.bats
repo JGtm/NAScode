@@ -241,12 +241,14 @@ _essential_test_binary() {
 }
 
 @test "_execute_essential_conversion: end-to-end avec audio multicanal + smart codec" {
-    # TODO 2026-05-20 : ce test hang dans le contexte bats (>180s) malgré
-    # un smoke test manuel qui passe en ~10s :
-    #   tools/bin/SvtAv1EncApp.exe + _build_audio_params produisent bien
-    #   un MKV final AV1 10-bit + E-AC3 5.1 quand lancé en bash direct.
-    # Suspecté : interaction `run` bats + pipe ffmpeg|SvtAv1EncApp dans
-    # un sous-shell avec stdin contrôlé. À investiguer.
-    # Le pipe encode IVF seul (test précédent) est verrouillé, lui.
-    skip "E2E avec audio hang en bats — smoke test manuel validé (cf. docs/AV1_OPTIMIZATION_PLAN.md §B)"
+    # Skip permanent : hang reproductible dans `run` bats malgré plusieurs
+    # tentatives de fix (stderr→log file, mktemp paths, etc.). Smoke test
+    # manuel valide le code en bash direct (~10s).
+    # Hypothèse non confirmée : interaction `run` + ffmpeg|SvtAv1EncApp + mux
+    # ffmpeg séparé dans un sous-shell capture stderr/stdout d'une façon qui
+    # déadlock. Le test "_essential_pipe_encode: encode pipe yuv4mpegpipe →
+    # IVF" ci-dessus verrouille la partie pipe encode. Le mux audio est
+    # exerce par les tests Phase C `_execute_auto_boost_conversion` qui
+    # utilisent un pattern similaire (et passe).
+    skip "E2E hang dans run bats — smoke test manuel valide le code"
 }
