@@ -125,7 +125,15 @@ main() {
     
     # Parser les arguments de la ligne de commande
     parse_arguments "$@"
-    
+
+    # Détection runtime du binaire SVT-AV1-Essential (Phase B, opt-in).
+    # Si --essential / --no-essential n'a pas été passé en CLI, on auto-active
+    # selon que le binaire est dispo dans le PATH (ou SVTAV1_ESSENTIAL_BIN).
+    # Best-effort, silencieux si pas de binaire.
+    if declare -f detect_svtav1_essential >/dev/null; then
+        detect_svtav1_essential >/dev/null 2>&1 || true
+    fi
+
     # Configurer les paramètres selon le mode de conversion
     set_conversion_mode_parameters
 

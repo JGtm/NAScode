@@ -36,3 +36,6 @@ Capture*.PNG
 x265_2pass.log.cutree
 x265_2pass.log
 .vscode/settings.json
+
+# Binaires externes (Phase B SVT-AV1-Essential)
+tools/bin/

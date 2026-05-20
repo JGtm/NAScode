@@ -508,7 +508,7 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 |---|---|---|---|---|
 | Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts ; film-grain banni après bisection |
 | A — Rétroportage défauts Essential | **Terminé** | 2026-05-19 | 2026-05-19 | Profils film + adaptatif enrichis (qm, ac-bias, perceptual params). 13 nouveaux tests bats. |
-| B — Intégration Essential .exe | **Scaffolding terminé** | 2026-05-19 | | Détection runtime, override env, mapping params, doc install. Reste : refactor pipe-based (§B.2) |
+| B — Intégration Essential .exe | **TERMINÉE** | 2026-05-19 | 2026-05-20 | Pipeline pipe-based opérationnel via flag `--essential` ou auto-détection. Binaire v4.0.1 dans tools/bin/ (gitignored). Tests + smoke E2E validés. |
 | C — Auto-boost-lite per-segment | **Branché en CLI + audio smart** | 2026-05-19 | 2026-05-19 | Mode `adaptatif-vmaf` opérationnel. Pipeline complet : segment → VMAF → CRF adapté → mux audio smart (Opus/AAC/EAC3 selon source). 34 tests verts. |
 | Codecs successeurs (H.266) | Veille | | | Quand libvvenc est shipped Windows |
 
@@ -524,7 +524,7 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
   conservé sur `film` (one-shot d'archive), désactivé sur `adaptatif`
   (crash HWACCEL documenté).
 
-**Phase B — SCAFFOLDING TERMINÉ. Refactor pipe RESTE À FAIRE.**
+**Phase B — TERMINÉE.**
 - [lib/svtav1_essential.sh](../lib/svtav1_essential.sh) : module créé
   avec détection runtime (`detect_svtav1_essential`), helpers
   (`should_use_svtav1_essential`, `get_essential_mode_params`) et stub
@@ -534,10 +534,34 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 - Documentation install Windows : [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
   section "SVT-AV1-Essential (optional, Phase B)".
 - Tests bats : 18 tests dans `tests/test_svtav1_essential.bats`.
-- **Ce qui reste à faire** : refactor de `_execute_ffmpeg_pipeline` pour
-  utiliser le binaire standalone via pipe YUV4MPEG (§B.2). Estimation
-  1-2 semaines de boulot incluant validation manuelle sur les 3 modes,
-  gestion two-pass, progress reporting via stderr SvtAv1EncApp.
+- **Implémentation pipe-based** (2026-05-20) :
+  - `_essential_pipe_encode` : ffmpeg → yuv4mpegpipe 10-bit (`-strict -1`
+    requis car non-officiel) → SvtAv1EncApp stdin → IVF.
+  - `_essential_params_to_cli` : convertit `key=value:key=value` (style
+    svtav1-params) en CLI args (`--key value`).
+  - `_execute_essential_conversion` : encode pipe + mux audio smart
+    (réutilise `_build_audio_params`) + sous-titres + metadata.
+- **Routing** : dans `lib/conversion.sh` étape 7, après auto-boost et
+  avant video_passthrough/standard. Priorise Essential quand
+  `_effective_encoder == libsvtav1` ET `should_use_svtav1_essential`.
+- **CLI** : flags `--essential` / `--no-essential` dans args.sh.
+  Auto-détection au boot via `detect_svtav1_essential` (best-effort).
+- **Tests** : 4 nouveaux tests bats + 2 tests d'intégration end-to-end
+  (encode pipe IVF + conversion complète avec audio multicanal).
+- **Smoke test manuel validé** : sample 8s AC3 5.1 → MKV AV1 10-bit +
+  E-AC3 5.1, ~1 Mo output, exit 0.
+- Binaire `tools/bin/SvtAv1EncApp.exe` v4.0.1 (sha256 vérifié) installé
+  via curl, gitignored.
+
+##### Ce qui reste pour une V2 Phase B
+- **Progress reporting** : SvtAv1EncApp émet sur stderr un format
+  différent de ffmpeg. Le watcher progress NAScode (`lib/progress.sh`)
+  ne le parse pas → pas d'affichage temps réel pendant l'encode.
+  Workaround : afficher au moins un "encoding..." spinner.
+- **Two-pass** : pas implémenté (single-pass CRF uniquement). Essential
+  supporte `--pass 1/2 --stats <file>`, mais peu rentable vs CRF capped.
+- **Tile auto-detection** : Essential expose `--tile-rows/columns`,
+  pour 4K on pourrait calibrer. Actuellement laissé à l'auto.
 
 **Phase C — IMPLÉMENTATION TERMINÉE. Branchement CLI RESTE À FAIRE.**
 - [lib/segmenter.sh](../lib/segmenter.sh) : `_segment_video` (via

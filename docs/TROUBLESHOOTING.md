@@ -151,11 +151,14 @@ nekotrix) qui apporte des paramètres perceptuels supplémentaires
 
 ### État actuel (mai 2026)
 
-**Scaffolding uniquement.** La détection est implémentée et NAScode log
-l'info, mais le pipeline d'encodage continue d'utiliser `-c:v libsvtav1`
-(mainline). Le refactor pour utiliser le binaire standalone via pipe
-est documenté §B.2 de [AV1_OPTIMIZATION_PLAN.md](AV1_OPTIMIZATION_PLAN.md)
-et reste à faire.
+**Opérationnel.** Quand le binaire est détecté (PATH ou `SVTAV1_ESSENTIAL_BIN`)
+et que l'encodeur cible est libsvtav1, NAScode bascule automatiquement vers
+le binaire Essential standalone via un pipeline pipe-based
+`ffmpeg → yuv4mpegpipe → SvtAv1EncApp → IVF → mux ffmpeg final`.
+
+Flags CLI :
+- `--essential`     : force l'usage Essential (override auto-détection).
+- `--no-essential`  : force le fallback libsvtav1 mainline.
 
 ### Installation Windows
 

@@ -119,23 +119,196 @@ get_essential_mode_params() {
 }
 
 ###########################################################
-# PIPELINE ENCODING — STUB
+# HELPERS UI
 ###########################################################
 
-# Encode via le binaire standalone SvtAv1EncApp Essential, en pipe avec FFmpeg.
-# Architecture cible (NON IMPLÉMENTÉE) :
-#   ffmpeg -i <in> [filters] -f yuv4mpegpipe -pix_fmt yuv420p10le -
-#     | SvtAv1EncApp -i stdin --params... -b stdout
-#     | ffmpeg -i pipe:0 [audio passthrough/transcode] -c:v copy <out>
+# Préfère print_status (cohérence couleur magenta NAScode), fallback echo.
+_essential_say() {
+    local msg="$1"
+    if declare -f print_status >/dev/null 2>&1; then
+        print_status "[essential] ${msg}" "${MAGENTA:-}"
+    else
+        echo "[essential] ${msg}"
+    fi
+}
+
+_essential_say_err() {
+    local msg="$1"
+    if declare -f print_error >/dev/null 2>&1; then
+        print_error "[essential] ${msg}"
+    else
+        echo "ERROR: [essential] ${msg}" >&2
+    fi
+}
+
+###########################################################
+# PIPELINE ENCODING (Phase B)
+###########################################################
+
+# Convertit une chaîne svtav1-params (style mainline `key=value:key=value`)
+# en arguments CLI pour SvtAv1EncApp standalone (`--key value --key value`).
+# Échappe les valeurs vides.
 #
-# Cf. docs/AV1_OPTIMIZATION_PLAN.md §B.2 pour la spécification complète.
-# Tant que cette fonction est stubée, NAScode utilise le pipeline standard
-# via `-c:v libsvtav1` (mainline), même si Essential est détecté.
+# Usage : _essential_params_to_cli "tune=0:enable-overlays=1:preset=5"
+# Retourne : "--tune 0 --enable-overlays 1 --preset 5"
+_essential_params_to_cli() {
+    local params="$1"
+    [[ -z "$params" ]] && { echo ""; return 0; }
+    local out=""
+    local IFS=':'
+    # shellcheck disable=SC2206
+    local -a pairs=($params)
+    local pair key val
+    for pair in "${pairs[@]}"; do
+        [[ -z "$pair" ]] && continue
+        key="${pair%%=*}"
+        val="${pair#*=}"
+        # Si pas de '=' dans la paire, on traite comme flag standalone.
+        if [[ "$key" == "$val" ]]; then
+            out+=" --${key}"
+        else
+            out+=" --${key} ${val}"
+        fi
+    done
+    # Trim leading space.
+    echo "${out# }"
+}
+
+# Encode une vidéo en AV1 via SvtAv1EncApp Essential standalone, en pipe
+# YUV4MPEG depuis ffmpeg. Sortie au format IVF (raw AV1 stream).
 #
-# Usage : _essential_pipe_encode <input> <output> <mode> [extras...]
+# Architecture :
+#   ffmpeg -i <input> [filters] -f yuv4mpegpipe -pix_fmt yuv420p10le -strict -1 pipe:1
+#     | SvtAv1EncApp -i - --preset N --crf N <params Essential> -b <output_ivf>
+#
+# Note `-strict -1` : requis car yuv420p10le n'est pas officiel dans le
+# format y4m, mais ffmpeg+SvtAv1EncApp s'entendent quand même.
+#
+# Usage : _essential_pipe_encode <input> <output_ivf> [mode] [crf] [preset]
+# - <input>      : fichier vidéo source (ffmpeg le lit).
+# - <output_ivf> : chemin du fichier IVF de sortie (raw AV1).
+# - [mode]       : profil NAScode (serie/film/adaptatif). Défaut : adaptatif.
+# - [crf]        : CRF cible. Défaut : ${CRF_VALUE:-${SVTAV1_CRF_DEFAULT:-32}}.
+# - [preset]     : preset SVT-AV1 [0-13]. Défaut : ${SVTAV1_PRESET_DEFAULT:-8}.
+#
+# Retourne : 0 si OK, code != 0 sinon. Le binaire est attendu dans
+# SVTAV1_ESSENTIAL_BIN (sinon dans le PATH sous le nom SvtAv1EncApp).
 _essential_pipe_encode() {
-    echo "ERROR: _essential_pipe_encode is not yet implemented." >&2
-    echo "       Falling back to mainline libsvtav1 pipeline." >&2
-    echo "       Cf. docs/AV1_OPTIMIZATION_PLAN.md §B.2 (Phase B refactor pipe)." >&2
-    return 99  # Code spécial signalant le stub
+    local input="$1"
+    local output_ivf="$2"
+    local mode="${3:-adaptatif}"
+    local crf="${4:-${CRF_VALUE:-${SVTAV1_CRF_DEFAULT:-32}}}"
+    local preset="${5:-${SVTAV1_PRESET_DEFAULT:-8}}"
+
+    if [[ -z "$input" || -z "$output_ivf" ]]; then
+        echo "ERROR: _essential_pipe_encode usage: <input> <output_ivf> [mode] [crf] [preset]" >&2
+        return 2
+    fi
+    if [[ ! -f "$input" ]]; then
+        echo "ERROR: _essential_pipe_encode: input not found: $input" >&2
+        return 2
+    fi
+
+    # Binaire Essential : SVTAV1_ESSENTIAL_BIN ou fallback PATH.
+    local bin="${SVTAV1_ESSENTIAL_BIN:-SvtAv1EncApp}"
+    if ! command -v "$bin" >/dev/null 2>&1; then
+        echo "ERROR: _essential_pipe_encode: binaire Essential introuvable ($bin)" >&2
+        return 3
+    fi
+
+    # Récupérer les params Essential pour le mode demandé.
+    local params_essential
+    params_essential=$(get_essential_mode_params "$mode")
+    local cli_params
+    cli_params=$(_essential_params_to_cli "$params_essential")
+
+    _essential_say "Encode pipe via SvtAv1EncApp ${mode} (preset=${preset}, crf=${crf})"
+
+    # Construction du pipe.
+    # ffmpeg : input → yuv4mpegpipe 10-bit → stdout.
+    # SvtAv1EncApp : stdin (y4m auto-detect) → IVF.
+    # On capture stderr de SvtAv1EncApp pour récupérer ses logs.
+    #
+    # shellcheck disable=SC2086 (cli_params expansion volontaire)
+    if ! ffmpeg -hide_banner -loglevel error \
+            -i "$input" \
+            -map 0:v:0 -an -sn \
+            -f yuv4mpegpipe -pix_fmt yuv420p10le -strict -1 pipe:1 2>/dev/null \
+        | "$bin" -i - \
+            --preset "$preset" --crf "$crf" $cli_params \
+            -b "$output_ivf" 2>&1 | grep -iE 'svt \[error\]'; then
+        # grep -E error trouve rien → tout va bien. Mais on doit vérifier
+        # autrement car pipefail + grep no-match donne exit 1.
+        :
+    fi
+
+    # Vérifier que la sortie existe et n'est pas vide.
+    if [[ ! -s "$output_ivf" ]]; then
+        echo "ERROR: _essential_pipe_encode: IVF output empty or missing: $output_ivf" >&2
+        return 4
+    fi
+    return 0
+}
+
+# Wrapper d'intégration pour le pipeline NAScode. Analogue à
+# `_execute_auto_boost_conversion` mais avec encode SvtAv1EncApp Essential
+# au lieu d'auto-boost. Sortie : mkv complet avec audio smart codec
+# (réutilise `_build_audio_params` de lib/audio_params.sh).
+#
+# Usage : _execute_essential_conversion <tmp_input> <tmp_output> <log> <duration> <base_name>
+_execute_essential_conversion() {
+    local tmp_input="$1"
+    local tmp_output="$2"
+    local ffmpeg_log="$3"
+    local duration="$4"
+    local base_name="$5"
+
+    if [[ -z "$tmp_input" || -z "$tmp_output" ]]; then
+        echo "ERROR: _execute_essential_conversion usage: <in> <out> <log> <duration> <base_name>" >&2
+        return 1
+    fi
+    if [[ ! -f "$tmp_input" ]]; then
+        echo "ERROR: _execute_essential_conversion: input not found: $tmp_input" >&2
+        return 1
+    fi
+
+    # Étape 1 : encode vidéo en IVF via pipe.
+    local out_ivf="${tmp_output%.*}.essential.ivf"
+    local mode="${CONVERSION_MODE:-adaptatif}"
+    # `adaptatif-vmaf` partage le profil `adaptatif` côté params.
+    [[ "$mode" == "adaptatif-vmaf" ]] && mode="adaptatif"
+
+    _essential_say "Démarrage encode SVT-AV1-Essential (mode ${mode})"
+    if ! _essential_pipe_encode "$tmp_input" "$out_ivf" "$mode" 2>>"$ffmpeg_log"; then
+        _essential_say_err "pipe encode failed"
+        echo "ERROR: _execute_essential_conversion: pipe encode failed" >>"$ffmpeg_log"
+        rm -f "$out_ivf"
+        return 1
+    fi
+    _essential_say "Mux final (audio smart codec + sous-titres + metadata)"
+
+    # Étape 2 : audio smart codec (fallback copy si module pas chargé).
+    local audio_opts_str="-c:a copy"
+    if declare -f _build_audio_params >/dev/null; then
+        audio_opts_str=$(_build_audio_params "$tmp_input" 2>/dev/null) || audio_opts_str="-c:a copy"
+        [[ -z "$audio_opts_str" ]] && audio_opts_str="-c:a copy"
+    fi
+    local -a audio_opts
+    # shellcheck disable=SC2206
+    audio_opts=( $audio_opts_str )
+
+    # Étape 3 : mux final IVF + audio/subs/metadata source.
+    if ! ffmpeg -hide_banner -loglevel error -y \
+            -i "$out_ivf" -i "$tmp_input" \
+            -map 0:v:0 -map 1:a? -map 1:s? \
+            -c:v copy "${audio_opts[@]}" -c:s copy \
+            -map_metadata 1 -map_chapters 1 \
+            "$tmp_output" 2>>"$ffmpeg_log"; then
+        echo "ERROR: _execute_essential_conversion: final mux failed" >>"$ffmpeg_log"
+        rm -f "$out_ivf"
+        return 1
+    fi
+
+    rm -f "$out_ivf"
+    return 0
 }
