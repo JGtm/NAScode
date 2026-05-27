@@ -303,6 +303,60 @@ set_conversion_mode_parameters() {
             # Adaptatif : pas de limitation FPS (bitrate ajusté automatiquement)
             [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=false
             ;;
+        gaming)
+            # Variante de `adaptatif` calibrée pour du contenu high-motion :
+            # replays OBS Studio, captures de jeux vidéo, screencasts.
+            #
+            # ===== Stratégie : cap 29.97 fps + BPP_BASE haut =====
+            # Par défaut on cap le FPS de sortie à 29.97 (comme `serie`). Pour
+            # des replays gaming, le 60fps natif est rarement essentiel à la
+            # lecture (vs au gameplay), et passer à 30fps libère la moitié des
+            # bits qui peuvent être réalloués à la qualité par frame.
+            #
+            # On combine cap 30fps + BPP_BASE=0.20 (vs 0.032 cinéma) pour donner
+            # à AV1 suffisamment de bits par frame sur du contenu high-motion :
+            #
+            # Formule : R = W × H × FPS_OUT × BPP × C
+            #   - 1080p30  → ~12 Mbit/s,  ~47 Mo / 30s
+            #   - 1440p30  → ~22 Mbit/s,  ~83 Mo / 30s
+            #   - 4K30     → ~50 Mbit/s,  ~187 Mo / 30s
+            #   - 1080p60  → ~25 Mbit/s (si LIMIT_FPS désactivé)
+            #
+            # Qualité par frame ~414 kbit (vs 166 en mode adaptatif standard
+            # 60fps + BPP 0.080) → ~2.5× plus de bits par frame.
+            #
+            # Override via env :
+            #   `export ADAPTIVE_BPP_BASE_GAMING=0.25` plus de qualité (~58 Mo)
+            #   `export ADAPTIVE_BPP_BASE_GAMING=0.16` plus de compression (~37 Mo)
+            #   `export LIMIT_FPS=false` préserver le FPS natif (60+)
+            #
+            # Le garde-fou "max 75% du source" plafonne en bout de chaîne.
+            base_target_kbps=12500  # Estimation 1080p30 high-motion qualité
+            base_maxrate_kbps=17500
+            base_bufsize_kbps=31250
+            ENCODER_PRESET="medium"
+            X265_EXTRA_PARAMS=""
+            X265_PASS1_FAST=false
+            SINGLE_PASS_MODE=true
+            CRF_VALUE=21
+            FILM_KEYINT=240
+            FILM_TUNE_FASTDECODE=false
+            # Active l'analyse complexity adaptative.
+            ADAPTIVE_COMPLEXITY_MODE=true
+            # Override clé pour ce mode : BPP haut pour offrir ~2.5× plus de
+            # bits par frame qu'un encode adaptatif standard 60fps + BPP 0.080.
+            # Combiné au cap 30fps, donne ~12 Mbit/s en 1080p30 (qualité gaming).
+            export ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE_GAMING:-0.20}"
+            # Hérite du profil SVT-AV1 `adaptatif` (params perceptuels sans
+            # film-grain car crash HWACCEL, variance-boost+luma-bias compensent).
+            ENCODER_MODE_PROFILE="adaptatif"
+            AUDIO_FORCE_STEREO=false
+            AUDIO_TRANSLATE_EQUIV_QUALITY=true
+            VIDEO_EQUIV_QUALITY_CAP=true
+            # Cap FPS de sortie à 29.97 (comme `serie`). Le user peut désactiver
+            # via `export LIMIT_FPS=false` s'il veut préserver le 60fps natif.
+            [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=true
+            ;;
         adaptatif-vmaf)
             # Phase C de la roadmap AV1 (docs/AV1_OPTIMIZATION_PLAN.md §C) :
             # mode dérivé de `adaptatif` qui active le pipeline auto-boost-lite
@@ -373,7 +427,7 @@ set_conversion_mode_parameters() {
             ;;
         *)
             print_error "$(msg MSG_CFG_UNKNOWN_MODE "$CONVERSION_MODE")"
-            echo "  Modes disponibles : film, adaptatif, adaptatif-vmaf, serie"
+            echo "  Modes disponibles : film, adaptatif, adaptatif-vmaf, gaming, serie"
             exit 1
             ;;
     esac

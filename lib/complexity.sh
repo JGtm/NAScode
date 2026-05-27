@@ -26,6 +26,12 @@
 : "${ADAPTIVE_MIN_BITRATE_KBPS:=800}"
 : "${ADAPTIVE_MAXRATE_FACTOR:=1.4}"
 : "${ADAPTIVE_BUFSIZE_FACTOR:=2.5}"
+# Plafond bitrate adaptatif : max % du bitrate source (évite d'over-allouer
+# si la source est elle-même bas bitrate). 75 = jamais plus de 75% du source.
+# Fallback inline aligné sur constants.sh pour quand ce dernier n'est pas sourcé
+# (tests isolés). Sinon le calcul `target * "" / 100 = 0` écrase tout à 0 et le
+# plancher ADAPTIVE_MIN_BITRATE_KBPS s'applique.
+: "${ADAPTIVE_MAX_ORIGINAL_PCT:=75}"
 
 # Constantes SI/TI (Spatial/Temporal Information)
 : "${ADAPTIVE_WEIGHT_STDDEV:=0.40}"

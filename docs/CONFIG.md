@@ -12,7 +12,7 @@ This project is designed to work "out of the box" via CLI, but the base configur
 ## Conversion Modes
 
 Modes are defined in [lib/config.sh](../lib/config.sh) via `set_conversion_mode_parameters()`.
-NAScode supports **four modes** with distinct philosophies, summarized below.
+NAScode supports **five modes** with distinct philosophies, summarized below.
 
 ### Philosophies en bref
 
@@ -22,26 +22,64 @@ NAScode supports **four modes** with distinct philosophies, summarized below.
   Idéal pour l'archivage de films (one-shot, on accepte le surcoût temps).
 - **`adaptatif`** — Variable, adapte les paramètres **par fichier** selon
   l'analyse de complexité (stddev / SI / TI). Bon compromis pour catalogues
-  hétérogènes où la complexité varie d'un film à l'autre.
+  hétérogènes où la complexité varie d'un film à l'autre. Calibré pour
+  contenu **cinéma 24fps** (BPP_BASE=0.032 ≈ 2-3 Mbit/s pour 1080p24).
+- **`gaming`** — Variante de `adaptatif` calibrée pour le **high-motion**
+  (replays OBS, captures jeux, screencasts). **Cap FPS de sortie à 29.97
+  par défaut** (comme `serie`) — pour des replays, la fluidité 60fps natif
+  est moins critique que la qualité visuelle par frame. Compensation :
+  `ADAPTIVE_BPP_BASE=0.16` (doublé vs 60fps + 0.080), ce qui donne le
+  **même bitrate target** mais **2× plus de bits par frame**. Override
+  via `LIMIT_FPS=false` pour préserver le 60+fps natif. Le profil SVT-AV1
+  reste celui d'adaptatif.
 - **`adaptatif-vmaf`** — Variable, adapte le CRF **par scène** (segment) via
   VMAF prédictif. Le plus lent mais qualité ciblée sur les scènes difficiles
   (Phase C de [AV1_OPTIMIZATION_PLAN.md](AV1_OPTIMIZATION_PLAN.md)).
 
 ### Comparaison détaillée
 
-| Aspect | `serie` | `film` | `adaptatif` | `adaptatif-vmaf` |
-|---|---|---|---|---|
-| **Vitesse relative** | Rapide | Lente | Modérée | Très lente |
-| **Pass** | single CRF | **two-pass ABR** | single CRF capped | single CRF par segment |
-| **Pass1 fast** | ✓ (+15% vitesse) | ✗ (analyse complète) | n/a | n/a |
-| **Bitrate strategy** | fixe CRF 21 | budget two-pass | calculé par fichier | calculé par scène (VMAF) |
-| **Target bitrate (HEVC ref)** | 2070 kbps | 2035 kbps | 2500 kbps (estim) | 2500 kbps (estim) |
-| **Maxrate (HEVC ref)** | 2520 kbps | 3200 kbps | 3500 kbps | 3500 kbps |
-| **GOP (keyint)** | **360** (~15s @ 24fps) | 240 (~10s @ 24fps) | 240 | 240 |
-| **`LIMIT_FPS`** | **true** (cap 29.97) | false | false | false |
-| **Audio (target layout)** | **stéréo forcé** | multichannel préservé | multichannel + equiv-qual | multichannel + smart codec |
-| **`ADAPTIVE_COMPLEXITY_MODE`** | ✗ | ✗ | ✓ (par fichier) | ✗ (auto-boost à la place) |
-| **`AUTO_BOOST_ENABLED`** | ✗ | ✗ | ✗ | ✓ (Phase C, par scène) |
+| Aspect | `serie` | `film` | `adaptatif` | `gaming` | `adaptatif-vmaf` |
+|---|---|---|---|---|---|
+| **Vitesse relative** | Rapide | Lente | Modérée | Modérée | Très lente |
+| **Pass** | single CRF | **two-pass ABR** | single CRF capped | single CRF capped | single CRF par segment |
+| **Pass1 fast** | ✓ (+15% vitesse) | ✗ (analyse complète) | n/a | n/a | n/a |
+| **Bitrate strategy** | fixe CRF 21 | budget two-pass | calculé par fichier | calculé par fichier (BPP×2.5) | calculé par scène (VMAF) |
+| **Target bitrate (HEVC ref)** | 2070 kbps | 2035 kbps | 2500 kbps | **5000 kbps** | 2500 kbps |
+| **Maxrate (HEVC ref)** | 2520 kbps | 3200 kbps | 3500 kbps | **7000 kbps** | 3500 kbps |
+| **`ADAPTIVE_BPP_BASE`** | n/a | n/a | 0.032 (cinéma) | **0.20** (high-motion + cap 30) | 0.032 |
+| **GOP (keyint)** | **360** (~15s @ 24fps) | 240 (~10s @ 24fps) | 240 | 240 | 240 |
+| **`LIMIT_FPS`** | **true** (cap 29.97) | false | false | **true** (cap 29.97, override possible) | false |
+| **Audio (target layout)** | **stéréo forcé** | multichannel préservé | multichannel + equiv-qual | multichannel + equiv-qual | multichannel + smart codec |
+| **`ADAPTIVE_COMPLEXITY_MODE`** | ✗ | ✗ | ✓ (par fichier) | ✓ (par fichier) | ✗ (auto-boost à la place) |
+| **`AUTO_BOOST_ENABLED`** | ✗ | ✗ | ✗ | ✗ | ✓ (Phase C, par scène) |
+
+### Mode `gaming` : exemples de bitrate target
+
+Formule : `R_target = W × H × FPS_OUT × ADAPTIVE_BPP_BASE × complexity_C`.
+Avec `ADAPTIVE_BPP_BASE=0.20` (défaut gaming) et `C=1.0`, FPS de sortie cap
+à 29.97 par défaut :
+
+| Résolution × FPS sortie | Bitrate target | Output 30s |
+|---|---|---|
+| **1080p30** (défaut, source 60fps→30) | **~12.4 Mbit/s** | **~47 Mo** |
+| 1080p30 (source 30fps native) | ~12.4 Mbit/s | ~47 Mo |
+| 1440p30 | ~22 Mbit/s | ~83 Mo |
+| 4K30 | ~50 Mbit/s | ~187 Mo |
+| **Override LIMIT_FPS=false** : 1080p60 | ~25 Mbit/s | ~93 Mo |
+
+**Qualité par frame** : ~414 kbit (vs 166 en mode `adaptatif` standard
+60fps + BPP 0.080) → environ **2.5× plus de bits par frame**. Cap 30fps
++ BPP 0.20 donne ainsi un compromis taille/qualité adapté au visionnage
+de replays (vs au gameplay où le 60fps natif est essentiel).
+
+Le garde-fou **`ADAPTIVE_MAX_ORIGINAL_PCT=75`** plafonne en bout de chaîne :
+le target ne dépasse jamais 75% du bitrate source.
+
+Override possible via env :
+- `export ADAPTIVE_BPP_BASE_GAMING=0.25` → +25% qualité (~58 Mo)
+- `export ADAPTIVE_BPP_BASE_GAMING=0.16` → -20% taille (~37 Mo)
+- `export ADAPTIVE_BPP_BASE_GAMING=0.32` → quasi-source (~75 Mo, qualité ~HEVC source)
+- `export LIMIT_FPS=false` → préserver 60fps natif (file size ×2)
 
 ### SVT-AV1 — paramètres perceptuels par mode
 

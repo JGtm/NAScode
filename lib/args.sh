@@ -401,6 +401,7 @@ ${CYAN}$(msg MSG_HELP_MODES_TITLE)${NOCOLOR}
   ${YELLOW}film${NOCOLOR}             : $(msg MSG_HELP_MODE_FILM)
   ${YELLOW}adaptatif${NOCOLOR}        : $(msg MSG_HELP_MODE_ADAPTATIF)
   ${YELLOW}adaptatif-vmaf${NOCOLOR}   : auto-boost-lite par segment via VMAF prédictif (AV1, audio passthrough)
+  ${YELLOW}gaming${NOCOLOR}           : variante adaptatif calibrée high-motion (replays, captures jeux ; FPS quelconque)
   ${YELLOW}serie${NOCOLOR}            : $(msg MSG_HELP_MODE_SERIE)
 
 ${CYAN}$(msg MSG_HELP_OFF_PEAK_TITLE)${NOCOLOR}
