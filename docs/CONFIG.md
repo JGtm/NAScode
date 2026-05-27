@@ -12,20 +12,83 @@ This project is designed to work "out of the box" via CLI, but the base configur
 ## Conversion Modes
 
 Modes are defined in [lib/config.sh](../lib/config.sh) via `set_conversion_mode_parameters()`.
+NAScode supports **four modes** with distinct philosophies, summarized below.
 
-| Parameter | `serie` Mode | `film` Mode |
-|-----------|--------------|-------------|
-| Encoding | **CRF 21** (single-pass, default) or two-pass | Two-pass **forced** |
-| Target bitrate (HEVC ref) | 2070 kbps (if two-pass) | 2035 kbps |
-| Maxrate (HEVC ref) | 2520 kbps | 3200 kbps |
-| GOP (keyint) | 600 (~25s @ ~24fps) | 240 (~10s @ ~24fps) |
-| Tune fastdecode | Yes | No |
-| x265 extra params | Yes (series optimizations) | No (max quality) |
-| Audio (target layout) | **Forced stereo** (downmix if multichannel) | Stereo/5.1 depending on source |
+### Philosophies en bref
 
-Notes:
-- The project aims for **10-bit** (`yuv420p10le`) on the video side.
-- The "reference" bitrates above are **HEVC** and are then adjusted according to target codec efficiency (see below).
+- **`serie`** — Efficace, compromis qualité/stockage. Idéal pour les séries TV
+  où on accepte une qualité "très bonne" pour gagner en vitesse et limiter la taille.
+- **`film`** — Qualité maximale, taille optimisée. Le mode le plus exigeant.
+  Idéal pour l'archivage de films (one-shot, on accepte le surcoût temps).
+- **`adaptatif`** — Variable, adapte les paramètres **par fichier** selon
+  l'analyse de complexité (stddev / SI / TI). Bon compromis pour catalogues
+  hétérogènes où la complexité varie d'un film à l'autre.
+- **`adaptatif-vmaf`** — Variable, adapte le CRF **par scène** (segment) via
+  VMAF prédictif. Le plus lent mais qualité ciblée sur les scènes difficiles
+  (Phase C de [AV1_OPTIMIZATION_PLAN.md](AV1_OPTIMIZATION_PLAN.md)).
+
+### Comparaison détaillée
+
+| Aspect | `serie` | `film` | `adaptatif` | `adaptatif-vmaf` |
+|---|---|---|---|---|
+| **Vitesse relative** | Rapide | Lente | Modérée | Très lente |
+| **Pass** | single CRF | **two-pass ABR** | single CRF capped | single CRF par segment |
+| **Pass1 fast** | ✓ (+15% vitesse) | ✗ (analyse complète) | n/a | n/a |
+| **Bitrate strategy** | fixe CRF 21 | budget two-pass | calculé par fichier | calculé par scène (VMAF) |
+| **Target bitrate (HEVC ref)** | 2070 kbps | 2035 kbps | 2500 kbps (estim) | 2500 kbps (estim) |
+| **Maxrate (HEVC ref)** | 2520 kbps | 3200 kbps | 3500 kbps | 3500 kbps |
+| **GOP (keyint)** | **360** (~15s @ 24fps) | 240 (~10s @ 24fps) | 240 | 240 |
+| **`LIMIT_FPS`** | **true** (cap 29.97) | false | false | false |
+| **Audio (target layout)** | **stéréo forcé** | multichannel préservé | multichannel + equiv-qual | multichannel + smart codec |
+| **`ADAPTIVE_COMPLEXITY_MODE`** | ✗ | ✗ | ✓ (par fichier) | ✗ (auto-boost à la place) |
+| **`AUTO_BOOST_ENABLED`** | ✗ | ✗ | ✗ | ✓ (Phase C, par scène) |
+
+### SVT-AV1 — paramètres perceptuels par mode
+
+Tous les modes utilisent le **10-bit forcé** en sortie (`yuv420p10le`) et le
+**preset SVT-AV1 5** (médium, dérivé de `medium` x265). Les params suivants
+diffèrent par mode pour adapter le trade-off qualité/vitesse :
+
+| Param SVT-AV1 | `serie` | `film` | `adaptatif` / `adaptatif-vmaf` | Effet |
+|---|---|---|---|---|
+| `film-grain` | **absent** | **8** | 0 (interdit HWACCEL) | Synthèse de grain ; coûte ~10× en temps. Banni de serie après bisection (2026-05-19). |
+| `variance-boost-strength` | **3** (max pratique) | 2 (défaut) | 3 (compense no-grain) | Boost qualité sur zones plates (low-variance). |
+| `luminance-qp-bias` | **20** (agressif) | 15 (modéré) | 15 | Alloue plus de bits aux blocs sombres (loi de Weber). |
+| `sharpness` | 1 | 1 | 1 | Préserve un peu plus de détail fin. |
+| `enable-qm` + `qm-min` | 1 / 0 | 1 / 0 | 1 / 0 | Quantization matrices activées. Coût taille négligeable. |
+| `ac-bias` | 0.25 | 0.25 | 0.25 | Biais AC (défaut Essential v4). |
+| `tune` | 0 (Visual) | 0 | 0 | Optimisation perceptuelle (vs PSNR=1). |
+| `enable-overlays` | 1 | 1 | **0** (interdit HWACCEL) | Alt-ref overlay frames pour qualité. |
+| `lp` | 6 (max) | 6 | 6 | Level of Parallelism (range [0-6] — pas un thread count). |
+
+Pourquoi ces différences :
+- **`serie`** : pas de `film-grain` (coût rédhibitoire pour batch série), mais
+  les params perceptuels sont les **plus agressifs** (variance-boost à 3,
+  luma-bias à 20) pour compenser l'absence de grain dans les scènes sombres.
+- **`film`** : `film-grain=8` apporte un grain photographique naturel, ce qui
+  rend l'agressivité des autres params moins nécessaire (variance à 2, luma à 15).
+- **`adaptatif` / `adaptatif-vmaf`** : `film-grain=0` est **forcé** par une
+  contrainte historique (crash RAM/VRAM avec HWACCEL CUDA, cf.
+  [lib/config.sh:298](../lib/config.sh#L298)). On compense par variance à 3
+  et luma à 15. `enable-overlays=0` pour la même raison.
+
+### SVT-AV1-Essential (Phase B, opt-in)
+
+Si le binaire `SvtAv1EncApp.exe` Essential est installé (cf.
+[TROUBLESHOOTING.md](TROUBLESHOOTING.md) section "SVT-AV1-Essential"), NAScode
+peut basculer vers un pipeline pipe-based qui apporte :
+- `photon-noise` (remplace `film-grain`, grain plus naturel)
+- `enable-tf=3` (temporal filter sur toutes frames)
+- `enable-alt-cdef=1`, `enable-alt-dlf=1` (CDEF/deblocking améliorés)
+
+Activation : flag `--essential` (override) ou auto-détection au boot. Le flag
+`--no-essential` force le fallback libsvtav1 mainline.
+
+Notes :
+- The "reference" bitrates above are **HEVC** and are then adjusted according
+  to target codec efficiency (see below).
+- Voir [AV1_OPTIMIZATION_PLAN.md](AV1_OPTIMIZATION_PLAN.md) pour l'historique
+  des décisions perceptuelles (Phase A, B, C de la roadmap).
 
 ## Bitrate Adaptation by Resolution (per file)
 

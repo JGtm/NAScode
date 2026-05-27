@@ -251,8 +251,22 @@ convert_file() {
     print_conversion_info "$v_codec" "$tmp_input" "$v_width" "$v_height" "$v_pix_fmt" "$a_codec" "$a_bitrate"
     
     # 7. Exécution de la conversion (fonctions dans transcode_video.sh / ffmpeg_pipeline.sh)
+    # Ordre de priorité :
+    #   1. auto-boost (mode adaptatif-vmaf, Phase C)
+    #   2. SVT-AV1-Essential pipe (Phase B, opt-in, encoder AV1 uniquement)
+    #   3. video_passthrough
+    #   4. flow standard libsvtav1 / libx265 in-process
     local conversion_success=false
-    if [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
+    local _effective_encoder="${EFFECTIVE_VIDEO_ENCODER:-${VIDEO_ENCODER:-libx265}}"
+    if [[ "${AUTO_BOOST_ENABLED:-false}" == true ]]; then
+        _execute_auto_boost_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true
+    elif [[ "$_effective_encoder" == "libsvtav1" ]] \
+            && declare -f should_use_svtav1_essential >/dev/null \
+            && should_use_svtav1_essential; then
+        # Phase B : encode via le binaire Essential standalone en pipe.
+        # Cf. lib/svtav1_essential.sh::_execute_essential_conversion.
+        _execute_essential_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true
+    elif [[ "${CONVERSION_ACTION:-full}" == "video_passthrough" ]]; then
         _execute_video_passthrough "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true
     else
         _execute_conversion "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" "$duration_secs" "$base_name" && conversion_success=true

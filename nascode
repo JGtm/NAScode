@@ -75,6 +75,8 @@ source "$LIB_DIR/ui_options.sh"   # Formatage options UI (dépend de ui.sh)
 source "$LIB_DIR/detect.sh"       # Détection outils/système (dépend de rien, modifie PATH)
 source "$LIB_DIR/config.sh"       # Configuration (dépend de colors pour erreurs)
 source "$LIB_DIR/codec_profiles.sh" # Profils codecs (dépend de config pour VIDEO_CODEC)
+source "$LIB_DIR/svtav1_essential.sh" # SVT-AV1-Essential détection (Phase B, scaffolding)
+source "$LIB_DIR/segmenter.sh"      # Segmentation/concat propres (Phase C)
 source "$LIB_DIR/utils.sh"        # Utilitaires (dépend de detect pour HAS_*)
 source "$LIB_DIR/logging.sh"      # Logs (dépend de config pour EXECUTION_TIMESTAMP)
 source "$LIB_DIR/notify.sh"       # Notifications externes (Discord, etc.) — best-effort
@@ -87,6 +89,8 @@ source "$LIB_DIR/index.sh"        # Index fichiers (dépend de ui, utils)
 source "$LIB_DIR/counters.sh"     # Compteurs persistants (dépend de config)
 source "$LIB_DIR/queue.sh"        # Queue (dépend de index, counters, ui, config, utils, logging)
 source "$LIB_DIR/vmaf.sh"         # VMAF (dépend de colors, config, utils, logging)
+source "$LIB_DIR/vmaf_predictive.sh" # Phase C : encode rapide + VMAF par segment (dépend de vmaf.sh)
+source "$LIB_DIR/auto_boost.sh"   # Phase C : orchestration auto-boost-lite (dépend de segmenter + vmaf_predictive)
 source "$LIB_DIR/media_probe.sh"  # Propriétés média (dépend de utils)
 source "$LIB_DIR/complexity.sh"   # Analyse complexité pour mode adaptatif (dépend de media_probe)
 source "$LIB_DIR/audio_decision.sh" # Décision audio smart (dépend de config, codec_profiles)
@@ -121,7 +125,15 @@ main() {
     
     # Parser les arguments de la ligne de commande
     parse_arguments "$@"
-    
+
+    # Détection runtime du binaire SVT-AV1-Essential (Phase B, opt-in).
+    # Si --essential / --no-essential n'a pas été passé en CLI, on auto-active
+    # selon que le binaire est dispo dans le PATH (ou SVTAV1_ESSENTIAL_BIN).
+    # Best-effort, silencieux si pas de binaire.
+    if declare -f detect_svtav1_essential >/dev/null; then
+        detect_svtav1_essential >/dev/null 2>&1 || true
+    fi
+
     # Configurer les paramètres selon le mode de conversion
     set_conversion_mode_parameters
 

@@ -494,9 +494,10 @@ print_transfer_start() {
 
 # Affiche la fin de la section transfert
 # Usage: print_transfer_complete
+# Note: l'espacement avant la box est géré par l'appelant (wait_all_transfers)
+# pour éviter un double saut de ligne après print_transfer_start.
 print_transfer_complete() {
     _ui_is_quiet && return 0
-    echo ""
     echo -e "${CYAN}  ┏━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓${NOCOLOR}"
     echo -e "${CYAN}  ┃  ${GREEN}${BOX_CHECK}${NOCOLOR}  ${GREEN}$(msg MSG_UI_TRANSFERS_DONE)${NOCOLOR}${CYAN}        ┃${NOCOLOR}"
     echo -e "${CYAN}  ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛${NOCOLOR}"

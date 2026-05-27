@@ -141,3 +141,48 @@ Reading benchmarks (indicative):
 ## File names
 
 The script handles spaces and special characters, but avoid control characters.
+
+## SVT-AV1-Essential (optional, Phase B)
+
+NAScode peut détecter et utiliser à terme le fork
+[SVT-AV1-Essential](https://github.com/nekotrix/SVT-AV1-Essential) (par
+nekotrix) qui apporte des paramètres perceptuels supplémentaires
+(`photon-noise`, `enable-tf=3`, `enable-alt-cdef/dlf`, quarter-step CRF, etc.).
+
+### État actuel (mai 2026)
+
+**Opérationnel.** Quand le binaire est détecté (PATH ou `SVTAV1_ESSENTIAL_BIN`)
+et que l'encodeur cible est libsvtav1, NAScode bascule automatiquement vers
+le binaire Essential standalone via un pipeline pipe-based
+`ffmpeg → yuv4mpegpipe → SvtAv1EncApp → IVF → mux ffmpeg final`.
+
+Flags CLI :
+- `--essential`     : force l'usage Essential (override auto-détection).
+- `--no-essential`  : force le fallback libsvtav1 mainline.
+
+### Installation Windows
+
+1. Télécharger le binaire optimisé depuis les releases :
+   https://github.com/nekotrix/SVT-AV1-Essential/releases
+   → `SvtAv1EncApp-X.Y.Z-Essential-Windows_Optimized.exe`
+2. Renommer en `SvtAv1EncApp.exe` et placer dans un dossier du PATH
+   (par exemple `C:\bin\` ou `C:\Users\<user>\bin\`).
+3. Vérifier :
+   ```powershell
+   SvtAv1EncApp --version
+   ```
+   La sortie doit contenir le tag `-Essential` (ex. `SVT-AV1-Essential v4.0.1`).
+
+### Forcer / désactiver via env
+
+- `export SVTAV1_USE_ESSENTIAL=true`  → force l'usage Essential
+- `export SVTAV1_USE_ESSENTIAL=false` → force le fallback mainline
+- variable absente → auto-détection (utilise Essential si présent)
+
+### Vérifier la détection NAScode
+
+```bash
+bash -c 'source lib/codec_profiles.sh; source lib/svtav1_essential.sh; \
+  detect_svtav1_essential && echo "Essential détecté: $SVTAV1_ESSENTIAL_BIN" \
+  || echo "Pas d'\''Essential dans le PATH"'
+```

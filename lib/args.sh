@@ -42,9 +42,21 @@ parse_arguments() {
                 CONVERSION_MODE="$2"
                 shift 2 
                 ;;
-            -d|--dry-run|--dryrun) 
+            -d|--dry-run|--dryrun)
                 DRYRUN=true
-                shift 
+                shift
+                ;;
+            --essential)
+                # Phase B : force l'usage du binaire SVT-AV1-Essential.
+                # Si le binaire n'est pas détecté, le routing retombe sur le
+                # flow standard (libsvtav1 mainline).
+                SVTAV1_USE_ESSENTIAL=true
+                shift
+                ;;
+            --no-essential)
+                # Force le fallback mainline même si Essential est détecté.
+                SVTAV1_USE_ESSENTIAL=false
+                shift
                 ;;
             -x|--no-suffix) 
                 SUFFIX_MODE="off"
@@ -343,6 +355,8 @@ ${CYAN}$(msg MSG_HELP_OPTIONS)${NOCOLOR}
     ${GREEN}-m, --mode${NOCOLOR} MODE              $(msg MSG_HELP_MODE)
     ${GREEN}--min-size${NOCOLOR} SIZE              $(msg MSG_HELP_MIN_SIZE)
     ${GREEN}-d, --dry-run${NOCOLOR}                $(msg MSG_HELP_DRYRUN)
+    ${GREEN}--essential${NOCOLOR}                  force le binaire SVT-AV1-Essential (encodage AV1)
+    ${GREEN}--no-essential${NOCOLOR}               force le fallback libsvtav1 mainline
     ${GREEN}-S, --suffix${NOCOLOR} [STRING]        $(msg MSG_HELP_SUFFIX)
     ${GREEN}-x, --no-suffix${NOCOLOR}              $(msg MSG_HELP_NO_SUFFIX)
     ${GREEN}-r, --random${NOCOLOR}                 $(msg MSG_HELP_RANDOM)
@@ -384,9 +398,10 @@ ${CYAN}$(msg MSG_HELP_SMART_CODEC_TITLE)${NOCOLOR}
   ${DIM}$(msg MSG_HELP_SMART_CODEC_DESC)${NOCOLOR}
 
 ${CYAN}$(msg MSG_HELP_MODES_TITLE)${NOCOLOR}
-  ${YELLOW}film${NOCOLOR}          : $(msg MSG_HELP_MODE_FILM)
-  ${YELLOW}adaptatif${NOCOLOR}     : $(msg MSG_HELP_MODE_ADAPTATIF)
-  ${YELLOW}serie${NOCOLOR}         : $(msg MSG_HELP_MODE_SERIE)
+  ${YELLOW}film${NOCOLOR}             : $(msg MSG_HELP_MODE_FILM)
+  ${YELLOW}adaptatif${NOCOLOR}        : $(msg MSG_HELP_MODE_ADAPTATIF)
+  ${YELLOW}adaptatif-vmaf${NOCOLOR}   : auto-boost-lite par segment via VMAF prédictif (AV1, audio passthrough)
+  ${YELLOW}serie${NOCOLOR}            : $(msg MSG_HELP_MODE_SERIE)
 
 ${CYAN}$(msg MSG_HELP_OFF_PEAK_TITLE)${NOCOLOR}
   ${DIM}$(msg MSG_HELP_OFF_PEAK_DESC)${NOCOLOR}

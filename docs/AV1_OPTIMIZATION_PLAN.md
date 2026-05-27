@@ -506,11 +506,157 @@ sont assez universels pour survivre. Le mapping sera probablement direct.
 
 | Phase | État | Date début | Date fin | Notes |
 |---|---|---|---|---|
-| Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts |
-| A — Rétroportage défauts Essential | À démarrer | | | |
-| B — Intégration Essential .exe | Planifié | | | Pré-requis : valider que le .exe tourne |
-| C — Auto-boost-lite per-segment | Planifié | | | Pré-requis : aucun, indépendant de B |
+| Pré-phase (5 patches scène sombres série) | Terminé | 2026-05-19 | 2026-05-19 | 906/906 tests verts ; film-grain banni après bisection |
+| A — Rétroportage défauts Essential | **Terminé** | 2026-05-19 | 2026-05-19 | Profils film + adaptatif enrichis (qm, ac-bias, perceptual params). 13 nouveaux tests bats. |
+| B — Intégration Essential .exe | **TERMINÉE** | 2026-05-19 | 2026-05-20 | Pipeline pipe-based opérationnel via flag `--essential` ou auto-détection. Binaire v4.0.1 dans tools/bin/ (gitignored). Tests + smoke E2E validés. |
+| C — Auto-boost-lite per-segment | **Branché en CLI + audio smart** | 2026-05-19 | 2026-05-19 | Mode `adaptatif-vmaf` opérationnel. Pipeline complet : segment → VMAF → CRF adapté → mux audio smart (Opus/AAC/EAC3 selon source). 34 tests verts. |
 | Codecs successeurs (H.266) | Veille | | | Quand libvvenc est shipped Windows |
+
+### Détail état des phases (au 2026-05-19)
+
+**Phase A — TERMINÉE.**
+- [lib/codec_profiles.sh:268-300](../lib/codec_profiles.sh#L268) : profils
+  `serie`, `film`, `adaptatif` enrichis avec base commune
+  `enable-qm=1:qm-min=0:ac-bias=0.25` + params perceptuels spécifiques par
+  mode.
+- 13 tests bats ajoutés ; suite codec_profiles : 91/91 OK.
+- Décisions actées : `film-grain` reste BANNI du profil série (coût 10×),
+  conservé sur `film` (one-shot d'archive), désactivé sur `adaptatif`
+  (crash HWACCEL documenté).
+
+**Phase B — TERMINÉE.**
+- [lib/svtav1_essential.sh](../lib/svtav1_essential.sh) : module créé
+  avec détection runtime (`detect_svtav1_essential`), helpers
+  (`should_use_svtav1_essential`, `get_essential_mode_params`) et stub
+  pour le pipeline pipe-based (`_essential_pipe_encode`).
+- Mapping params mainline → Essential : OK (photon-noise remplace film-grain,
+  ajout de enable-tf=3 / alt-cdef / alt-dlf).
+- Documentation install Windows : [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+  section "SVT-AV1-Essential (optional, Phase B)".
+- Tests bats : 18 tests dans `tests/test_svtav1_essential.bats`.
+- **Implémentation pipe-based** (2026-05-20) :
+  - `_essential_pipe_encode` : ffmpeg → yuv4mpegpipe 10-bit (`-strict -1`
+    requis car non-officiel) → SvtAv1EncApp stdin → IVF.
+  - `_essential_params_to_cli` : convertit `key=value:key=value` (style
+    svtav1-params) en CLI args (`--key value`).
+  - `_execute_essential_conversion` : encode pipe + mux audio smart
+    (réutilise `_build_audio_params`) + sous-titres + metadata.
+- **Routing** : dans `lib/conversion.sh` étape 7, après auto-boost et
+  avant video_passthrough/standard. Priorise Essential quand
+  `_effective_encoder == libsvtav1` ET `should_use_svtav1_essential`.
+- **CLI** : flags `--essential` / `--no-essential` dans args.sh.
+  Auto-détection au boot via `detect_svtav1_essential` (best-effort).
+- **Tests** : 4 nouveaux tests bats + 2 tests d'intégration end-to-end
+  (encode pipe IVF + conversion complète avec audio multicanal).
+- **Smoke test manuel validé** : sample 8s AC3 5.1 → MKV AV1 10-bit +
+  E-AC3 5.1, ~1 Mo output, exit 0.
+- Binaire `tools/bin/SvtAv1EncApp.exe` v4.0.1 (sha256 vérifié) installé
+  via curl, gitignored.
+
+##### Ce qui reste pour une V2 Phase B
+- **Progress reporting** : SvtAv1EncApp émet sur stderr un format
+  différent de ffmpeg. Le watcher progress NAScode (`lib/progress.sh`)
+  ne le parse pas → pas d'affichage temps réel pendant l'encode.
+  Workaround V1 : `_essential_say` affiche "Démarrage encode..." et
+  "Mux final..." aux étapes clés. Pas de progress per-frame.
+- **Two-pass** : pas implémenté (single-pass CRF uniquement). Essential
+  supporte `--pass 1/2 --stats <file>`, mais peu rentable vs CRF capped.
+- **Tile auto-detection** : Essential expose `--tile-rows/columns`,
+  pour 4K on pourrait calibrer. Actuellement laissé à l'auto.
+- **Combinaison `--essential` + `-m adaptatif-vmaf`** : actuellement le
+  routing donne la priorité à auto-boost (mode adaptatif-vmaf), qui
+  utilise ffmpeg-libsvtav1 mainline pour ses encodes de segments. Le
+  flag `--essential` est donc ignoré silencieusement dans ce cas. Pour
+  les combiner, il faudrait modifier `_quick_encode_segment` et
+  `_auto_boost_quality_encode` (lib/vmaf_predictive.sh et auto_boost.sh)
+  pour router vers SvtAv1EncApp standalone via pipe. Valeur ajoutée
+  modeste (qualité équivalente à preset/crf identiques), mérite qu'on
+  attende le retour utilisateur sur les forces propres à chaque mode.
+- **Bats E2E `_execute_essential_conversion` hang** : non résolu malgré
+  capture stderr dans log temp file (commit e70cfe3). Hypothèse :
+  interaction `run` bats + double process ffmpeg|SvtAv1EncApp + mux
+  ffmpeg séparé qui ne libère pas correctement les pipes. Le pipe
+  encode IVF seul est verrouillé par tests bats ; le smoke manuel
+  confirme l'E2E (audio multicanal smart codec) en ~10s.
+
+**Phase C — IMPLÉMENTATION TERMINÉE. Branchement CLI RESTE À FAIRE.**
+- [lib/segmenter.sh](../lib/segmenter.sh) : `_segment_video` (via
+  `ffmpeg -f segment` aligné keyframes), `_concat_segments` (concat
+  demuxer avec paths relatifs pour robustesse MSYS2/Windows),
+  `_list_keyframes` (ffprobe packets).
+- [lib/vmaf_predictive.sh](../lib/vmaf_predictive.sh) :
+  `_quick_encode_segment` (preset 12, CRF 32 par défaut),
+  `_measure_vmaf_segment` (réutilise `compute_vmaf_score` de vmaf.sh),
+  `_compute_crf_adjustment` (parser table CSV via awk pour gérer floats).
+  Table par défaut : `92:+2,85:0,75:-2,0:-4`.
+- [lib/auto_boost.sh](../lib/auto_boost.sh) : orchestration
+  `auto_boost_encode` 6 étapes. Sortie : vidéo AV1 10-bit only (audio mux
+  délégué au caller). `auto_boost_check_prereqs` valide la chaîne de
+  dépendances.
+- Modules sourcés dans [nascode](../nascode) après vmaf.sh.
+- Tests bats : 27 tests dans `tests/test_phase_c_scaffolding.bats` dont
+  un test d'intégration end-to-end qui :
+  - génère un sample 30s @ 240x144 via `testsrc2` lavfi,
+  - lance auto_boost_encode avec segments de 10s (→ 3 segments),
+  - vérifie codec=av1, pix_fmt=yuv420p10le, durée 29-31s.
+- Validation manuelle smoke test : 3 segments encodés en ~25s, sortie
+  AV1 10-bit ~1 Mo pour un sample 30s.
+- **Ce qui reste à faire** :
+  - **Branchement dans le pipeline CLI** : créer le mode `adaptatif-vmaf`
+    dans `lib/config.sh`, l'ajouter à `lib/args.sh` (parsing + help), et
+    router `_execute_ffmpeg_pipeline` vers `auto_boost_encode` quand ce
+    mode est actif. Sensible — touche au flow audio/sous-titres/metadata.
+    Estimation 1-2 jours avec validation manuelle sur fichiers réels.
+  - **Mux audio post-encode** : `auto_boost_encode` produit une vidéo
+    AV1 only ; le caller doit muxer audio + subs + chapitres + métadata
+    depuis la source via un dernier ffmpeg `-map_metadata 0 -map_chapters 0`.
+  - **Logs détaillés** : intégrer le pattern de progress NAScode (slot
+    UI, watcher progress, etc.).
+  - **Edge cases** : fichiers très courts (< AUTO_BOOST_SEGMENT_DURATION),
+    fichiers sans keyframes alignées, segments avec VMAF=NA (libvmaf
+    indispo).
+
+#### Branchement CLI V1 (2026-05-19) — `adaptatif-vmaf`
+- [lib/config.sh](../lib/config.sh) : nouveau mode `adaptatif-vmaf` qui
+  hérite du profil SVT-AV1 `adaptatif` (params perceptuels sans
+  film-grain), avec `ADAPTIVE_COMPLEXITY_MODE=false` (auto-boost a sa
+  propre analyse par segment via VMAF) et `AUTO_BOOST_ENABLED=true`.
+- [lib/args.sh](../lib/args.sh) : ligne mode ajoutée au help.
+- [lib/conversion.sh](../lib/conversion.sh) : routage étape 7 vers
+  `_execute_auto_boost_conversion` quand `AUTO_BOOST_ENABLED=true`.
+- [lib/auto_boost.sh](../lib/auto_boost.sh) : nouveau
+  `_execute_auto_boost_conversion` wrapper d'intégration :
+  1. `auto_boost_encode` → vidéo AV1 only (`*.vonly.mkv`).
+  2. Mux ffmpeg final : vidéo copy + audio/subs/metadata/chapters
+     depuis l'input source (tout en COPY pour cette V1).
+- Tests bats : 8 nouveaux dans `tests/test_phase_c_scaffolding.bats`.
+
+##### §C.9 — Ce qui reste à faire pour une V2 complète
+- ~~**Transcodage audio "smart"**~~ — **FAIT 2026-05-19** :
+  `_execute_auto_boost_conversion` appelle `_build_audio_params` du module
+  audio standard. Décision smart codec NAScode appliquée (copy / Opus /
+  AAC / EAC3 / FLAC selon source + cible vidéo). Smoke test validé :
+  AC3 5.1 → E-AC3 5.1 avec layout normalisé. Fallback `-c:a copy` si
+  le module audio n'est pas chargé.
+- ~~**Progress reporting NAScode-style**~~ — **FAIT 2026-05-19** :
+  `auto_boost_encode` utilise désormais `print_status` (couleur magenta)
+  pour les étapes intermédiaires et `print_error` pour les erreurs.
+  Fallback `echo` quand l'UI n'est pas chargée (tests / scripts).
+  Le progress per-frame ffmpeg n'est pas encore canalisé via les slots
+  `lib/progress.sh` (TODO mineur, peu d'impact UX en mode CLI).
+- ~~**Notifications Discord** : `analysis_started` / `analysis_completed`~~
+  — **PARTIELLEMENT FAIT** : `analysis_started` émis au début du
+  pipeline auto-boost. `analysis_completed` reste à implémenter avec un
+  payload pertinent (nombre de segments, deltas CRF moyens, etc.).
+- ~~**VMAF final**~~ — **GRATUIT** : `_finalize_conversion_success`
+  appelle déjà `_queue_vmaf_analysis "$file_original" "$final_actual"`
+  pour tous les modes. Le VMAF global de la sortie auto-boost est donc
+  mesuré automatiquement, comme pour les autres modes. Le VMAF par
+  segment du pipeline est une métrique interne distincte (qualité
+  par scène pour ajuster le CRF).
+- **Sample mode** : tester l'interaction `--sample` / `-S` (encode d'un
+  échantillon court pour VMAF), à vérifier si le découpage est cohérent
+  avec la segmentation auto-boost.
 
 ---
 

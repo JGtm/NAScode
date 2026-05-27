@@ -1,0 +1,350 @@
+#!/bin/bash
+###########################################################
+# AUTO-BOOST — orchestration du mode `adaptatif-vmaf`
+#
+# Phase C de la roadmap (docs/AV1_OPTIMIZATION_PLAN.md §C.1) :
+# variante "lite" en pur Bash + ffmpeg + libvmaf de l'outil
+# Auto-Boost-Essential (qui utilise Python + Vapoursynth + SSIMU2).
+#
+# Pipeline (6 étapes) :
+#   1. Découper l'input en segments alignés keyframes (lib/segmenter.sh).
+#   2. Encoder chaque segment en "preview rapide" (lib/vmaf_predictive.sh).
+#   3. Mesurer VMAF du preview vs source pour chaque segment.
+#   4. Calculer un delta CRF par segment selon le VMAF observé.
+#   5. Ré-encoder chaque segment avec son CRF ajusté (config qualité).
+#   6. Concaténer les segments finaux en un fichier vidéo unique.
+#
+# La sortie est une vidéo AV1 only (pas d'audio, pas de sous-titres).
+# Le mux audio est délégué au caller (typiquement NAScode standard).
+#
+# Dépendances : lib/segmenter.sh, lib/vmaf_predictive.sh (et lib/vmaf.sh
+# qui définit compute_vmaf_score).
+#
+# NOTE: Pas de `set -euo pipefail` car sourcé.
+###########################################################
+
+###########################################################
+# CONFIGURATION
+###########################################################
+
+# Durée approximative d'un segment, en secondes. Compromis entre
+# granularité (court = mieux ciblé) et coût (court = plus de fichiers
+# temporaires, plus de concat overhead). 30s est un bon défaut.
+AUTO_BOOST_SEGMENT_DURATION="${AUTO_BOOST_SEGMENT_DURATION:-30}"
+
+# Répertoire de travail pour les segments temporaires.
+# Si vide, mktemp -d sera utilisé.
+AUTO_BOOST_WORK_DIR="${AUTO_BOOST_WORK_DIR:-}"
+
+# CRF de base pour l'encode final (delta sera ajouté/soustrait par segment).
+# Aligné sur le défaut adaptatif série (CRF_VALUE=21 dans config.sh).
+AUTO_BOOST_BASE_CRF="${AUTO_BOOST_BASE_CRF:-21}"
+
+# Preset SVT-AV1 pour l'encode final (= mainline 5 medium).
+AUTO_BOOST_FINAL_PRESET="${AUTO_BOOST_FINAL_PRESET:-5}"
+
+# Params SVT-AV1 perceptuels pour l'encode final. Aligné sur le profil
+# adaptatif (sans film-grain qui ralentit, avec variance-boost et lp=6).
+AUTO_BOOST_SVTAV1_PARAMS="${AUTO_BOOST_SVTAV1_PARAMS:-tune=0:enable-overlays=0:film-grain=0:variance-boost-strength=3:luminance-qp-bias=15:sharpness=1:enable-qm=1:qm-min=0:ac-bias=0.25:lp=6}"
+
+###########################################################
+# ORCHESTRATION PRINCIPALE
+###########################################################
+
+# Exécute le pipeline auto-boost-lite sur un fichier d'entrée.
+# Produit un fichier de sortie vidéo AV1 only avec un CRF variable
+# par segment. Le caller doit muxer l'audio séparément.
+#
+# Usage : auto_boost_encode <input> <output> [base_crf]
+# Retourne : 0 si OK, code != 0 sinon.
+auto_boost_encode() {
+    local input="$1"
+    local output="$2"
+    local base_crf="${3:-$AUTO_BOOST_BASE_CRF}"
+
+    if [[ -z "$input" || -z "$output" ]]; then
+        echo "ERROR: auto_boost_encode usage: <input> <output> [base_crf]" >&2
+        return 2
+    fi
+    if [[ ! -f "$input" ]]; then
+        echo "ERROR: auto_boost_encode: input not found: $input" >&2
+        return 2
+    fi
+
+    # Vérifier les prérequis de briques (segmenter + vmaf_predictive).
+    if ! auto_boost_check_prereqs; then
+        return 3
+    fi
+
+    # Workspace temporaire. mktemp si pas fourni explicitement.
+    local work_dir="${AUTO_BOOST_WORK_DIR}"
+    local cleanup_work_dir=false
+    if [[ -z "$work_dir" ]]; then
+        work_dir=$(mktemp -d -t nascode_autoboost.XXXXXX) || {
+            echo "ERROR: auto_boost_encode: cannot create work dir" >&2
+            return 4
+        }
+        cleanup_work_dir=true
+    else
+        mkdir -p "$work_dir" || return 4
+    fi
+
+    local raw_dir="${work_dir}/raw"        # segments source (-c copy)
+    local proxy_dir="${work_dir}/proxy"    # encodes rapides pour mesure VMAF
+    local final_dir="${work_dir}/final"    # encodes qualité avec CRF ajusté
+    mkdir -p "$raw_dir" "$proxy_dir" "$final_dir"
+
+    local ret=0
+    _auto_boost_run_pipeline "$input" "$output" "$base_crf" \
+        "$raw_dir" "$proxy_dir" "$final_dir"
+    ret=$?
+
+    if [[ "$cleanup_work_dir" == true ]]; then
+        rm -rf "$work_dir"
+    fi
+    return "$ret"
+}
+
+# Pipeline interne — séparé pour faciliter la gestion du cleanup.
+_auto_boost_run_pipeline() {
+    local input="$1"
+    local output="$2"
+    local base_crf="$3"
+    local raw_dir="$4"
+    local proxy_dir="$5"
+    local final_dir="$6"
+
+    _auto_boost_say "Pipeline auto-boost démarré (segments ~${AUTO_BOOST_SEGMENT_DURATION}s, CRF base ${base_crf})"
+    # Notification Discord best-effort. On réutilise l'évent du mode adaptatif
+    # pour ne pas avoir à créer un canal dédié. Si l'évent n'est pas géré
+    # côté notify, c'est silencieux.
+    if declare -f notify_event >/dev/null 2>&1; then
+        notify_event "analysis_started" 2>/dev/null || true
+    fi
+
+    # Étape 1 : segmentation.
+    if ! _segment_video "$input" "$AUTO_BOOST_SEGMENT_DURATION" "$raw_dir"; then
+        _auto_boost_say_err "segmentation failed"
+        return 10
+    fi
+
+    # Liste des segments raw (ordre lexicographique = ordre chronologique
+    # grâce au pattern seg_%03d).
+    local raw_segments=("$raw_dir"/seg_*)
+    if [[ ${#raw_segments[@]} -eq 0 ]] || [[ ! -f "${raw_segments[0]}" ]]; then
+        _auto_boost_say_err "no segments produced"
+        return 11
+    fi
+    _auto_boost_say "${#raw_segments[@]} segments à traiter"
+
+    local final_list="${final_dir}/concat.list"
+    : > "$final_list"
+
+    # Étape 2-5 : pour chaque segment, proxy → VMAF → delta → encode final.
+    local idx=0
+    local seg seg_basename proxy_path final_path vmaf delta final_crf
+    for seg in "${raw_segments[@]}"; do
+        seg_basename=$(basename "$seg")
+        proxy_path="${proxy_dir}/${seg_basename}"
+        final_path="${final_dir}/${seg_basename}"
+
+        # 2. Proxy rapide
+        if ! _quick_encode_segment "$seg" "$proxy_path"; then
+            _auto_boost_say_err "proxy encode failed for $seg_basename"
+            return 20
+        fi
+
+        # 3. Mesure VMAF
+        vmaf=$(_measure_vmaf_segment "$proxy_path" "$seg")
+
+        # 4. Delta CRF
+        delta=$(_compute_crf_adjustment "$vmaf")
+
+        # CRF final = base + delta, borné à [10, 50] pour rester sain.
+        final_crf=$((base_crf + delta))
+        if [[ $final_crf -lt 10 ]]; then final_crf=10; fi
+        if [[ $final_crf -gt 50 ]]; then final_crf=50; fi
+
+        _auto_boost_say "seg ${idx}: vmaf=${vmaf} delta=${delta} crf=${final_crf}"
+
+        # 5. Encode qualité final
+        if ! _auto_boost_quality_encode "$seg" "$final_path" "$final_crf"; then
+            _auto_boost_say_err "quality encode failed for $seg_basename"
+            return 30
+        fi
+
+        # Ajout à la concat list. Path *relatif* (basename seulement) :
+        # robuste face aux conversions /tmp ↔ C:/tmp côté ffmpeg.exe sous
+        # MSYS2/Windows. ffmpeg résout les paths relativement au dossier
+        # contenant le concat list — ici final_dir, qui contient le segment.
+        printf "file '%s'\n" "$(_auto_boost_concat_escape "$(basename "$final_path")")" >> "$final_list"
+        idx=$((idx + 1))
+    done
+
+    # Étape 6 : concat.
+    if ! _concat_segments "$final_list" "$output"; then
+        _auto_boost_say_err "final concat failed"
+        return 40
+    fi
+
+    _auto_boost_say "OK — ${idx} segments encodés, sortie: $output"
+    return 0
+}
+
+# Helpers d'affichage : préfèrent print_status (couleur magenta, cohérent
+# avec le reste de NAScode) quand l'UI est chargée, fallback echo sinon
+# (sourcing isolé pour tests, scripts externes).
+_auto_boost_say() {
+    local msg="$1"
+    if declare -f print_status >/dev/null 2>&1; then
+        print_status "[auto-boost] ${msg}" "${MAGENTA:-}"
+    else
+        echo "[auto-boost] ${msg}"
+    fi
+}
+
+_auto_boost_say_err() {
+    local msg="$1"
+    if declare -f print_error >/dev/null 2>&1; then
+        print_error "[auto-boost] ${msg}"
+    else
+        echo "ERROR: [auto-boost] ${msg}" >&2
+    fi
+}
+
+# Encode "qualité" d'un segment avec les params perceptuels finaux.
+# Usage : _auto_boost_quality_encode <input_seg> <out_seg> <crf>
+_auto_boost_quality_encode() {
+    local input_seg="$1"
+    local out_seg="$2"
+    local crf="$3"
+
+    ffmpeg -hide_banner -loglevel error -y \
+        -i "$input_seg" \
+        -c:v libsvtav1 \
+        -crf "$crf" \
+        -preset "$AUTO_BOOST_FINAL_PRESET" \
+        -svtav1-params "$AUTO_BOOST_SVTAV1_PARAMS" \
+        -pix_fmt yuv420p10le \
+        -an -sn \
+        "$out_seg" 2>&1
+}
+
+# Échappe les apostrophes dans un chemin pour le format `ffmpeg -f concat`.
+# Le format concat veut: file 'path/with''quote.mkv' (apostrophe doublée).
+_auto_boost_concat_escape() {
+    printf "%s" "${1//\'/\'\\\'\'}"
+}
+
+###########################################################
+# INTÉGRATION PIPELINE NAScode — mode `adaptatif-vmaf`
+###########################################################
+
+# Wrapper d'intégration appelé depuis lib/conversion.sh quand le mode
+# `adaptatif-vmaf` est actif (`AUTO_BOOST_ENABLED=true`).
+# 1) auto_boost_encode produit une vidéo AV1 only.
+# 2) Mux final avec audio (transcodage smart NAScode), sous-titres,
+#    metadata et chapters depuis la source.
+#
+# Le transcodage audio passe par `_build_audio_params` (lib/audio_params.sh)
+# qui décide entre copy, conversion (Opus/AAC/E-AC3...) et downscale selon
+# les règles smart codec NAScode standard. Fallback `-c:a copy` si la
+# fonction n'est pas chargée.
+#
+# Signature alignée sur _execute_conversion :
+# Usage : _execute_auto_boost_conversion <tmp_input> <tmp_output> <ffmpeg_log> <duration> <base_name>
+# Retourne : 0 si OK, 1 sinon (les erreurs sont propagées au caller).
+_execute_auto_boost_conversion() {
+    local tmp_input="$1"
+    local tmp_output="$2"
+    local ffmpeg_log="$3"
+    local duration="$4"
+    local base_name="$5"
+
+    if [[ -z "$tmp_input" || -z "$tmp_output" ]]; then
+        echo "ERROR: _execute_auto_boost_conversion usage: <in> <out> <log> <duration> <base_name>" >&2
+        return 1
+    fi
+    if [[ ! -f "$tmp_input" ]]; then
+        echo "ERROR: _execute_auto_boost_conversion: input not found: $tmp_input" >&2
+        return 1
+    fi
+
+    # Fichier intermédiaire (vidéo only AV1 produite par auto_boost_encode).
+    local video_only
+    video_only="${tmp_output%.*}.vonly.mkv"
+
+    # 1) Encode vidéo auto-boost (segments + VMAF + ajustement CRF).
+    # CRF base : utiliser CRF_VALUE si défini, sinon AUTO_BOOST_BASE_CRF (21).
+    local base_crf="${CRF_VALUE:-${AUTO_BOOST_BASE_CRF:-21}}"
+    if ! auto_boost_encode "$tmp_input" "$video_only" "$base_crf" 2>>"$ffmpeg_log"; then
+        echo "ERROR: _execute_auto_boost_conversion: auto_boost_encode failed" >>"$ffmpeg_log"
+        rm -f "$video_only"
+        return 1
+    fi
+
+    # 2) Construire les options audio smart NAScode (sinon fallback copy).
+    # _build_audio_params retourne une chaîne d'options ffmpeg, ex. :
+    #   "-c:a copy"
+    #   "-c:a libopus -b:a 192k -ac 6"
+    # Le split en array via `read -ra` est correct ici car les options
+    # générées ne contiennent pas de guillemets/spaces dans les valeurs.
+    local audio_opts_str="-c:a copy"
+    if declare -f _build_audio_params >/dev/null; then
+        audio_opts_str=$(_build_audio_params "$tmp_input" 2>/dev/null) || audio_opts_str="-c:a copy"
+        [[ -z "$audio_opts_str" ]] && audio_opts_str="-c:a copy"
+    fi
+    local -a audio_opts
+    # shellcheck disable=SC2206
+    audio_opts=( $audio_opts_str )
+
+    # 3) Mux final : vidéo AV1 (depuis video_only) + audio (transcodé selon
+    # decision smart) + sous-titres (copy) + metadata/chapters (source).
+    # -map 1:a? / -map 1:s? : optionnels, ignorés si absent.
+    if ! ffmpeg -hide_banner -loglevel error -y \
+        -i "$video_only" -i "$tmp_input" \
+        -map 0:v:0 -map 1:a? -map 1:s? \
+        -c:v copy "${audio_opts[@]}" -c:s copy \
+        -map_metadata 1 -map_chapters 1 \
+        "$tmp_output" 2>>"$ffmpeg_log"; then
+        echo "ERROR: _execute_auto_boost_conversion: final mux failed" >>"$ffmpeg_log"
+        rm -f "$video_only"
+        return 1
+    fi
+
+    rm -f "$video_only"
+    return 0
+}
+
+###########################################################
+# UTILITAIRES
+###########################################################
+
+# Vérifie que toutes les dépendances Phase C sont prêtes (briques
+# définies, outils dispo).
+#
+# Usage : auto_boost_check_prereqs
+# Retourne : 0 si tout est prêt, !=0 avec message d'erreur sinon.
+auto_boost_check_prereqs() {
+    local missing=()
+    for fn in _segment_video _concat_segments _quick_encode_segment \
+              _measure_vmaf_segment _compute_crf_adjustment compute_vmaf_score; do
+        if ! declare -f "$fn" >/dev/null; then
+            missing+=("$fn")
+        fi
+    done
+
+    if [[ ${#missing[@]} -gt 0 ]]; then
+        echo "ERROR: auto_boost: missing functions: ${missing[*]}" >&2
+        echo "       Make sure lib/segmenter.sh, lib/vmaf_predictive.sh," >&2
+        echo "       and lib/vmaf.sh are all sourced." >&2
+        return 1
+    fi
+
+    if ! command -v ffmpeg >/dev/null 2>&1; then
+        echo "ERROR: auto_boost: ffmpeg not in PATH" >&2
+        return 2
+    fi
+
+    return 0
+}
