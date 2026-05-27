@@ -313,26 +313,27 @@ set_conversion_mode_parameters() {
             # lecture (vs au gameplay), et passer à 30fps libère la moitié des
             # bits qui peuvent être réalloués à la qualité par frame.
             #
-            # On compense la réduction FPS en doublant BPP_BASE à 0.16 (vs
-            # 0.032 cinéma). Résultat : bitrate target similaire à un encode
-            # 60fps + BPP 0.080 (~10 Mbit/s en 1080p), MAIS chaque frame
-            # reçoit 2× plus de bits → qualité par frame nettement supérieure.
+            # On combine cap 30fps + BPP_BASE=0.20 (vs 0.032 cinéma) pour donner
+            # à AV1 suffisamment de bits par frame sur du contenu high-motion :
             #
             # Formule : R = W × H × FPS_OUT × BPP × C
-            #   - 1080p30  → ~10 Mbit/s,  ~37 Mo / 30s
-            #   - 1080p60  → ~20 Mbit/s (si LIMIT_FPS désactivé)
-            #   - 1440p30  → ~17 Mbit/s
-            #   - 4K30     → ~40 Mbit/s
+            #   - 1080p30  → ~12 Mbit/s,  ~47 Mo / 30s
+            #   - 1440p30  → ~22 Mbit/s,  ~83 Mo / 30s
+            #   - 4K30     → ~50 Mbit/s,  ~187 Mo / 30s
+            #   - 1080p60  → ~25 Mbit/s (si LIMIT_FPS désactivé)
+            #
+            # Qualité par frame ~414 kbit (vs 166 en mode adaptatif standard
+            # 60fps + BPP 0.080) → ~2.5× plus de bits par frame.
             #
             # Override via env :
-            #   `export ADAPTIVE_BPP_BASE_GAMING=0.20` plus de qualité
-            #   `export ADAPTIVE_BPP_BASE_GAMING=0.10` plus de compression
+            #   `export ADAPTIVE_BPP_BASE_GAMING=0.25` plus de qualité (~58 Mo)
+            #   `export ADAPTIVE_BPP_BASE_GAMING=0.16` plus de compression (~37 Mo)
             #   `export LIMIT_FPS=false` préserver le FPS natif (60+)
             #
             # Le garde-fou "max 75% du source" plafonne en bout de chaîne.
-            base_target_kbps=10000  # Estimation 1080p30 high-motion qualité
-            base_maxrate_kbps=14000
-            base_bufsize_kbps=25000
+            base_target_kbps=12500  # Estimation 1080p30 high-motion qualité
+            base_maxrate_kbps=17500
+            base_bufsize_kbps=31250
             ENCODER_PRESET="medium"
             X265_EXTRA_PARAMS=""
             X265_PASS1_FAST=false
@@ -342,9 +343,10 @@ set_conversion_mode_parameters() {
             FILM_TUNE_FASTDECODE=false
             # Active l'analyse complexity adaptative.
             ADAPTIVE_COMPLEXITY_MODE=true
-            # Override clé pour ce mode : BPP doublé pour compenser le cap 30fps
-            # et offrir 2× plus de bits par frame qu'un encode 60fps + BPP 0.080.
-            export ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE_GAMING:-0.16}"
+            # Override clé pour ce mode : BPP haut pour offrir ~2.5× plus de
+            # bits par frame qu'un encode adaptatif standard 60fps + BPP 0.080.
+            # Combiné au cap 30fps, donne ~12 Mbit/s en 1080p30 (qualité gaming).
+            export ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE_GAMING:-0.20}"
             # Hérite du profil SVT-AV1 `adaptatif` (params perceptuels sans
             # film-grain car crash HWACCEL, variance-boost+luma-bias compensent).
             ENCODER_MODE_PROFILE="adaptatif"
