@@ -25,9 +25,13 @@ NAScode supports **five modes** with distinct philosophies, summarized below.
   hétérogènes où la complexité varie d'un film à l'autre. Calibré pour
   contenu **cinéma 24fps** (BPP_BASE=0.032 ≈ 2-3 Mbit/s pour 1080p24).
 - **`gaming`** — Variante de `adaptatif` calibrée pour le **high-motion**
-  (replays OBS, captures jeux, screencasts). Override `ADAPTIVE_BPP_BASE=0.080`
-  (~10 Mbit/s pour 1080p60). Fonctionne pour **tout FPS** (30/60/120/144+) —
-  la formule scale linéairement. Le profil SVT-AV1 reste celui d'adaptatif.
+  (replays OBS, captures jeux, screencasts). **Cap FPS de sortie à 29.97
+  par défaut** (comme `serie`) — pour des replays, la fluidité 60fps natif
+  est moins critique que la qualité visuelle par frame. Compensation :
+  `ADAPTIVE_BPP_BASE=0.16` (doublé vs 60fps + 0.080), ce qui donne le
+  **même bitrate target** mais **2× plus de bits par frame**. Override
+  via `LIMIT_FPS=false` pour préserver le 60+fps natif. Le profil SVT-AV1
+  reste celui d'adaptatif.
 - **`adaptatif-vmaf`** — Variable, adapte le CRF **par scène** (segment) via
   VMAF prédictif. Le plus lent mais qualité ciblée sur les scènes difficiles
   (Phase C de [AV1_OPTIMIZATION_PLAN.md](AV1_OPTIMIZATION_PLAN.md)).
@@ -42,34 +46,39 @@ NAScode supports **five modes** with distinct philosophies, summarized below.
 | **Bitrate strategy** | fixe CRF 21 | budget two-pass | calculé par fichier | calculé par fichier (BPP×2.5) | calculé par scène (VMAF) |
 | **Target bitrate (HEVC ref)** | 2070 kbps | 2035 kbps | 2500 kbps | **5000 kbps** | 2500 kbps |
 | **Maxrate (HEVC ref)** | 2520 kbps | 3200 kbps | 3500 kbps | **7000 kbps** | 3500 kbps |
-| **`ADAPTIVE_BPP_BASE`** | n/a | n/a | 0.032 (cinéma) | **0.080** (high-motion) | 0.032 |
+| **`ADAPTIVE_BPP_BASE`** | n/a | n/a | 0.032 (cinéma) | **0.16** (high-motion + cap 30) | 0.032 |
 | **GOP (keyint)** | **360** (~15s @ 24fps) | 240 (~10s @ 24fps) | 240 | 240 | 240 |
-| **`LIMIT_FPS`** | **true** (cap 29.97) | false | false | **false** (préserve 60+) | false |
+| **`LIMIT_FPS`** | **true** (cap 29.97) | false | false | **true** (cap 29.97, override possible) | false |
 | **Audio (target layout)** | **stéréo forcé** | multichannel préservé | multichannel + equiv-qual | multichannel + equiv-qual | multichannel + smart codec |
 | **`ADAPTIVE_COMPLEXITY_MODE`** | ✗ | ✗ | ✓ (par fichier) | ✓ (par fichier) | ✗ (auto-boost à la place) |
 | **`AUTO_BOOST_ENABLED`** | ✗ | ✗ | ✗ | ✗ | ✓ (Phase C, par scène) |
 
 ### Mode `gaming` : exemples de bitrate target
 
-Formule : `R_target = W × H × FPS × ADAPTIVE_BPP_BASE × complexity_C`.
-Avec `ADAPTIVE_BPP_BASE=0.080` (défaut gaming) et `C=1.0` :
+Formule : `R_target = W × H × FPS_OUT × ADAPTIVE_BPP_BASE × complexity_C`.
+Avec `ADAPTIVE_BPP_BASE=0.16` (défaut gaming) et `C=1.0`, FPS de sortie cap
+à 29.97 par défaut :
 
-| Résolution × FPS | Bitrate target | Output 28s |
+| Résolution × FPS sortie | Bitrate target | Output 30s |
 |---|---|---|
-| 1080p30 | ~5 Mbit/s | ~17 Mo |
-| **1080p60** | **~10 Mbit/s** | **~35 Mo** |
-| 1080p120 | ~20 Mbit/s | ~70 Mo |
-| 1080p144 | ~24 Mbit/s | ~84 Mo |
-| 1440p60 | ~17 Mbit/s | ~60 Mo |
-| 4K60 | ~40 Mbit/s | ~140 Mo |
+| **1080p30** (défaut, source 60fps→30) | **~10 Mbit/s** | **~37 Mo** |
+| 1080p30 (source 30fps native) | ~10 Mbit/s | ~37 Mo |
+| 1440p30 | ~17 Mbit/s | ~64 Mo |
+| 4K30 | ~40 Mbit/s | ~150 Mo |
+| **Override LIMIT_FPS=false** : 1080p60 | ~20 Mbit/s | ~75 Mo |
 
-Le garde-fou **`ADAPTIVE_MAX_ORIGINAL_PCT=75`** plafonne quand même : le
-target ne dépasse jamais 75% du bitrate source (évite d'over-allouer si la
-source est elle-même bas bitrate).
+À résolution × FPS_OUT × BPP constants, le bitrate target est identique.
+La stratégie "cap 30fps + BPP doublé" garantit le même fichier qu'un encode
+60fps + BPP moitié, mais avec **2× plus de bits par frame** → qualité
+visuelle nettement supérieure par frame.
+
+Le garde-fou **`ADAPTIVE_MAX_ORIGINAL_PCT=75`** plafonne en bout de chaîne :
+le target ne dépasse jamais 75% du bitrate source.
 
 Override possible via env :
-- `export ADAPTIVE_BPP_BASE_GAMING=0.10` → plus de qualité (~+25% taille)
-- `export ADAPTIVE_BPP_BASE_GAMING=0.06` → plus de compression (~-25% taille)
+- `export ADAPTIVE_BPP_BASE_GAMING=0.20` → +25% qualité (~47 Mo)
+- `export ADAPTIVE_BPP_BASE_GAMING=0.12` → -25% taille (~28 Mo)
+- `export LIMIT_FPS=false` → préserver 60fps natif (file size ×2)
 
 ### SVT-AV1 — paramètres perceptuels par mode
 

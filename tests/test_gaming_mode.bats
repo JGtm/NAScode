@@ -55,11 +55,19 @@ teardown() {
     [ "${AUTO_BOOST_ENABLED:-false}" != "true" ]
 }
 
-@test "gaming: ne force PAS LIMIT_FPS (préserve 60/120/144+ fps natif)" {
+@test "gaming: cap LIMIT_FPS à 29.97 par défaut (économie bits/frame)" {
     unset LIMIT_FPS
     CONVERSION_MODE="gaming"
     set_conversion_mode_parameters
-    [ "${LIMIT_FPS:-}" != "true" ]
+    [ "${LIMIT_FPS:-}" = "true" ]
+}
+
+@test "gaming: respecte LIMIT_FPS=false env override (préserver 60+fps)" {
+    LIMIT_FPS=false
+    CONVERSION_MODE="gaming"
+    set_conversion_mode_parameters
+    [ "${LIMIT_FPS:-}" = "false" ]
+    unset LIMIT_FPS
 }
 
 @test "gaming: ne force PAS l'audio stéréo (préserve multicanal)" {
@@ -72,11 +80,11 @@ teardown() {
 # Override ADAPTIVE_BPP_BASE — c'est le levier clé du mode
 ###########################################################
 
-@test "gaming: ADAPTIVE_BPP_BASE override à 0.080 par défaut" {
+@test "gaming: ADAPTIVE_BPP_BASE override à 0.16 par défaut (compense cap 30fps)" {
     unset ADAPTIVE_BPP_BASE_GAMING
     CONVERSION_MODE="gaming"
     set_conversion_mode_parameters
-    [ "${ADAPTIVE_BPP_BASE:-}" = "0.080" ]
+    [ "${ADAPTIVE_BPP_BASE:-}" = "0.16" ]
 }
 
 @test "gaming: respecte ADAPTIVE_BPP_BASE_GAMING env override (plus haut)" {
@@ -99,43 +107,45 @@ teardown() {
 # Calcul du bitrate target — la philosophie du mode
 ###########################################################
 
-@test "gaming: bitrate target 1080p60 est ~10 Mbit/s à BPP=0.080 et C=1.0" {
+@test "gaming: bitrate target 1080p30 est ~10 Mbit/s à BPP=0.16 et C=1.0" {
     # Vérifie la formule R = W × H × FPS × BPP × C avec BPP gaming.
+    # En 1080p30, BPP 0.16 donne ~10 Mbit/s — équivalent à un encode 60fps
+    # à BPP 0.080 (file size identique) mais 2× plus de bits par frame.
     source "$LIB_DIR/complexity.sh"
     CONVERSION_MODE="gaming"
     set_conversion_mode_parameters
-    # original_bitrate_bps élevé (48 Mbit/s style replay OBS) pour que le
-    # garde-fou "max 75% du source" (= 36 Mbit/s) ne déclenche pas.
     local result
-    result=$(compute_adaptive_target_bitrate 1920 1080 60 "1.0" "48000000")
-    # Attendu : 1920*1080*60*0.080/1000 = 9953 kbps (avant garde-fous).
+    # original_bitrate_bps élevé pour ne pas déclencher le garde-fou 75% source.
+    result=$(compute_adaptive_target_bitrate 1920 1080 30 "1.0" "48000000")
+    # Attendu : 1920*1080*30*0.16/1000 = 9953 kbps.
     [ "$result" -ge 9000 ]
     [ "$result" -le 11000 ]
 }
 
-@test "gaming: bitrate target 1080p30 ≈ moitié du 1080p60 (scale linéaire avec FPS)" {
+@test "gaming: bitrate target scale linéairement avec FPS (60 = 2× 30)" {
+    # Même si le mode cap à 30 en pratique, la formule R = W×H×FPS×BPP×C
+    # reste linéaire en FPS pour tout FPS passé en argument.
     source "$LIB_DIR/complexity.sh"
     CONVERSION_MODE="gaming"
     set_conversion_mode_parameters
     local r30 r60
-    r30=$(compute_adaptive_target_bitrate 1920 1080 30 "1.0" "48000000")
-    r60=$(compute_adaptive_target_bitrate 1920 1080 60 "1.0" "48000000")
-    # r60 / r30 ≈ 2 (tolérance 5%)
+    r30=$(compute_adaptive_target_bitrate 1920 1080 30 "1.0" "100000000")
+    r60=$(compute_adaptive_target_bitrate 1920 1080 60 "1.0" "100000000")
     local ratio_pct=$(( r60 * 100 / r30 ))
     [ "$ratio_pct" -ge 195 ]
     [ "$ratio_pct" -le 205 ]
 }
 
-@test "gaming: bitrate target 1080p144 ~24 Mbit/s (high refresh rate)" {
+@test "gaming: bitrate target 4K30 ~40 Mbit/s (haute résolution)" {
     source "$LIB_DIR/complexity.sh"
     CONVERSION_MODE="gaming"
     set_conversion_mode_parameters
     local result
-    # Source 100 Mbit/s pour ne pas déclencher le cap 75% source.
-    result=$(compute_adaptive_target_bitrate 1920 1080 144 "1.0" "100000000")
-    # 1920*1080*144*0.080/1000 = 23888 kbps
-    [ "$result" -ge 22000 ]
-    [ "$result" -le 26000 ]
+    # Source 200 Mbit/s pour ne pas déclencher le cap 75% source.
+    result=$(compute_adaptive_target_bitrate 3840 2160 30 "1.0" "200000000")
+    # 3840*2160*30*0.16/1000 = 39813 kbps
+    [ "$result" -ge 38000 ]
+    [ "$result" -le 42000 ]
 }
 
 @test "gaming: garde-fou 'max 75% du source' s'applique aussi en gaming" {
