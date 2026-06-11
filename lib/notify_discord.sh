@@ -112,13 +112,17 @@ notify_discord_send_markdown() {
         # `http_code=$(curl ... || echo "000")` faisait que `$?` reflétait
         # l'echo (toujours 0) : le log de debug mentait systématiquement.
         # Le `|| curl_exit=$?` évite aussi un abort sous set -e (best-effort).
+        # L'URL (secret) est fournie via un fichier de config curl lu sur stdin
+        # (`--config -`), JAMAIS en argument : sinon elle serait visible dans
+        # `ps`/`/proc/*/cmdline` par les autres utilisateurs du NAS.
         local http_code="000" curl_exit=0
-        http_code=$(curl -sS -m "$curl_timeout" --retry "$curl_retries" --retry-delay "$curl_retry_delay" \
+        http_code=$(printf 'url = "%s"\n' "$NASCODE_DISCORD_WEBHOOK_URL" \
+            | curl -sS -m "$curl_timeout" --retry "$curl_retries" --retry-delay "$curl_retry_delay" \
             -H "Content-Type: application/json; charset=utf-8" \
             -X POST \
             --data-binary "@${payload_file}" \
             -o "${resp_file:-/dev/null}" -w '%{http_code}' \
-            "${NASCODE_DISCORD_WEBHOOK_URL}" \
+            --config - \
             2>/dev/null) || curl_exit=$?
         [[ -z "$http_code" ]] && http_code="000"
 
@@ -134,11 +138,13 @@ notify_discord_send_markdown() {
 
         [[ -n "${resp_file:-}" ]] && rm -f "${resp_file}" 2>/dev/null || true
     else
-        curl -sS -m "$curl_timeout" --retry "$curl_retries" --retry-delay "$curl_retry_delay" \
+        # URL via config sur stdin (hors argv, cf. branche debug ci-dessus).
+        printf 'url = "%s"\n' "$NASCODE_DISCORD_WEBHOOK_URL" \
+            | curl -sS -m "$curl_timeout" --retry "$curl_retries" --retry-delay "$curl_retry_delay" \
             -H "Content-Type: application/json; charset=utf-8" \
             -X POST \
             --data-binary "@${payload_file}" \
-            "${NASCODE_DISCORD_WEBHOOK_URL}" \
+            --config - \
             >/dev/null 2>&1 || true
     fi
 
