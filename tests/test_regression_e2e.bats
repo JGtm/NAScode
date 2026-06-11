@@ -239,15 +239,17 @@ teardown() {
     local out_file
     out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
     
-    if [[ -n "$out_file" ]]; then
-        # Vérifier la résolution de sortie
-        local out_height
-        out_height=$(ffprobe -v error -select_streams v:0 \
-            -show_entries stream=height -of csv=p=0 "$out_file")
-        
-        # La hauteur doit être ≤ 1080
-        [ "$out_height" -le 1080 ]
-    fi
+    # Un fichier de sortie DOIT exister, sinon l'assertion ne vérifie rien
+    # (status=0 sans fichier produit = régression silencieuse).
+    [ -n "$out_file" ]
+
+    # Vérifier la résolution de sortie
+    local out_height
+    out_height=$(ffprobe -v error -select_streams v:0 \
+        -show_entries stream=height -of csv=p=0 "$out_file")
+
+    # La hauteur doit être ≤ 1080
+    [ "$out_height" -le 1080 ]
 }
 
 @test "E2E DOWNSCALE: vidéo 720p n'est pas agrandie" {
@@ -646,25 +648,26 @@ teardown() {
     local out_file
     out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
     
-    if [[ -n "$out_file" ]]; then
-        # Vérifier le framerate de sortie (format: num/den, ex: 30000/1001)
-        local out_fps_raw
-        out_fps_raw=$(ffprobe -v error -select_streams v:0 \
-            -show_entries stream=r_frame_rate -of csv=p=0 "$out_file")
-        
-        echo "Output FPS raw: $out_fps_raw" >&3
-        
-        # Calculer le fps effectif (num/den → float)
-        local out_fps
-        out_fps=$(echo "$out_fps_raw" | awk -F'/' '{if(NF==2 && $2>0) printf "%.2f", $1/$2; else print $1}')
-        
-        echo "Output FPS: $out_fps" >&3
-        
-        # Le FPS doit être ≤ 30 (avec marge pour 29.97)
-        local fps_ok
-        fps_ok=$(echo "$out_fps" | awk '{if($1 <= 30.01) print "yes"; else print "no"}')
-        [ "$fps_ok" = "yes" ]
-    fi
+    # Un fichier de sortie DOIT exister, sinon l'assertion ne vérifie rien.
+    [ -n "$out_file" ]
+
+    # Vérifier le framerate de sortie (format: num/den, ex: 30000/1001)
+    local out_fps_raw
+    out_fps_raw=$(ffprobe -v error -select_streams v:0 \
+        -show_entries stream=r_frame_rate -of csv=p=0 "$out_file")
+
+    echo "Output FPS raw: $out_fps_raw" >&3
+
+    # Calculer le fps effectif (num/den → float)
+    local out_fps
+    out_fps=$(echo "$out_fps_raw" | awk -F'/' '{if(NF==2 && $2>0) printf "%.2f", $1/$2; else print $1}')
+
+    echo "Output FPS: $out_fps" >&3
+
+    # Le FPS doit être ≤ 30 (avec marge pour 29.97)
+    local fps_ok
+    fps_ok=$(echo "$out_fps" | awk '{if($1 <= 30.01) print "yes"; else print "no"}')
+    [ "$fps_ok" = "yes" ]
 }
 
 @test "E2E HFR: vidéo 60fps avec --no-limit-fps conserve fps original" {
@@ -699,23 +702,24 @@ teardown() {
     local out_file
     out_file=$(find "$OUT_DIR" -type f -name "*.mkv" | head -1)
     
-    if [[ -n "$out_file" ]]; then
-        # Vérifier le framerate de sortie
-        local out_fps_raw
-        out_fps_raw=$(ffprobe -v error -select_streams v:0 \
-            -show_entries stream=r_frame_rate -of csv=p=0 "$out_file")
-        
-        echo "Output FPS raw: $out_fps_raw" >&3
-        
-        # Calculer le fps effectif
-        local out_fps
-        out_fps=$(echo "$out_fps_raw" | awk -F'/' '{if(NF==2 && $2>0) printf "%.2f", $1/$2; else print $1}')
-        
-        echo "Output FPS: $out_fps" >&3
-        
-        # Le FPS doit être ≥ 50 (proche de 60)
-        local fps_ok
-        fps_ok=$(echo "$out_fps" | awk '{if($1 >= 50) print "yes"; else print "no"}')
-        [ "$fps_ok" = "yes" ]
-    fi
+    # Un fichier de sortie DOIT exister, sinon l'assertion ne vérifie rien.
+    [ -n "$out_file" ]
+
+    # Vérifier le framerate de sortie
+    local out_fps_raw
+    out_fps_raw=$(ffprobe -v error -select_streams v:0 \
+        -show_entries stream=r_frame_rate -of csv=p=0 "$out_file")
+
+    echo "Output FPS raw: $out_fps_raw" >&3
+
+    # Calculer le fps effectif
+    local out_fps
+    out_fps=$(echo "$out_fps_raw" | awk -F'/' '{if(NF==2 && $2>0) printf "%.2f", $1/$2; else print $1}')
+
+    echo "Output FPS: $out_fps" >&3
+
+    # Le FPS doit être ≥ 50 (proche de 60)
+    local fps_ok
+    fps_ok=$(echo "$out_fps" | awk '{if($1 >= 50) print "yes"; else print "no"}')
+    [ "$fps_ok" = "yes" ]
 }
