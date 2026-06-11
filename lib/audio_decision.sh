@@ -343,7 +343,22 @@ _get_smart_audio_decision() {
     if [[ -n "$opt_source_codec" ]]; then
         source_codec="$opt_source_codec"
         source_bitrate_kbps="${opt_source_bitrate_kbps:-0}"
-        channels="${opt_channels:-2}"
+        channels="${opt_channels:-}"
+        # Canaux non fournis : les RE-PROBER au lieu de supposer 2 (stéréo).
+        # Sans ça, les chemins skip (skip_decision) et suffixe (_get_effective_audio_codec)
+        # passaient toujours par la branche stéréo alors que l'encodage réel probe
+        # les canaux → décisions divergentes (ex. AAC 5.1 : skip/suffixe décident
+        # "convert→opus" et collent _OPUS, mais l'encodage fait "copy" anti-upscale
+        # multicanal → fichier jamais skippé, remux inutile, suffixe mensonger).
+        if [[ -z "$channels" || "$channels" == "N/A" ]]; then
+            channels="2"
+            if [[ -f "$input_file" ]] && declare -f _probe_audio_full &>/dev/null; then
+                local _audio_full_reprobe _ch_reprobe
+                _audio_full_reprobe=$(_probe_audio_full "$input_file")
+                IFS='|' read -r _ _ _ch_reprobe _ <<< "$_audio_full_reprobe"
+                [[ "$_ch_reprobe" =~ ^[0-9]+$ ]] && channels="$_ch_reprobe"
+            fi
+        fi
     else
         if declare -f _probe_audio_full &>/dev/null; then
             local audio_full
