@@ -44,3 +44,27 @@ EOF
   [ "$status" -eq 0 ]
   echo "$output" | grep -q "notify=true"
 }
+
+@test "env: l'environnement du process a priorité sur .env.local" {
+  tmp="$BATS_TEST_TMPDIR"
+  envf="$tmp/env.local"
+
+  # .env.local dit "true", mais l'environnement du process dit "false".
+  printf '%s\n' 'NASCODE_DISCORD_NOTIFY=true' > "$envf"
+
+  run bash -c 'export NASCODE_DISCORD_NOTIFY=false; source "$LIB_DIR/env.sh"; _nascode_load_env_file "$1"; echo "notify=${NASCODE_DISCORD_NOTIFY:-}"' bash "$envf"
+  [ "$status" -eq 0 ]
+  # L'env du process (false) reste souverain.
+  echo "$output" | grep -q "notify=false"
+}
+
+@test "env: une variable absente de l'environnement est bien prise du .env.local" {
+  tmp="$BATS_TEST_TMPDIR"
+  envf="$tmp/env.local"
+
+  printf '%s\n' 'NASCODE_ONLY_IN_FILE=fromfile' > "$envf"
+
+  run bash -c 'unset NASCODE_ONLY_IN_FILE; source "$LIB_DIR/env.sh"; _nascode_load_env_file "$1"; echo "v=${NASCODE_ONLY_IN_FILE:-}"' bash "$envf"
+  [ "$status" -eq 0 ]
+  echo "$output" | grep -q "v=fromfile"
+}

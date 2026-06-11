@@ -53,6 +53,12 @@ _nascode_load_env_file() {
             value="${value:1:${#value}-2}"
         fi
 
+        # Précédence : environnement du process > .env.local > défauts.
+        # Si la variable est DÉJÀ définie dans l'environnement (même vide), on ne
+        # l'écrase pas : `NASCODE_DISCORD_NOTIFY=false ./nascode` doit rester
+        # souverain face à un .env.local qui dirait l'inverse.
+        [[ -n "${!key+x}" ]] && continue
+
         export "$key=$value"
     done < "$env_file"
 

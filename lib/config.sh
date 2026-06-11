@@ -427,18 +427,30 @@ set_conversion_mode_parameters() {
             ;;
         *)
             print_error "$(msg MSG_CFG_UNKNOWN_MODE "$CONVERSION_MODE")"
-            echo "  Modes disponibles : film, adaptatif, adaptatif-vmaf, gaming, serie"
+            echo "  $(msg MSG_CFG_AVAILABLE_MODES)"
             exit 1
             ;;
     esac
 
+    # Two-pass (-2) est incompatible avec les modes adaptatifs : ils encodent en
+    # CRF contraint single-pass avec un bitrate calculé par fichier/segment.
+    # Si l'utilisateur a explicitement passé -2, on le SIGNALE au lieu de
+    # l'ignorer en silence, et on conserve le single-pass imposé par le design.
+    # (film/serie respectent -2 : leurs presets sont compatibles two-pass.)
+    if [[ "${SINGLE_PASS_MODE_SET_BY_CLI:-}" == true ]] \
+        && [[ "${ENCODER_MODE_PROFILE:-}" == "adaptatif" ]] \
+        && [[ "${SINGLE_PASS_MODE:-}" == true ]]; then
+        print_warning "$(msg MSG_CFG_TWOPASS_IGNORED_ADAPTIVE "$CONVERSION_MODE")"
+    fi
+
     # Override CLI du mode "qualité équivalente" (audio + cap vidéo).
     #
-    # EXCEPTION adaptatif : l'override est ignoré car ce mode calcule
-    # un bitrate adaptatif PAR FICHIER via l'analyse de complexité.
-    # La traduction "qualité équivalente" est donc intrinsèque au mode et n'a
-    # pas de sens à désactiver — sans elle, le mode adaptatif perd sa raison d'être.
-    if [[ "$CONVERSION_MODE" != "adaptatif" ]]; then
+    # EXCEPTION adaptatif : l'override est ignoré car ces modes calculent un
+    # bitrate adaptatif PAR FICHIER/segment. La traduction "qualité équivalente"
+    # est intrinsèque et n'a pas de sens à désactiver. On teste le PROFIL
+    # encodeur (pas le nom de mode) pour couvrir adaptatif + gaming +
+    # adaptatif-vmaf, tous bâtis sur le profil "adaptatif".
+    if [[ "${ENCODER_MODE_PROFILE:-}" != "adaptatif" ]]; then
         if [[ "${EQUIV_QUALITY_OVERRIDE:-}" == true ]]; then
             AUDIO_TRANSLATE_EQUIV_QUALITY=true
             VIDEO_EQUIV_QUALITY_CAP=true

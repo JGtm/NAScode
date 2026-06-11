@@ -54,12 +54,11 @@ if [[ ! -d "$LIB_DIR" ]]; then
     exit 1
 fi
 
-# Charger l'internationalisation en premier (avant tout message utilisateur)
-# Note: i18n.sh charge automatiquement la locale selon NASCODE_LANG ou --lang
-source "$LIB_DIR/i18n.sh"
-
-# Auto-charger un fichier d'environnement local (optionnel)
-# Remarque: implémentation dans lib/env.sh (sans `source` du .env)
+# Auto-charger un fichier d'environnement local (optionnel) AVANT l'i18n.
+# Remarque: implémentation dans lib/env.sh (sans `source` du .env).
+# Ordre important : un NASCODE_LANG défini dans .env.local doit être visible
+# quand i18n.sh charge la locale (il lit NASCODE_LANG à son sourcing). env.sh
+# n'émet aucun message traduit, le placer avant i18n est donc sans risque.
 if [[ -f "$LIB_DIR/env.sh" ]]; then
     # shellcheck disable=SC1090
     source "$LIB_DIR/env.sh"
@@ -67,6 +66,10 @@ if [[ -f "$LIB_DIR/env.sh" ]]; then
         _nascode_autoload_env "$SCRIPT_DIR"
     fi
 fi
+
+# Charger l'internationalisation (avant tout message utilisateur).
+# Note: i18n.sh charge automatiquement la locale selon NASCODE_LANG ou --lang
+source "$LIB_DIR/i18n.sh"
 
 # Charger les modules dans l'ordre des dépendances
 source "$LIB_DIR/constants.sh"    # Constantes globales (pas de dépendances, overridables)

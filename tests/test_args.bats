@@ -503,3 +503,14 @@ _reset_cli_state() {
     [ "$status" -eq 0 ]
     [ "$output" = "false" ]
 }
+
+@test "parse_arguments: une option à valeur refuse une valeur commençant par '-'" {
+    # `-s -o /out` : -o ne doit PAS être avalé comme source.
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments -s -o /out'
+    [ "$status" -ne 0 ]
+
+    # Contrôle positif : une vraie valeur passe.
+    run bash -lc 'set -euo pipefail; cd "$PROJECT_ROOT"; source lib/ui.sh; source lib/config.sh; source lib/off_peak.sh; source lib/args.sh; parse_arguments -s /videos -o /out; echo "src=$SOURCE"'
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"src=/videos"* ]]
+}

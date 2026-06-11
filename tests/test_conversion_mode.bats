@@ -104,3 +104,49 @@ _reset_state() {
     # Pas de downgrade : on ré-encode en AV1 pour plafonner le bitrate
     [ "$EFFECTIVE_VIDEO_CODEC" = "av1" ]
 }
+
+###########################################################
+# Précédence CLI > preset de mode (SINGLE_PASS_MODE / -2)
+###########################################################
+
+@test "set_conversion_mode_parameters: -2 (two-pass) conservé en mode serie" {
+    CONVERSION_MODE="serie"
+    VIDEO_CODEC="hevc"
+    SINGLE_PASS_MODE=false
+    SINGLE_PASS_MODE_SET_BY_CLI=true
+
+    set_conversion_mode_parameters
+
+    # serie respecte le choix utilisateur : two-pass conservé
+    [ "$SINGLE_PASS_MODE" = "false" ]
+}
+
+@test "set_conversion_mode_parameters: mode adaptatif conserve son single-pass (-2 non passé)" {
+    CONVERSION_MODE="adaptatif"
+    VIDEO_CODEC="av1"
+    SINGLE_PASS_MODE=true
+    unset SINGLE_PASS_MODE_SET_BY_CLI
+
+    set_conversion_mode_parameters
+
+    [ "$SINGLE_PASS_MODE" = "true" ]
+}
+
+@test "set_conversion_mode_parameters: -2 en mode adaptatif force le single-pass (design) et le signale" {
+    CONVERSION_MODE="adaptatif"
+    VIDEO_CODEC="av1"
+    SINGLE_PASS_MODE=false
+    SINGLE_PASS_MODE_SET_BY_CLI=true
+
+    # Valeur résultante : le single-pass du mode est conservé
+    set_conversion_mode_parameters
+    [ "$SINGLE_PASS_MODE" = "true" ]
+
+    # Et l'utilisateur est averti (au lieu d'un écrasement silencieux)
+    CONVERSION_MODE="adaptatif"
+    VIDEO_CODEC="av1"
+    SINGLE_PASS_MODE=false
+    SINGLE_PASS_MODE_SET_BY_CLI=true
+    run set_conversion_mode_parameters
+    [[ "$output" == *"Two-pass"* ]]
+}
