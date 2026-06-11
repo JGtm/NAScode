@@ -9,8 +9,38 @@
 # 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
+# Extrait pooled_metrics.vmaf.mean d'un JSON libvmaf.
+#
+# IMPORTANT : on ancre explicitement sur le bloc "pooled_metrics" PUIS sur la
+# clé "vmaf" avant de lire "mean". Le JSON libvmaf liste d'autres features
+# (integer_adm2, integer_motion2, integer_vif_scaleN…) AVANT le bloc vmaf, et
+# chacune possède sa propre clé "mean". Un simple `grep '"mean"' | head -1`
+# extrait donc integer_adm2 (≈0.95, échelle 0-1), pas le VMAF (échelle 0-100) :
+# c'est le bug historique que masquait l'heuristique "score<1 → ×100".
+#
+# Tolère le JSON multi-ligne (libvmaf réel) comme le compact mono-ligne (tests).
+# Usage : _vmaf_extract_pooled_mean <json_file>  →  imprime le nombre ou rien
+_vmaf_extract_pooled_mean() {
+    local json_file="${1:-}"
+    [[ -f "$json_file" && -s "$json_file" ]] || return 1
+    # On extrait le nombre qui suit la clé "mean" (et non le premier nombre de
+    # la ligne) : sur un JSON compact, "min"/"max"/"mean" sont sur la même ligne
+    # et "min" précède "mean". `"harmonic_mean"` ne matche pas /"mean"/ (pas de
+    # guillemet avant "mean"), donc pas de faux positif.
+    awk '
+        /"pooled_metrics"/                 { in_pooled = 1 }
+        in_pooled && /"vmaf"[[:space:]]*:/ { in_vmaf = 1 }
+        in_vmaf && /"mean"[[:space:]]*:/ {
+            s = $0
+            sub(/.*"mean"[[:space:]]*:[[:space:]]*/, "", s)
+            if (match(s, /[0-9]+\.[0-9]+/)) { print substr(s, RSTART, RLENGTH); exit }
+            if (match(s, /[0-9]+/))         { print substr(s, RSTART, RLENGTH); exit }
+        }
+    ' "$json_file"
+}
+
 # Calcul du score VMAF (qualité vidéo perceptuelle)
-# Usage : compute_vmaf_score <fichier_original> <fichier_converti> [filename_display] [current_index] [total_count] [keyframe_pos]
+# Usage : compute_vmaf_score <fichier_original> <fichier_converti> [filename_display] [current_index] [total_count] [keyframe_pos] [fps_was_limited]
 # Retourne le score VMAF moyen (0-100) ou "NA" si indisponible
 compute_vmaf_score() {
     local original="$1"
@@ -19,12 +49,16 @@ compute_vmaf_score() {
     local current_index="${4:-}"
     local total_count="${5:-}"
     local keyframe_pos="${6:-}"  # Position du keyframe (mode sample)
-    
+    # FPS limité pour CE fichier. Passé explicitement par la queue (le flag est
+    # exporté dans le subshell de conversion et n'atteint pas le process parent
+    # qui traite la queue) ; à défaut, on retombe sur la globale.
+    local fps_was_limited="${7:-${FPS_WAS_LIMITED:-false}}"
+
     # FFmpeg à utiliser pour VMAF (peut être différent du principal)
     local ffmpeg_cmd="${FFMPEG_VMAF:-ffmpeg}"
-    
+
     # Si le FPS a été modifié, VMAF n'est pas fiable (frame count différent)
-    if [[ "${FPS_WAS_LIMITED:-false}" == true ]]; then
+    if [[ "$fps_was_limited" == true ]]; then
         if [[ "${NO_PROGRESS:-false}" != true ]]; then
             print_warning "$(msg MSG_VMAF_FPS_IGNORED "${FPS_ORIGINAL:-?}" "${LIMIT_FPS_TARGET:-29.97}")"
         fi
@@ -237,29 +271,26 @@ compute_vmaf_score() {
     # Nettoyer les fichiers temporaires
     rm -f "$progress_file" 2>/dev/null || true
     
-    # Extraire le score VMAF depuis le fichier JSON
-    # Le format JSON de libvmaf contient : "pooled_metrics": { "vmaf": { "mean": XX.XX, ... } }
+    # Extraire le vrai score VMAF (pooled_metrics.vmaf.mean, échelle 0-100).
     local vmaf_score=""
     if [[ -f "$vmaf_log_file" ]] && [[ -s "$vmaf_log_file" ]]; then
-        # Essayer d'extraire le score VMAF mean depuis pooled_metrics
-        # Format: "mean": 92.456789 (le score est normalement entre 0 et 100)
-        vmaf_score=$(grep -oE '"mean"[[:space:]]*:[[:space:]]*[0-9]+\.?[0-9]*' "$vmaf_log_file" 2>/dev/null | head -1 | grep -oE '[0-9]+\.?[0-9]*$')
+        vmaf_score=$(_vmaf_extract_pooled_mean "$vmaf_log_file")
     fi
-    
+
     # Nettoyer le fichier temporaire
     rm -f "$vmaf_log_file" 2>/dev/null || true
-    
-    if [[ -n "$vmaf_score" ]]; then
-        # Vérifier si le score est normalisé entre 0 et 1 (certaines versions)
-        # Si c'est le cas, multiplier par 100 pour avoir l'échelle 0-100
-        local score_int=${vmaf_score%%.*}
-        if [[ "$score_int" -eq 0 ]] && [[ $(awk "BEGIN {print ($vmaf_score > 0)}") -eq 1 ]]; then
-            # Score entre 0 et 1 (ex: 0.92) -> convertir en 0-100 (ex: 92)
-            vmaf_score=$(awk "BEGIN {printf \"%.2f\", $vmaf_score * 100}")
-        fi
-        # Utiliser awk pour le formatage (insensible à la locale)
-        awk "BEGIN {printf \"%.2f\", $vmaf_score}"
+
+    # Garde de plausibilité : un VMAF valide est dans [0,100]. Vide, non
+    # numérique ou hors borne = extraction ratée → NA explicite (loggué) plutôt
+    # qu'un chiffre faux silencieux. Plus d'heuristique ×100 : elle n'existait
+    # que pour rattraper l'ancien parsing qui lisait integer_adm2 (0-1).
+    if [[ "$vmaf_score" =~ ^[0-9]+(\.[0-9]+)?$ ]] \
+        && [[ "$(awk -v v="$vmaf_score" 'BEGIN{print (v>=0 && v<=100)?1:0}')" -eq 1 ]]; then
+        awk -v v="$vmaf_score" 'BEGIN{printf "%.2f", v}'
     else
+        if [[ -n "$vmaf_score" ]] && [[ -n "${LOG_SESSION:-}" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING VMAF_PARSE | score illisible ou hors borne [0,100]: '${vmaf_score}'" >> "$LOG_SESSION" 2>/dev/null || true
+        fi
         echo "NA"
     fi
 }
@@ -302,10 +333,15 @@ _queue_vmaf_analysis() {
         return 0
     fi
     
-    # Enregistrer la paire dans le fichier de queue
-    # Format: original|converti|keyframe_pos (keyframe_pos vide si mode normal)
+    # Enregistrer la paire dans le fichier de queue.
+    # Format TSV : original \t converti \t keyframe_pos \t fps_was_limited
+    # (séparateur TAB plutôt que '|', qui est un caractère légal dans les noms
+    #  de fichiers sur ext4/NAS et cassait le parsing).
+    # fps_was_limited est capturé ICI car le flag est exporté dans le subshell
+    # de conversion ; il serait perdu côté process parent qui traite la queue.
     local keyframe_pos="${SAMPLE_KEYFRAME_POS:-}"
-    echo "${file_original}|${final_actual}|${keyframe_pos}" >> "$VMAF_QUEUE_FILE" 2>/dev/null || true
+    local fps_was_limited="${FPS_WAS_LIMITED:-false}"
+    printf '%s\t%s\t%s\t%s\n' "$file_original" "$final_actual" "$keyframe_pos" "$fps_was_limited" >> "$VMAF_QUEUE_FILE" 2>/dev/null || true
 }
 
 # Traiter toutes les analyses VMAF en attente
@@ -390,16 +426,21 @@ process_vmaf_queue() {
             fi
 
             if [[ -n "$cur_score" ]] && _vmaf_float_lt "$score" "$cur_score"; then
-                # shift down
-                worst_lines[2]="${worst_lines[1]:-}"
-                worst_lines[1]="${worst_lines[0]:-}"
+                # Décaler vers le haut uniquement les positions STRICTEMENT après i
+                # (de la fin vers i+1), puis insérer en i. L'ancien code shiftait
+                # [1]←[0] et [2]←[1] quel que soit i, ce qui dupliquait et perdait
+                # des entrées (insérer 25 dans [10,20,30] donnait [10,10,25]).
+                local j
+                for ((j=2; j>i; j--)); do
+                    worst_lines[$j]="${worst_lines[$((j-1))]:-}"
+                done
                 worst_lines[$i]="$line"
                 return 0
             fi
         done
         return 0
     }
-    while IFS='|' read -r file_original final_actual keyframe_pos; do
+    while IFS=$'\t' read -r file_original final_actual keyframe_pos fps_limited; do
         ((current++)) || true
         
         local filename
@@ -437,7 +478,7 @@ process_vmaf_queue() {
         local vmaf_start_time vmaf_end_time vmaf_duration vmaf_duration_str
         vmaf_start_time=$(date +%s)
         local vmaf_score
-        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename" "$current" "$vmaf_count" "$keyframe_pos")
+        vmaf_score=$(compute_vmaf_score "$file_original" "$final_actual" "$filename" "$current" "$vmaf_count" "$keyframe_pos" "${fps_limited:-false}")
         vmaf_end_time=$(date +%s)
         vmaf_duration=$((vmaf_end_time - vmaf_start_time))
         # Format hh:mm:ss
