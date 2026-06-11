@@ -479,6 +479,7 @@ MSG_FFMPEG_SEGMENT="Segment de %ss à partir de %s"
 ###########################################################
 
 MSG_FINAL_GENERATED="GÉNÉRÉ"
+MSG_FINAL_ANOMALY_DETECTED="🚨 ANOMALIE DÉTECTÉE : le nom de base original diffère du nom généré sans suffixe !"
 MSG_FINAL_ANOMALY_COUNT="%d ANOMALIE(S) de nommage trouvée(s)."
 MSG_FINAL_ANOMALY_HINT="Veuillez vérifier les caractères spéciaux ou les problèmes d'encodage pour ces fichiers."
 MSG_FINAL_NO_ANOMALY="Aucune anomalie de nommage détectée."

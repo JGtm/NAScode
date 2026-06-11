@@ -481,6 +481,7 @@ MSG_FFMPEG_SEGMENT="Segment of %ss starting from %s"
 ###########################################################
 
 MSG_FINAL_GENERATED="GENERATED"
+MSG_FINAL_ANOMALY_DETECTED="🚨 ANOMALY DETECTED: the original base name differs from the generated name without suffix!"
 MSG_FINAL_ANOMALY_COUNT="%d naming ANOMALY(IES) found."
 MSG_FINAL_ANOMALY_HINT="Please check for special characters or encoding issues for these files."
 MSG_FINAL_NO_ANOMALY="No naming anomalies detected."
