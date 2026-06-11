@@ -22,26 +22,47 @@ if ! declare -f msg >/dev/null 2>&1; then
     fi
 fi
 
-# === COULEURS DE BASE ===
-readonly NOCOLOR=$'\033[0m'
-readonly GREEN=$'\033[0;32m'
-readonly YELLOW=$'\033[0;33m'
-readonly RED=$'\033[0;31m'
-readonly CYAN=$'\033[0;36m'
-readonly BLUE=$'\033[0;34m'
-readonly MAGENTA=$'\033[0;35m'
-readonly WHITE=$'\033[0;37m'
-# shellcheck disable=SC2034
-readonly ORANGE=$'\033[1;33m'
+# === DÉTECTION DE LA COULEUR ===
+# La couleur n'est émise que si la sortie est un vrai terminal, pour qu'un run
+# redirigé (cron, `nascode > log`, CI) ne reçoive pas de séquences ANSI brutes.
+# Conventions respectées :
+#   - NO_COLOR défini (https://no-color.org) → couleur désactivée
+#   - NASCODE_FORCE_COLOR défini → couleur forcée (pipe vers un pager coloré)
+#   - sinon : activée seulement si stdout (fd 1) est un terminal
+_ui_color_enabled() {
+    [[ -n "${NASCODE_FORCE_COLOR:-}" ]] && return 0
+    [[ -n "${NO_COLOR:-}" ]] && return 1
+    [[ -t 1 ]]
+}
 
-# === STYLES SUPPLÉMENTAIRES ===
-# shellcheck disable=SC2034
-readonly BOLD=$'\033[1m'
-readonly DIM=$'\033[2m'
-# shellcheck disable=SC2034
-readonly ITALIC=$'\033[3m'
-# shellcheck disable=SC2034
-readonly UNDERLINE=$'\033[4m'
+# === COULEURS DE BASE ===
+if _ui_color_enabled; then
+    readonly NOCOLOR=$'\033[0m'
+    readonly GREEN=$'\033[0;32m'
+    readonly YELLOW=$'\033[0;33m'
+    readonly RED=$'\033[0;31m'
+    readonly CYAN=$'\033[0;36m'
+    readonly BLUE=$'\033[0;34m'
+    readonly MAGENTA=$'\033[0;35m'
+    readonly WHITE=$'\033[0;37m'
+    # shellcheck disable=SC2034
+    readonly ORANGE=$'\033[1;33m'
+    # === STYLES SUPPLÉMENTAIRES ===
+    # shellcheck disable=SC2034
+    readonly BOLD=$'\033[1m'
+    readonly DIM=$'\033[2m'
+    # shellcheck disable=SC2034
+    readonly ITALIC=$'\033[3m'
+    # shellcheck disable=SC2034
+    readonly UNDERLINE=$'\033[4m'
+else
+    # Sortie non-terminale : pas de séquences ANSI (variables vides).
+    readonly NOCOLOR='' GREEN='' YELLOW='' RED='' CYAN='' BLUE='' MAGENTA='' WHITE=''
+    # shellcheck disable=SC2034
+    readonly ORANGE=''
+    # shellcheck disable=SC2034
+    readonly BOLD='' DIM='' ITALIC='' UNDERLINE=''
+fi
 
 # === CARACTÈRES DE DESSIN DE BOÎTE (Unicode) ===
 readonly BOX_TL="╭"    # Top-left
