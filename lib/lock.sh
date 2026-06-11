@@ -98,6 +98,7 @@ cleanup() {
     sleep 0.2
     
     rm -f "$LOCKFILE"
+    rm -f "${LOCKFILE}.flock" 2>/dev/null || true
     # Nettoyage des artefacts de queue dynamique
     if [[ -n "${WORKFIFO:-}" ]]; then
         rm -f "${WORKFIFO}" 2>/dev/null || true
@@ -137,10 +138,25 @@ _handle_interrupt() {
 ###########################################################
 
 check_lock() {
+    # Le test "lock existant ?" puis l'écriture du PID forment une fenêtre TOCTOU :
+    # deux instances lancées simultanément pouvaient la franchir toutes les deux.
+    # On SÉRIALISE cette section critique sous un flock (sur un fichier annexe),
+    # de sorte qu'une seule instance à la fois lise/écrive le lock. La DÉCISION
+    # reste basée sur le PID (liveness via ps) — compat sémantique et messages.
+    # flock est requis par `make doctor` ; à défaut on retombe sur l'ancien
+    # comportement non atomique (best-effort).
+    local _have_flock=false
+    if command -v flock >/dev/null 2>&1; then
+        if exec 9>"${LOCKFILE}.flock" 2>/dev/null; then
+            flock 9 2>/dev/null && _have_flock=true
+        fi
+    fi
+
+    # --- Section critique (atomique entre instances grâce au flock ci-dessus) ---
     if [[ -f "$LOCKFILE" ]]; then
         local pid
-        pid=$(cat "$LOCKFILE")
-        
+        pid=$(cat "$LOCKFILE" 2>/dev/null)
+
         if ps -p "$pid" > /dev/null 2>&1; then
             print_error "$(msg MSG_LOCK_ALREADY_RUNNING "$pid")"
             exit 1
@@ -149,8 +165,16 @@ check_lock() {
             rm -f "$LOCKFILE"
         fi
     fi
-    
+
     echo $$ > "$LOCKFILE"
+
+    # Relâcher le verrou de sérialisation : la protection "déjà en cours" est
+    # ensuite assurée par la présence du PID (vérifié ci-dessus), pas par flock.
+    # (Sinon une 2e instance bloquerait au lieu de sortir avec "déjà en cours".)
+    if [[ "$_have_flock" == true ]]; then
+        flock -u 9 2>/dev/null || true
+        exec 9>&- 2>/dev/null || true
+    fi
 }
 
 ###########################################################

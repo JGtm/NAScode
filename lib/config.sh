@@ -14,8 +14,12 @@
 # Note: SCRIPT_DIR est défini dans le script principal avant le chargement des modules
 EXECUTION_TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
 readonly EXECUTION_TIMESTAMP
-readonly LOCKFILE="/tmp/conversion_video.lock"
-readonly STOP_FLAG="/tmp/conversion_stop_flag"
+# Chemins runtime. Surchargables pour isoler plusieurs instances/utilisateurs
+# sur une machine partagée (ex. `export NASCODE_RUNTIME_DIR="$XDG_RUNTIME_DIR"`,
+# ou NASCODE_LOCKFILE/NASCODE_STOP_FLAG pour un contrôle fin). Défaut historique
+# inchangé : /tmp (mono-utilisateur).
+readonly LOCKFILE="${NASCODE_LOCKFILE:-${NASCODE_RUNTIME_DIR:-/tmp}/conversion_video.lock}"
+readonly STOP_FLAG="${NASCODE_STOP_FLAG:-${NASCODE_RUNTIME_DIR:-/tmp}/conversion_stop_flag}"
 # SCRIPT_DIR est déjà défini par le script principal
 
 # ----- Variables modifiables par arguments -----
@@ -135,8 +139,8 @@ SUFFIX_STRING=""  # Suffixe par défaut (sera mis à jour par build_dynamic_suff
 EXCLUDES=("./logs" "./*.sh" "./*.txt" "./Converted" "./samples" "./tests" "../ConversionPy")
 
 # ----- Paramètres système -----
-readonly TMP_DIR="/tmp/video_convert"
-readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans /tmp
+readonly TMP_DIR="${NASCODE_TMP_DIR:-${NASCODE_RUNTIME_DIR:-/tmp}/video_convert}"
+readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans TMP_DIR
 
 # ----- Paramètres de conversion -----
 # Le seuil de skip est maintenant dynamique : MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)
