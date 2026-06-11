@@ -63,6 +63,79 @@ teardown() {
     [ -f "$expected" ]
 }
 
+@test "_finalize_try_move: publie atomiquement et ne laisse pas de .partial" {
+    local tmp_output="$TEST_TEMP_DIR/tmp_out.bin"
+    printf 'hello world data' > "$tmp_output"
+
+    local dest_dir="$TEST_TEMP_DIR/dest"
+    mkdir -p "$dest_dir"
+    local final_output="$dest_dir/out.mkv"
+
+    run _finalize_try_move "$tmp_output" "$final_output" "/src/orig.mkv"
+    [ "$status" -eq 0 ]
+    [ "$output" = "$final_output" ]
+
+    # Sortie publiée, intègre, et aucun artefact .partial / tmp résiduel
+    [ -f "$final_output" ]
+    [ ! -f "${final_output}.partial" ]
+    [ ! -f "$tmp_output" ]
+    [ "$(cat "$final_output")" = "hello world data" ]
+}
+
+@test "_finalize_try_move: taille incohérente → quarantaine .corrupt, ne publie pas (statut 3)" {
+    # Stub déterministe par chemin (un compteur ne survivrait pas aux sous-shells
+    # de substitution de commande) : la source tmp "pèse" 100, le .partial acheminé
+    # "paraît" tronqué à 50 → mismatch détecté AVANT publication.
+    get_file_size_bytes() {
+        case "$1" in
+            *.partial) echo 50 ;;
+            *)         echo 100 ;;
+        esac
+    }
+
+    local tmp_output="$TEST_TEMP_DIR/tmp_out.bin"
+    printf 'data' > "$tmp_output"
+    local dest_dir="$TEST_TEMP_DIR/dest"
+    mkdir -p "$dest_dir"
+    local final_output="$dest_dir/out.mkv"
+
+    run _finalize_try_move "$tmp_output" "$final_output" "/src/orig.mkv"
+    [ "$status" -eq 3 ]
+
+    # La sortie finale n'est JAMAIS publiée ; pas de .partial résiduel
+    [ ! -f "$final_output" ]
+    [ ! -f "${final_output}.partial" ]
+    # Un fichier de quarantaine existe et c'est le chemin retourné
+    [[ "$output" == "${final_output}.corrupt-"* ]]
+    ls "${dest_dir}"/out.mkv.corrupt-* >/dev/null 2>&1
+}
+
+@test "_finalize_log_and_verify: move_status=3 → ERROR QUARANTINED, ni SUCCESS ni queue VMAF" {
+    local corrupt="$TEST_TEMP_DIR/out.mkv.corrupt-x"
+    printf 'partialdata' > "$corrupt"  # 11 octets
+
+    local tmp_input="$TEST_TEMP_DIR/tmp_in.bin"
+    local ffmpeg_log_temp="$TEST_TEMP_DIR/ffmpeg.log"
+    printf 'x' > "$tmp_input"
+    printf 'log' > "$ffmpeg_log_temp"
+
+    export VMAF_QUEUE_FILE="$TEST_TEMP_DIR/.vmaf_queue"
+    : > "$VMAF_QUEUE_FILE"
+    # Détecte tout appel indu à la mise en queue VMAF
+    _queue_vmaf_analysis() { echo "QUEUED" >> "$VMAF_QUEUE_FILE"; }
+
+    _finalize_log_and_verify "/src/orig.mkv" "$corrupt" "$tmp_input" "$ffmpeg_log_temp" "" 1 11 "$TEST_TEMP_DIR/out.mkv" 3
+
+    # Erreur de quarantaine loggée
+    run grep -F "| ERROR QUARANTINED |" "$LOG_SESSION"
+    [ "$status" -eq 0 ]
+    # Pas de SUCCESS pour un fichier quarantiné
+    run grep -F "| SUCCESS |" "$LOG_SESSION"
+    [ "$status" -ne 0 ]
+    # Pas de mise en queue VMAF
+    [ ! -s "$VMAF_QUEUE_FILE" ]
+}
+
 @test "_finalize_log_and_verify: fichier final manquant -> ERROR TRANSFER_FAILED et show_summary compte une erreur" {
     local tmp_input="$TEST_TEMP_DIR/tmp_in.bin"
     local ffmpeg_log_temp="$TEST_TEMP_DIR/ffmpeg.log"

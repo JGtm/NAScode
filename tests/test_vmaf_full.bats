@@ -227,20 +227,43 @@ EOF
     grep -q "test_video_2s.mkv" "$VMAF_QUEUE_FILE"
 }
 
-@test "_queue_vmaf_analysis: format correct (original|converti|keyframe)" {
+@test "_queue_vmaf_analysis: format TSV à 4 champs (original\tconverti\tkeyframe\tfps_limited)" {
     VMAF_ENABLED=true
     HAS_LIBVMAF=1
-    
+
     local original="$FIXTURES_DIR/test_video_2s.mkv"
     local converted="$FIXTURES_DIR/test_video_hevc_2s.mkv"
-    
+
     _queue_vmaf_analysis "$original" "$converted"
-    
-    # Vérifier le format avec les 3 champs séparés par |
+
     local line
     line=$(cat "$VMAF_QUEUE_FILE")
-    
-    [[ "$line" =~ \| ]]
+
+    # Le séparateur est désormais une TABULATION (pas '|', légal dans les noms)
+    [[ "$line" == *$'\t'* ]]
+    ! [[ "$line" =~ \| ]]
+
+    # 4 champs séparés par TAB
+    local nfields
+    nfields=$(awk -F'\t' '{print NF}' <<< "$line")
+    [ "$nfields" -eq 4 ]
+}
+
+@test "_queue_vmaf_analysis: persiste FPS_WAS_LIMITED dans le 4e champ" {
+    VMAF_ENABLED=true
+    HAS_LIBVMAF=1
+    export FPS_WAS_LIMITED=true
+
+    local original="$FIXTURES_DIR/test_video_2s.mkv"
+    local converted="$FIXTURES_DIR/test_video_hevc_2s.mkv"
+
+    _queue_vmaf_analysis "$original" "$converted"
+
+    local field4
+    field4=$(awk -F'\t' '{print $4}' < "$VMAF_QUEUE_FILE")
+    [ "$field4" = "true" ]
+
+    unset FPS_WAS_LIMITED
 }
 
 @test "_queue_vmaf_analysis: ne fait rien si VMAF désactivé" {
@@ -381,41 +404,85 @@ EOF
 }
 
 @test "process_vmaf_queue: lit le format correct" {
-    # Créer une queue avec le bon format
-    echo "$FIXTURES_DIR/test_video_2s.mkv|$FIXTURES_DIR/test_video_hevc_2s.mkv|" > "$VMAF_QUEUE_FILE"
-    
+    # Créer une queue avec le bon format TSV (4 champs)
+    printf '%s\t%s\t%s\t%s\n' \
+        "$FIXTURES_DIR/test_video_2s.mkv" "$FIXTURES_DIR/test_video_hevc_2s.mkv" "" "false" \
+        > "$VMAF_QUEUE_FILE"
+
     local count
     count=$(wc -l < "$VMAF_QUEUE_FILE")
-    
+
     [ "$count" -eq 1 ]
 }
 
 ###########################################################
-# Tests de normalisation du score
+# Tests d'extraction du score depuis le JSON libvmaf
+#
+# Régression CRITIQUE : le JSON libvmaf liste integer_adm2 (échelle 0-1) AVANT
+# le bloc vmaf (échelle 0-100). L'ancien parsing `grep '"mean"' | head -1`
+# lisait integer_adm2 puis le ×100 le maquillait. _vmaf_extract_pooled_mean
+# doit ancrer sur pooled_metrics.vmaf.mean.
 ###########################################################
 
-@test "vmaf: score 0-1 converti en 0-100" {
-    # Si le score est entre 0 et 1, il doit être multiplié par 100
-    local vmaf_score="0.92"
-    local score_int=${vmaf_score%%.*}
-    
-    if [[ "$score_int" -eq 0 ]] && [[ $(awk "BEGIN {print ($vmaf_score > 0)}") -eq 1 ]]; then
-        vmaf_score=$(awk "BEGIN {printf \"%.2f\", $vmaf_score * 100}")
-    fi
-    
-    [[ "$vmaf_score" == "92.00" ]]
+@test "vmaf: extrait pooled_metrics.vmaf.mean et PAS integer_adm2 (multi-features)" {
+    local json="$TEST_TEMP_DIR/vmaf_multi.json"
+    cat > "$json" <<'JSON'
+{
+  "frames": [ { "metrics": { "integer_adm2": 0.93, "vmaf": 80.1 } } ],
+  "pooled_metrics": {
+    "integer_adm2": { "min": 0.91, "max": 0.99, "mean": 0.959339, "harmonic_mean": 0.95 },
+    "integer_motion2": { "min": 0.0, "max": 12.3, "mean": 6.12 },
+    "vmaf": { "min": 70.12, "max": 99.20, "mean": 82.317162, "harmonic_mean": 81.04 }
+  }
+}
+JSON
+    local out
+    out=$(_vmaf_extract_pooled_mean "$json")
+    [ "$out" = "82.317162" ]
 }
 
-@test "vmaf: score déjà en 0-100 non modifié" {
-    local vmaf_score="92.50"
-    local score_int=${vmaf_score%%.*}
-    
-    # Si score_int > 0, pas de conversion
-    if [[ "$score_int" -eq 0 ]] && [[ $(awk "BEGIN {print ($vmaf_score > 0)}") -eq 1 ]]; then
-        vmaf_score=$(awk "BEGIN {printf \"%.2f\", $vmaf_score * 100}")
-    fi
-    
-    [[ "$vmaf_score" == "92.50" ]]
+@test "vmaf: extrait le mean d'un JSON compact (bloc vmaf sur une ligne)" {
+    local json="$TEST_TEMP_DIR/vmaf_compact.json"
+    echo '{ "pooled_metrics": { "vmaf": { "min": 70.1, "max": 99.2, "mean": 88.4 } } }' > "$json"
+    local out
+    out=$(_vmaf_extract_pooled_mean "$json")
+    [ "$out" = "88.4" ]
+}
+
+@test "vmaf: extraction vide si le bloc vmaf est absent" {
+    local json="$TEST_TEMP_DIR/vmaf_novmaf.json"
+    echo '{ "pooled_metrics": { "integer_adm2": { "mean": 0.95 } } }' > "$json"
+    local out
+    out=$(_vmaf_extract_pooled_mean "$json")
+    [ -z "$out" ]
+}
+
+@test "vmaf: un mean sous 1.0 N'EST PLUS gonflé ×100 (plus d'heuristique)" {
+    # Le fake ffmpeg écrit un JSON dont vmaf.mean = 0.50. Avec l'ancienne
+    # heuristique, compute_vmaf_score retournait 50.00. Désormais 0.50 est un
+    # score valide dans [0,100] et doit être retourné tel quel (formaté).
+    HAS_LIBVMAF=1
+    local fake_ffmpeg="$TEST_TEMP_DIR/fake_ffmpeg_low.sh"
+    cat > "$fake_ffmpeg" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+lavfi=""
+for ((i=1; i<=$#; i++)); do
+    if [[ "${!i}" == "-lavfi" ]]; then j=$((i+1)); lavfi="${!j}"; break; fi
+done
+log_path=$(printf '%s' "$lavfi" | sed -n 's/.*log_path=\([^:]*\).*/\1/p' | head -1)
+[[ -n "${log_path:-}" ]] && printf '%s\n' '{ "pooled_metrics": { "vmaf": { "mean": 0.50 } } }' > "$log_path"
+exit 0
+EOF
+    chmod +x "$fake_ffmpeg"
+    FFMPEG_VMAF="$fake_ffmpeg"
+
+    local orig="$TEST_TEMP_DIR/o.mkv" conv="$TEST_TEMP_DIR/c.mkv"
+    printf 'x' > "$orig"; printf 'y' > "$conv"
+
+    local result
+    result=$(compute_vmaf_score "$orig" "$conv" "dummy")
+    [ "$result" = "0.50" ]
 }
 
 ###########################################################
@@ -537,10 +604,13 @@ EOF
     
     local pipeline_file="$LIB_DIR/ffmpeg_pipeline.sh"
     
-    # Extraire uniquement la fonction _execute_ffmpeg_pipeline
-    # et vérifier que _setup_sample_mode_params est appelée avant le case
+    # Extraire uniquement la fonction _execute_ffmpeg_pipeline (de sa définition
+    # jusqu'à son accolade fermante en colonne 0). On utilise awk et non
+    # `sed '/start/,/^[^ ]/'` : ce dernier coupait la plage trop tôt à cause
+    # d'une chaîne awk multi-ligne dont une ligne commence en colonne 0
+    # (faux positif de "fin de fonction").
     local func_content
-    func_content=$(sed -n '/^_execute_ffmpeg_pipeline()/,/^[^ ]/p' "$pipeline_file" | head -n -1)
+    func_content=$(awk '/^_execute_ffmpeg_pipeline\(\)/{f=1} f{print} f && /^\}/{exit}' "$pipeline_file")
     
     # Vérifier que _setup_sample_mode_params est présent
     echo "$func_content" | grep -q "_setup_sample_mode_params"

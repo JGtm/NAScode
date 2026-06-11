@@ -13,7 +13,10 @@
 _args_require_value() {
     local opt="$1"
     local val="${2:-}"
-    if [[ -z "$val" ]]; then
+    # Rejeter une valeur vide OU commençant par '-' : sinon `nascode -s -o /out`
+    # avalerait "-o" comme source et décalerait silencieusement les arguments.
+    # (Même garde que -S, ici généralisée à toutes les options à valeur.)
+    if [[ -z "$val" ]] || [[ "$val" == -* ]]; then
         print_error "$(msg MSG_ARG_REQUIRES_VALUE "$opt")"
         exit 1
     fi
@@ -184,6 +187,9 @@ parse_arguments() {
                 ;;
             -2|--two-pass)
                 SINGLE_PASS_MODE=false
+                # Marqueur : l'utilisateur a explicitement demandé two-pass.
+                # Les presets de mode ne doivent pas l'écraser en silence.
+                SINGLE_PASS_MODE_SET_BY_CLI=true
                 shift
                 ;;
             -c|--codec)
@@ -355,8 +361,8 @@ ${CYAN}$(msg MSG_HELP_OPTIONS)${NOCOLOR}
     ${GREEN}-m, --mode${NOCOLOR} MODE              $(msg MSG_HELP_MODE)
     ${GREEN}--min-size${NOCOLOR} SIZE              $(msg MSG_HELP_MIN_SIZE)
     ${GREEN}-d, --dry-run${NOCOLOR}                $(msg MSG_HELP_DRYRUN)
-    ${GREEN}--essential${NOCOLOR}                  force le binaire SVT-AV1-Essential (encodage AV1)
-    ${GREEN}--no-essential${NOCOLOR}               force le fallback libsvtav1 mainline
+    ${GREEN}--essential${NOCOLOR}                  $(msg MSG_HELP_ESSENTIAL)
+    ${GREEN}--no-essential${NOCOLOR}               $(msg MSG_HELP_NO_ESSENTIAL)
     ${GREEN}-S, --suffix${NOCOLOR} [STRING]        $(msg MSG_HELP_SUFFIX)
     ${GREEN}-x, --no-suffix${NOCOLOR}              $(msg MSG_HELP_NO_SUFFIX)
     ${GREEN}-r, --random${NOCOLOR}                 $(msg MSG_HELP_RANDOM)
@@ -400,8 +406,8 @@ ${CYAN}$(msg MSG_HELP_SMART_CODEC_TITLE)${NOCOLOR}
 ${CYAN}$(msg MSG_HELP_MODES_TITLE)${NOCOLOR}
   ${YELLOW}film${NOCOLOR}             : $(msg MSG_HELP_MODE_FILM)
   ${YELLOW}adaptatif${NOCOLOR}        : $(msg MSG_HELP_MODE_ADAPTATIF)
-  ${YELLOW}adaptatif-vmaf${NOCOLOR}   : auto-boost-lite par segment via VMAF prédictif (AV1, audio passthrough)
-  ${YELLOW}gaming${NOCOLOR}           : variante adaptatif calibrée high-motion (replays, captures jeux ; FPS quelconque)
+  ${YELLOW}adaptatif-vmaf${NOCOLOR}   : $(msg MSG_HELP_MODE_ADAPTATIF_VMAF)
+  ${YELLOW}gaming${NOCOLOR}           : $(msg MSG_HELP_MODE_GAMING)
   ${YELLOW}serie${NOCOLOR}            : $(msg MSG_HELP_MODE_SERIE)
 
 ${CYAN}$(msg MSG_HELP_OFF_PEAK_TITLE)${NOCOLOR}

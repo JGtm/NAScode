@@ -658,8 +658,12 @@ get_adaptive_encoding_params() {
     if [[ "$fps" == *"/"* ]]; then
         fps=$(awk -F/ '{if($2>0) printf "%.3f", $1/$2; else print $1}' <<< "$fps")
     fi
-    [[ -z "$fps" ]] && fps="24"
-    
+    # Un fps illisible OU nul (ex. "0/0" → 0) fausserait le bitrate adaptatif
+    # (R = W×H×fps×BPP = 0 → plancher appliqué même sur de la 4K). Fallback 24.
+    if ! [[ "$fps" =~ ^[0-9]+(\.[0-9]+)?$ ]] || [[ "$(awk -v f="$fps" 'BEGIN{print (f>0)?1:0}')" -ne 1 ]]; then
+        fps="24"
+    fi
+
     # Analyser la complexité (retourne stddev|SI|TI)
     local analysis_result stddev si_avg ti_avg
     analysis_result=$(analyze_video_complexity "$file" "$duration" true)

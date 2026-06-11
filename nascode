@@ -1,30 +1,17 @@
 #!/bin/bash
 
 ###########################################################
-# SCRIPT DE CONVERSION VIDÉO LIBX265
+# NAScode — Transcodage vidéo intelligent pour NAS
 # Version modulaire - Point d'entrée principal
 ###########################################################
-# 
-# Ce script convertit des fichiers vidéo en HEVC/x265 avec
-# encodage two-pass pour une taille prévisible (~1,1 Go/h).
 #
-# Architecture modulaire :
-#   lib/ui.sh     - Codes couleurs ANSI
-#   lib/config.sh     - Configuration globale et paramètres
-#   lib/utils.sh      - Fonctions utilitaires (MD5, timestamps, etc.)
-#   lib/logging.sh    - Gestion des logs et répertoires
-#   lib/lock.sh       - Gestion des verrous et cleanup
-#   lib/system.sh     - Vérifications système et dépendances
-#   lib/args.sh       - Parsing des arguments CLI
-#   lib/queue.sh      - Construction et gestion de la file d'attente
-#   lib/progress.sh   - Système de slots pour progression parallèle
-#   lib/media_probe.sh - Propriétés média (ffprobe)
-#   lib/transcode_video.sh - Transcodage vidéo (x265, 10-bit/downscale)
-#   lib/conversion.sh - Logique de conversion FFmpeg
-#   lib/processing.sh - Traitement parallèle et FIFO
-#   lib/vmaf.sh       - Analyse VMAF (qualité vidéo)
-#   lib/finalize.sh   - Finalisation et résumé
-#   lib/exports.sh    - Export des fonctions/variables pour sous-shells
+# Convertit des bibliothèques vidéo en AV1 (SVT-AV1) ou HEVC (x265) selon le
+# mode choisi (film / serie / adaptatif / gaming / adaptatif-vmaf), avec
+# décision de codec audio "smart", VMAF optionnel et transferts asynchrones.
+#
+# Architecture : ~45 modules sourcés depuis lib/ dans l'ordre de leurs
+# dépendances (voir la section "CHARGEMENT DES MODULES" ci-dessous, chaque
+# `source` est annoté de ses dépendances et effets de bord éventuels).
 #
 ###########################################################
 
@@ -54,12 +41,11 @@ if [[ ! -d "$LIB_DIR" ]]; then
     exit 1
 fi
 
-# Charger l'internationalisation en premier (avant tout message utilisateur)
-# Note: i18n.sh charge automatiquement la locale selon NASCODE_LANG ou --lang
-source "$LIB_DIR/i18n.sh"
-
-# Auto-charger un fichier d'environnement local (optionnel)
-# Remarque: implémentation dans lib/env.sh (sans `source` du .env)
+# Auto-charger un fichier d'environnement local (optionnel) AVANT l'i18n.
+# Remarque: implémentation dans lib/env.sh (sans `source` du .env).
+# Ordre important : un NASCODE_LANG défini dans .env.local doit être visible
+# quand i18n.sh charge la locale (il lit NASCODE_LANG à son sourcing). env.sh
+# n'émet aucun message traduit, le placer avant i18n est donc sans risque.
 if [[ -f "$LIB_DIR/env.sh" ]]; then
     # shellcheck disable=SC1090
     source "$LIB_DIR/env.sh"
@@ -67,6 +53,10 @@ if [[ -f "$LIB_DIR/env.sh" ]]; then
         _nascode_autoload_env "$SCRIPT_DIR"
     fi
 fi
+
+# Charger l'internationalisation (avant tout message utilisateur).
+# Note: i18n.sh charge automatiquement la locale selon NASCODE_LANG ou --lang
+source "$LIB_DIR/i18n.sh"
 
 # Charger les modules dans l'ordre des dépendances
 source "$LIB_DIR/constants.sh"    # Constantes globales (pas de dépendances, overridables)

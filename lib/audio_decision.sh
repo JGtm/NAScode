@@ -1,4 +1,5 @@
-#!/bin/bash###########################################################
+#!/bin/bash
+###########################################################
 # LOGIQUE DE DÉCISION AUDIO "SMART CODEC"
 #
 # Rôle: déterminer quoi faire avec l'audio (quoi faire)

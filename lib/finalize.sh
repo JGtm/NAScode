@@ -14,8 +14,23 @@
 # DÉPLACEMENT DU FICHIER CONVERTI
 ###########################################################
 
-# Essayer de déplacer le fichier produit vers la destination finale.
-# Renvoie le chemin réel utilisé pour le fichier final sur stdout.
+# Transfère tmp_output vers final_output de façon ATOMIQUE et vérifiée.
+#
+# Problème résolu : la destination est typiquement un montage NAS (autre
+# filesystem que /tmp), donc `mv` = copy+unlink interruptible. Écrire
+# directement sur le nom final laissait, en cas de kill (Ctrl+C → kill du
+# process group), un fichier TRONQUÉ portant le nom final — que le run suivant
+# considérait comme une sortie valide (skip définitif). Corruption silencieuse.
+#
+# Stratégie : on écrit dans "${final}.partial", on vérifie la taille, puis on
+# rename .partial → final (même filesystem = rename atomique, jamais tronqué).
+# Un kill pendant la copie laisse un .partial (jamais pris pour la sortie
+# finale) ; une taille incohérente met le fichier en quarantaine ".corrupt-*"
+# au lieu de le publier.
+#
+# Renvoie le chemin réel utilisé sur stdout.
+# Codes retour : 0=publié OK | 1=repli dossier fallback | 2=échec (tmp gardé)
+#                3=taille incohérente, mis en quarantaine (NON publié)
 # Usage : _finalize_try_move <tmp_output> <final_output> <file_original>
 _finalize_try_move() {
     local tmp_output="$1"
@@ -24,31 +39,63 @@ _finalize_try_move() {
 
     local max_try="${MOVE_RETRY_MAX_TRY:-3}"
     local retry_sleep="${MOVE_RETRY_SLEEP_SECONDS:-2}"
+    local partial="${final_output}.partial"
+
+    # Taille attendue, capturée AVANT tout déplacement (tmp_output disparaît après).
+    local expected_bytes
+    expected_bytes=$(get_file_size_bytes "$tmp_output")
+
+    # Nettoyer un éventuel .partial résiduel d'un run précédent interrompu.
+    rm -f "$partial" 2>/dev/null || true
+
+    # Acheminer tmp_output → .partial (mv puis cp+rm), avec retries.
+    local staged=false
     local try=0
-
-    # Tentative mv (3 essais)
     while [[ $try -lt $max_try ]]; do
-        if mv "$tmp_output" "$final_output" 2>/dev/null; then
-            printf "%s" "$final_output"
-            return 0
+        if mv "$tmp_output" "$partial" 2>/dev/null; then
+            staged=true
+            break
         fi
         try=$((try+1))
         [[ "$retry_sleep" != "0" ]] && sleep "$retry_sleep"
     done
+    if [[ "$staged" != true ]]; then
+        try=0
+        while [[ $try -lt $max_try ]]; do
+            if cp "$tmp_output" "$partial" 2>/dev/null; then
+                rm -f "$tmp_output" 2>/dev/null || true
+                staged=true
+                break
+            fi
+            try=$((try+1))
+            [[ "$retry_sleep" != "0" ]] && sleep "$retry_sleep"
+        done
+    fi
 
-    # Essayer cp + rm (3 essais)
-    try=0
-    while [[ $try -lt $max_try ]]; do
-        if cp "$tmp_output" "$final_output" 2>/dev/null; then
-            rm -f "$tmp_output" 2>/dev/null || true
+    if [[ "$staged" == true ]]; then
+        # Vérifier la taille AVANT de publier. Un transfert tronqué (kill,
+        # disque plein, hoquet NAS) est attrapé ici et n'est jamais publié.
+        local actual_bytes
+        actual_bytes=$(get_file_size_bytes "$partial")
+        if [[ "$expected_bytes" -gt 0 && "$actual_bytes" -ne "$expected_bytes" ]]; then
+            # Quarantaine : on ne supprime pas (unique exemplaire converti), on
+            # renomme pour analyse et on signale l'échec.
+            local corrupt_target="${final_output}.corrupt-$(date +%Y%m%d_%H%M%S)_$$"
+            mv "$partial" "$corrupt_target" 2>/dev/null || true
+            printf "%s" "$corrupt_target"
+            return 3
+        fi
+        # Publication atomique (rename même filesystem que la destination finale).
+        if mv "$partial" "$final_output" 2>/dev/null; then
             printf "%s" "$final_output"
             return 0
         fi
-        try=$((try+1))
-        [[ "$retry_sleep" != "0" ]] && sleep "$retry_sleep"
-    done
+        # Le rename a échoué (rare) : la donnée vérifiée reste dans .partial.
+        printf "%s" "$partial"
+        return 2
+    fi
 
-    # Repli local : dossier fallback
+    # Repli local : dossier fallback (impossible d'atteindre la destination).
     local local_fallback_dir="${FALLBACK_DIR:-$HOME/Conversion_failed_uploads}"
     mkdir -p "$local_fallback_dir" 2>/dev/null || true
     local fallback_target
@@ -159,7 +206,8 @@ _finalize_log_and_verify() {
     fi
 
     # Log success (conversion OK) — même si le transfert a dû passer par un fallback, on garde la trace.
-    if [[ -n "$LOG_SESSION" ]]; then
+    # Exception : statut 3 = quarantaine (taille incohérente), ce n'est pas un succès.
+    if [[ "$move_status" != "3" ]] && [[ -n "$LOG_SESSION" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | SUCCESS | $file_original → $final_actual | $size_comparison" >> "$LOG_SESSION" 2>/dev/null || true
     fi
 
@@ -170,7 +218,11 @@ _finalize_log_and_verify() {
     # Nettoyer le checksum_before (supprimer espaces/newlines parasites)
     checksum_before="${checksum_before//[$'\n\r\t ']/}"
     
-    if [[ ! -e "$final_actual" ]]; then
+    if [[ "$move_status" == "3" ]]; then
+        # _finalize_try_move a détecté une taille incohérente et a mis le fichier
+        # en quarantaine (.corrupt-*) sans publier la sortie finale.
+        verify_status="QUARANTINED"
+    elif [[ ! -e "$final_actual" ]]; then
         verify_status="TRANSFER_FAILED"
     elif [[ "$size_before_bytes" -gt 0 && "$size_after_bytes" -gt 0 && "$size_before_bytes" -ne "$size_after_bytes" ]]; then
         # Taille différente = transfert incomplet ou corrompu
@@ -200,8 +252,11 @@ _finalize_log_and_verify() {
         _finalize_preserve_mtime "$file_original" "$final_actual" || true
     fi
 
-    # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les conversions)
-    if declare -f _queue_vmaf_analysis &>/dev/null; then
+    # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les
+    # conversions). Uniquement si la sortie est intègre : pas de VMAF sur un
+    # transfert échoué ou un fichier mis en quarantaine.
+    if [[ "$verify_status" == "OK" || "$verify_status" == "SKIPPED" ]] \
+        && declare -f _queue_vmaf_analysis &>/dev/null; then
         _queue_vmaf_analysis "$file_original" "$final_actual"
     fi
 
@@ -265,58 +320,47 @@ _finalize_conversion_success() {
         return 1
     fi
 
+    # Métriques de fin de fichier — calculées même en headless car la notif
+    # Discord les utilise (cf. ci-dessous).
+    local elapsed_display="N/A"
+    local start_for_file="${FILE_START_TS:-${START_TS:-}}"
+    if [[ -n "${start_for_file:-}" ]] && [[ "${start_for_file}" =~ ^[0-9]+$ ]]; then
+        local end_ts
+        end_ts=$(date +%s)
+        elapsed_display=$(format_duration_compact "$((end_ts - start_for_file))")
+    fi
+
+    local before_fmt="" after_fmt="" size_part=""
+    if [[ "${SAMPLE_MODE:-false}" != true ]]; then
+        local before_bytes=0 after_bytes=0
+        if [[ -e "$file_original" ]]; then
+            before_bytes=$(get_file_size_bytes "$file_original")
+        elif [[ -n "${size_before_mb:-}" ]] && [[ "${size_before_mb}" =~ ^[0-9]+$ ]]; then
+            before_bytes=$((size_before_mb * 1024 * 1024))
+        fi
+        if [[ -e "$tmp_output" ]]; then
+            after_bytes=$(get_file_size_bytes "$tmp_output")
+        fi
+        before_fmt=$(_format_size_bytes_compact "$before_bytes")
+        after_fmt=$(_format_size_bytes_compact "$after_bytes")
+        size_part=" | ${before_fmt} → ${after_fmt}"
+    fi
+
+    # Notification Discord (best-effort) : fin fichier. Émise INCONDITIONNELLEMENT
+    # — y compris en --no-progress / -Q (headless), précisément le cas cron où
+    # Discord est le seul retour. Auparavant piégée dans le bloc NO_PROGRESS, elle
+    # rendait l'événement "fichier terminé" muet alors que "fichier démarré"
+    # partait, créant une asymétrie déroutante.
+    if declare -f notify_event &>/dev/null; then
+        if [[ "${SAMPLE_MODE:-false}" == true ]]; then
+            notify_event file_completed "${elapsed_display}" "" "" || true
+        else
+            notify_event file_completed "${elapsed_display}" "${before_fmt:-}" "${after_fmt:-}" || true
+        fi
+    fi
+
+    # Affichage console (uniquement si la progression est activée).
     if [[ "$NO_PROGRESS" != true ]]; then
-        # Calculer la durée écoulée depuis le début de la conversion (START_TS défini avant l'appel à ffmpeg)
-        local elapsed_display="N/A"
-        local start_for_file="${FILE_START_TS:-${START_TS:-}}"
-        if [[ -n "${start_for_file:-}" ]] && [[ "${start_for_file}" =~ ^[0-9]+$ ]]; then
-            local end_ts
-            end_ts=$(date +%s)
-            local elapsed
-            elapsed=$((end_ts - start_for_file))
-            elapsed_display=$(format_duration_compact "$elapsed")
-        fi
-
-        local display_name
-        display_name="$(basename "${final_output:-$filename}")"
-
-        # Tronquer à 45 caractères max pour l'affichage
-        local display_name_trunc="$display_name"
-        if [[ ${#display_name_trunc} -gt 45 ]]; then
-            display_name_trunc="${display_name_trunc:0:42}..."
-        fi
-
-        local size_part=""
-        if [[ "${SAMPLE_MODE:-false}" != true ]]; then
-            local before_bytes after_bytes
-            before_bytes=0
-            after_bytes=0
-
-            if [[ -e "$file_original" ]]; then
-                before_bytes=$(get_file_size_bytes "$file_original")
-            elif [[ -n "${size_before_mb:-}" ]] && [[ "${size_before_mb}" =~ ^[0-9]+$ ]]; then
-                before_bytes=$((size_before_mb * 1024 * 1024))
-            fi
-
-            if [[ -e "$tmp_output" ]]; then
-                after_bytes=$(get_file_size_bytes "$tmp_output")
-            fi
-
-            local before_fmt after_fmt
-            before_fmt=$(_format_size_bytes_compact "$before_bytes")
-            after_fmt=$(_format_size_bytes_compact "$after_bytes")
-            size_part=" | ${before_fmt} → ${after_fmt}"
-        fi
-
-        # Notification Discord (best-effort) : fin fichier
-        if declare -f notify_event &>/dev/null; then
-            if [[ "${SAMPLE_MODE:-false}" == true ]]; then
-                notify_event file_completed "${elapsed_display}" "" "" || true
-            else
-                notify_event file_completed "${elapsed_display}" "${before_fmt:-}" "${after_fmt:-}" || true
-            fi
-        fi
-
         print_success "$(msg MSG_FINAL_CONV_DONE "$elapsed_display")${size_part}"
     fi
 
@@ -435,7 +479,12 @@ _finalize_conversion_error() {
 ###########################################################
 
 dry_run_compare_names() {
+    # /dev/tty seulement s'il est réellement ouvrable en écriture (cf. run_tests.sh) :
+    # sous MSYS et en non-interactif, -w peut passer alors que l'open échoue.
     local TTY_DEV="/dev/tty"
+    if ! { : >"$TTY_DEV"; } 2>/dev/null; then
+        TTY_DEV="/dev/null"
+    fi
     local LOG_FILE="$LOG_DRYRUN_COMPARISON"
 
     ask_question "$(msg MSG_FINAL_SHOW_COMPARISON)"
@@ -511,12 +560,12 @@ dry_run_compare_names() {
                     # --- VÉRIFICATION D'ANOMALIE ---
                     if [[ "$base_name" != "$generated_base_name" ]]; then
                         anomaly_count=$((anomaly_count + 1))
-                        anomaly_message="🚨 ANOMALIE DÉTECTÉE : Le nom de base original diffère du nom généré sans suffixe !"
+                        anomaly_message="$(msg MSG_FINAL_ANOMALY_DETECTED)"
                     fi
-                    
+
                     if [[ -n "$anomaly_message" ]]; then
                         echo "$anomaly_message"
-                        echo -e "${RED}  $anomaly_message${NOCOLOR}" > $TTY_DEV
+                        echo -e "${RED}  $anomaly_message${NOCOLOR}" > "$TTY_DEV"
                     fi
                     
                     # Affichage des noms

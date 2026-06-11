@@ -26,6 +26,16 @@ BOLD='\033[1m'
 DIM='\033[2m'
 NC='\033[0m'
 
+# Cible pour l'affichage temps réel : /dev/tty si réellement ouvrable en
+# écriture, sinon /dev/null. On teste par une ouverture effective plutôt que
+# par les flags [[ -w ]] : sous Git Bash/MSYS et en contexte non interactif
+# (cron, CI sans -v), /dev/tty peut passer -e/-w tout en échouant à l'open
+# ("No such device or address"), ce qui crasherait le script sous `set -e`.
+TTY_OUT="/dev/tty"
+if ! { : >"$TTY_OUT"; } 2>/dev/null; then
+    TTY_OUT="/dev/null"
+fi
+
 # Options
 VERBOSE=false
 FILTER=""
@@ -74,55 +84,6 @@ translate_error() {
 count_tests_in_file() {
     local file="$1"
     grep -c '^@test ' "$file" 2>/dev/null || true
-}
-
-# Parse la sortie TAP de bats pour extraire les résultats
-parse_tap_output() {
-    local output="$1"
-    local passed=0
-    local failed=0
-    local skipped=0
-    local errors=()
-    local current_test=""
-    local in_error=false
-    local error_buffer=""
-    
-    while IFS= read -r line; do
-        # Ligne de test OK
-        if [[ "$line" =~ ^ok\ [0-9]+\ (.*)$ ]]; then
-            ((passed++)) || true
-            in_error=false
-        # Ligne de test SKIP
-        elif [[ "$line" =~ ^ok\ [0-9]+\ .*\#\ skip ]]; then
-            ((skipped++)) || true
-            in_error=false
-        # Ligne de test FAILED
-        elif [[ "$line" =~ ^not\ ok\ [0-9]+\ (.*)$ ]]; then
-            current_test="${BASH_REMATCH[1]}"
-            ((failed++)) || true
-            in_error=true
-            error_buffer="Test: $current_test"
-        # Commentaire d'erreur (lignes commençant par #)
-        elif [[ "$in_error" == true && "$line" =~ ^#\ (.*)$ ]]; then
-            error_buffer+=$'\n'"  ${BASH_REMATCH[1]}"
-        # Fin de bloc d'erreur
-        elif [[ "$in_error" == true && ! "$line" =~ ^# ]]; then
-            errors+=("$error_buffer")
-            in_error=false
-            error_buffer=""
-        fi
-    done <<< "$output"
-    
-    # Ajouter la dernière erreur si elle existe
-    if [[ -n "$error_buffer" ]]; then
-        errors+=("$error_buffer")
-    fi
-    
-    # Retourner les résultats via variables globales
-    _PASSED=$passed
-    _FAILED=$failed
-    _SKIPPED=$skipped
-    _ERRORS=("${errors[@]+"${errors[@]}"}")
 }
 
 ###########################################################
@@ -258,8 +219,14 @@ TOTAL_PASSED=0
 TOTAL_FAILED=0
 TOTAL_SKIPPED=0
 TOTAL_TESTS=0
+TOTAL_HARNESS_ERRORS=0
 FAILED_FILES=()
 FILE_NUM=0
+
+# Fichier temporaire pour récupérer le code de sortie de bats à travers la
+# process substitution (sinon $? reflète la boucle while, pas bats).
+BATS_RC_TMP=$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/nascode_bats_rc.$$")
+trap 'rm -f "$BATS_RC_TMP" 2>/dev/null || true' EXIT
 
 for test_file in "${TEST_FILES[@]}"; do
     ((FILE_NUM++)) || true
@@ -276,7 +243,7 @@ for test_file in "${TEST_FILES[@]}"; do
     else
         if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
             # Mode condensé : afficher le fichier en cours (colonnes alignées)
-            printf "${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" 0 "$test_count" >/dev/tty
+            printf "${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" 0 "$test_count" >"$TTY_OUT"
         fi
     fi
     
@@ -319,7 +286,7 @@ for test_file in "${TEST_FILES[@]}"; do
                 if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
                     # Mettre à jour le compteur en temps réel
                     done_count=$((local_passed + local_failed + local_skipped))
-                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >"$TTY_OUT"
                 fi
             fi
             
@@ -339,7 +306,7 @@ for test_file in "${TEST_FILES[@]}"; do
                 if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
                     # Mettre à jour le compteur
                     done_count=$((local_passed + local_failed + local_skipped))
-                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >/dev/tty
+                    printf "\r${YELLOW}⏳${NC} [%2d/%-2d] %-55s (%2d/%-2d)" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$done_count" "$test_count" >"$TTY_OUT"
                 fi
             fi
             
@@ -353,19 +320,45 @@ for test_file in "${TEST_FILES[@]}"; do
                 echo "    $translated" >> "$LOG_FILE"
             fi
         fi
-    done < <(bats --tap "$test_file" 2>&1)
+    done < <(bats --tap "$test_file" 2>&1; echo "$?" > "$BATS_RC_TMP")
     set -e
-    
+
+    # Récupérer le code de sortie de bats (écrit dans le sous-shell ci-dessus).
+    bats_rc=$(cat "$BATS_RC_TMP" 2>/dev/null || echo 0)
+    [[ "$bats_rc" =~ ^[0-9]+$ ]] || bats_rc=0
+
     # Ajouter la dernière erreur si elle existe
     if [[ -n "$current_error" ]]; then
         local_errors+=("$current_error")
     fi
-    
+
+    # --- Réconciliation : détecter les fichiers qui n'ont pas tourné correctement ---
+    # Un .bats qui crashe au chargement (helper manquant, erreur de syntaxe)
+    # n'émet aucune ligne `not ok` → local_failed=0 alors que bats_rc != 0.
+    # De même, un nombre de tests exécutés différent du nombre attendu signale
+    # une interruption ou une découverte partielle.
+    executed=$((local_passed + local_failed + local_skipped))
+    harness_error=""
+    if [[ "$bats_rc" -ne 0 && "$local_failed" -eq 0 ]]; then
+        harness_error="bats a retourné le code $bats_rc sans émettre d'échec TAP (crash de chargement ?)"
+    elif [[ "$test_count" -gt 0 && "$executed" -ne "$test_count" ]]; then
+        harness_error="$executed test(s) exécuté(s) sur $test_count attendu(s) (fichier interrompu ?)"
+    fi
+    if [[ -n "$harness_error" ]]; then
+        TOTAL_HARNESS_ERRORS=$((TOTAL_HARNESS_ERRORS + 1))
+        print_and_log "${RED}✗  [HARNESS] $test_file : $harness_error${NC}"
+    fi
+    # Bookkeeping centralisé : un fichier est en échec s'il a des `not ok` OU
+    # un problème de harnais (peu importe le mode verbeux/condensé).
+    if [[ "$local_failed" -gt 0 || -n "$harness_error" ]]; then
+        FAILED_FILES+=("$test_file")
+    fi
+
     # Mettre à jour les totaux
     TOTAL_PASSED=$((TOTAL_PASSED + local_passed))
     TOTAL_FAILED=$((TOTAL_FAILED + local_failed))
     TOTAL_SKIPPED=$((TOTAL_SKIPPED + local_skipped))
-    
+
     # Copier les erreurs dans _ERRORS pour l'affichage
     _ERRORS=("${local_errors[@]+"${local_errors[@]}"}")
     _FAILED=$local_failed
@@ -380,18 +373,15 @@ for test_file in "${TEST_FILES[@]}"; do
             skip_indicator_plain=" ⚠"
         fi
         
-        if [[ $local_failed -eq 0 ]]; then
+        if [[ $local_failed -eq 0 && -z "$harness_error" ]]; then
             if [[ "$SHOW_ONLY_ERRORS" != true ]]; then
-                printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-55s ${DIM}(%2d/%-2d)${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator" >/dev/tty
+                printf "\r${GREEN}✓${NC}  [%2d/%-2d] %-55s ${DIM}(%2d/%-2d)${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator" >"$TTY_OUT"
                 printf "✓  [%2d/%-2d] %-55s (%2d/%-2d)%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_passed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
             fi
-        else
-            printf "\r${RED}✗${NC}  [%2d/%-2d] %-55s ${RED}%2d échec(s)${NC} ${DIM}/ %-2d${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator" >/dev/tty
+        elif [[ $local_failed -gt 0 ]]; then
+            printf "\r${RED}✗${NC}  [%2d/%-2d] %-55s ${RED}%2d échec(s)${NC} ${DIM}/ %-2d${NC}%b\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator" >"$TTY_OUT"
             printf "✗  [%2d/%-2d] %-55s %2d échec(s) / %-2d%s\n" "$FILE_NUM" "$TOTAL_FILES" "$test_file" "$local_failed" "$test_count" "$skip_indicator_plain" >> "$LOG_FILE"
-            
-            # Stocker pour le résumé
-            FAILED_FILES+=("$test_file")
-            
+
             # Afficher les erreurs traduites
             if [[ ${#_ERRORS[@]} -gt 0 ]]; then
                 for error in "${_ERRORS[@]}"; do
@@ -423,8 +413,10 @@ else
     SUCCESS_RATE=0
 fi
 
-# Afficher le résumé avec couleur selon le résultat
-if [[ $TOTAL_FAILED -eq 0 ]]; then
+# Afficher le résumé avec couleur selon le résultat.
+# Un run est en échec s'il y a des tests `not ok` OU des erreurs de harnais
+# (fichier qui n'a pas tourné / a crashé au chargement).
+if [[ $TOTAL_FAILED -eq 0 && $TOTAL_HARNESS_ERRORS -eq 0 ]]; then
     print_and_log "${GREEN}✓ SUCCÈS${NC} — Tous les tests sont passés !"
     print_and_log ""
     print_and_log "  ${GREEN}$TOTAL_PASSED${NC} réussi(s)  ${DIM}|${NC}  $TOTAL_FILES fichiers  ${DIM}|${NC}  $SUCCESS_RATE%"
@@ -432,6 +424,9 @@ else
     print_and_log "${RED}✗ ÉCHECS DÉTECTÉS${NC}"
     print_and_log ""
     print_and_log "  ${GREEN}$TOTAL_PASSED${NC} réussi(s)  ${DIM}|${NC}  ${RED}$TOTAL_FAILED${NC} échoué(s)  ${DIM}|${NC}  ${YELLOW}$TOTAL_SKIPPED${NC} ignoré(s)"
+    if [[ $TOTAL_HARNESS_ERRORS -gt 0 ]]; then
+        print_and_log "  ${RED}$TOTAL_HARNESS_ERRORS${NC} fichier(s) avec erreur de harnais (tests non exécutés)"
+    fi
     print_and_log ""
     print_and_log "${DIM}Fichiers en échec :${NC}"
     for f in "${FAILED_FILES[@]}"; do
@@ -454,7 +449,7 @@ print_and_log "${DIM}Log complet : $LOG_FILE${NC}"
 print_and_log "${CYAN}═══════════════════════════════════════════════════════${NC}"
 
 # Code de sortie
-if [[ $TOTAL_FAILED -gt 0 ]]; then
+if [[ $TOTAL_FAILED -gt 0 || $TOTAL_HARNESS_ERRORS -gt 0 ]]; then
     exit 1
 fi
 exit 0
