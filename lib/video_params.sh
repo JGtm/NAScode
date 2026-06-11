@@ -310,8 +310,12 @@ _get_video_fps() {
     if [[ "$fps" == *"/"* ]]; then
         fps=$(awk -F/ '{if($2>0) printf "%.3f", $1/$2; else print $1}' <<< "$fps")
     fi
-    [[ -z "$fps" ]] && fps="24"
-    
+    # fps illisible OU nul (ex. "0/0" → 0) : fallback 24 (sinon les calculs HFR
+    # et de bitrate en aval seraient faussés).
+    if ! [[ "$fps" =~ ^[0-9]+(\.[0-9]+)?$ ]] || [[ "$(awk -v f="$fps" 'BEGIN{print (f>0)?1:0}')" -ne 1 ]]; then
+        fps="24"
+    fi
+
     echo "$fps"
 }
 

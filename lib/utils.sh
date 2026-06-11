@@ -326,7 +326,9 @@ compute_heavy_output_path() {
     local heavy_root="${out_root}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
 
     if [[ "$final_output" == "$out_root"* ]]; then
-        printf '%s' "${heavy_root}${final_output#${out_root}}"
+        # Pattern quoté : un OUTPUT_DIR contenant des métacaractères glob
+        # ([, ?, *, plausibles sous Windows) fausserait la troncature sinon.
+        printf '%s' "${heavy_root}${final_output#"$out_root"}"
         return 0
     fi
 

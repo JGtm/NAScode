@@ -108,16 +108,19 @@ notify_discord_send_markdown() {
         local resp_file
         resp_file="$(mktemp 2>/dev/null || echo "")"
 
-        local http_code="000"
+        # On capture le VRAI code de sortie de curl. L'ancienne forme
+        # `http_code=$(curl ... || echo "000")` faisait que `$?` reflétait
+        # l'echo (toujours 0) : le log de debug mentait systématiquement.
+        # Le `|| curl_exit=$?` évite aussi un abort sous set -e (best-effort).
+        local http_code="000" curl_exit=0
         http_code=$(curl -sS -m "$curl_timeout" --retry "$curl_retries" --retry-delay "$curl_retry_delay" \
             -H "Content-Type: application/json; charset=utf-8" \
             -X POST \
             --data-binary "@${payload_file}" \
             -o "${resp_file:-/dev/null}" -w '%{http_code}' \
             "${NASCODE_DISCORD_WEBHOOK_URL}" \
-            2>/dev/null || echo "000")
-
-        local curl_exit=$?
+            2>/dev/null) || curl_exit=$?
+        [[ -z "$http_code" ]] && http_code="000"
 
         local payload_len=${#payload}
         _notify_discord_debug_log "event=${event_name:-unknown} http=${http_code} curl_exit=${curl_exit} payload_len=${payload_len}"
