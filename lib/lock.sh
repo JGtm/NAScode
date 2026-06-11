@@ -44,6 +44,16 @@ _cleanup_x265_logs() {
 
 cleanup() {
     local exit_code=$?
+
+    # Désarmer INT/TERM pendant le cleanup. Le `kill -- -$$` plus bas signale
+    # TOUT le process group, y compris ce shell (leader). Tant que _handle_interrupt
+    # restait armé sur TERM, ce SIGTERM auto-infligé ré-entrait dans le handler →
+    # `exit 130`, écrasant le vrai code de sortie (ex. 0 sur `--help`, d'où le
+    # exit 130 observé sur une fin normale). En ignorant le signal ici, le shell
+    # survit au kill du groupe, termine le cleanup et sort avec exit_code réel.
+    # Le cas Ctrl+C garde son 130 : _handle_interrupt l'a déjà posé AVANT ce trap.
+    trap '' INT TERM
+
     # Afficher le message d'interruption seulement si terminaison par signal (INT/TERM)
     # et pas déjà signalé par STOP_FLAG
     # Note: On utilise une variable pour détecter les signaux plutôt que le code de sortie
