@@ -14,105 +14,23 @@
 
 export_variables() {
     # ========================================================
-    # FONCTIONS UTILITAIRES DE BASE
+    # FONCTIONS : auto-export de TOUTES les fonctions définies
     # ========================================================
-    export -f normalize_path_for_ffprobe ffprobe_safe
-    
-    # ========================================================
-    # FONCTIONS DE CONVERSION PRINCIPALES
-    # ========================================================
-    export -f convert_file get_video_metadata get_video_stream_props detect_hwaccel
-    export -f should_skip_conversion should_skip_conversion_adaptive
-    export -f _determine_conversion_mode print_skip_message clean_number custom_pv
-    
-    # --- Fonctions codec_profiles.sh (gestion des codecs vidéo) ---
-    export -f get_codec_encoder get_codec_suffix get_codec_ffmpeg_names
-    export -f is_codec_match is_codec_supported get_codec_rank get_codec_efficiency
-    export -f translate_bitrate_kbps_between_codecs _translate_bitrate_by_efficiency
-    export -f is_codec_better_or_equal convert_preset validate_codec_config
-    export -f get_encoder_params_flag
-    
-    # --- Fonctions de paramètres vidéo (video_params.sh) ---
-    export -f _select_output_pix_fmt _build_downscale_filter_if_needed
-    export -f _compute_output_height_for_bitrate _compute_effective_bitrate_kbps_for_height
-    export -f _build_effective_suffix_for_dims compute_video_params_adaptive
-    
-    # --- Fonctions d'analyse de complexité (complexity.sh) ---
-    export -f analyze_video_complexity _map_stddev_to_complexity _describe_complexity
-    export -f _map_metrics_to_complexity _map_score_to_complexity _compute_combined_score
-    export -f _normalize_si _normalize_ti _is_siti_available _compute_siti _analyze_siti_multi
-    export -f _show_analysis_progress _show_siti_progress _get_frame_sizes _compute_normalized_stddev
-    export -f compute_adaptive_target_bitrate compute_adaptive_maxrate compute_adaptive_bufsize
-    export -f get_adaptive_encoding_params display_complexity_analysis
-    
-    # --- Fonctions d'encodage (transcode_video.sh) ---
-    export -f _setup_video_encoding_params _setup_sample_mode_params
-    export -f _run_ffmpeg_encode _execute_conversion _execute_video_passthrough
-    
-    # --- Fonctions audio et sous-titres ---
-    export -f _get_audio_target_bitrate _get_audio_conversion_info _build_audio_params _build_stream_mapping
-    export -f _should_convert_audio _probe_audio_info _probe_audio_channels _probe_audio_full
-    export -f _is_audio_multichannel _get_target_audio_layout _build_audio_layout_filter
-    export -f _get_multichannel_target_bitrate _compute_eac3_target_bitrate_kbps
-    export -f is_audio_codec_premium_passthrough is_audio_codec_lossless is_audio_codec_efficient
-    export -f get_audio_codec_rank get_audio_ffmpeg_encoder get_audio_codec_target_bitrate
-    export -f get_audio_codec_efficiency translate_audio_bitrate_kbps_between_codecs
-    
-    # ========================================================
-    # FONCTIONS DE PRÉPARATION ET FINALISATION
-    # ========================================================
-    export -f _get_counter_prefix
-    export -f _prepare_file_paths _check_output_exists _handle_dryrun_mode
-    export -f _setup_temp_files_and_logs _check_disk_space _get_temp_filename
-    export -f _analyze_video _copy_to_temp_storage
-    export -f _convert_handle_adaptive_mode print_conversion_info
-    export -f print_conversion_required print_conversion_not_required
-    export -f _finalize_conversion_success _finalize_try_move
-    export -f _finalize_log_and_verify _finalize_conversion_error
-    
-    # ========================================================
-    # FONCTIONS DE TRANSFERT ASYNCHRONE
-    # ========================================================
-    export -f init_async_transfers start_async_transfer
-    export -f wait_for_transfer_slot wait_all_transfers cleanup_transfers
-    export -f _add_transfer_pid _cleanup_finished_transfers _count_active_transfers
-    
-    # ========================================================
-    # FONCTIONS DE GESTION DE QUEUE
-    # ========================================================
-    export -f _handle_custom_queue _handle_existing_index
-    export -f _normalize_source_path _validate_index_source _save_index_metadata
-    export -f _count_total_video_files _index_video_files _generate_index
-    export -f _build_queue_from_index _apply_queue_limitations _validate_queue_not_empty
-    export -f _display_random_mode_selection _create_readable_queue_copy _show_active_options
-    export -f build_queue validate_queue_file
-    
-    # ========================================================
-    # FONCTIONS DE TRAITEMENT PARALLÈLE
-    # ========================================================
-    export -f prepare_dynamic_queue _process_queue_simple _process_queue_with_fifo
-    export -f increment_processed_count increment_starting_counter update_queue
-    
-    # ========================================================
-    # FONCTIONS UTILITAIRES
-    # ========================================================
-    export -f is_excluded count_null_separated compute_md5_prefix now_ts compute_sha256
-    export -f normalize_path call_if_exists
-    
-    # --- Fonctions de logging (logging.sh) ---
-    export -f log_error log_warning log_info log_success
-    
-    # --- Fonctions i18n (internationalisation) ---
-    export -f msg _i18n_load
-    export LANG_UI
-    
-    # --- Fonctions VMAF (qualité vidéo) ---
-    export -f compute_vmaf_score _queue_vmaf_analysis process_vmaf_queue check_vmaf
-    
-    # --- Fonctions HFR (video_params.sh) ---
-    export -f _get_video_fps _is_hfr _compute_hfr_bitrate_factor
-    export -f _apply_hfr_bitrate_adjustment _build_fps_limit_filter
-    
+    # exports.sh est chargé en DERNIER (après tous les modules lib/), donc
+    # `declare -F` liste l'intégralité des fonctions du programme. On les exporte
+    # toutes pour les sous-shells (mode parallèle -j N).
+    #
+    # Remplace l'ancienne liste manuelle de ~150 `export -f` : c'était une bombe
+    # à retardement — toute fonction nouvellement appelée (même transitivement)
+    # depuis convert_file en sous-shell devait y être ajoutée, sinon le mode
+    # parallèle cassait UNIQUEMENT au runtime (le séquentiel marchait). L'auto-
+    # export est un sur-ensemble : impossible d'oublier une fonction.
+    local _fn
+    while IFS= read -r _fn; do
+        [[ -n "$_fn" ]] || continue
+        export -f "$_fn" 2>/dev/null || true
+    done < <(declare -F | awk '{print $3}')
+
     # ========================================================
     # VARIABLES DE CONFIGURATION ENCODAGE
     # ========================================================
@@ -127,7 +45,7 @@ export_variables() {
     export ADAPTIVE_BITRATE_BY_RESOLUTION ADAPTIVE_720P_MAX_HEIGHT ADAPTIVE_720P_SCALE_PERCENT
     export ADAPTIVE_480P_MAX_HEIGHT ADAPTIVE_480P_SCALE_PERCENT
     export MIN_TMP_FREE_MB PARALLEL_JOBS FFMPEG_MIN_VERSION
-    
+
     # --- Variables mode adaptatif (complexity.sh, constants.sh) ---
     export ADAPTIVE_COMPLEXITY_MODE
     export ADAPTIVE_BPP_BASE ADAPTIVE_C_MIN ADAPTIVE_C_MAX
@@ -136,11 +54,11 @@ export_variables() {
     export ADAPTIVE_MARGIN_START_PCT ADAPTIVE_MARGIN_END_PCT
     export ADAPTIVE_MIN_BITRATE_KBPS ADAPTIVE_MAXRATE_FACTOR ADAPTIVE_BUFSIZE_FACTOR
     export ADAPTIVE_TARGET_KBPS ADAPTIVE_MAXRATE_KBPS ADAPTIVE_BUFSIZE_KBPS
-    
+
     # --- Variables HFR / limitation FPS (constants.sh, config.sh) ---
     export LIMIT_FPS HFR_THRESHOLD_FPS LIMIT_FPS_TARGET
     export FPS_WAS_LIMITED FPS_ORIGINAL HFR_BITRATE_ADJUSTED HFR_FACTOR
-    
+
     # --- Variables audio ---
     export AUDIO_CODEC AUDIO_BITRATE_KBPS NO_LOSSLESS FORCE_AUDIO_CODEC AUDIO_FORCE_STEREO
     export AUDIO_TRANSLATE_EQUIV_QUALITY
@@ -153,27 +71,20 @@ export_variables() {
     # --- Variables Discord (constants.sh) ---
     export DISCORD_CONTENT_MAX_CHARS DISCORD_CURL_TIMEOUT DISCORD_CURL_RETRIES DISCORD_CURL_RETRY_DELAY
     export DISCORD_PROGRESS_UPDATE_DELAY
-    
-    # --- Fonctions notification Discord (ffmpeg_pipeline.sh, notify_*.sh) ---
-    # Ces fonctions peuvent ne pas être chargées dans certains contextes (tests unitaires)
-    declare -F _create_progress_marker_file &>/dev/null && export -f _create_progress_marker_file
-    declare -F _start_progress_watcher &>/dev/null && export -f _start_progress_watcher
-    declare -F _stop_progress_watcher &>/dev/null && export -f _stop_progress_watcher
-    declare -F notify_event &>/dev/null && export -f notify_event
-    declare -F _notify_discord_is_enabled &>/dev/null && export -f _notify_discord_is_enabled
-    declare -F notify_discord_send_markdown &>/dev/null && export -f notify_discord_send_markdown
-    declare -F _notify_format_event_file_progress_update &>/dev/null && export -f _notify_format_event_file_progress_update
 
     # --- Variables vidéo ---
     export VIDEO_EQUIV_QUALITY_CAP
-    
+
+    # --- i18n ---
+    export LANG_UI
+
     # ========================================================
     # VARIABLES DE CHEMINS
     # ========================================================
     export SOURCE OUTPUT_DIR TMP_DIR SCRIPT_DIR
     export LOG_DIR LOG_SESSION LOG_PROGRESS SUMMARY_FILE SUMMARY_METRICS_FILE
     export QUEUE INDEX INDEX_META INDEX_READABLE
-    
+
     # ========================================================
     # VARIABLES DE QUEUE ET PROCESSING
     # ========================================================
@@ -181,7 +92,7 @@ export_variables() {
     export FIFO_WRITER_PID FIFO_WRITER_READY
     export PROCESSED_COUNT_FILE TARGET_COUNT_FILE
     export TRANSFER_PIDS_FILE MAX_CONCURRENT_TRANSFERS
-    
+
     # ========================================================
     # VARIABLES D'OPTIONS
     # ========================================================
@@ -191,17 +102,14 @@ export_variables() {
     export SAMPLE_MODE SAMPLE_DURATION SAMPLE_MARGIN_START SAMPLE_MARGIN_END SAMPLE_KEYFRAME_POS
     export SINGLE_PASS_MODE CRF_VALUE
     export LOG_DRYRUN_COMPARISON IS_MSYS
-    
+
     # ========================================================
     # VARIABLES D'AFFICHAGE
     # ========================================================
     export NOCOLOR GREEN YELLOW RED CYAN MAGENTA BLUE ORANGE
     export AWK_PROGRESS_SCRIPT AWK_FFMPEG_PROGRESS_SCRIPT IO_PRIORITY_CMD
-    
-    # --- Progression parallèle ---
-    export -f acquire_progress_slot release_progress_slot cleanup_progress_slots setup_progress_display
     export SLOTS_DIR
-    
+
     # ========================================================
     # VARIABLES DE DÉTECTION D'OUTILS
     # ========================================================
@@ -209,13 +117,10 @@ export_variables() {
     export HAS_DATE_NANO HAS_PERL_HIRES HAS_GAWK
     export HAS_SHA256SUM HAS_SHASUM HAS_OPENSSL
     export HAS_LIBVMAF VMAF_QUEUE_FILE FFMPEG_VMAF
-    
+
     # ========================================================
-    # VARIABLES ET FONCTIONS HEURES CREUSES
+    # VARIABLES HEURES CREUSES
     # ========================================================
     export OFF_PEAK_ENABLED OFF_PEAK_START OFF_PEAK_END OFF_PEAK_CHECK_INTERVAL
     export OFF_PEAK_WAIT_COUNT OFF_PEAK_TOTAL_WAIT_SECONDS
-    export -f is_off_peak_time wait_for_off_peak check_off_peak_before_processing
-    export -f parse_off_peak_range time_to_minutes seconds_until_off_peak format_wait_time
-    export -f show_off_peak_status show_off_peak_startup_info
 }
