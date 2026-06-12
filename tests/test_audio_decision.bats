@@ -383,3 +383,27 @@ teardown() {
     result=$(_emit_audio_decision "convert" "opus" "160" "test_convert" "aac" "192" "2")
     [ "$result" = "convert|opus|160|test_convert" ]
 }
+
+###########################################################
+# Régression : divergence skip/encode sur le multicanal
+###########################################################
+
+@test "_get_smart_audio_decision: re-probe les canaux quand non fournis (plus de divergence stéréo)" {
+    AUDIO_CODEC="opus"
+    AUDIO_FORCE_STEREO=false
+
+    local f="$TEST_TEMP_DIR/multi.mkv"
+    : > "$f"
+
+    # Stub : la source est de l'AAC 5.1 (6 canaux) @192k.
+    _probe_audio_full() { echo "aac|192|6|"; }
+
+    # Décision SANS canaux (chemin skip/suffixe) vs AVEC canaux (chemin encodage).
+    local without_channels with_channels
+    without_channels=$(_get_smart_audio_decision "$f" "aac" "192")
+    with_channels=$(_get_smart_audio_decision "$f" "aac" "192" "6")
+
+    # Avant le fix, "without" supposait 2 canaux → décision différente (suffixe
+    # _OPUS mensonger, remux en boucle). Désormais les deux sont IDENTIQUES.
+    [ "$without_channels" = "$with_channels" ]
+}

@@ -14,8 +14,12 @@
 # Note: SCRIPT_DIR est défini dans le script principal avant le chargement des modules
 EXECUTION_TIMESTAMP=$(date +'%Y%m%d_%H%M%S')
 readonly EXECUTION_TIMESTAMP
-readonly LOCKFILE="/tmp/conversion_video.lock"
-readonly STOP_FLAG="/tmp/conversion_stop_flag"
+# Chemins runtime. Surchargables pour isoler plusieurs instances/utilisateurs
+# sur une machine partagée (ex. `export NASCODE_RUNTIME_DIR="$XDG_RUNTIME_DIR"`,
+# ou NASCODE_LOCKFILE/NASCODE_STOP_FLAG pour un contrôle fin). Défaut historique
+# inchangé : /tmp (mono-utilisateur).
+readonly LOCKFILE="${NASCODE_LOCKFILE:-${NASCODE_RUNTIME_DIR:-/tmp}/conversion_video.lock}"
+readonly STOP_FLAG="${NASCODE_STOP_FLAG:-${NASCODE_RUNTIME_DIR:-/tmp}/conversion_stop_flag}"
 # SCRIPT_DIR est déjà défini par le script principal
 
 # ----- Variables modifiables par arguments -----
@@ -135,8 +139,8 @@ SUFFIX_STRING=""  # Suffixe par défaut (sera mis à jour par build_dynamic_suff
 EXCLUDES=("./logs" "./*.sh" "./*.txt" "./Converted" "./samples" "./tests" "../ConversionPy")
 
 # ----- Paramètres système -----
-readonly TMP_DIR="/tmp/video_convert"
-readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans /tmp
+readonly TMP_DIR="${NASCODE_TMP_DIR:-${NASCODE_RUNTIME_DIR:-/tmp}/video_convert}"
+readonly MIN_TMP_FREE_MB=2048  # Espace libre requis en MB dans TMP_DIR
 
 # ----- Paramètres de conversion -----
 # Le seuil de skip est maintenant dynamique : MAXRATE_KBPS * (1 + SKIP_TOLERANCE_PERCENT%)
@@ -245,6 +249,30 @@ ENCODER_MODE_PROFILE="serie"
 # Paramètres encodeur spécifiques au mode (calculés dans set_conversion_mode_parameters)
 ENCODER_MODE_PARAMS=""
 
+# Preset de BASE commun aux modes adaptatifs (adaptatif / gaming / adaptatif-vmaf),
+# tous bâtis sur le profil SVT-AV1 "adaptatif" : CRF contraint single-pass, GOP
+# court, pas de paramètres x265 spéciaux, traduction "qualité équivalente" active.
+# Chaque mode applique ensuite ses DELTAS (bitrates de référence, complexity,
+# auto-boost, BPP, limitation FPS). Centralise ce qui était copié-collé 3 fois.
+_apply_adaptive_base_preset() {
+    ENCODER_PRESET="medium"
+    # Pas de paramètres x265 spéciaux (le profil "adaptatif" désactive les
+    # options coûteuses type enable-overlays/film-grain qui crashent SVT-AV1).
+    X265_EXTRA_PARAMS=""
+    X265_PASS1_FAST=false
+    # CRF contraint single-pass (avec limites VBV). CRF 21 = meilleure qualité
+    # que le défaut x265 (23).
+    SINGLE_PASS_MODE=true
+    CRF_VALUE=21
+    # GOP court pour un meilleur seeking.
+    FILM_KEYINT=240
+    FILM_TUNE_FASTDECODE=false
+    ENCODER_MODE_PROFILE="adaptatif"
+    AUDIO_FORCE_STEREO=false
+    AUDIO_TRANSLATE_EQUIV_QUALITY=true
+    VIDEO_EQUIV_QUALITY_CAP=true
+}
+
 set_conversion_mode_parameters() {
     # Bitrates de référence HEVC (seront ajustés selon le codec)
     local base_target_kbps base_maxrate_kbps base_bufsize_kbps
@@ -276,31 +304,15 @@ set_conversion_mode_parameters() {
             ;;
         adaptatif)
             # Films adaptatifs : bitrate calculé par fichier selon complexité
-            # Utilise Constrained CRF avec maxrate adaptatif
-            # Les bitrates réels sont calculés dans lib/complexity.sh
-            # Valeurs de référence (seront surchargées par fichier)
+            # (Constrained CRF + maxrate adaptatif, calculé dans lib/complexity.sh).
+            # Valeurs de référence (seront surchargées par fichier).
             base_target_kbps=2500  # Estimation moyenne 1080p@24fps
             base_maxrate_kbps=3500
             base_bufsize_kbps=6250
-            ENCODER_PRESET="medium"
-            # Films : pas de paramètres x265 spéciaux
-            X265_EXTRA_PARAMS=""
-            X265_PASS1_FAST=false
-            # Mode CRF contraint (single-pass avec limites VBV)
-            SINGLE_PASS_MODE=true
-            CRF_VALUE=21  # Meilleure qualité que le défaut x265 (23)
-            # GOP court pour meilleur seeking
-            FILM_KEYINT=240
-            FILM_TUNE_FASTDECODE=false
-            # Flag pour activer le calcul adaptatif dans video_params
+            _apply_adaptive_base_preset
+            # Delta : active le calcul adaptatif par complexité dans video_params.
             ADAPTIVE_COMPLEXITY_MODE=true
-            # Profil "adaptatif" distinct de "film" : désactive les options coûteuses
-            # (enable-overlays, film-grain) qui provoquent un crash RAM/VRAM avec SVT-AV1
-            ENCODER_MODE_PROFILE="adaptatif"
-            AUDIO_FORCE_STEREO=false
-            AUDIO_TRANSLATE_EQUIV_QUALITY=true
-            VIDEO_EQUIV_QUALITY_CAP=true
-            # Adaptatif : pas de limitation FPS (bitrate ajusté automatiquement)
+            # Pas de limitation FPS (bitrate ajusté automatiquement).
             [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=false
             ;;
         gaming)
@@ -334,27 +346,14 @@ set_conversion_mode_parameters() {
             base_target_kbps=12500  # Estimation 1080p30 high-motion qualité
             base_maxrate_kbps=17500
             base_bufsize_kbps=31250
-            ENCODER_PRESET="medium"
-            X265_EXTRA_PARAMS=""
-            X265_PASS1_FAST=false
-            SINGLE_PASS_MODE=true
-            CRF_VALUE=21
-            FILM_KEYINT=240
-            FILM_TUNE_FASTDECODE=false
-            # Active l'analyse complexity adaptative.
+            _apply_adaptive_base_preset
+            # Delta : analyse complexity adaptative active.
             ADAPTIVE_COMPLEXITY_MODE=true
-            # Override clé pour ce mode : BPP haut pour offrir ~2.5× plus de
-            # bits par frame qu'un encode adaptatif standard 60fps + BPP 0.080.
-            # Combiné au cap 30fps, donne ~12 Mbit/s en 1080p30 (qualité gaming).
+            # Delta clé : BPP haut pour ~2.5× plus de bits par frame qu'un encode
+            # adaptatif standard. Combiné au cap 30fps → ~12 Mbit/s en 1080p30.
             export ADAPTIVE_BPP_BASE="${ADAPTIVE_BPP_BASE_GAMING:-0.20}"
-            # Hérite du profil SVT-AV1 `adaptatif` (params perceptuels sans
-            # film-grain car crash HWACCEL, variance-boost+luma-bias compensent).
-            ENCODER_MODE_PROFILE="adaptatif"
-            AUDIO_FORCE_STEREO=false
-            AUDIO_TRANSLATE_EQUIV_QUALITY=true
-            VIDEO_EQUIV_QUALITY_CAP=true
-            # Cap FPS de sortie à 29.97 (comme `serie`). Le user peut désactiver
-            # via `export LIMIT_FPS=false` s'il veut préserver le 60fps natif.
+            # Cap FPS de sortie à 29.97 (comme `serie`). Désactivable via
+            # `export LIMIT_FPS=false` pour préserver le 60fps natif.
             [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=true
             ;;
         adaptatif-vmaf)
@@ -369,22 +368,11 @@ set_conversion_mode_parameters() {
             base_target_kbps=2500
             base_maxrate_kbps=3500
             base_bufsize_kbps=6250
-            ENCODER_PRESET="medium"
-            X265_EXTRA_PARAMS=""
-            X265_PASS1_FAST=false
-            SINGLE_PASS_MODE=true
-            CRF_VALUE=21
-            FILM_KEYINT=240
-            FILM_TUNE_FASTDECODE=false
-            # NE PAS activer ADAPTIVE_COMPLEXITY_MODE : auto-boost fait sa
-            # propre analyse par segment via VMAF, on évite la double
-            # analyse stddev/SI/TI au niveau fichier.
+            _apply_adaptive_base_preset
+            # Delta : NE PAS activer ADAPTIVE_COMPLEXITY_MODE — auto-boost fait sa
+            # propre analyse par segment via VMAF (évite la double analyse).
             ADAPTIVE_COMPLEXITY_MODE=false
-            ENCODER_MODE_PROFILE="adaptatif"
-            AUDIO_FORCE_STEREO=false
-            AUDIO_TRANSLATE_EQUIV_QUALITY=true
-            VIDEO_EQUIV_QUALITY_CAP=true
-            # Flag déclenchant le routage vers _execute_auto_boost_conversion.
+            # Delta : route vers _execute_auto_boost_conversion.
             AUTO_BOOST_ENABLED=true
             [[ -z "${LIMIT_FPS:-}" ]] && LIMIT_FPS=false
             ;;

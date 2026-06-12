@@ -669,21 +669,12 @@ teardown() {
 
     echo "Output FPS: $out_fps" >&3
 
-    # Le FPS doit être ≤ 30 (avec marge pour 29.97)
+    # Le FPS doit être ≤ 30 (avec marge pour 29.97).
+    # (Le bug où --limit-fps ne capait pas l'fps — filtre construit par
+    # compute_video_params mais jamais appliqué dans le chemin d'encodage — est
+    # corrigé : le filtre fps est désormais assemblé dans _setup_video_encoding_params.)
     local fps_ok
     fps_ok=$(echo "$out_fps" | awk '{if($1 <= 30.01) print "yes"; else print "no"}')
-
-    # BUG PRÉ-EXISTANT (identique sur HEAD) : sur une source H.264 1080p60 en
-    # mode serie, la vidéo est bien ré-encodée (→ HEVC) mais le filtre
-    # `-vf fps=29.97` construit par compute_video_params n'atteint pas la
-    # commande d'encodage → sortie 60fps. L'ancienne assertion était vacante
-    # (`if [[ -n "$out_file" ]]` jamais vrai car la sortie part dans _Heavier),
-    # elle masquait le bug. On le SKIP explicitement (xfail documenté) au lieu de
-    # le re-masquer, le temps d'un chantier dédié sur l'application des filtres.
-    # Voir [[project-review-2026-06-findings]].
-    if [[ "$fps_ok" != "yes" ]]; then
-        skip "BUG pré-existant: --limit-fps ne cape pas l'fps (sortie ${out_fps}fps) — chantier filtres à part"
-    fi
     [ "$fps_ok" = "yes" ]
 }
 

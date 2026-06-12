@@ -314,3 +314,33 @@ teardown() {
     # Le lock doit être libéré
     [ ! -f "$TEST_LOCKFILE" ]
 }
+
+###########################################################
+# Chemins runtime surchargables (isolation multi-instances)
+###########################################################
+
+@test "config: NASCODE_RUNTIME_DIR isole LOCKFILE/STOP_FLAG/TMP_DIR" {
+    run bash -c "
+        export SCRIPT_DIR='$PROJECT_ROOT'
+        export NASCODE_RUNTIME_DIR='/tmp/nascode_test_iso'
+        source '$LIB_DIR/ui.sh' 2>/dev/null
+        source '$LIB_DIR/detect.sh' 2>/dev/null
+        source '$LIB_DIR/config.sh' 2>/dev/null
+        echo \"\$LOCKFILE|\$STOP_FLAG|\$TMP_DIR\"
+    "
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"/tmp/nascode_test_iso/conversion_video.lock|/tmp/nascode_test_iso/conversion_stop_flag|/tmp/nascode_test_iso/video_convert"* ]]
+}
+
+@test "config: chemins runtime par défaut inchangés (/tmp)" {
+    run bash -c "
+        export SCRIPT_DIR='$PROJECT_ROOT'
+        unset NASCODE_RUNTIME_DIR NASCODE_LOCKFILE NASCODE_STOP_FLAG NASCODE_TMP_DIR
+        source '$LIB_DIR/ui.sh' 2>/dev/null
+        source '$LIB_DIR/detect.sh' 2>/dev/null
+        source '$LIB_DIR/config.sh' 2>/dev/null
+        echo \"\$LOCKFILE\"
+    "
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"/tmp/conversion_video.lock"* ]]
+}

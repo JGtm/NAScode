@@ -61,13 +61,15 @@ _setup_video_encoding_params() {
     # Pixel format de sortie (10-bit si source 10-bit)
     OUTPUT_PIX_FMT=$(_select_output_pix_fmt "$input_pix_fmt")
 
-    # Filtre de downscale si nécessaire
+    # Filtres vidéo : downscale (si >1080p) PUIS limitation FPS (si --limit-fps
+    # et source HFR). Combinés dans un seul -vf séparé par des virgules.
+    local -a vfilters=()
+
+    # --- Downscale ---
     local downscale_filter
     downscale_filter=$(_build_downscale_filter_if_needed "$input_width" "$input_height")
-    
-    VIDEO_FILTER_OPTS=""
     if [[ -n "$downscale_filter" ]]; then
-        VIDEO_FILTER_OPTS="-vf $downscale_filter"
+        vfilters+=("$downscale_filter")
         if [[ "$NO_PROGRESS" != true ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
             local downscale_msg
             downscale_msg=$(msg MSG_UI_DOWNSCALE "$input_width" "$input_height" "$DOWNSCALE_MAX_WIDTH" "$DOWNSCALE_MAX_HEIGHT")
@@ -77,6 +79,38 @@ _setup_video_encoding_params() {
                 echo -e "${CYAN}  ⬇️  ${downscale_msg}${NOCOLOR}"
             fi
         fi
+    fi
+
+    # --- Limitation FPS (HFR) ---
+    # _build_fps_limit_filter renvoie "fps=29.97" si LIMIT_FPS=true ET source HFR,
+    # sinon vide. CORRECTION : ce filtre n'était construit que par
+    # compute_video_params, qui N'EST PAS appelée dans le chemin d'encodage →
+    # --limit-fps n'avait aucun effet (sortie au FPS source). On le construit
+    # donc ici, là où VIDEO_FILTER_OPTS est réellement consommé (cf. downscale).
+    if declare -f _get_video_fps &>/dev/null && declare -f _build_fps_limit_filter &>/dev/null; then
+        local source_fps fps_filter
+        source_fps=$(_get_video_fps "$input_file")
+        fps_filter=$(_build_fps_limit_filter "$source_fps")
+        if [[ -n "$fps_filter" ]]; then
+            vfilters+=("$fps_filter")
+            export FPS_WAS_LIMITED=true
+            export FPS_ORIGINAL="$source_fps"
+            if [[ "$NO_PROGRESS" != true ]] && [[ "${VIDEO_PRECONVERSION_VIDEOINFO_SHOWN:-false}" != true ]]; then
+                local fps_msg
+                fps_msg=$(msg MSG_UI_FPS_LIMITED "$source_fps" "${LIMIT_FPS_TARGET:-29.97}")
+                if declare -f ui_print_raw &>/dev/null; then
+                    ui_print_raw "${CYAN}  📽️  ${fps_msg}${NOCOLOR}"
+                else
+                    echo -e "${CYAN}  📽️  ${fps_msg}${NOCOLOR}"
+                fi
+            fi
+        fi
+    fi
+
+    VIDEO_FILTER_OPTS=""
+    if [[ ${#vfilters[@]} -gt 0 ]]; then
+        local IFS=','
+        VIDEO_FILTER_OPTS="-vf ${vfilters[*]}"
     fi
     
     # Affichage 10-bit si applicable
