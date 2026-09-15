@@ -289,7 +289,7 @@ get_encoder_mode_params() {
                 #   le film-grain compense déjà partiellement la perte sur zones plates.
                 # - luminance-qp-bias=15 : moins agressif que serie (20) pour la même raison.
                 # - sharpness=1, qm, ac-bias : identiques aux autres modes.
-                film)  echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}:film-grain=8:film-grain-denoise=0:variance-boost-strength=2:luminance-qp-bias=15:sharpness=1:${av1_base_qm}${lp_suffix}" ;;
+                film)  echo "tune=${SVTAV1_TUNE_DEFAULT}:enable-overlays=${SVTAV1_ENABLE_OVERLAYS_DEFAULT}:film-grain=6:film-grain-denoise=0:variance-boost-strength=2:luminance-qp-bias=15:sharpness=1:${av1_base_qm}${lp_suffix}" ;;
                 # Adaptatif : overlays et film-grain désactivés (trop gourmands en RAM/CPU,
                 # combinés à HWACCEL provoquent un crash au démarrage de l'encodage).
                 # On compense l'absence de film-grain par variance-boost à 3 + luma-bias=15.
