@@ -147,7 +147,11 @@ check_lock() {
     # comportement non atomique (best-effort).
     local _have_flock=false
     if command -v flock >/dev/null 2>&1; then
-        if exec 9>"${LOCKFILE}.flock" 2>/dev/null; then
+        # NB: le 2>/dev/null doit porter sur le groupe, PAS sur le `exec`.
+        # `exec 9>f 2>/dev/null` appliquerait la redirection de stderr au
+        # SHELL COURANT de façon permanente : plus aucune sortie stderr pour
+        # tout le reste du run (barres de progression comprises).
+        if { exec 9>"${LOCKFILE}.flock"; } 2>/dev/null; then
             flock 9 2>/dev/null && _have_flock=true
         fi
     fi
@@ -173,7 +177,7 @@ check_lock() {
     # (Sinon une 2e instance bloquerait au lieu de sortir avec "déjà en cours".)
     if [[ "$_have_flock" == true ]]; then
         flock -u 9 2>/dev/null || true
-        exec 9>&- 2>/dev/null || true
+        { exec 9>&-; } 2>/dev/null || true
     fi
 }
 
