@@ -299,17 +299,25 @@ function format_time(ts,   cmd,t) { cmd="date -d @" ts " +%H:%M:%S"; cmd | getli
 
             cmd+=(-f matroska "$tmp_output" -progress pipe:1 -nostats)
 
+            # Repli progression par frames (out_time à N/A avec sous-titres PGS).
+            local total_frames=0
+            if declare -f _compute_total_frames &>/dev/null; then
+                total_frames=$(_compute_total_frames "$tmp_input" "$EFFECTIVE_DURATION")
+            fi
+
             if [[ -n "${NASCODE_WORKDIR:-}" ]] && [[ -d "${NASCODE_WORKDIR}" ]]; then
                 (cd "${NASCODE_WORKDIR}" && "${cmd[@]}" 2> "$ffmpeg_log_temp") | \
                     awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
                         -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="$(msg MSG_PROGRESS_DONE)" \
+                        -v TOTAL_FRAMES="$total_frames" \
                         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
             else
                 "${cmd[@]}" 2> "$ffmpeg_log_temp" | \
                     awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                         -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
                         -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="📋" -v END_MSG="$(msg MSG_PROGRESS_DONE)" \
+                        -v TOTAL_FRAMES="$total_frames" \
                         "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
             fi
 

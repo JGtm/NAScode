@@ -409,6 +409,10 @@ readonly AWK_FFMPEG_PROGRESS_SCRIPT='
 BEGIN {
     duration = DURATION + 0;
     if (duration < 1) exit;
+    # Repli progression par frames : certains muxages laissent out_time à
+    # N/A (cf. bloc /out_time_us=/). TOTAL_FRAMES=0 ou absent => désactivé.
+    total_frames = TOTAL_FRAMES + 0;
+    cur_frame = 0;
     start = START + 0;
     start_time_str = format_time(start);
     last_update = 0;
@@ -437,12 +441,28 @@ BEGIN {
     }
 }
 
+/^frame=/ {
+    frame_val = substr($0, 7);
+    if (frame_val ~ /^[0-9]+$/) cur_frame = frame_val + 0;
+}
+
 /out_time_us=/ {
     if (match($0, /[0-9]+/)) {
         current_time = substr($0, RSTART, RLENGTH) / 1000000;
     } else {
         current_time = 0;
     }
+
+    # out_time est produit par le muxer, pas par le codec : avec des
+    # sous-titres PGS mappés en copy, ffmpeg le laisse à N/A pendant des
+    # milliers de frames puis le fige, alors que frame= reste exact.
+    # On garde donc le max des deux estimations : chacune peut être en
+    # retard, jamais en avance.
+    if (total_frames > 0 && cur_frame > 0) {
+        frame_time = duration * cur_frame / total_frames;
+        if (frame_time > current_time) current_time = frame_time;
+    }
+    if (current_time > duration) current_time = duration;
 
     percent = (current_time / duration) * 100;
     if (percent > 100) percent = 100;
