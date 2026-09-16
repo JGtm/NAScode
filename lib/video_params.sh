@@ -319,6 +319,37 @@ _get_video_fps() {
     echo "$fps"
 }
 
+# Estime le nombre total de frames de SORTIE, pour la barre de progression.
+# Sert de repli quand ffmpeg laisse out_time à N/A : avec des sous-titres PGS
+# mappés en copy le muxer ne publie pas de timestamp exploitable (cf. le script
+# AWK dans utils.sh), alors que le compteur frame= reste correct.
+# À appeler APRÈS _setup_video_encoding_params, qui positionne FPS_WAS_LIMITED
+# quand --limit-fps s'applique : frame= compte les frames de SORTIE, pas celles
+# de la source.
+# Usage: _compute_total_frames <input_file> <duration_secs>
+# Retourne: nombre entier de frames, ou 0 si indéterminable (repli désactivé)
+_compute_total_frames() {
+    local input_file="$1"
+    local duration_secs="$2"
+
+    if [[ -z "$duration_secs" || "$duration_secs" == "N/A" ]]; then
+        echo "0"
+        return 0
+    fi
+
+    local out_fps
+    if [[ "${FPS_WAS_LIMITED:-false}" == true ]]; then
+        out_fps="${LIMIT_FPS_TARGET:-29.97}"
+    elif declare -f _get_video_fps &>/dev/null; then
+        out_fps=$(_get_video_fps "$input_file")
+    else
+        echo "0"
+        return 0
+    fi
+
+    awk -v d="$duration_secs" -v f="$out_fps" 'BEGIN { printf "%d", (d > 0 && f > 0) ? d * f : 0 }'
+}
+
 # Vérifie si un FPS est considéré comme HFR (High Frame Rate).
 # Usage: _is_hfr <fps>
 # Retourne: 0 (true) si HFR, 1 (false) sinon

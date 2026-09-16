@@ -691,12 +691,19 @@ _run_ffmpeg_encode() {
     # Garder l'ordre historique (output puis progress) pour minimiser le risque de régression.
     cmd+=(-progress pipe:1 -nostats)
 
+    # Repli progression par frames (out_time à N/A avec des sous-titres PGS).
+    local total_frames=0
+    if declare -f _compute_total_frames &>/dev/null; then
+        total_frames=$(_compute_total_frames "$input_file" "$EFFECTIVE_DURATION")
+    fi
+
     if [[ -n "${NASCODE_WORKDIR:-}" ]] && [[ -d "${NASCODE_WORKDIR}" ]]; then
         (cd "${NASCODE_WORKDIR}" && "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}") | \
             awk -v DURATION="$EFFECTIVE_DURATION" -v CURRENT_FILE_NAME="$progress_display_text" -v NOPROG="$NO_PROGRESS" \
                 -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
                 -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
                 -v PROGRESS_MARKER_FILE="${PROGRESS_MARKER_FILE:-}" -v PROGRESS_MARKER_DELAY="${PROGRESS_MARKER_DELAY:-15}" \
+                -v TOTAL_FRAMES="$total_frames" \
                 "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
     else
         "${cmd[@]}" 2> "${ffmpeg_log}${log_suffix}" | \
@@ -704,6 +711,7 @@ _run_ffmpeg_encode() {
                 -v START="$START_TS" -v SLOT="$progress_slot" -v PARALLEL="$is_parallel" \
                 -v MAX_SLOTS="${PARALLEL_JOBS:-1}" -v EMOJI="$emoji" -v END_MSG="$end_msg" \
                 -v PROGRESS_MARKER_FILE="${PROGRESS_MARKER_FILE:-}" -v PROGRESS_MARKER_DELAY="${PROGRESS_MARKER_DELAY:-15}" \
+                -v TOTAL_FRAMES="$total_frames" \
                 "$awk_time_func $AWK_FFMPEG_PROGRESS_SCRIPT"
     fi
 
