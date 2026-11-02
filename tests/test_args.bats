@@ -45,6 +45,7 @@ _reset_cli_state() {
     SINGLE_FILE=""
     MIN_SIZE_BYTES=0
     KEEP_METADATA=false
+    REPLACE_ORIGINAL=false
 
     # Override global du mode "qualité équivalente" (CLI)
     EQUIV_QUALITY_OVERRIDE=""
@@ -207,6 +208,24 @@ _reset_cli_state() {
     _reset_cli_state
     parse_arguments --mode serie
     [ "$KEEP_METADATA" = "false" ]
+    [ "$REPLACE_ORIGINAL" = "false" ]
+
+    # Test 11: --replace active REPLACE_ORIGINAL
+    _reset_cli_state
+    parse_arguments --mode film --replace
+    [ "$REPLACE_ORIGINAL" = "true" ]
+
+    # Test 12: --replace ignoré en mode sample (jamais remplacer par un extrait)
+    _reset_cli_state
+    parse_arguments --replace --sample
+    [ "$REPLACE_ORIGINAL" = "false" ]
+    [ "$SAMPLE_MODE" = "true" ]
+
+    # Test 13: --replace désactive VMAF
+    _reset_cli_state
+    parse_arguments --replace --vmaf
+    [ "$REPLACE_ORIGINAL" = "true" ]
+    [ "$VMAF_ENABLED" = "false" ]
 }
 
 ###########################################################

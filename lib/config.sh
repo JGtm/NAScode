@@ -124,6 +124,11 @@ KEEP_INDEX=false
 # userspace standards sur Linux, donc non préservée.
 KEEP_METADATA=false
 
+# Remplacer le fichier source par sa version convertie (--replace).
+# Uniquement après transfert vérifié, gain réel et durée identique ;
+# sinon l'original est conservé. Incompatible avec --vmaf et --sample.
+REPLACE_ORIGINAL=false
+
 # ----- Constantes de configuration -----
 # Paramètre de nombre de fichiers à sélectionner aléatoirement par défaut
 readonly RANDOM_MODE_DEFAULT_LIMIT=10

@@ -162,6 +162,117 @@ _finalize_preserve_mtime() {
 }
 
 ###########################################################
+# REMPLACEMENT DE L'ORIGINAL (--replace)
+###########################################################
+
+# Durée (secondes, décimale) d'un fichier via ffprobe. Vide si indisponible.
+_finalize_probe_duration() {
+    local file="$1"
+    local probe="ffprobe"
+    declare -f ffprobe_safe &>/dev/null && probe="ffprobe_safe"
+    "$probe" -v error -show_entries format=duration \
+        -of default=noprint_wrappers=1:nokey=1 "$file" 2>/dev/null | head -n1 | tr -d '\r\n ' || true
+}
+
+# Remplace le fichier source par sa version convertie, à côté de l'original.
+# Appelé uniquement après un transfert vérifié (status OK/SKIPPED).
+#
+# Garde-fous (le moindre doute → on garde l'original, rien n'est supprimé) :
+#   - sortie redirigée vers _Heavier ou plus lourde que la source ;
+#   - durée de la sortie différente de la source (> max(2s, 1%)) ;
+#   - un autre fichier porte déjà le nom cible (ex: .mp4 → .mkv existant) ;
+#   - copie vers le NAS tronquée.
+# Publication atomique : copie vers "<cible>.partial" (même dossier que la
+# source), vérification de taille, puis rename. L'original n'est supprimé
+# qu'une fois la cible en place (cas d'une extension différente).
+#
+# Usage : _finalize_replace_original <file_original> <final_actual>
+# Retour : 0 remplacé | 1 désactivé | 2 refusé/échec (original conservé)
+_finalize_replace_original() {
+    local file_original="$1"
+    local final_actual="$2"
+
+    [[ "${REPLACE_ORIGINAL:-false}" != true ]] && return 1
+
+    local reason=""
+    local heavy_root="${OUTPUT_DIR%/}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
+    local original_bytes=0 converted_bytes=0
+
+    if [[ ! -f "$file_original" ]]; then
+        reason="source_missing"
+    elif [[ ! -f "$final_actual" ]]; then
+        reason="output_missing"
+    elif [[ -n "${OUTPUT_DIR:-}" && "$final_actual" == "$heavy_root"/* ]]; then
+        reason="heavier_output"
+    else
+        original_bytes=$(get_file_size_bytes "$file_original")
+        converted_bytes=$(get_file_size_bytes "$final_actual")
+        if [[ "$converted_bytes" -le 0 || "$converted_bytes" -ge "$original_bytes" ]]; then
+            reason="not_smaller"
+        fi
+    fi
+
+    if [[ -z "$reason" ]]; then
+        local dur_src dur_out
+        dur_src=$(_finalize_probe_duration "$file_original")
+        dur_out=$(_finalize_probe_duration "$final_actual")
+        if [[ -z "$dur_src" || -z "$dur_out" ]]; then
+            reason="duration_unknown"
+        elif ! awk -v a="$dur_src" -v b="$dur_out" 'BEGIN {
+                d = a - b; if (d < 0) d = -d
+                tol = a * 0.01; if (tol < 2) tol = 2
+                exit (d <= tol) ? 0 : 1 }'; then
+            reason="duration_mismatch(${dur_src}s/${dur_out}s)"
+        fi
+    fi
+
+    local target=""
+    if [[ -z "$reason" ]]; then
+        target="$(dirname "$file_original")/$(basename "$final_actual")"
+        if [[ "$target" != "$file_original" && -e "$target" ]]; then
+            reason="target_exists"
+        fi
+    fi
+
+    if [[ -z "$reason" ]]; then
+        local partial="${target}.partial"
+        rm -f "$partial" 2>/dev/null || true
+        if ! cp "$final_actual" "$partial" 2>/dev/null; then
+            reason="copy_failed"
+        elif [[ "$(get_file_size_bytes "$partial")" -ne "$converted_bytes" ]]; then
+            reason="copy_truncated"
+        else
+            [[ "${KEEP_METADATA:-false}" == true ]] && touch -r "$file_original" "$partial" 2>/dev/null
+            if ! mv -f "$partial" "$target" 2>/dev/null; then
+                reason="rename_failed"
+            fi
+        fi
+        [[ -n "$reason" ]] && rm -f "$partial" 2>/dev/null
+    fi
+
+    if [[ -n "$reason" ]]; then
+        print_warning "$(msg MSG_FINAL_REPLACE_REFUSED "$reason" "$(basename "$file_original")")"
+        if [[ -n "${LOG_SESSION:-}" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR REPLACE | $file_original -> ${target:-$final_actual} | reason:$reason" >> "$LOG_SESSION" 2>/dev/null || true
+        fi
+        return 2
+    fi
+
+    # Cible en place : supprimer l'original s'il portait un autre nom, puis
+    # la copie locale devenue inutile.
+    [[ "$target" != "$file_original" ]] && rm -f "$file_original" 2>/dev/null
+    rm -f "$final_actual" 2>/dev/null || true
+
+    if [[ "${NO_PROGRESS:-false}" != true ]]; then
+        print_success "$(msg MSG_FINAL_REPLACED "$target")"
+    fi
+    if [[ -n "${LOG_SESSION:-}" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | REPLACED | $file_original -> $target | size:${original_bytes}B->${converted_bytes}B" >> "$LOG_SESSION" 2>/dev/null || true
+    fi
+    return 0
+}
+
+###########################################################
 # VÉRIFICATION D'INTÉGRITÉ ET LOGGING
 ###########################################################
 
@@ -255,7 +366,9 @@ _finalize_log_and_verify() {
     # Enregistrer pour analyse VMAF ultérieure (sera traité après toutes les
     # conversions). Uniquement si la sortie est intègre : pas de VMAF sur un
     # transfert échoué ou un fichier mis en quarantaine.
+    # Avec --replace, la source et la copie locale disparaissent : pas de VMAF.
     if [[ "$verify_status" == "OK" || "$verify_status" == "SKIPPED" ]] \
+        && [[ "${REPLACE_ORIGINAL:-false}" != true ]] \
         && declare -f _queue_vmaf_analysis &>/dev/null; then
         _queue_vmaf_analysis "$file_original" "$final_actual"
     fi
@@ -285,7 +398,12 @@ _finalize_log_and_verify() {
             [[ -n "${TOTAL_SIZE_AFTER_FILE:-}" ]] && atomic_add_int_to_file "$TOTAL_SIZE_AFTER_FILE" "$size_after_bytes"
         fi
     fi
-    
+
+    # --replace : en dernier, une fois les compteurs calculés sur l'original.
+    if [[ "$verify_status" == "OK" || "$verify_status" == "SKIPPED" ]] && [[ "$move_status" == "0" ]]; then
+        _finalize_replace_original "$file_original" "$final_actual" || true
+    fi
+
     return 0
 }
 

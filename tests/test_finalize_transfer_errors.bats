@@ -461,3 +461,147 @@ _get_mtime() {
     run grep -F "KEEP_METADATA" "$LOG_SESSION"
     [ "$status" -ne 0 ]
 }
+
+###########################################################
+# --replace : remplacement de l'original
+###########################################################
+
+# Prépare src/<nom_src> (2000 o) et out/<nom_out> (1000 o par défaut).
+# Durées simulées via DUR_SRC / DUR_OUT (stub ffprobe_safe).
+_setup_replace() {
+    local src_name="$1" out_name="$2" out_size="${3:-1000}"
+    export REPLACE_ORIGINAL=true
+    export OUTPUT_DIR="$TEST_TEMP_DIR/out"
+    export HEAVY_OUTPUT_DIR_SUFFIX="_Heavier"
+    export DUR_SRC=6000.0 DUR_OUT=6000.4
+    mkdir -p "$TEST_TEMP_DIR/src" "$OUTPUT_DIR"
+    REPL_SRC="$TEST_TEMP_DIR/src/$src_name"
+    REPL_OUT="$OUTPUT_DIR/$out_name"
+    dd if=/dev/zero of="$REPL_SRC" bs=2000 count=1 2>/dev/null
+    dd if=/dev/urandom of="$REPL_OUT" bs="$out_size" count=1 2>/dev/null
+    ffprobe_safe() {
+        if [[ "${*: -1}" == "$OUTPUT_DIR"* ]]; then echo "$DUR_OUT"; else echo "$DUR_SRC"; fi
+    }
+}
+
+@test "_finalize_replace_original: désactivé par défaut → ne touche à rien" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    export REPLACE_ORIGINAL=false
+
+    run _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$status" -eq 1 ]
+    [ "$(get_file_size_bytes "$REPL_SRC")" -eq 2000 ]
+    [ -f "$REPL_OUT" ]
+}
+
+@test "_finalize_replace_original: même nom → original écrasé, copie locale supprimée" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    local out_sum
+    out_sum=$(compute_sha256 "$REPL_OUT")
+
+    run _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$status" -eq 0 ]
+    [ "$(compute_sha256 "$REPL_SRC")" = "$out_sum" ]
+    [ ! -e "$REPL_OUT" ]
+    [ ! -e "${REPL_SRC}.partial" ]
+    grep -q "| REPLACED | $REPL_SRC -> $REPL_SRC" "$LOG_SESSION"
+}
+
+@test "_finalize_replace_original: extension différente → .mkv publié, .mp4 supprimé" {
+    _setup_replace "Film.mp4" "Film.mkv"
+
+    run _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$status" -eq 0 ]
+    [ ! -e "$REPL_SRC" ]
+    [ -f "$TEST_TEMP_DIR/src/Film.mkv" ]
+    [ ! -e "$REPL_OUT" ]
+}
+
+@test "_finalize_replace_original: --keep-metadata reporte le mtime de l'original" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    export KEEP_METADATA=true
+    touch -t 202101011200.00 "$REPL_SRC"
+    local mtime_src
+    mtime_src=$(_get_mtime "$REPL_SRC")
+
+    _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$(_get_mtime "$REPL_SRC")" = "$mtime_src" ]
+}
+
+@test "_finalize_replace_original: sortie pas plus légère → original conservé" {
+    _setup_replace "Film.mkv" "Film.mkv" 2000
+
+    run _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$status" -eq 2 ]
+    [ -f "$REPL_OUT" ]
+    grep -q "ERROR REPLACE .*reason:not_smaller" "$LOG_SESSION"
+}
+
+@test "_finalize_replace_original: durée différente → original conservé" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    export DUR_OUT=30.0
+
+    run _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$status" -eq 2 ]
+    [ "$(get_file_size_bytes "$REPL_SRC")" -eq 2000 ]
+    [ -f "$REPL_OUT" ]
+    grep -q "reason:duration_mismatch" "$LOG_SESSION"
+}
+
+@test "_finalize_replace_original: durée illisible → original conservé" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    export DUR_OUT=""
+
+    run _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$status" -eq 2 ]
+    grep -q "reason:duration_unknown" "$LOG_SESSION"
+}
+
+@test "_finalize_replace_original: un autre fichier porte le nom cible → rien n'est écrasé" {
+    _setup_replace "Film.mp4" "Film.mkv"
+    echo "autre" > "$TEST_TEMP_DIR/src/Film.mkv"
+
+    run _finalize_replace_original "$REPL_SRC" "$REPL_OUT"
+    [ "$status" -eq 2 ]
+    [ -f "$REPL_SRC" ]
+    [ "$(cat "$TEST_TEMP_DIR/src/Film.mkv")" = "autre" ]
+    grep -q "reason:target_exists" "$LOG_SESSION"
+}
+
+@test "_finalize_replace_original: sortie redirigée vers _Heavier → original conservé" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    local heavy="$TEST_TEMP_DIR/out_Heavier/Film.mkv"
+    mkdir -p "$(dirname "$heavy")"
+    mv "$REPL_OUT" "$heavy"
+
+    run _finalize_replace_original "$REPL_SRC" "$heavy"
+    [ "$status" -eq 2 ]
+    [ -f "$heavy" ]
+    grep -q "reason:heavier_output" "$LOG_SESSION"
+}
+
+@test "_finalize_log_and_verify: --replace remplace après vérif, compteurs sur la taille d'origine" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    local tmp_input="$TEST_TEMP_DIR/tmp_in.bin" ffmpeg_log_temp="$TEST_TEMP_DIR/ffmpeg.log"
+    touch "$tmp_input" "$ffmpeg_log_temp"
+    local checksum
+    checksum=$(compute_sha256 "$REPL_OUT")
+
+    _finalize_log_and_verify "$REPL_SRC" "$REPL_OUT" "$tmp_input" "$ffmpeg_log_temp" "$checksum" 0 1000 "$REPL_OUT" 0
+
+    [ "$(compute_sha256 "$REPL_SRC")" = "$checksum" ]
+    [ ! -e "$REPL_OUT" ]
+    [ "$(cat "$TOTAL_SIZE_BEFORE_FILE")" -eq 2000 ]
+    [ "$(cat "$TOTAL_SIZE_AFTER_FILE")" -eq 1000 ]
+}
+
+@test "_finalize_log_and_verify: --replace ignoré si le transfert est passé en fallback" {
+    _setup_replace "Film.mkv" "Film.mkv"
+    local tmp_input="$TEST_TEMP_DIR/tmp_in.bin" ffmpeg_log_temp="$TEST_TEMP_DIR/ffmpeg.log"
+    touch "$tmp_input" "$ffmpeg_log_temp"
+
+    _finalize_log_and_verify "$REPL_SRC" "$REPL_OUT" "$tmp_input" "$ffmpeg_log_temp" "" 0 1000 "$REPL_OUT" 1
+
+    [ "$(get_file_size_bytes "$REPL_SRC")" -eq 2000 ]
+    [ -f "$REPL_OUT" ]
+}
