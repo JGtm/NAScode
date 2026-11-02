@@ -281,6 +281,11 @@ parse_arguments() {
                 KEEP_METADATA=true
                 shift
                 ;;
+            --replace)
+                # Remplace la source par la version convertie (après vérifications)
+                REPLACE_ORIGINAL=true
+                shift
+                ;;
             --no-limit-fps)
                 # Désactive la limitation FPS (garde le FPS original, majore le bitrate)
                 LIMIT_FPS=false
@@ -338,6 +343,18 @@ parse_arguments() {
             SAMPLE_MODE=false
         fi
     fi
+
+    # --replace : jamais sur un extrait (remplacerait un film par 30 s), et
+    # VMAF a besoin de la source + sortie, supprimées après remplacement.
+    if [[ "$REPLACE_ORIGINAL" == true ]]; then
+        if [[ "$SAMPLE_MODE" == true ]]; then
+            print_warning "$(msg MSG_WARN_REPLACE_SAMPLE)"
+            REPLACE_ORIGINAL=false
+        elif [[ "$VMAF_ENABLED" == true ]]; then
+            print_warning "$(msg MSG_WARN_VMAF_REPLACE)"
+            VMAF_ENABLED=false
+        fi
+    fi
     
     # Recalculer la regex d'exclusions après avoir potentiellement ajouté des patterns via -e/--exclude.
     # (EXCLUDES_REGEX est initialisée au chargement de config.sh.)
@@ -393,6 +410,8 @@ ${CYAN}$(msg MSG_HELP_OPTIONS)${NOCOLOR}
                                  ${DIM}$(msg MSG_HELP_EQUIV_QUALITY_HINT)${NOCOLOR}
     ${GREEN}--keep-metadata${NOCOLOR}              $(msg MSG_HELP_KEEP_METADATA)
                                  ${DIM}$(msg MSG_HELP_KEEP_METADATA_HINT)${NOCOLOR}
+    ${GREEN}--replace${NOCOLOR}                    $(msg MSG_HELP_REPLACE)
+                                 ${DIM}$(msg MSG_HELP_REPLACE_HINT)${NOCOLOR}
     ${GREEN}--lang${NOCOLOR} LANG                  $(msg MSG_HELP_LANG)
 
 ${CYAN}$(msg MSG_HELP_SHORT_OPTIONS_TITLE)${NOCOLOR}

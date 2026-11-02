@@ -242,6 +242,8 @@ MSG_HELP_NO_EQUIV_QUALITY="Désactiver le mode \"qualité équivalente\" (audio 
 MSG_HELP_EQUIV_QUALITY_HINT="Ignoré en mode adaptatif (reste activé)"
 MSG_HELP_KEEP_METADATA="Conserver les métadonnées et la date de modification du fichier source (FLAG)"
 MSG_HELP_KEEP_METADATA_HINT="ffmpeg : -map_metadata 0 -map_chapters 0 ; mtime/atime via touch -r"
+MSG_HELP_REPLACE="Remplacer le fichier source par la version convertie (FLAG)"
+MSG_HELP_REPLACE_HINT="Seulement si transfert vérifié, gain réel et durée identique ; sinon l'original est gardé"
 MSG_HELP_LANG="Langue de l'interface : fr, en (ARG) [défaut : fr]"
 
 MSG_HELP_SHORT_OPTIONS_TITLE="Remarque sur les options courtes groupées :"
@@ -270,6 +272,8 @@ MSG_HELP_EXAMPLES_TITLE="Exemples :"
 
 MSG_WARN_VMAF_DRYRUN="VMAF désactivé en mode dry-run"
 MSG_WARN_SAMPLE_DRYRUN="Mode sample ignoré en mode dry-run"
+MSG_WARN_REPLACE_SAMPLE="--replace ignoré en mode sample (les originaux sont conservés)"
+MSG_WARN_VMAF_REPLACE="VMAF désactivé avec --replace (la source est supprimée après remplacement)"
 
 ###########################################################
 # UI OPTIONS (lib/ui_options.sh)
@@ -295,6 +299,7 @@ MSG_UI_OPT_FILE_COUNT="Compteur de fichiers à traiter"
 MSG_UI_OPT_HFR_LIMITED="Vidéos HFR : limitées à %s fps"
 MSG_UI_OPT_HFR_BITRATE="Vidéos HFR : bitrate ajusté (fps original conservé)"
 MSG_UI_OPT_KEEP_METADATA="Conservation des métadonnées et de la date de modification source"
+MSG_UI_OPT_REPLACE="Remplacement des originaux par les fichiers convertis"
 
 ###########################################################
 # UI MESSAGES (lib/ui.sh)
@@ -496,6 +501,8 @@ MSG_FINAL_INTERRUPTED="INTERRUPTED"
 MSG_FINAL_TEMP_KEPT="fichier temp conservé"
 MSG_FINAL_TEMP_MISSING="fichier temp absent"
 MSG_FINAL_CONV_DONE="Conversion terminée en %s"
+MSG_FINAL_REPLACED="Original remplacé : %s"
+MSG_FINAL_REPLACE_REFUSED="Original conservé (%s) : %s"
 MSG_FINAL_SHOW_COMPARISON="Afficher la comparaison des noms de fichiers originaux et générés ?"
 MSG_LOG_HEAVIER_FILE="FICHIER PLUS LOURD"
 MSG_LOG_DISK_SPACE="Espace disque insuffisant dans %s (%s MB libres)"

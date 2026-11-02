@@ -244,6 +244,8 @@ MSG_HELP_NO_EQUIV_QUALITY="Disable \"equivalent quality\" mode (audio + video ca
 MSG_HELP_EQUIV_QUALITY_HINT="Ignored in adaptive mode (stays enabled)"
 MSG_HELP_KEEP_METADATA="Preserve source file metadata and modification date (FLAG)"
 MSG_HELP_KEEP_METADATA_HINT="ffmpeg: -map_metadata 0 -map_chapters 0 ; mtime/atime via touch -r"
+MSG_HELP_REPLACE="Replace the source file with the converted version (FLAG)"
+MSG_HELP_REPLACE_HINT="Only after a verified transfer, real savings and matching duration; otherwise the original is kept"
 MSG_HELP_LANG="Interface language: fr, en (ARG) [default: fr]"
 
 MSG_HELP_SHORT_OPTIONS_TITLE="Note on grouped short options:"
@@ -272,6 +274,8 @@ MSG_HELP_EXAMPLES_TITLE="Examples:"
 
 MSG_WARN_VMAF_DRYRUN="VMAF disabled in dry-run mode"
 MSG_WARN_SAMPLE_DRYRUN="Sample mode ignored in dry-run mode"
+MSG_WARN_REPLACE_SAMPLE="--replace ignored in sample mode (originals are kept)"
+MSG_WARN_VMAF_REPLACE="VMAF disabled with --replace (the source is deleted after replacement)"
 
 ###########################################################
 # UI OPTIONS (lib/ui_options.sh)
@@ -297,6 +301,7 @@ MSG_UI_OPT_FILE_COUNT="Files to process"
 MSG_UI_OPT_HFR_LIMITED="HFR videos: limited to %s fps"
 MSG_UI_OPT_HFR_BITRATE="HFR videos: adjusted bitrate (original fps preserved)"
 MSG_UI_OPT_KEEP_METADATA="Preserving source metadata and modification date"
+MSG_UI_OPT_REPLACE="Replacing originals with converted files"
 
 ###########################################################
 # UI MESSAGES (lib/ui.sh)
@@ -498,6 +503,8 @@ MSG_FINAL_INTERRUPTED="INTERRUPTED"
 MSG_FINAL_TEMP_KEPT="temp file kept"
 MSG_FINAL_TEMP_MISSING="temp file missing"
 MSG_FINAL_CONV_DONE="Conversion completed in %s"
+MSG_FINAL_REPLACED="Original replaced: %s"
+MSG_FINAL_REPLACE_REFUSED="Original kept (%s): %s"
 MSG_FINAL_SHOW_COMPARISON="Show comparison of original and generated filenames?"
 MSG_LOG_HEAVIER_FILE="HEAVIER FILE"
 MSG_LOG_DISK_SPACE="Insufficient disk space in %s (%s MB free)"

@@ -244,6 +244,10 @@ _show_active_options() {
         options+=("$(format_option_keep_metadata)")
     fi
 
+    if [[ "${REPLACE_ORIGINAL:-false}" == true ]]; then
+        options+=("$(format_option_replace)")
+    fi
+
     # Afficher seulement si au moins une option est active
     if [[ ${#options[@]} -gt 0 ]]; then
         print_active_options "${options[@]}"
