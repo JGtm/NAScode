@@ -104,6 +104,14 @@ check_plexignore() {
 # VÉRIFICATION DU SUFFIXE DE SORTIE
 ###########################################################
 
+# Signale --replace au démarrage (mode batch et fichier unique).
+check_replace_mode() {
+    if [[ "${REPLACE_ORIGINAL:-false}" == true ]]; then
+        print_info "$(msg MSG_SYS_REPLACE_ENABLED)"
+    fi
+    return 0
+}
+
 check_output_suffix() {
     local source_abs output_abs is_same_dir=false
     source_abs=$(cd "$SOURCE" && pwd)
