@@ -153,6 +153,7 @@ main() {
 
         # Vérification interactive du suffixe de sortie (cohérent avec le mode batch)
         check_output_suffix
+        check_replace_mode
 
         detect_hwaccel
         check_vmaf
@@ -205,6 +206,7 @@ main() {
     # Vérifications interactives
     check_plexignore
     check_output_suffix
+    check_replace_mode
     
     # Détecter le hwaccel avant d'indexer / construire la queue
     detect_hwaccel

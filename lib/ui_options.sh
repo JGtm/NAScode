@@ -183,13 +183,6 @@ format_option_limit_fps() {
 format_option_keep_metadata() {
     echo -e "🗂️   ${CYAN}$(msg MSG_UI_OPT_KEEP_METADATA)${NOCOLOR}"
 }
-
-# Formate l'option --replace pour print_active_options
-# Usage: format_option_replace
-format_option_replace() {
-    echo -e "♻️   ${YELLOW}$(msg MSG_UI_OPT_REPLACE)${NOCOLOR}"
-}
-
 ###########################################################
 # FONCTIONS LEGACY (POUR RÉTRO-COMPATIBILITÉ)
 ###########################################################

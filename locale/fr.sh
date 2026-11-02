@@ -61,6 +61,7 @@ MSG_SYS_PLEXIGNORE_CREATE="Créer un fichier .plexignore dans le répertoire de 
 MSG_SYS_PLEXIGNORE_CREATED="Fichier .plexignore créé dans le répertoire de destination"
 MSG_SYS_PLEXIGNORE_SKIPPED="Création de .plexignore ignorée"
 MSG_SYS_NO_SUFFIX_ENABLED="Option --no-suffix activée. Le suffixe est désactivé par commande."
+MSG_SYS_REPLACE_ENABLED="Option --replace activée. Les originaux seront remplacés après vérification."
 MSG_SYS_SUFFIX_ENABLED="Suffixe de sortie activé"
 MSG_SYS_SUFFIX_USE="Utiliser le suffixe de sortie ?"
 MSG_SYS_OVERWRITE_RISK_TITLE="RISQUE D'ÉCRASEMENT"
@@ -299,7 +300,6 @@ MSG_UI_OPT_FILE_COUNT="Compteur de fichiers à traiter"
 MSG_UI_OPT_HFR_LIMITED="Vidéos HFR : limitées à %s fps"
 MSG_UI_OPT_HFR_BITRATE="Vidéos HFR : bitrate ajusté (fps original conservé)"
 MSG_UI_OPT_KEEP_METADATA="Conservation des métadonnées et de la date de modification source"
-MSG_UI_OPT_REPLACE="Remplacement des originaux par les fichiers convertis"
 
 ###########################################################
 # UI MESSAGES (lib/ui.sh)
