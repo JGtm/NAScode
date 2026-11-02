@@ -141,7 +141,8 @@ readonly DRYRUN_SUFFIX="-dryrun-sample"
 SUFFIX_STRING=""  # Suffixe par défaut (sera mis à jour par build_dynamic_suffix selon le codec)
 
 # Exclusions par défaut
-EXCLUDES=("./logs" "./*.sh" "./*.txt" "./Converted" "./samples" "./tests" "../ConversionPy")
+# "#recycle" / "@eaDir" : corbeille et miniatures Synology (exclues partout).
+EXCLUDES=("./logs" "./*.sh" "./*.txt" "./Converted" "./samples" "./tests" "../ConversionPy" "#recycle" "@eaDir")
 
 # ----- Paramètres système -----
 readonly TMP_DIR="${NASCODE_TMP_DIR:-${NASCODE_RUNTIME_DIR:-/tmp}/video_convert}"

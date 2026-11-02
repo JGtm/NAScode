@@ -213,10 +213,13 @@ _index_video_files() {
     local count_file="$4"
     
     # Deuxième passe : indexer les fichiers avec leur taille
-    find "$SOURCE" \
+    # find sort en 1 sur un dossier illisible (ex: corbeille NAS "#recycle") :
+    # sous pipefail + errexit, cela tuait le script en silence après l'indexation.
+    # Même tolérance que le comptage : on ignore les dossiers inaccessibles.
+    { find "$SOURCE" \
         -wholename "$exclude_dir_name" -prune \
         -o \
-        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 | \
+        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null || true; } | \
     while IFS= read -r -d $'\0' f; do
         if is_excluded "$f"; then continue; fi
         if [[ "$f" =~ \.(sh|txt)$ ]]; then continue; fi

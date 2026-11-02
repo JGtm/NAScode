@@ -529,3 +529,30 @@ teardown() {
     # Vérifier que le fichier est dans la queue
     tr '\0' '\n' < "$QUEUE" | grep -q "L'épisode spécial.mkv"
 }
+
+@test "_index_video_files: un dossier illisible (find exit 1) ne tue pas le run sous pipefail" {
+    # Simule "find: '/z/#recycle': Permission denied" : sortie partielle + exit 1.
+    find() { command find "$@"; echo "find: Permission denied" >&2; return 1; }
+    local count_file="$TEST_QUEUE_DIR/.count" index_tmp="$TEST_QUEUE_DIR/index.tmp"
+    echo 0 > "$count_file"
+
+    # Bats tourne en errexit : sous pipefail, un exit 1 de find ferait échouer le test.
+    set -o pipefail
+    _index_video_files "$OUTPUT_DIR" 4 "$index_tmp" "$count_file" 2> "$TEST_QUEUE_DIR/stderr"
+    set +o pipefail
+    unset -f find
+
+    [ "$(cat "$count_file")" -eq 4 ]
+    [ "$(wc -l < "$index_tmp")" -eq 4 ]
+    ! grep -q "Permission denied" "$TEST_QUEUE_DIR/stderr"
+}
+
+@test "is_excluded: corbeille et miniatures Synology exclues par défaut" {
+    run bash -c 'SCRIPT_DIR="$1"; source "$1/lib/ui.sh"; source "$1/lib/config.sh"; source "$1/lib/utils.sh"
+        EXCLUDES_REGEX="$(_build_excludes_regex)"
+        is_excluded "/z/#recycle/Film.mkv" || exit 1
+        is_excluded "/z/Films/@eaDir/Film.mkv/SYNOVIDEO_VIDEO_SCREENSHOT.jpg" || exit 2
+        is_excluded "/z/Past.Lives.2023.mkv" && exit 3
+        exit 0' _ "$PROJECT_ROOT"
+    [ "$status" -eq 0 ]
+}
