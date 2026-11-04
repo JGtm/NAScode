@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.0
+
+- ✅ **New `gaming` mode**: adaptive variant calibrated for high-motion content (replays, game captures), 29.97 fps cap by default.
+- ✅ **New `adaptatif-vmaf` mode (AV1)**: per-scene CRF adaptation driven by VMAF ("auto-boost-lite", pure Bash), with NAScode-style progress, Discord notifications and the audio smart codec. Optional `SVT-AV1-Essential` pipe encoder (not combinable with `adaptatif-vmaf` in V1).
+- ✅ **`--replace` option**: replaces the source with the converted file, only after a verified transfer, real savings and matching duration; never on samples. Mentioned at startup.
+- ✅ **`--keep-metadata` option**: preserves metadata, chapters and source modification date.
+- ✅ **Faster indexing**: sizes obtained directly from `find -printf` (no `stat` per file), in-memory counter and throttled progress display. An unreadable folder (e.g. NAS `#recycle`) no longer kills the run.
+- ✅ **`ffprobe` probe cache**: a file is probed once per run for identical options (invalidated if the file changes); `ffmpeg` capabilities are also cached.
+- ✅ **Robustness**: atomic `.partial` transfer verified before publication, lock TOCTOU closed (`flock`), `umask 0077` on temporary files, Discord webhook kept out of the `curl` argv, `wait -n` race fixed.
+- ✅ **Fixes**: VMAF now reads the real `pooled_metrics.vmaf.mean`; `--limit-fps` actually caps the fps; option precedence CLI > mode preset > env > `.env.local`; smart audio decision re-probes channels (skip/encode consistency); PGS subtitle crashes on Blu-ray remux; x265 4.x `fastdecode` segfault; SI/TI parsing; progress bar in mintty / PGS / system timezone.
+- ✅ **SVT-AV1**: perceptual tuning of the series profile, `film-grain` lowered (8 → 6) on the film profile, `enable-overlays` / `film-grain` disabled in adaptive mode, zombie `SvtAv1EncApp` killed on SIGINT/SIGTERM.
+- ✅ **UX**: SI/TI complexity analysis now shows a progress bar; ANSI colors only emitted to a terminal (`NO_COLOR` honored).
+- ✅ **Dev tooling**: GitHub Actions workflow (lint + Bats), strict `run_tests.sh` (can no longer report a false success), centralized constants (`lib/constants.sh`), automatic function export, docs in English as primary language (French in `docs/fr/`).
+
 ## v2.8
 
 - ✅ **HFR (High Frame Rate) Management**: new `--limit-fps` / `--no-limit-fps` options to handle videos >30 fps. In series mode (default), HFR videos are limited to 29.97 fps to optimize size. In film/adaptatif mode, bitrate is proportionally adjusted to framerate.

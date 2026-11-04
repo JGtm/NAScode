@@ -37,6 +37,12 @@ Defaults importants (issus de la config) :
 - Codec audio : `aac`
 - Sortie : `Converted/`
 
+Modes disponibles (`-m`) : `serie` (défaut), `film`, `adaptatif`, `gaming` (contenu high-motion : replays, captures de jeux), `adaptatif-vmaf` (AV1 : CRF par scène piloté par VMAF). Détails : [docs/fr/CONFIG.md](docs/fr/CONFIG.md).
+
+Options pratiques :
+- `--replace` : remplace la source par le fichier converti, uniquement après transfert vérifié, gain réel et durée identique (jamais sur un extrait).
+- `--keep-metadata` : conserve les métadonnées, les chapitres et la date de modification de la source.
+
 ## 🌐 Internationalisation (i18n)
 
 NAScode supporte l'anglais et le français :

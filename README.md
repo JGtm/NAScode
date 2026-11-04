@@ -37,6 +37,12 @@ Important defaults (from config):
 - Audio codec: `aac`
 - Output: `Converted/`
 
+Available modes (`-m`): `serie` (default), `film`, `adaptatif`, `gaming` (high-motion content: replays, game captures), `adaptatif-vmaf` (AV1: per-scene CRF driven by VMAF). Details: [docs/CONFIG.md](docs/CONFIG.md).
+
+Handy options:
+- `--replace`: replaces the source with the converted file, only after a verified transfer, real savings and matching duration (never on a sample).
+- `--keep-metadata`: preserves metadata, chapters and the source modification date.
+
 ## What the script does
 
 - Converts to **HEVC (x265)** or **AV1** depending on `--codec`.

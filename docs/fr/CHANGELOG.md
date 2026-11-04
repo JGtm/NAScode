@@ -1,5 +1,19 @@
 # Changelog
 
+## v3.0
+
+- ✅ **Nouveau mode `gaming`** : variante adaptative calibrée pour le high-motion (replays, captures de jeux), cap à 29.97 fps par défaut.
+- ✅ **Nouveau mode `adaptatif-vmaf` (AV1)** : CRF adapté par scène via VMAF (« auto-boost-lite », Bash pur), avec progression façon NAScode, notifications Discord et smart codec audio. Encodeur optionnel via pipe `SVT-AV1-Essential` (non combinable avec `adaptatif-vmaf` en V1).
+- ✅ **Option `--replace`** : remplace la source par le fichier converti, uniquement après transfert vérifié, gain réel et durée identique ; jamais sur un extrait. Mentionnée au démarrage.
+- ✅ **Option `--keep-metadata`** : conserve les métadonnées, les chapitres et la date de modification de la source.
+- ✅ **Indexation accélérée** : taille obtenue directement via `find -printf` (plus de `stat` par fichier), compteur en mémoire et affichage de progression limité. Un dossier illisible (ex. `#recycle` du NAS) ne tue plus le run.
+- ✅ **Cache des sondes `ffprobe`** : un fichier n'est sondé qu'une fois par run pour des options identiques (invalidé si le fichier change) ; les capacités `ffmpeg` sont aussi mises en cache.
+- ✅ **Robustesse** : transfert atomique `.partial` vérifié avant publication, fenêtre TOCTOU du lock fermée (`flock`), `umask 0077` sur les temporaires, webhook Discord hors de l'argv `curl`, course `wait -n` corrigée.
+- ✅ **Correctifs** : VMAF lit le vrai `pooled_metrics.vmaf.mean` ; `--limit-fps` cape réellement l'fps ; précédence CLI > preset de mode > env > `.env.local` ; décision audio smart qui re-sonde les canaux (cohérence skip/encode) ; crash des sous-titres PGS sur remux Blu-ray ; segfault x265 4.x `fastdecode` ; parsing SI/TI ; barre de progression (mintty, PGS, fuseau horaire système).
+- ✅ **SVT-AV1** : optimisation perceptuelle du profil série, `film-grain` abaissé (8 → 6) sur le profil film, `enable-overlays` / `film-grain` désactivés en mode adaptatif, `SvtAv1EncApp` zombies tués sur SIGINT/SIGTERM.
+- ✅ **UX** : l'analyse de complexité SI/TI affiche une barre de progression ; couleurs ANSI émises seulement vers un terminal (`NO_COLOR` respecté).
+- ✅ **Outillage dev** : workflow GitHub Actions (lint + Bats), `run_tests.sh` strict (ne peut plus mentir), constantes centralisées (`lib/constants.sh`), export automatique des fonctions, documentation en anglais langue principale (français dans `docs/fr/`).
+
 ## v2.9
 
 - ✅ **Internationalisation (i18n)** : système complet de traduction avec support français et anglais. Nouvelle option `--lang <fr|en>` pour choisir la langue de l'interface.
