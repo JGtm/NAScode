@@ -87,7 +87,13 @@ readonly TOTAL_SIZE_AFTER_FILE="$LOG_DIR/.total_size_after_${EXECUTION_TIMESTAMP
 
 initialize_directories() {
     mkdir -p "$LOG_DIR" "$TMP_DIR" "$OUTPUT_DIR"
-    
+
+    # Cache des sondes ffprobe (cf. ffprobe_safe), vidé à chaque démarrage
+    NASCODE_PROBE_CACHE_DIR="$TMP_DIR/probe_cache"
+    rm -rf "$NASCODE_PROBE_CACHE_DIR"
+    mkdir -p "$NASCODE_PROBE_CACHE_DIR"
+    export NASCODE_PROBE_CACHE_DIR
+
     rm -f "$STOP_FLAG"
     
     # Nettoyage automatique des vieux logs (30 jours)

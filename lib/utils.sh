@@ -177,16 +177,61 @@ normalize_path_for_ffprobe() {
 # Wrapper ffprobe qui normalise automatiquement les chemins Windows/Git Bash.
 # Usage identique à ffprobe : ffprobe_safe [options] <file>
 # Le dernier argument est considéré comme le fichier à normaliser.
+#
+# Cache : si NASCODE_PROBE_CACHE_DIR est défini, une sonde déjà réussie (mêmes options,
+# même fichier, fichier non modifié depuis) est rejouée sans relancer ffprobe. Chaque appel
+# ouvre le fichier (réseau sur NAS) et lance un process (coûteux sous MSYS) : un même
+# fichier est sondé jusqu'à une dizaine de fois par le pipeline.
 ffprobe_safe() {
     local args=("$@")
     local last_idx=$((${#args[@]} - 1))
-    
-    # Normaliser le dernier argument (le fichier)
+    local f=""
+
+    # Normaliser le dernier argument (le fichier), sans fork
     if [[ $last_idx -ge 0 ]]; then
-        args[$last_idx]=$(normalize_path_for_ffprobe "${args[$last_idx]}")
+        f="${args[$last_idx]}"
+        if [[ "$f" =~ ^/([a-zA-Z])/ ]]; then
+            f="${BASH_REMATCH[1]^}:${f:2}"
+        fi
+        args[$last_idx]="$f"
     fi
-    
-    ffprobe "${args[@]}"
+
+    local cache_dir="${NASCODE_PROBE_CACHE_DIR:-}"
+    local orig="${*: -1}"
+    if [[ -z "$cache_dir" || $last_idx -lt 1 || ! -f "$orig" ]]; then
+        ffprobe "${args[@]}"
+        return
+    fi
+
+    # Clé = options + chemin ; pas de cache si trop longue (évite toute collision par troncature)
+    local key="${args[*]}"
+    key="${key//[^a-zA-Z0-9]/_}"
+    if (( ${#key} > 200 )) || [[ ! -d "$cache_dir" ]]; then
+        ffprobe "${args[@]}"
+        return
+    fi
+
+    local cache_file="$cache_dir/$key"
+    local content
+    if [[ -f "$cache_file" && ! "$orig" -nt "$cache_file" ]]; then
+        content=$(<"$cache_file")
+        [[ -n "$content" ]] && printf '%s\n' "$content"
+        return 0
+    fi
+
+    # Sonde réelle ; on ne met en cache que les succès
+    local tmp="$cache_file.$$.tmp" rc=0
+    ffprobe "${args[@]}" > "$tmp" || rc=$?
+    if (( rc == 0 )); then
+        content=$(<"$tmp")
+        mv -f "$tmp" "$cache_file" 2>/dev/null || rm -f "$tmp"
+        [[ -n "$content" ]] && printf '%s\n' "$content"
+    else
+        # Rejouer la sortie partielle comme ffprobe l'aurait fait
+        cat "$tmp"
+        rm -f "$tmp"
+    fi
+    return "$rc"
 }
 
 ###########################################################

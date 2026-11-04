@@ -179,30 +179,57 @@ _handle_existing_index() {
     esac
 }
 
+# Liste les vidéos candidates au format "taille<TAB>chemin<NUL>".
+# find -printf '%s' fournit la taille sans fork de stat par fichier
+# (très coûteux sous MSYS/Windows et sur NAS). Repli stat si find sans -printf (macOS/BSD).
+# Un dossier illisible (ex: "#recycle" du NAS) fait sortir find en 1 : on l'ignore,
+# sinon pipefail + errexit tuaient le script en silence.
+_NASCODE_FIND_PRINTF=""
+_list_video_candidates() {
+    local exclude_dir_name="$1"
+    if [[ -z "$_NASCODE_FIND_PRINTF" ]]; then
+        if command find . -maxdepth 0 -printf '' &>/dev/null; then
+            _NASCODE_FIND_PRINTF=1
+        else
+            _NASCODE_FIND_PRINTF=0
+        fi
+    fi
+
+    if [[ "$_NASCODE_FIND_PRINTF" == 1 ]]; then
+        { find "$SOURCE" \
+            -wholename "$exclude_dir_name" -prune \
+            -o \
+            -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) \
+            -printf '%s\t%p\0' 2>/dev/null || true; }
+    else
+        local f
+        { find "$SOURCE" \
+            -wholename "$exclude_dir_name" -prune \
+            -o \
+            -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) \
+            -print0 2>/dev/null || true; } | \
+        while IFS= read -r -d $'\0' f; do
+            printf '%s\t%s\0' "$(get_file_size_bytes "$f")" "$f"
+        done
+    fi
+}
+
 _count_total_video_files() {
     local exclude_dir_name="$1"
-    local count=0
-    
-    # Calcul du nombre total de fichiers candidats (applique les mêmes exclusions que l'indexation)
-    while IFS= read -r -d $'\0' f; do
-        # Appliquer les mêmes exclusions que _index_video_files
+    local count=0 rec size f
+
+    # Calcul du nombre total de fichiers candidats (mêmes exclusions que l'indexation)
+    while IFS= read -r -d $'\0' rec; do
+        size="${rec%%$'\t'*}"
+        f="${rec#*$'\t'}"
         if is_excluded "$f"; then continue; fi
         if [[ "$f" =~ \.(sh|txt)$ ]]; then continue; fi
-
-        # Si filtre taille activé, ne compter que les fichiers >= seuil
-        if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]]; then
-            local size
-            size=$(get_file_size_bytes "$f")
-            if [[ "$size" -lt "$MIN_SIZE_BYTES" ]]; then
-                continue
-            fi
+        if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]] && [[ "$size" -lt "$MIN_SIZE_BYTES" ]]; then
+            continue
         fi
-        ((count++))
-    done < <(find "$SOURCE" \
-        -wholename "$exclude_dir_name" -prune \
-        -o \
-        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null)
-    
+        count=$((count + 1))
+    done < <(_list_video_candidates "$exclude_dir_name")
+
     echo "$count"
 }
 
@@ -211,22 +238,16 @@ _index_video_files() {
     local total_files="$2"
     local queue_tmp="$3"
     local count_file="$4"
-    
-    # Deuxième passe : indexer les fichiers avec leur taille
-    # find sort en 1 sur un dossier illisible (ex: corbeille NAS "#recycle") :
-    # sous pipefail + errexit, cela tuait le script en silence après l'indexation.
-    # Même tolérance que le comptage : on ignore les dossiers inaccessibles.
-    { find "$SOURCE" \
-        -wholename "$exclude_dir_name" -prune \
-        -o \
-        -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) -print0 2>/dev/null || true; } | \
-    while IFS= read -r -d $'\0' f; do
+
+    # Boucle sans pipe (pas de sous-shell) : compteur en mémoire, aucun fork par fichier.
+    # Progression limitée à 1 mise à jour sur 25 (+ la dernière).
+    local count=0 rec size f
+    : > "$queue_tmp"
+    while IFS= read -r -d $'\0' rec; do
+        size="${rec%%$'\t'*}"
+        f="${rec#*$'\t'}"
         if is_excluded "$f"; then continue; fi
         if [[ "$f" =~ \.(sh|txt)$ ]]; then continue; fi
-        
-        # Stockage de la taille et du chemin (séparé par tab)
-        local size
-        size=$(get_file_size_bytes "$f")
 
         # Filtre taille (index/queue) : ne garder que les fichiers >= seuil
         if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]] && [[ "$size" -lt "$MIN_SIZE_BYTES" ]]; then
@@ -234,17 +255,15 @@ _index_video_files() {
         fi
 
         # Incrémenter le compteur APRÈS le filtre (sinon progression incorrecte)
-        local count
-        count=$(($(cat "$count_file") + 1))
-        echo "$count" > "$count_file"
-        
-        # Affichage de progression
-        if [[ "$NO_PROGRESS" != true ]]; then
+        count=$((count + 1))
+        if [[ "$NO_PROGRESS" != true ]] && { (( count % 25 == 0 )) || (( count == total_files )); }; then
             print_indexing_progress "$count" "$total_files"
         fi
 
-        echo -e "${size}\t$f"
-    done > "$queue_tmp"
+        printf '%s\t%s\n' "$size" "$f"
+    done < <(_list_video_candidates "$exclude_dir_name") >> "$queue_tmp"
+
+    echo "$count" > "$count_file"
 }
 
 _generate_index() {
