@@ -122,15 +122,21 @@ _apply_queue_limitations() {
     # Lire la queue (séparée par \0) et la convertir en lignes pour le traitement
     queue_content=$(tr '\0' '\n' < "$QUEUE")
     
-    # Appliquer le tri (aléatoire si random) et la limite
+    # Appliquer le tri (aléatoire si random) et la limite.
+    # La liste complète passe par un fichier avant `head` : avec une grosse queue
+    # (plusieurs centaines de Ko), `printf ... | head -n N` fait recevoir SIGPIPE à printf
+    # quand head se ferme, et pipefail + errexit tuaient le script sans message (exit 141).
+    local tmp_all="$QUEUE.limit.all"
     if [[ "$RANDOM_MODE" == true ]]; then
         # Mode RANDOM : Tri aléatoire puis limitation
-        printf '%s\n' "$queue_content" | shuffle_lines | head -n "$limit_count" | tr '\n' '\0' > "$tmp_limit"
+        printf '%s\n' "$queue_content" | shuffle_lines > "$tmp_all"
     else
         # Mode Normal : Limitation du haut de la liste (déjà triée par taille décroissante)
-        printf '%s\n' "$queue_content" | head -n "$limit_count" | tr '\n' '\0' > "$tmp_limit"
+        printf '%s\n' "$queue_content" > "$tmp_all"
     fi
-    
+    head -n "$limit_count" "$tmp_all" | tr '\n' '\0' > "$tmp_limit"
+    rm -f "$tmp_all"
+
     mv "$tmp_limit" "$QUEUE"
 }
 

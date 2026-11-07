@@ -5,6 +5,7 @@ Script Bash d'automatisation pour convertir des vidéos vers **HEVC (x265)** ou 
 Prérequis :
 - **bash 4+** (Git Bash/WSL sur Windows OK)
 - **ffmpeg** avec `libx265` (AV1 via `libsvtav1` optionnel, VMAF via `libvmaf` optionnel)
+- **macOS** : `brew install bash findutils` recommandé (`find` GNU = indexation bien plus rapide, surtout sur un partage NAS)
 
 Installation :
 ```bash
@@ -229,6 +230,9 @@ bash run_tests.sh -v
 
 # Filtrer
 bash run_tests.sh -f "queue"  # exemple
+
+# Fichiers en parallèle (défaut : auto = nb de cœurs) ; -j 1 = séquentiel
+bash run_tests.sh -j 4
 ```
 
 Sur Git Bash / Windows, [run_tests.sh](run_tests.sh) tente aussi `${HOME}/.local/bin/bats` si `bats` n’est pas sur le PATH.

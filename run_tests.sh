@@ -41,6 +41,8 @@ VERBOSE=false
 FILTER=""
 SHOW_ONLY_ERRORS=false
 FAST_MODE=false
+# Nombre de fichiers .bats exécutés en parallèle ("auto" = nombre de cœurs, 1 = séquentiel)
+JOBS="auto"
 
 ###########################################################
 # Fonctions utilitaires
@@ -132,6 +134,14 @@ while [[ $# -gt 0 ]]; do
             FAST_MODE=true
             shift
             ;;
+        -j|--jobs)
+            JOBS="${2:-}"
+            if ! [[ "$JOBS" =~ ^[1-9][0-9]*$ || "$JOBS" == "auto" ]]; then
+                echo -e "${RED}Valeur invalide pour $1 : '${JOBS}' (entier >= 1 ou auto)${NC}"
+                exit 1
+            fi
+            shift 2
+            ;;
         -h|--help)
             echo "Usage: $0 [options]"
             echo ""
@@ -140,6 +150,7 @@ while [[ $# -gt 0 ]]; do
             echo "  -e, --errors-only  Affiche uniquement les fichiers avec erreurs"
             echo "  -f, --filter PAT   Exécuter seulement les tests matchant PAT"
             echo "  --fast             Mode rapide (exclut les tests E2E lents)"
+            echo "  -j, --jobs N       Fichiers exécutés en parallèle (défaut : auto = nb de cœurs ; 1 = séquentiel)"
             echo "  -h, --help         Afficher cette aide"
             echo ""
             echo "Les résultats sont enregistrés dans: logs/tests/"
@@ -226,7 +237,99 @@ FILE_NUM=0
 # Fichier temporaire pour récupérer le code de sortie de bats à travers la
 # process substitution (sinon $? reflète la boucle while, pas bats).
 BATS_RC_TMP=$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/nascode_bats_rc.$$")
-trap 'rm -f "$BATS_RC_TMP" 2>/dev/null || true' EXIT
+
+###########################################################
+# Exécution parallèle (préparation)
+###########################################################
+# Les fichiers sont lancés en arrière-plan ; la boucle d'affichage ci-dessous
+# relit ensuite leurs sorties TAP dans l'ordre habituel (même parsing, mêmes
+# contrôles de harnais).
+#   - fichiers "isolables" : en parallèle, chacun avec son propre
+#     NASCODE_RUNTIME_DIR (lockfile, stop flag et TMP_DIR séparés) ;
+#   - fichiers qui codent en dur /tmp/conversion_* ou /tmp/video_convert
+#     (E2E, lock) : à la suite, dans un seul worker, comme avant.
+PREPARED_DIR=""
+PREP_PIDS=()
+
+_cleanup_runner() {
+    rm -f "$BATS_RC_TMP" 2>/dev/null || true
+    if [[ ${#PREP_PIDS[@]} -gt 0 ]]; then
+        kill "${PREP_PIDS[@]}" 2>/dev/null || true
+        pkill -P $$ 2>/dev/null || true
+    fi
+    if [[ -n "$PREPARED_DIR" && -d "$PREPARED_DIR" ]]; then
+        rm -rf "$PREPARED_DIR" 2>/dev/null || true
+    fi
+}
+trap _cleanup_runner EXIT
+trap 'exit 130' INT TERM
+
+if [[ "$JOBS" == "auto" ]]; then
+    JOBS=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
+    [[ "$JOBS" =~ ^[0-9]+$ && "$JOBS" -ge 1 ]] || JOBS=4
+fi
+
+# Lance un fichier .bats et écrit <fichier>.tap puis <fichier>.rc (écrit en dernier :
+# sa présence signale que le fichier est terminé).
+# Usage: _prepare_one <fichier.bats> <isolé:0|1>
+_prepare_one() {
+    local f="$1" isolated="$2" rt="" rc=0
+    if [[ "$isolated" == 1 ]]; then
+        rt=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/nascode_rt_$$_$RANDOM")
+        # TMP_DIR par défaut = $NASCODE_RUNTIME_DIR/video_convert (lib/config.sh) :
+        # certains tests supposent qu'il existe, comme /tmp/video_convert en séquentiel.
+        mkdir -p "$rt/video_convert"
+        NASCODE_RUNTIME_DIR="$rt" bats --tap "$f" > "$PREPARED_DIR/$f.tap" 2>&1 || rc=$?
+        rm -rf "$rt" 2>/dev/null || true
+    else
+        bats --tap "$f" > "$PREPARED_DIR/$f.tap" 2>&1 || rc=$?
+    fi
+    echo "$rc" > "$PREPARED_DIR/$f.rc.tmp"
+    mv "$PREPARED_DIR/$f.rc.tmp" "$PREPARED_DIR/$f.rc"
+}
+
+if [[ "$JOBS" -gt 1 && "$TOTAL_FILES" -gt 1 ]]; then
+    PREPARED_DIR=$(mktemp -d 2>/dev/null || echo "${TMPDIR:-/tmp}/nascode_tests_$$")
+    mkdir -p "$PREPARED_DIR"
+
+    PARALLEL_FILES=()
+    SERIAL_FILES=()
+    for test_file in "${TEST_FILES[@]}"; do
+        if grep -qE '/tmp/(conversion_|video_convert)' "$test_file"; then
+            SERIAL_FILES+=("$test_file")
+        else
+            PARALLEL_FILES+=("$test_file")
+        fi
+    done
+
+    print_and_log "${DIM}⚡ Parallèle : ${JOBS} jobs (${#PARALLEL_FILES[@]} fichiers isolés, ${#SERIAL_FILES[@]} à la suite) — -j 1 pour séquentiel${NC}"
+    print_and_log ""
+
+    # Worker séquentiel (fichiers partageant /tmp) : démarré en premier, c'est le plus long.
+    if [[ ${#SERIAL_FILES[@]} -gt 0 ]]; then
+        ( for f in "${SERIAL_FILES[@]}"; do _prepare_one "$f" 0; done ) &
+        PREP_PIDS+=($!)
+    fi
+
+    # Pool parallèle pour les fichiers isolés (un slot est laissé au worker séquentiel).
+    pool_size=$JOBS
+    [[ ${#SERIAL_FILES[@]} -gt 0 && "$pool_size" -gt 1 ]] && pool_size=$((pool_size - 1))
+    if [[ ${#PARALLEL_FILES[@]} -gt 0 ]]; then
+        (
+            running=0
+            for f in "${PARALLEL_FILES[@]}"; do
+                if [[ "$running" -ge "$pool_size" ]]; then
+                    wait -n 2>/dev/null || true
+                    running=$((running - 1))
+                fi
+                _prepare_one "$f" 1 &
+                running=$((running + 1))
+            done
+            wait
+        ) &
+        PREP_PIDS+=($!)
+    fi
+fi
 
 for test_file in "${TEST_FILES[@]}"; do
     ((FILE_NUM++)) || true
@@ -320,7 +423,16 @@ for test_file in "${TEST_FILES[@]}"; do
                 echo "    $translated" >> "$LOG_FILE"
             fi
         fi
-    done < <(bats --tap "$test_file" 2>&1; echo "$?" > "$BATS_RC_TMP")
+    done < <(
+        if [[ -n "$PREPARED_DIR" ]]; then
+            # Mode parallèle : attendre la fin du fichier, puis relire sa sortie TAP
+            while [[ ! -f "$PREPARED_DIR/$test_file.rc" ]]; do sleep 0.2; done
+            cat "$PREPARED_DIR/$test_file.tap"
+            cat "$PREPARED_DIR/$test_file.rc" > "$BATS_RC_TMP"
+        else
+            bats --tap "$test_file" 2>&1; echo "$?" > "$BATS_RC_TMP"
+        fi
+    )
     set -e
 
     # Récupérer le code de sortie de bats (écrit dans le sous-shell ci-dessus).

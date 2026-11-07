@@ -146,7 +146,11 @@ _handle_existing_index() {
     fi
     
     local index_date
-    index_date=$(stat -c '%y' "$INDEX" | cut -d'.' -f1)
+    # GNU stat (Linux/MSYS) puis BSD stat (macOS sans coreutils) : sans repli,
+    # l'échec de `stat -c` tuait le script en silence sous pipefail + errexit.
+    index_date=$( { stat -c '%y' "$INDEX" 2>/dev/null \
+        || stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S' "$INDEX" 2>/dev/null \
+        || echo "?"; } | cut -d'.' -f1)
     # Si l'utilisateur a demandé de conserver l'index, on l'accepte sans demander
     if [[ "$KEEP_INDEX" == true ]]; then
         if [[ "$NO_PROGRESS" != true ]]; then
@@ -181,22 +185,34 @@ _handle_existing_index() {
 
 # Liste les vidéos candidates au format "taille<TAB>chemin<NUL>".
 # find -printf '%s' fournit la taille sans fork de stat par fichier
-# (très coûteux sous MSYS/Windows et sur NAS). Repli stat si find sans -printf (macOS/BSD).
+# (très coûteux sous MSYS/Windows et sur NAS). Le find de macOS (BSD) n'a pas -printf :
+# on prend alors le find GNU de Homebrew (gfind, paquet findutils) s'il est installé.
+# Repli stat par fichier en dernier recours (lent sur un partage réseau).
 # Un dossier illisible (ex: "#recycle" du NAS) fait sortir find en 1 : on l'ignore,
 # sinon pipefail + errexit tuaient le script en silence.
 _NASCODE_FIND_PRINTF=""
+_NASCODE_FIND_BIN="find"
+_detect_find_printf() {
+    [[ -n "$_NASCODE_FIND_PRINTF" ]] && return 0
+    local bin
+    for bin in find gfind; do
+        command -v "$bin" &>/dev/null || continue
+        if command "$bin" . -maxdepth 0 -printf '' &>/dev/null; then
+            _NASCODE_FIND_BIN="$bin"
+            _NASCODE_FIND_PRINTF=1
+            return 0
+        fi
+    done
+    _NASCODE_FIND_BIN="find"
+    _NASCODE_FIND_PRINTF=0
+}
+
 _list_video_candidates() {
     local exclude_dir_name="$1"
-    if [[ -z "$_NASCODE_FIND_PRINTF" ]]; then
-        if command find . -maxdepth 0 -printf '' &>/dev/null; then
-            _NASCODE_FIND_PRINTF=1
-        else
-            _NASCODE_FIND_PRINTF=0
-        fi
-    fi
+    _detect_find_printf
 
     if [[ "$_NASCODE_FIND_PRINTF" == 1 ]]; then
-        { find "$SOURCE" \
+        { "$_NASCODE_FIND_BIN" "$SOURCE" \
             -wholename "$exclude_dir_name" -prune \
             -o \
             -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) \
@@ -214,8 +230,21 @@ _list_video_candidates() {
     fi
 }
 
+# Lit la liste des candidates : depuis un fichier déjà produit par _list_video_candidates
+# (une seule exploration de la source) ou, à défaut, en explorant la source.
+_read_video_candidates() {
+    local exclude_dir_name="$1"
+    local candidates_file="${2:-}"
+    if [[ -n "$candidates_file" ]] && [[ -f "$candidates_file" ]]; then
+        cat "$candidates_file"
+    else
+        _list_video_candidates "$exclude_dir_name"
+    fi
+}
+
 _count_total_video_files() {
     local exclude_dir_name="$1"
+    local candidates_file="${2:-}"
     local count=0 rec size f
 
     # Calcul du nombre total de fichiers candidats (mêmes exclusions que l'indexation)
@@ -228,7 +257,7 @@ _count_total_video_files() {
             continue
         fi
         count=$((count + 1))
-    done < <(_list_video_candidates "$exclude_dir_name")
+    done < <(_read_video_candidates "$exclude_dir_name" "$candidates_file")
 
     echo "$count"
 }
@@ -238,6 +267,7 @@ _index_video_files() {
     local total_files="$2"
     local queue_tmp="$3"
     local count_file="$4"
+    local candidates_file="${5:-}"
 
     # Boucle sans pipe (pas de sous-shell) : compteur en mémoire, aucun fork par fichier.
     # Progression limitée à 1 mise à jour sur 25 (+ la dernière).
@@ -261,7 +291,7 @@ _index_video_files() {
         fi
 
         printf '%s\t%s\n' "$size" "$f"
-    done < <(_list_video_candidates "$exclude_dir_name") >> "$queue_tmp"
+    done < <(_read_video_candidates "$exclude_dir_name" "$candidates_file") >> "$queue_tmp"
 
     echo "$count" > "$count_file"
 }
@@ -269,10 +299,15 @@ _index_video_files() {
 _generate_index() {
     # Génération de l'INDEX (fichier permanent contenant tous les fichiers indexés avec tailles)
     local exclude_dir_name=$OUTPUT_DIR
-    
+
+    # Une seule exploration de la source (coûteuse sur un partage réseau),
+    # réutilisée pour le comptage puis pour l'indexation.
+    local candidates_file="$TMP_DIR/.index_candidates_$$"
+    _list_video_candidates "$exclude_dir_name" > "$candidates_file"
+
     # Première passe : compter le nombre total de fichiers vidéo candidats
     local total_files
-    total_files=$(_count_total_video_files "$exclude_dir_name")
+    total_files=$(_count_total_video_files "$exclude_dir_name" "$candidates_file")
 
     # Afficher l'en-tête du bloc d'indexation
     if [[ "$NO_PROGRESS" != true ]]; then
@@ -285,8 +320,9 @@ _generate_index() {
     
     # Deuxième passe : indexer les fichiers (stockage taille + chemin)
     local index_tmp="$INDEX.tmp"
-    _index_video_files "$exclude_dir_name" "$total_files" "$index_tmp" "$count_file"
-    
+    _index_video_files "$exclude_dir_name" "$total_files" "$index_tmp" "$count_file" "$candidates_file"
+    rm -f "$candidates_file"
+
     local final_count
     final_count=$(cat "$count_file")
     rm -f "$count_file"

@@ -321,8 +321,14 @@ parse_arguments() {
     # -m : ne requiert pas l'existence du répertoire (il sera créé plus tard).
     # Sans normalisation, un chemin absolu passé via -o ou OUTPUT_DIR=... serait
     # précédé de $SCRIPT_DIR si la logique de concaténation s'applique.
-    if command -v realpath &>/dev/null; then
-        OUTPUT_DIR=$(realpath -m "$OUTPUT_DIR")
+    # Le realpath BSD de macOS (sans GNU coreutils) ne connaît pas -m : on retombe
+    # alors sur l'équivalent sans résolution (absolu par rapport au dossier courant).
+    local _resolved_output=""
+    if command -v realpath &>/dev/null && _resolved_output=$(realpath -m "$OUTPUT_DIR" 2>/dev/null); then
+        OUTPUT_DIR="$_resolved_output"
+    elif command -v realpath &>/dev/null; then
+        [[ "$OUTPUT_DIR" != /* ]] && OUTPUT_DIR="$PWD/$OUTPUT_DIR"
+        [[ "$OUTPUT_DIR" != "/" ]] && OUTPUT_DIR="${OUTPUT_DIR%/}"
     elif [[ "$OUTPUT_DIR" != /* ]]; then
         OUTPUT_DIR="$SCRIPT_DIR/$OUTPUT_DIR"
     fi

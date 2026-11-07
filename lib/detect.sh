@@ -140,7 +140,8 @@ normalize_path() {
         path="${path//\/.\//\/}"
     done
     # Supprimer les doubles slashes (sauf au début pour les chemins UNC)
-    path=$(echo "$path" | sed 's#\([^:]\)//\+#\1/#g')
+    # sed -E (GNU, BSD/macOS, Git Bash) : `\+` en BRE n'existe que dans GNU sed.
+    path=$(echo "$path" | sed -E 's#([^:])/{2,}#\1/#g')
     # Supprimer le slash final sauf pour la racine
     [[ "$path" != "/" && "$path" != *":" ]] && path="${path%/}"
 

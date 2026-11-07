@@ -241,10 +241,10 @@ _essential_pipe_encode() {
     # Limite : si plusieurs encodes Essential tournent en parallèle (xargs -P),
     # ce trap tue tous les SvtAv1EncApp.exe — pas seulement le nôtre. Acceptable
     # vu que NAScode ne parallélise pas à ce niveau aujourd'hui.
-    # shellcheck disable=SC2064 (svt_log expanded volontairement au moment du trap)
+    # shellcheck disable=SC2064 # svt_log expanded volontairement au moment du trap
     trap "_essential_kill_orphans 2>/dev/null; rm -f \"$svt_log\" 2>/dev/null; exit 130" INT TERM
 
-    # shellcheck disable=SC2086 (cli_params expansion volontaire)
+    # shellcheck disable=SC2086 # cli_params expansion volontaire
     ffmpeg -hide_banner -loglevel error \
             -i "$input" \
             -map 0:v:0 -an -sn \

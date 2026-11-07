@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.0.1
+
+- ✅ **macOS — silent stop with `-l N`**: on a large queue, `printf | head` received SIGPIPE and `pipefail` killed the script without any message (exit 141). Fixed in normal and random (`-r`) modes.
+- ✅ **macOS — fast indexing**: BSD `find` has no `-printf`; GNU `find` from Homebrew (`gfind`, `findutils`) is now used when available instead of one `stat` per file. The source is also explored only once (count + indexing), which halves the time on a NAS share.
+- ✅ **macOS without GNU coreutils**: portable fallbacks for `stat -c` (existing index with `-k`, copy progress), `realpath -m` (output folder), `date -d` (ETA with BSD awk), GNU-only `sed` `\+` (path normalization, Discord) and a BSD awk regex (Discord queue preview).
+- ✅ **Tests**: new `test_regression_macos_portability.bats` (SIGPIPE, `find`/`gfind` detection, `stat` fallback, single exploration, BSD `stat`). `run_tests.sh` runs files in parallel (`-j N`, default = CPU count, `-j 1` = sequential): ~10 min → ~3 min.
+
 ## v3.0
 
 - ✅ **New `gaming` mode**: adaptive variant calibrated for high-motion content (replays, game captures), 29.97 fps cap by default.
