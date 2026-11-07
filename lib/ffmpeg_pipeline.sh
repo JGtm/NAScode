@@ -279,7 +279,8 @@ function format_time(ts,   cmd,t) { cmd="date -d @" ts " +%H:%M:%S 2>/dev/null |
                 _cmd_append_words cmd "$IO_PRIORITY_CMD"
             fi
 
-            cmd+=(ffmpeg -y -loglevel warning)
+            # -nostdin : ffmpeg ne doit jamais lire de touches (cf. lib/processing.sh).
+            cmd+=(ffmpeg -nostdin -y -loglevel warning)
             cmd+=(-probesize "${FFMPEG_PROBESIZE:-100M}" -analyzeduration "${FFMPEG_ANALYZEDURATION:-100M}")
 
             _cmd_append_words cmd "${SAMPLE_SEEK_PARAMS:-}"

@@ -46,7 +46,11 @@ _process_queue_simple() {
             break
         fi
         
-        convert_file "$file" "$OUTPUT_DIR" &
+        # stdin coupé : sans cela, ffmpeg hérite de la queue (`done < "$QUEUE"`) et lit
+        # les chemins comme des touches clavier. Un « c » ouvre son invite
+        # « Enter command: », son fil principal boucle à l'infini : progression figée
+        # et ffmpeg qui ne se termine jamais, même encodage fini.
+        convert_file "$file" "$OUTPUT_DIR" < /dev/null &
         _pids+=("$!")
         if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
             # Attendre qu'un des jobs trackés (convert_file) se termine, pas un
@@ -208,7 +212,8 @@ _process_queue_with_fifo() {
                 break
             fi
             
-            convert_file "$file" "$OUTPUT_DIR" &
+            # stdin coupé : sinon ffmpeg lirait le FIFO de la queue (cf. _process_queue_simple).
+            convert_file "$file" "$OUTPUT_DIR" < /dev/null &
             _pids+=("$!")
             if [[ "${#_pids[@]}" -ge "$PARALLEL_JOBS" ]]; then
                 # Même correction que dans _process_queue_simple : attendre qu'un

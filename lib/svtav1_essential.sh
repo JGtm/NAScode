@@ -245,7 +245,7 @@ _essential_pipe_encode() {
     trap "_essential_kill_orphans 2>/dev/null; rm -f \"$svt_log\" 2>/dev/null; exit 130" INT TERM
 
     # shellcheck disable=SC2086 # cli_params expansion volontaire
-    ffmpeg -hide_banner -loglevel error \
+    ffmpeg -nostdin -hide_banner -loglevel error \
             -i "$input" \
             -map 0:v:0 -an -sn \
             -f yuv4mpegpipe -pix_fmt yuv420p10le -strict -1 pipe:1 2>/dev/null \
@@ -333,7 +333,7 @@ _execute_essential_conversion() {
     audio_opts=( $audio_opts_str )
 
     # Étape 3 : mux final IVF + audio/subs/metadata source.
-    if ! ffmpeg -hide_banner -loglevel error -y \
+    if ! ffmpeg -nostdin -hide_banner -loglevel error -y \
             -i "$out_ivf" -i "$tmp_input" \
             -map 0:v:0 -map 1:a? -map 1:s? \
             -c:v copy "${audio_opts[@]}" -c:s copy \
