@@ -615,7 +615,8 @@ _notify_format_queue_preview() {
             tail_line[idx]=line
             tail_n[idx]=n
         }
-        function base(s) { sub(/^.*[\\/]/, "", s); return s }
+        # Deux sub() : le awk BSD de macOS rejette la classe [\\/] ("nonterminated character class").
+        function base(s) { sub(/^.*\//, "", s); sub(/^.*\\/, "", s); return s }
         function trunc(s, m) { if (length(s) > m) return substr(s, 1, m-3) "..."; return s }
         END {
             if (n == 0) exit

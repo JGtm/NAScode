@@ -32,7 +32,9 @@ teardown_test_env() {
     fi
     # Nettoyer les fichiers globaux créés par nascode pour éviter la contamination
     # entre tests (le lockfile bloque les runs E2E suivants dans la même suite bats)
-    rm -f /tmp/conversion_video.lock /tmp/conversion_stop_flag
+    # Respecte NASCODE_RUNTIME_DIR (run_tests.sh -j isole chaque fichier) : sans cela,
+    # un fichier parallèle supprimerait le lockfile d'un E2E en cours.
+    rm -f "${NASCODE_RUNTIME_DIR:-/tmp}/conversion_video.lock" "${NASCODE_RUNTIME_DIR:-/tmp}/conversion_stop_flag"
 }
 
 ###########################################################

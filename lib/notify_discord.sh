@@ -132,7 +132,7 @@ notify_discord_send_markdown() {
         # Si la requête est rejetée, log un extrait de la réponse (utile pour 400 Invalid Form Body)
         if [[ -n "${resp_file:-}" ]] && [[ -f "${resp_file}" ]] && [[ "${http_code}" =~ ^[45] ]]; then
             local resp_snippet
-            resp_snippet=$(head -c 400 "${resp_file}" 2>/dev/null | tr '\r\n' ' ' | sed 's/[[:space:]]\+/ /g' || true)
+            resp_snippet=$(head -c 400 "${resp_file}" 2>/dev/null | tr '\r\n' ' ' | sed -E 's/[[:space:]]+/ /g' || true)
             [[ -n "${resp_snippet}" ]] && _notify_discord_debug_log "event=${event_name:-unknown} resp=${resp_snippet}"
         fi
 

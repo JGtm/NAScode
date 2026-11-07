@@ -648,7 +648,7 @@ custom_pv() {
     fi
 
     local total copied start_ts current_ts dd_pid
-    total=$(stat -c%s -- "$src" 2>/dev/null) || total=0
+    total=$(get_file_size_bytes "$src")
     if [[ $total -le 0 ]]; then
         # repli : copie simple
         dd if="$src" of="$dst" bs=4M status=none 2>/dev/null
@@ -665,7 +665,7 @@ custom_pv() {
 
     # Interroger la progression pendant l'exécution de dd
     while kill -0 "$dd_pid" 2>/dev/null; do
-        copied=$(stat -c%s -- "$dst" 2>/dev/null || echo 0)
+        copied=$(get_file_size_bytes "$dst")
         current_ts=$(now_ts)
 
         # Afficher la progression (sans saut de ligne)
@@ -679,7 +679,7 @@ custom_pv() {
     wait "$dd_pid" 2>/dev/null || true
 
     # valeur finale (avec saut de ligne)
-    copied=$(stat -c%s -- "$dst" 2>/dev/null || echo 0)
+    copied=$(get_file_size_bytes "$dst")
     current_ts=$(now_ts)
     awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" \
         -v width=30 -v color="$color" -v nocolor="$NOCOLOR" -v newline=1 \

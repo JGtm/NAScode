@@ -532,7 +532,10 @@ teardown() {
 
 @test "_index_video_files: un dossier illisible (find exit 1) ne tue pas le run sous pipefail" {
     # Simule "find: '/z/#recycle': Permission denied" : sortie partielle + exit 1.
-    find() { command find "$@"; echo "find: Permission denied" >&2; return 1; }
+    # On enveloppe le binaire réellement retenu (find, ou gfind sur macOS).
+    _detect_find_printf
+    local fbin="$_NASCODE_FIND_BIN"
+    eval "${fbin}() { command ${fbin} \"\$@\"; echo \"find: Permission denied\" >&2; return 1; }"
     local count_file="$TEST_QUEUE_DIR/.count" index_tmp="$TEST_QUEUE_DIR/index.tmp"
     echo 0 > "$count_file"
 
@@ -540,7 +543,7 @@ teardown() {
     set -o pipefail
     _index_video_files "$OUTPUT_DIR" 4 "$index_tmp" "$count_file" 2> "$TEST_QUEUE_DIR/stderr"
     set +o pipefail
-    unset -f find
+    unset -f "$fbin"
 
     [ "$(cat "$count_file")" -eq 4 ]
     [ "$(wc -l < "$index_tmp")" -eq 4 ]
