@@ -219,7 +219,7 @@ _auto_boost_quality_encode() {
     local out_seg="$2"
     local crf="$3"
 
-    ffmpeg -hide_banner -loglevel error -y \
+    ffmpeg -nostdin -hide_banner -loglevel error -y \
         -i "$input_seg" \
         -c:v libsvtav1 \
         -crf "$crf" \
@@ -301,7 +301,7 @@ _execute_auto_boost_conversion() {
     # 3) Mux final : vidéo AV1 (depuis video_only) + audio (transcodé selon
     # decision smart) + sous-titres (copy) + metadata/chapters (source).
     # -map 1:a? / -map 1:s? : optionnels, ignorés si absent.
-    if ! ffmpeg -hide_banner -loglevel error -y \
+    if ! ffmpeg -nostdin -hide_banner -loglevel error -y \
         -i "$video_only" -i "$tmp_input" \
         -map 0:v:0 -map 1:a? -map 1:s? \
         -c:v copy "${audio_opts[@]}" -c:s copy \

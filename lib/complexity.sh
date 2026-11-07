@@ -164,7 +164,7 @@ _compute_siti() {
     
     # Essayer d'utiliser le filtre siti (FFmpeg 5+)
     local siti_output
-    siti_output=$(ffmpeg -hide_banner -ss "$start_sec" -t "$duration_sec" -i "$file" \
+    siti_output=$(ffmpeg -nostdin -hide_banner -ss "$start_sec" -t "$duration_sec" -i "$file" \
         -vf "siti=print_summary=1" -f null - 2>&1)
     
     # Parser la sortie FFmpeg pour extraire SI et TI moyens

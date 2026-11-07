@@ -39,6 +39,88 @@ _cleanup_x265_logs() {
 }
 
 ###########################################################
+# ARRÊT DES ENCODEURS RÉCALCITRANTS
+###########################################################
+
+# Noms des processus lourds à ne jamais laisser orphelins après un cleanup.
+_CLEANUP_KILL_NAMES="${_CLEANUP_KILL_NAMES:-ffmpeg ffprobe SvtAv1EncApp}"
+
+# Liste les PID des encodeurs DESCENDANTS de <root> (défaut : ce shell), par
+# parcours de l'arbre ppid. À appeler AVANT de tuer les parents : un orphelin est
+# rattaché à PID 1 et sort de l'arbre. Ne vise jamais les ffmpeg d'autres
+# programmes du même process group (script appelant, autres runs, tests).
+# Silencieux et vide si `ps -o` est indisponible (MSYS).
+_cleanup_descendant_encoders() {
+    local root="${1:-$$}"
+    ps -A -o pid= -o ppid= -o comm= 2>/dev/null | awk -v root="$root" -v names="$_CLEANUP_KILL_NAMES" '
+        BEGIN { n = split(names, arr, " "); for (i = 1; i <= n; i++) want[arr[i]] = 1 }
+        {
+            pid = $1; ppid = $2; c = $3
+            for (i = 4; i <= NF; i++) c = c " " $i
+            sub(/.*\//, "", c)
+            parent[pid] = ppid; comm[pid] = c
+        }
+        END {
+            for (pid in parent) {
+                if (!(comm[pid] in want)) continue
+                p = parent[pid]; depth = 0
+                while (p != "" && p != 0 && p != 1 && depth < 64) {
+                    if (p == root) { print pid; break }
+                    p = parent[p]; depth++
+                }
+            }
+        }'
+}
+
+# Un encodeur peut survivre au SIGTERM de groupe (ffmpeg bloqué dans sa saisie
+# clavier l'ignore) et rester orphelin à 100 % CPU. Pour les PID donnés (relevés
+# par _cleanup_descendant_encoders avant le kill) : SIGTERM, courte période de
+# grâce, puis SIGKILL des survivants.
+# Usage: _cleanup_kill_survivors <grace_ticks de 0,2 s> [pid...]
+_cleanup_kill_survivors() {
+    local ticks="${1:-10}"; shift || true
+    local -a pids=("$@") alive=()
+    local i p
+    [[ ${#pids[@]} -eq 0 ]] && return 0
+    kill -TERM "${pids[@]}" 2>/dev/null
+    for (( i = 0; i <= ticks; i++ )); do
+        alive=()
+        for p in "${pids[@]}"; do kill -0 "$p" 2>/dev/null && alive+=("$p"); done
+        [[ ${#alive[@]} -eq 0 ]] && return 0
+        (( i < ticks )) && sleep 0.2
+    done
+    kill -9 "${alive[@]}" 2>/dev/null
+    return 0
+}
+
+# Supprime les temporaires enregistrés par ce run (cf. _register_temp_path),
+# y compris les dérivés (ex. <log>.pass1). Uniquement après interruption : en fin
+# normale, des transferts asynchrones peuvent encore utiliser certains fichiers.
+_cleanup_run_temp_files() {
+    local registry="${TMP_DIR:-/tmp/video_convert}/.run_tmp_${EXECUTION_TIMESTAMP:-0}_$$"
+    [[ -f "$registry" ]] || return 0
+    local p
+    while IFS= read -r p; do
+        # Garde-fou : ne jamais supprimer hors de TMP_DIR
+        [[ -n "$p" && "$p" == "${TMP_DIR:-/tmp/video_convert}/"* ]] || continue
+        rm -rf -- "$p" "$p".* 2>/dev/null || true
+    done < "$registry"
+    rm -f -- "$registry" 2>/dev/null || true
+}
+
+# Supprime les dossiers de travail vides de ce run (créés même en fin normale).
+_cleanup_run_empty_workdirs() {
+    local registry="${TMP_DIR:-/tmp/video_convert}/.run_tmp_${EXECUTION_TIMESTAMP:-0}_$$"
+    [[ -f "$registry" ]] || return 0
+    local p
+    while IFS= read -r p; do
+        [[ "$p" == "${TMP_DIR:-/tmp/video_convert}/work_"* && -d "$p" ]] && rmdir -- "$p" 2>/dev/null
+    done < "$registry"
+    rm -f -- "$registry" 2>/dev/null || true
+    return 0
+}
+
+###########################################################
 # NETTOYAGE À LA SORTIE
 ###########################################################
 
@@ -77,7 +159,12 @@ cleanup() {
     # Supprimer les messages résiduels des sous-processus en redirigeant stderr
     # vers /dev/null pendant le cleanup
     exec 2>/dev/null
-    
+
+    # Relever NOS encodeurs (descendants) AVANT de tuer leurs parents : une fois
+    # orphelins, ils ne seraient plus identifiables comme les nôtres.
+    local -a enc_pids=()
+    mapfile -t enc_pids < <(_cleanup_descendant_encoders "$$" 2>/dev/null || true)
+
     # Envoyer SIGTERM aux jobs en arrière-plan
     local -a job_pids=()
     mapfile -t job_pids < <(jobs -p 2>/dev/null || true)
@@ -93,10 +180,20 @@ cleanup() {
     # Attendre que tous les processus enfants se terminent proprement
     # Cela évite que leurs messages s'affichent après le retour au prompt
     wait 2>/dev/null || true
-    
+
+    # `wait` n'attend que les enfants directs : un ffmpeg petit-enfant qui ignore
+    # SIGTERM survivrait, orphelin. Période de grâce puis SIGKILL.
+    _cleanup_kill_survivors 10 "${enc_pids[@]+"${enc_pids[@]}"}"
+
     # Petit délai pour laisser les processus finir d'écrire
     sleep 0.2
-    
+
+    if [[ "${_INTERRUPTED:-}" == "1" ]]; then
+        _cleanup_run_temp_files
+    else
+        _cleanup_run_empty_workdirs
+    fi
+
     rm -f "$LOCKFILE"
     rm -f "${LOCKFILE}.flock" 2>/dev/null || true
     # Nettoyage des artefacts de queue dynamique

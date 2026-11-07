@@ -640,7 +640,8 @@ _run_ffmpeg_encode() {
 
     local ffmpeg_loglevel
     ffmpeg_loglevel=$(_nascode_get_ffmpeg_loglevel_for_encoder "$encoder")
-    cmd+=(ffmpeg -y -loglevel "$ffmpeg_loglevel")
+    # -nostdin : ffmpeg ne doit jamais lire de touches (cf. lib/processing.sh).
+    cmd+=(ffmpeg -nostdin -y -loglevel "$ffmpeg_loglevel")
 
     # Augmenter probesize/analyzeduration pour les remux Blu-ray avec de nombreux streams
     # (sous-titres PGS, plusieurs pistes audio) dont les paramètres nécessitent plus de données.

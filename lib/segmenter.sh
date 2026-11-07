@@ -58,7 +58,7 @@ _segment_video() {
     #              séparément en fin de pipeline auto-boost).
     # -c copy : pas de ré-encodage à ce stade.
     # -segment_list ... : ffmpeg génère le fichier "concat list" pour nous.
-    if ! ffmpeg -hide_banner -loglevel error -y \
+    if ! ffmpeg -nostdin -hide_banner -loglevel error -y \
         -i "$input" \
         -map 0:v:0 -c copy \
         -f segment -segment_time "$duration_s" \
@@ -99,7 +99,7 @@ _concat_segments() {
 
     # -safe 0 : autorise les chemins absolus dans la liste (nécessaire
     # quand la liste est générée dans un répertoire temporaire).
-    if ! ffmpeg -hide_banner -loglevel error -y \
+    if ! ffmpeg -nostdin -hide_banner -loglevel error -y \
         -f concat -safe 0 \
         -i "$list_file" \
         -c copy \

@@ -64,7 +64,7 @@ _quick_encode_segment() {
     # -an -sn : pas d'audio ni sous-titres dans le proxy (seul le signal
     # vidéo nous intéresse pour la mesure VMAF).
     # tune=0 + lp=6 : alignés sur notre profil (cohérence VMAF).
-    if ! ffmpeg -hide_banner -loglevel error -y \
+    if ! ffmpeg -nostdin -hide_banner -loglevel error -y \
         -i "$input_seg" \
         -c:v libsvtav1 \
         -crf "$crf" \

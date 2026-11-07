@@ -478,7 +478,7 @@ validate_codec_config() {
     fi
     
     # Vérifier que l'encodeur est disponible dans FFmpeg
-    if ! ffmpeg -encoders 2>/dev/null | grep -q "^ V.*${VIDEO_ENCODER}"; then
+    if ! ffmpeg -nostdin -encoders 2>/dev/null | grep -q "^ V.*${VIDEO_ENCODER}"; then
         echo "$(msg MSG_CFG_ENCODER_UNAVAILABLE "$VIDEO_ENCODER")" >&2
         return 1
     fi

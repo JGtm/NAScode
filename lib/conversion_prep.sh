@@ -150,19 +150,34 @@ _handle_dryrun_mode() {
 # FICHIERS TEMPORAIRES
 ###########################################################
 
+# Registre des temporaires de CE run ($$ = shell principal, y compris dans les
+# sous-shells de convert_file) : permet à cleanup() (lib/lock.sh) de supprimer
+# les .in/.out d'une conversion interrompue, qui restaient sinon dans TMP_DIR.
+_tmp_registry_path() {
+    echo "$TMP_DIR/.run_tmp_${EXECUTION_TIMESTAMP:-0}_$$"
+}
+
+_register_temp_path() {
+    printf '%s\n' "$1" >> "$(_tmp_registry_path)" 2>/dev/null || true
+}
+
 _get_temp_filename() {
     local file_original="$1"
     local suffix="$2"
-    local md5p
+    local md5p path
     md5p=$(compute_md5_prefix "$file_original")
-    echo "$TMP_DIR/tmp_${md5p}_${RANDOM}${suffix}"
+    path="$TMP_DIR/tmp_${md5p}_${RANDOM}${suffix}"
+    _register_temp_path "$path"
+    echo "$path"
 }
 
 _get_temp_workdir() {
     local file_original="$1"
-    local md5p
+    local md5p path
     md5p=$(compute_md5_prefix "$file_original")
-    echo "$TMP_DIR/work_${md5p}_${EXECUTION_TIMESTAMP}_$$_${RANDOM}"
+    path="$TMP_DIR/work_${md5p}_${EXECUTION_TIMESTAMP}_$$_${RANDOM}"
+    _register_temp_path "$path"
+    echo "$path"
 }
 
 _setup_temp_files_and_logs() {

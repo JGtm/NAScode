@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.0.2
+
+- ✅ **Conversion figée / épisodes sautés en mode dossier (`-s`)** : `ffmpeg` héritait de la queue comme entrée et lisait les chemins comme des touches. Un « c » ouvrait son invite `Enter command:` : progression figée, `ffmpeg` qui ne se termine jamais (même encodage fini) et reste orphelin à 100 % CPU après Ctrl+C. Sur des fichiers courts, il avalait silencieusement des entrées de la queue (épisodes sautés, sans erreur). Corrigé : `convert_file` tourne avec stdin sur `/dev/null`, et chaque appel `ffmpeg` passe `-nostdin`.
+- ✅ **Ctrl+C** : les encodeurs (`ffmpeg`, `ffprobe`, `SvtAv1EncApp`) qui survivent au SIGTERM de groupe reçoivent SIGKILL après ~2 s, dans le vrai groupe de processus même si nascode est lancé derrière un autre programme. Les fichiers temporaires d'un run interrompu (`.in`/`.out`, plusieurs Go) sont supprimés ; les dossiers `work_*` vides ne s'accumulent plus.
+- ✅ **Tests** : nouveau `test_regression_ffmpeg_stdin_cleanup.bats` (héritage de stdin, contrat `-nostdin`, arrêt forcé, temporaires du run).
+
 ## v3.0.1
 
 - ✅ **macOS — arrêt silencieux avec `-l N`** : sur une grosse queue, `printf | head` recevait SIGPIPE et `pipefail` tuait le script sans message (exit 141). Corrigé en mode normal et aléatoire (`-r`).
