@@ -133,6 +133,8 @@ MSG_CONV_PREP_FAILED="Préparation des chemins impossible : %s"
 MSG_CONV_TMP_NOT_FOUND="ERREUR: Fichier temporaire introuvable après encodage: %s"
 MSG_CONV_GAIN_REDIRECT="Gain insuffisant : sortie redirigée vers %s"
 MSG_CONV_FAILED="Échec de la conversion : %s"
+MSG_CONV_INCOMPLETE="Sortie incomplète rejetée (source %s s, sortie %s s) : %s"
+MSG_CONV_EXISTING_INCOMPLETE="Sortie existante incomplète, reconversion (source %s s, sortie %s s) : %s"
 MSG_CONV_INTERRUPTED="Conversion interrompue, fichier temporaire conservé: %s"
 MSG_CONV_MOVE_ERROR="ERREUR Impossible de déplacer (custom_pv) : %s"
 

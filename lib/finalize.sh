@@ -165,21 +165,12 @@ _finalize_preserve_mtime() {
 # REMPLACEMENT DE L'ORIGINAL (--replace)
 ###########################################################
 
-# Durée (secondes, décimale) d'un fichier via ffprobe. Vide si indisponible.
-_finalize_probe_duration() {
-    local file="$1"
-    local probe="ffprobe"
-    declare -f ffprobe_safe &>/dev/null && probe="ffprobe_safe"
-    "$probe" -v error -show_entries format=duration \
-        -of default=noprint_wrappers=1:nokey=1 "$file" 2>/dev/null | head -n1 | tr -d '\r\n ' || true
-}
-
 # Remplace le fichier source par sa version convertie, à côté de l'original.
 # Appelé uniquement après un transfert vérifié (status OK/SKIPPED).
 #
 # Garde-fous (le moindre doute → on garde l'original, rien n'est supprimé) :
 #   - sortie redirigée vers _Heavier ou plus lourde que la source ;
-#   - durée de la sortie différente de la source (> max(2s, 1%)) ;
+#   - durée vidéo de la sortie différente de la source (cf. compare_video_durations) ;
 #   - un autre fichier porte déjà le nom cible (ex: .mp4 → .mkv existant) ;
 #   - copie vers le NAS tronquée.
 # Publication atomique : copie vers "<cible>.partial" (même dossier que la
@@ -213,16 +204,12 @@ _finalize_replace_original() {
     fi
 
     if [[ -z "$reason" ]]; then
-        local dur_src dur_out
-        dur_src=$(_finalize_probe_duration "$file_original")
-        dur_out=$(_finalize_probe_duration "$final_actual")
-        if [[ -z "$dur_src" || -z "$dur_out" ]]; then
+        local durations duration_rc=0
+        durations=$(compare_video_durations "$file_original" "$final_actual") || duration_rc=$?
+        if [[ "$duration_rc" -eq 2 ]]; then
             reason="duration_unknown"
-        elif ! awk -v a="$dur_src" -v b="$dur_out" 'BEGIN {
-                d = a - b; if (d < 0) d = -d
-                tol = a * 0.01; if (tol < 2) tol = 2
-                exit (d <= tol) ? 0 : 1 }'; then
-            reason="duration_mismatch(${dur_src}s/${dur_out}s)"
+        elif [[ "$duration_rc" -ne 0 ]]; then
+            reason="duration_mismatch(${durations%|*}s/${durations#*|}s)"
         fi
     fi
 
@@ -405,6 +392,57 @@ _finalize_log_and_verify() {
     fi
 
     return 0
+}
+
+###########################################################
+# CONTRÔLE DE COMPLÉTUDE DE LA SORTIE
+###########################################################
+
+# Vérifie qu'un encodage terminé sans erreur couvre bien tout le film, avant
+# toute publication : ffmpeg sort en code 0 sur une entrée tronquée.
+# Une sortie rejetée est supprimée (la source reste intacte et le prochain
+# run la reconvertira, puisqu'aucune sortie n'est publiée).
+#
+# Source illisible (NAS) : on compare à la copie locale. Si aucune référence
+# n'est lisible, on publie sans conclure ; --replace refusera faute de durée.
+#
+# Usage : _finalize_output_duration_ok <file_original> <tmp_input> <tmp_output> <ffmpeg_log_temp>
+# Retour : 0 poursuivre la finalisation | 1 sortie rejetée
+_finalize_output_duration_ok() {
+    local file_original="$1"
+    local tmp_input="$2"
+    local tmp_output="$3"
+    local ffmpeg_log_temp="$4"
+
+    # Extrait volontairement court, interruption et sortie absente : traités ailleurs.
+    [[ "${SAMPLE_MODE:-false}" == true ]] && return 0
+    [[ -n "${STOP_FLAG:-}" && -f "$STOP_FLAG" ]] && return 0
+    [[ -f "$tmp_output" ]] || return 0
+
+    local durations rc=0
+    durations=$(compare_video_durations "$file_original" "$tmp_output") || rc=$?
+    if [[ "$rc" -eq 2 && -z "${durations%|*}" && -f "$tmp_input" ]]; then
+        rc=0
+        durations=$(compare_video_durations "$tmp_input" "$tmp_output") || rc=$?
+    fi
+
+    local dur_ref="${durations%|*}" dur_out="${durations#*|}"
+    if [[ "$rc" -eq 0 ]]; then
+        return 0
+    fi
+    if [[ "$rc" -eq 2 && -z "$dur_ref" && -n "$dur_out" ]]; then
+        if [[ -n "${LOG_SESSION:-}" ]]; then
+            echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: DURATION_UNVERIFIED | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
+        fi
+        return 0
+    fi
+
+    print_error "$(msg MSG_CONV_INCOMPLETE "${dur_ref:-?}" "${dur_out:-?}" "$(basename "$file_original")")"
+    if [[ -n "${LOG_SESSION:-}" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR DURATION | $file_original | source:${dur_ref:-?}s output:${dur_out:-?}s" >> "$LOG_SESSION" 2>/dev/null || true
+    fi
+    rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
+    return 1
 }
 
 ###########################################################

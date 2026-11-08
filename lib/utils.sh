@@ -655,6 +655,7 @@ custom_pv() {
         return $?
     fi
 
+    local dd_rc=0
     rm -f -- "$dst" 2>/dev/null || true
 
     # Démarrer dd en arrière-plan
@@ -676,7 +677,7 @@ custom_pv() {
         sleep 0.5
     done
 
-    wait "$dd_pid" 2>/dev/null || true
+    wait "$dd_pid" 2>/dev/null || dd_rc=$?
 
     # valeur finale (avec saut de ligne)
     copied=$(get_file_size_bytes "$dst")
@@ -684,6 +685,13 @@ custom_pv() {
     awk -v copied="$copied" -v total="$total" -v start="$start_ts" -v now="$current_ts" \
         -v width=30 -v color="$color" -v nocolor="$NOCOLOR" -v newline=1 \
         "$AWK_PROGRESS_SCRIPT" >&2
+
+    # Une copie interrompue (NAS injoignable, veille, crash) laisse un fichier
+    # court mais lisible : ffmpeg l'encoderait sans erreur, en perdant la fin.
+    if [[ "$dd_rc" -ne 0 || "$copied" -ne "$total" ]]; then
+        rm -f -- "$dst" 2>/dev/null || true
+        return 1
+    fi
 
     return 0
 }
