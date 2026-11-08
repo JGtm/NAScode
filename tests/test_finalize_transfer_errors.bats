@@ -40,6 +40,7 @@ setup() {
 
     # Charger les modules testés
     source "$LIB_DIR/summary.sh"
+    source "$LIB_DIR/media_probe.sh"
     source "$LIB_DIR/finalize.sh"
 }
 
@@ -480,7 +481,7 @@ _setup_replace() {
     dd if=/dev/zero of="$REPL_SRC" bs=2000 count=1 2>/dev/null
     dd if=/dev/urandom of="$REPL_OUT" bs="$out_size" count=1 2>/dev/null
     ffprobe_safe() {
-        if [[ "${*: -1}" == "$OUTPUT_DIR"* ]]; then echo "$DUR_OUT"; else echo "$DUR_SRC"; fi
+        if [[ "${*: -1}" == "$OUTPUT_DIR"* ]]; then echo "duration=$DUR_OUT"; else echo "duration=$DUR_SRC"; fi
     }
 }
 

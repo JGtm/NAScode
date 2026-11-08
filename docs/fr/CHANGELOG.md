@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.0.3
+
+- ✅ **Films tronqués** : une copie NAS interrompue était ignorée, `ffmpeg` encodait le début du film et le run affichait un succès. La copie vers le stockage temporaire est désormais vérifiée (code de retour et taille), et chaque sortie est comparée à la source avant publication : une sortie incomplète est rejetée (`ERROR DURATION`).
+- ✅ **Sorties tronquées existantes** : au lieu de bloquer le fichier indéfiniment, elles sont renommées en `.corrupt-*` et le film est reconverti.
+- ✅ **Contrôle de durée fiable** : la comparaison porte sur la piste vidéo, plus sur le conteneur. Un sous-titre plus long que le film ne bloque plus `--replace`, et la tolérance passe de 1 % à 0,2 % (2 s minimum).
+- ✅ **Tests** : nouveau `test_regression_duration_integrity.bats`.
+
 ## v3.0.2
 
 - ✅ **Conversion figée / épisodes sautés en mode dossier (`-s`)** : `ffmpeg` héritait de la queue comme entrée et lisait les chemins comme des touches. Un « c » ouvrait son invite `Enter command:` : progression figée, `ffmpeg` qui ne se termine jamais (même encodage fini) et reste orphelin à 100 % CPU après Ctrl+C. Sur des fichiers courts, il avalait silencieusement des entrées de la queue (épisodes sautés, sans erreur). Corrigé : `convert_file` tourne avec stdin sur `/dev/null`, et chaque appel `ffmpeg` passe `-nostdin`.

@@ -274,7 +274,9 @@ convert_file() {
     
     # 8. Finalisation (fonctions dans finalize.sh)
     if [[ "$conversion_success" == true ]]; then
-        _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$size_before_mb"
+        if _finalize_output_duration_ok "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"; then
+            _finalize_conversion_success "$filename" "$file_original" "$tmp_input" "$tmp_output" "$final_output" "$ffmpeg_log_temp" "$size_before_mb"
+        fi
     else
         _finalize_conversion_error "$filename" "$file_original" "$tmp_input" "$tmp_output" "$ffmpeg_log_temp"
     fi

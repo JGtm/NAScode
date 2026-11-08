@@ -134,6 +134,8 @@ MSG_CONV_PREP_FAILED="Path preparation failed: %s"
 MSG_CONV_TMP_NOT_FOUND="ERROR: Temporary file not found after encoding: %s"
 MSG_CONV_GAIN_REDIRECT="Insufficient gain: output redirected to %s"
 MSG_CONV_FAILED="Conversion failed: %s"
+MSG_CONV_INCOMPLETE="Incomplete output rejected (source %s s, output %s s): %s"
+MSG_CONV_EXISTING_INCOMPLETE="Existing output is incomplete, converting again (source %s s, output %s s): %s"
 MSG_CONV_INTERRUPTED="Conversion interrupted, temporary file preserved: %s"
 MSG_CONV_MOVE_ERROR="ERROR: Unable to move (custom_pv): %s"
 

@@ -86,12 +86,39 @@ _prepare_file_paths() {
 # VÉRIFICATIONS PRÉ-CONVERSION
 ###########################################################
 
+# Écarte une sortie existante dont la durée vidéo ne correspond pas à la source,
+# pour qu'elle soit reconvertie au lieu de bloquer le fichier indéfiniment.
+# Renommée en .corrupt-* plutôt que supprimée : rien n'est perdu si l'écart
+# vient de la source. Dans le doute (durée illisible), la sortie est gardée.
+# Retour : 0 sortie écartée | 1 sortie conservée
+_quarantine_incomplete_output() {
+    local file_original="$1"
+    local final_output="$2"
+
+    [[ "${SAMPLE_MODE:-false}" == true ]] && return 1
+    declare -f compare_video_durations &>/dev/null || return 1
+
+    local durations rc=0
+    durations=$(compare_video_durations "$file_original" "$final_output") || rc=$?
+    [[ "$rc" -eq 1 ]] || return 1
+
+    local quarantine="${final_output}.corrupt-$(date +%Y%m%d_%H%M%S)_$$"
+    mv "$final_output" "$quarantine" 2>/dev/null || return 1
+
+    print_warning "$(msg MSG_CONV_EXISTING_INCOMPLETE "${durations%|*}" "${durations#*|}" "$(basename "$final_output")")"
+    if [[ -n "${LOG_SESSION:-}" ]]; then
+        echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: INCOMPLETE_OUTPUT | $file_original -> $quarantine | source:${durations%|*}s output:${durations#*|}s" >> "$LOG_SESSION" 2>/dev/null || true
+    fi
+    return 0
+}
+
 _check_output_exists() {
     local file_original="$1"
     local filename="$2"
     local final_output="$3"
-    
-    if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]]; then
+
+    if [[ "$DRYRUN" != true ]] && [[ -f "$final_output" ]] \
+        && ! _quarantine_incomplete_output "$file_original" "$final_output"; then
         local counter_prefix
         counter_prefix=$(_get_counter_prefix)
         echo -e "${counter_prefix}${BLUE}⏭️  $(msg MSG_UI_SKIP_EXISTS) : $filename${NOCOLOR}" >&2

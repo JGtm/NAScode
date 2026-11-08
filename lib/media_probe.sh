@@ -9,6 +9,72 @@
 # 3. Les modules sont sourcés, pas exécutés directement
 ###########################################################
 
+# Durée réelle de la piste vidéo principale, en secondes. Vide si indéterminable.
+#
+# Ne pas utiliser format=duration pour juger d'une conversion : le conteneur
+# prend la piste la plus longue, et un sous-titre qui déborde du film gonfle
+# cette valeur de plusieurs minutes.
+#
+# Ordre : durée du flux (MP4...) ou tag DURATION (MKV, éventuellement suffixé
+# par la langue : DURATION-eng) ; à défaut (MKV sans tags), dernier paquet vidéo ;
+# en dernier recours, durée du conteneur.
+# Usage: get_video_duration_seconds <file>
+get_video_duration_seconds() {
+    local file="$1"
+
+    local value
+    value=$(ffprobe_safe -v error -select_streams V:0 \
+        -show_entries stream=duration:stream_tags \
+        -of default=noprint_wrappers=1 "$file" 2>/dev/null | awk -F= '
+        { sub(/\r$/, ""); key = toupper($1); val = $2 }
+        key == "DURATION" && val ~ /^[0-9]+(\.[0-9]+)?$/ { stream = val + 0 }
+        key ~ /^TAG:DURATION/ && val ~ /^[0-9]+:[0-9]+:[0-9]+(\.[0-9]+)?$/ && !tag {
+            split(val, t, ":"); tag = t[1] * 3600 + t[2] * 60 + t[3]
+        }
+        END { r = (stream > 0) ? stream : tag; if (r > 0) printf "%.3f\n", r }' || true)
+    if [[ -n "$value" ]]; then
+        printf '%s\n' "$value"
+        return 0
+    fi
+
+    local container
+    container=$(ffprobe_safe -v error -show_entries format=duration \
+        -of default=noprint_wrappers=1:nokey=1 "$file" 2>/dev/null | head -n1 | tr -d '\r\n ' || true)
+    [[ "$container" =~ ^[0-9]+(\.[0-9]+)?$ ]] || return 0
+
+    # Lire seulement la fin du fichier : le seek retombe sur le dernier point
+    # d'entrée vidéo, même si le conteneur annonce une durée trop longue.
+    local start
+    start=$(awk -v d="$container" 'BEGIN { s = d - 120; if (s < 0) s = 0; printf "%.3f", s }')
+    value=$(ffprobe_safe -v error -select_streams V:0 -read_intervals "${start}%" \
+        -show_entries packet=pts_time -of csv=p=0 "$file" 2>/dev/null | awk -F, '
+        { sub(/\r$/, "") }
+        $1 ~ /^[0-9]+(\.[0-9]+)?$/ && $1 + 0 > max { max = $1 + 0 }
+        END { if (max > 0) printf "%.3f\n", max }' || true)
+
+    printf '%s\n' "${value:-$container}"
+}
+
+# Compare la durée vidéo d'un fichier converti à celle de sa référence.
+# Écart toléré : max(2 s, 0,2 %), soit 14 s sur un film de 2 h. Une conversion
+# saine conserve la durée à quelques millisecondes près.
+# Sortie : "<durée_référence>|<durée_sortie>"
+# Retour : 0 durées cohérentes | 1 écart | 2 au moins une durée indéterminable
+# Usage: compare_video_durations <reference> <output>
+compare_video_durations() {
+    local dur_ref dur_out
+    dur_ref=$(get_video_duration_seconds "$1")
+    dur_out=$(get_video_duration_seconds "$2")
+    printf '%s|%s\n' "$dur_ref" "$dur_out"
+
+    [[ -n "$dur_ref" && -n "$dur_out" ]] || return 2
+
+    awk -v a="$dur_ref" -v b="$dur_out" 'BEGIN {
+        d = a - b; if (d < 0) d = -d
+        tol = a * 0.002; if (tol < 2) tol = 2
+        exit (d <= tol) ? 0 : 1 }'
+}
+
 # Récupère TOUTES les métadonnées nécessaires en un seul appel ffprobe.
 # Optimise les performances en évitant les appels multiples.
 # Usage: get_full_media_metadata <file>

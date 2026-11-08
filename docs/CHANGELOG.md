@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.0.3
+
+- ✅ **Truncated films**: an interrupted NAS copy went unnoticed, `ffmpeg` encoded the start of the film and the run reported success. The copy to temporary storage is now verified (exit code and size), and every output is compared with its source before publishing: an incomplete output is rejected (`ERROR DURATION`).
+- ✅ **Existing truncated outputs**: instead of blocking the file forever, they are renamed to `.corrupt-*` and the film is converted again.
+- ✅ **Reliable duration check**: the comparison now uses the video track instead of the container. A subtitle longer than the film no longer blocks `--replace`, and the tolerance goes from 1% to 0.2% (2 s minimum).
+- ✅ **Tests**: new `test_regression_duration_integrity.bats`.
+
 ## v3.0.2
 
 - ✅ **Frozen conversion / skipped episodes in folder mode (`-s`)**: `ffmpeg` inherited the queue as its stdin and read file paths as key presses. A `c` opened its `Enter command:` prompt: frozen progress, an `ffmpeg` that never exits (even once encoding is done) and stays orphaned at 100% CPU after Ctrl+C. On short files, it silently swallowed queue entries (skipped episodes, no error). Fixed: `convert_file` now runs with stdin on `/dev/null`, and every `ffmpeg` call passes `-nostdin`.
