@@ -5,7 +5,8 @@
 - ✅ **Truncated films**: an interrupted NAS copy went unnoticed, `ffmpeg` encoded the start of the film and the run reported success. The copy to temporary storage is now verified (exit code and size), and every output is compared with its source before publishing: an incomplete output is rejected (`ERROR DURATION`).
 - ✅ **Existing truncated outputs**: instead of blocking the file forever, they are renamed to `.corrupt-*` and the film is converted again.
 - ✅ **Reliable duration check**: the comparison now uses the video track instead of the container. A subtitle longer than the film no longer blocks `--replace`, and the tolerance goes from 1% to 0.2% (2 s minimum).
-- ✅ **Tests**: new `test_regression_duration_integrity.bats`.
+- ✅ **"fps mismatch with 1st pass" failure on films with cover art (Windows)**: the native `ffprobe` ends its lines with `\r`, so cover art (`attached_pic`) was never recognised. It was mapped as video tracks and encoded with x265, which made the 2nd pass fail after a full 1st pass. `ffprobe_safe` now strips `\r`, which also makes subtitle language detection and the VMAF stream choice reliable.
+- ✅ **Tests**: new `test_regression_duration_integrity.bats`, and two CRLF tests in `test_regression_coverage.bats`.
 
 ## v3.0.2
 

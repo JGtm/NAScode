@@ -174,7 +174,20 @@ normalize_path_for_ffprobe() {
     fi
 }
 
-# Wrapper ffprobe qui normalise automatiquement les chemins Windows/Git Bash.
+# Lance ffprobe et retire les \r de sa sortie.
+# Le ffprobe natif Windows termine ses lignes par CRLF : sans ce nettoyage,
+# `read` garde le \r dans le dernier champ ("1\r" != "1"), et les jaquettes
+# (attached_pic) étaient mappées comme pistes vidéo puis encodées en x265.
+_ffprobe_lf() {
+    local out rc=0
+    out=$(ffprobe "$@") || rc=$?
+    out="${out//$'\r'/}"
+    [[ -n "$out" ]] && printf '%s\n' "$out"
+    return "$rc"
+}
+
+# Wrapper ffprobe qui normalise automatiquement les chemins Windows/Git Bash
+# et les fins de ligne (cf. _ffprobe_lf).
 # Usage identique à ffprobe : ffprobe_safe [options] <file>
 # Le dernier argument est considéré comme le fichier à normaliser.
 #
@@ -199,7 +212,7 @@ ffprobe_safe() {
     local cache_dir="${NASCODE_PROBE_CACHE_DIR:-}"
     local orig="${*: -1}"
     if [[ -z "$cache_dir" || $last_idx -lt 1 || ! -f "$orig" ]]; then
-        ffprobe "${args[@]}"
+        _ffprobe_lf "${args[@]}"
         return
     fi
 
@@ -207,7 +220,7 @@ ffprobe_safe() {
     local key="${args[*]}"
     key="${key//[^a-zA-Z0-9]/_}"
     if (( ${#key} > 200 )) || [[ ! -d "$cache_dir" ]]; then
-        ffprobe "${args[@]}"
+        _ffprobe_lf "${args[@]}"
         return
     fi
 
@@ -215,13 +228,15 @@ ffprobe_safe() {
     local content
     if [[ -f "$cache_file" && ! "$orig" -nt "$cache_file" ]]; then
         content=$(<"$cache_file")
+        # Un cache écrit avant le nettoyage peut encore contenir des \r.
+        content="${content//$'\r'/}"
         [[ -n "$content" ]] && printf '%s\n' "$content"
         return 0
     fi
 
     # Sonde réelle ; on ne met en cache que les succès
     local tmp="$cache_file.$$.tmp" rc=0
-    ffprobe "${args[@]}" > "$tmp" || rc=$?
+    _ffprobe_lf "${args[@]}" > "$tmp" || rc=$?
     if (( rc == 0 )); then
         content=$(<"$tmp")
         mv -f "$tmp" "$cache_file" 2>/dev/null || rm -f "$tmp"
