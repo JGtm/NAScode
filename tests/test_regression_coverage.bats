@@ -120,6 +120,61 @@ STUB
     [[ ! "$result" =~ "-map 0:0" ]]
 }
 
+@test "VIDEO: _build_stream_mapping exclut les jaquettes avec une sortie ffprobe CRLF (Windows)" {
+    # ffprobe natif Windows : "5,1\r". Le \r faisait mapper les jaquettes,
+    # encodées ensuite en x265 (« fps mismatch with 1st pass » en 2 passes).
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+
+    cat > "$stub_dir/ffprobe" << 'STUB'
+#!/bin/bash
+if [[ "$*" =~ "-select_streams v" ]]; then
+    printf '0,0\r\n5,1\r\n6,1\r\n'
+fi
+if [[ "$*" =~ "-select_streams s" ]]; then
+    printf '3,fre\r\n4,eng\r\n'
+fi
+exit 0
+STUB
+    chmod +x "$stub_dir/ffprobe"
+
+    PATH="$stub_dir:$PATH"
+
+    local result
+    result=$(_build_stream_mapping "/fake/file.mkv")
+
+    [[ "$result" =~ "-map 0:0 " ]]
+    [[ ! "$result" =~ "-map 0:5" ]]
+    [[ ! "$result" =~ "-map 0:6" ]]
+    [[ "$result" =~ "-map 0:3 " ]]
+    [[ ! "$result" =~ "-map 0:4" ]]
+    [[ "$result" != *$'\r'* ]]
+}
+
+@test "ffprobe_safe: retire les \\r, garde le code retour, nettoie le cache" {
+    local stub_dir="$TEST_TEMP_DIR/stub"
+    mkdir -p "$stub_dir"
+    printf '#!/bin/bash\nprintf "a,1\\r\\nb,2\\r\\n"\nexit 3\n' > "$stub_dir/ffprobe"
+    chmod +x "$stub_dir/ffprobe"
+    PATH="$stub_dir:$PATH"
+
+    run ffprobe_safe -v error "/fake/file.mkv"
+    [ "$status" -eq 3 ]
+    [ "$output" = $'a,1\nb,2' ]
+
+    # Cache écrit par une version antérieure (avec \r)
+    export NASCODE_PROBE_CACHE_DIR="$TEST_TEMP_DIR/cache"
+    mkdir -p "$NASCODE_PROBE_CACHE_DIR"
+    local media="$TEST_TEMP_DIR/media.mkv"
+    touch -t 202001010000 "$media"
+    local key="-v error $media"
+    key="${key//[^a-zA-Z0-9]/_}"
+    printf 'x,1\r\n' > "$NASCODE_PROBE_CACHE_DIR/$key"
+    run ffprobe_safe -v error "$media"
+    [ "$status" -eq 0 ]
+    [ "$output" = "x,1" ]
+}
+
 @test "SUBTITLES: fichier avec sous-titres FR uniquement conserve FR" {
     # Créer un stub ffprobe qui simule un fichier avec subs FR+EN
     local stub_dir="$TEST_TEMP_DIR/stub"

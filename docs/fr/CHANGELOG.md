@@ -5,7 +5,8 @@
 - ✅ **Films tronqués** : une copie NAS interrompue était ignorée, `ffmpeg` encodait le début du film et le run affichait un succès. La copie vers le stockage temporaire est désormais vérifiée (code de retour et taille), et chaque sortie est comparée à la source avant publication : une sortie incomplète est rejetée (`ERROR DURATION`).
 - ✅ **Sorties tronquées existantes** : au lieu de bloquer le fichier indéfiniment, elles sont renommées en `.corrupt-*` et le film est reconverti.
 - ✅ **Contrôle de durée fiable** : la comparaison porte sur la piste vidéo, plus sur le conteneur. Un sous-titre plus long que le film ne bloque plus `--replace`, et la tolérance passe de 1 % à 0,2 % (2 s minimum).
-- ✅ **Tests** : nouveau `test_regression_duration_integrity.bats`.
+- ✅ **Échec « fps mismatch with 1st pass » sur les films avec jaquettes (Windows)** : le `ffprobe` natif termine ses lignes par `\r`, si bien que les jaquettes (`attached_pic`) n'étaient jamais reconnues. Elles étaient mappées comme pistes vidéo et encodées en x265, ce qui faisait échouer la 2e passe après une 1re passe complète. `ffprobe_safe` retire désormais les `\r`, ce qui fiabilise aussi la détection de langue des sous-titres et le choix de la piste pour le VMAF.
+- ✅ **Tests** : nouveau `test_regression_duration_integrity.bats`, et deux tests CRLF dans `test_regression_coverage.bats`.
 
 ## v3.0.2
 
