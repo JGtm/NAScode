@@ -7,7 +7,8 @@
 - ✅ **Reliable duration check**: the comparison now uses the video track instead of the container. A subtitle longer than the film no longer blocks `--replace`, and the tolerance goes from 1% to 0.2% (2 s minimum).
 - ✅ **"fps mismatch with 1st pass" failure on films with cover art (Windows)**: the native `ffprobe` ends its lines with `\r`, so cover art (`attached_pic`) was never recognised. It was mapped as video tracks and encoded with x265, which made the 2nd pass fail after a full 1st pass. `ffprobe_safe` now strips `\r`, which also makes subtitle language detection and the VMAF stream choice reliable.
 - ✅ **Indexing with no display**: scanning the source (about 1 min 30 for 700 films on a NAS) happened before the indexing block opened, with a frozen screen. The block now opens straight away and counts the files found live (`stdbuf -o0` on `find`), then the same line switches to "Indexing X/Y". The frame is also aligned whatever the language.
-- ✅ **Tests**: new `test_regression_duration_integrity.bats`, two CRLF tests in `test_regression_coverage.bats` and three scan display tests in `test_regression_macos_portability.bats`.
+- ✅ **Ctrl+C on Windows: orphaned ffmpeg**: the MSYS `ps` has no `-o` option, so the list of encoders to kill stayed empty. A native `ffmpeg` also runs in its own process group and escapes the group kill: it kept running alone after Ctrl+C. Descendants are now found through `/proc/<pid>/stat` when `ps -o` is not available.
+- ✅ **Tests**: new `test_regression_duration_integrity.bats`, a `/proc` fallback test in `test_regression_ffmpeg_stdin_cleanup.bats`, two CRLF tests in `test_regression_coverage.bats` and three scan display tests in `test_regression_macos_portability.bats`.
 
 ## v3.0.2
 
