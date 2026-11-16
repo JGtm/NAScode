@@ -138,7 +138,14 @@ _check_output_exists() {
     fi
 
     # Anti-boucle : si une sortie "Heavier" existe déjà pour ce fichier, ne pas re-traiter.
-    if [[ "$DRYRUN" != true ]] && [[ "${HEAVY_OUTPUT_ENABLED:-true}" == true ]] && declare -f compute_heavy_output_path &>/dev/null; then
+    # Le journal des tentatives (lib/attempts.sh) a priorité : il a déjà retiré
+    # de la queue les essais identiques, donc un film qu'il y a laissé doit être
+    # retenté (paramètres ou seuil changés, --retry-heavier). L'ancien fichier
+    # ne sert de garde-fou que pour un film absent du journal.
+    if [[ "$DRYRUN" != true ]] && [[ "${HEAVY_OUTPUT_ENABLED:-true}" == true ]] \
+        && [[ "${RETRY_HEAVIER:-false}" != true ]] \
+        && ! { declare -f attempts_has_entry &>/dev/null && attempts_has_entry "$file_original"; } \
+        && declare -f compute_heavy_output_path &>/dev/null; then
         local heavy_output
         heavy_output=$(compute_heavy_output_path "$final_output" "$OUTPUT_DIR" 2>/dev/null || echo "")
         if [[ -n "$heavy_output" ]] && [[ -f "$heavy_output" ]]; then

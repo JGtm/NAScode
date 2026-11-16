@@ -129,6 +129,11 @@ KEEP_METADATA=false
 # sinon l'original est conservé. Incompatible avec --vmaf et --sample.
 REPLACE_ORIGINAL=false
 
+# Retenter les films déjà convertis sans gain suffisant (--retry-heavier).
+# Par défaut, le journal des tentatives (lib/attempts.sh) les écarte tant que
+# la source et les paramètres n'ont pas changé.
+RETRY_HEAVIER=false
+
 # ----- Constantes de configuration -----
 # Paramètre de nombre de fichiers à sélectionner aléatoirement par défaut
 readonly RANDOM_MODE_DEFAULT_LIMIT=10

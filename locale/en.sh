@@ -249,6 +249,8 @@ MSG_HELP_KEEP_METADATA="Preserve source file metadata and modification date (FLA
 MSG_HELP_KEEP_METADATA_HINT="ffmpeg: -map_metadata 0 -map_chapters 0 ; mtime/atime via touch -r"
 MSG_HELP_REPLACE="Replace the source file with the converted version (FLAG)"
 MSG_HELP_REPLACE_HINT="Only after a verified transfer, real savings and matching duration; otherwise the original is kept"
+MSG_HELP_RETRY_HEAVIER="Retry films already converted without enough savings (FLAG)"
+MSG_HELP_RETRY_HEAVIER_HINT="By default, logs/Attempts.tsv skips them while the source and settings are unchanged"
 MSG_HELP_LANG="Interface language: fr, en (ARG) [default: fr]"
 
 MSG_HELP_SHORT_OPTIONS_TITLE="Note on grouped short options:"
@@ -304,6 +306,7 @@ MSG_UI_OPT_FILE_COUNT="Files to process"
 MSG_UI_OPT_HFR_LIMITED="HFR videos: limited to %s fps"
 MSG_UI_OPT_HFR_BITRATE="HFR videos: adjusted bitrate (original fps preserved)"
 MSG_UI_OPT_KEEP_METADATA="Preserving source metadata and modification date"
+MSG_UI_OPT_RETRY_HEAVIER="Retrying films already converted without savings"
 
 ###########################################################
 # UI MESSAGES (lib/ui.sh)
@@ -366,6 +369,11 @@ MSG_SUMMARY_ANOM_SIZE_LABEL="Size"
 MSG_SUMMARY_ANOM_INTEGRITY_LABEL="Integrity"
 MSG_SUMMARY_ANOM_VMAF_LABEL="VMAF"
 MSG_SUMMARY_SPACE_SAVED_LABEL="Space saved"
+MSG_SUMMARY_CAMPAIGN_TITLE="TOTAL SINCE %s"
+MSG_SUMMARY_CAMPAIGN_CONVERTED="Films converted"
+MSG_SUMMARY_CAMPAIGN_HEAVIER="Tried, no savings"
+MSG_ATTEMPTS_SKIPPED="%s film(s) already tried without savings with these settings: skipped (--retry-heavier to retry)"
+MSG_ATTEMPTS_SEEDED="Attempt log initialised: %s _Heavier output(s) recorded (the folder can be emptied)"
 
 ###########################################################
 # COMPLEXITY (lib/complexity.sh)

@@ -2,6 +2,9 @@
 
 ## v3.0.3
 
+- ✅ **Reprise sans retraitement inutile** : nouveau journal `logs/Attempts.tsv`. Un film déjà converti sans gain suffisant n'est plus retraité au lancement suivant (même après réindexation) tant que la source et les paramètres n'ont pas changé ; changer de réglages ou baisser le seuil le relance, `--retry-heavier` le force. Amorcé une fois depuis `Converted_Heavier/`, qui peut ensuite être vidé.
+- ✅ **Cumul après reprise** : le résumé final ajoute « Cumul depuis le … » (films convertis, tentés sans gain, gain total) quand des runs précédents de la même campagne y contribuent.
+- ✅ **`_Heavier` à plat sous Windows** : le chemin de sortie (`C:/…`) et `OUTPUT_DIR` (`/c/…`) n'avaient pas la même forme, donc les films de sous-dossiers atterrissaient à la racine de `Converted_Heavier/`. L'arborescence est maintenant conservée.
 - ✅ **Films tronqués** : une copie NAS interrompue était ignorée, `ffmpeg` encodait le début du film et le run affichait un succès. La copie vers le stockage temporaire est désormais vérifiée (code de retour et taille), et chaque sortie est comparée à la source avant publication : une sortie incomplète est rejetée (`ERROR DURATION`).
 - ✅ **Sorties tronquées existantes** : au lieu de bloquer le fichier indéfiniment, elles sont renommées en `.corrupt-*` et le film est reconverti.
 - ✅ **Contrôle de durée fiable** : la comparaison porte sur la piste vidéo, plus sur le conteneur. Un sous-titre plus long que le film ne bloque plus `--replace`, et la tolérance passe de 1 % à 0,2 % (2 s minimum).

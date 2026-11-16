@@ -57,6 +57,7 @@ cleanup_old_logs() {
         # On exclut l'Index et Index.meta qui sont persistants
         find "$LOG_DIR" -type f -mtime +"$days" \
             ! -name "Index" ! -name "Index.meta" ! -name "Index_readable*" \
+            ! -name "Attempts.tsv" \
             -exec rm -f {} + 2>/dev/null || true
     fi
 }
@@ -74,6 +75,8 @@ readonly INDEX="$LOG_DIR/Index"
 readonly INDEX_META="$LOG_DIR/Index.meta"
 readonly INDEX_READABLE="$LOG_DIR/Index_readable_${EXECUTION_TIMESTAMP}.txt"
 readonly QUEUE="$LOG_DIR/Queue"
+# Journal persistant des tentatives (cf. lib/attempts.sh), conservé entre les runs
+ATTEMPTS_FILE="${ATTEMPTS_FILE:-$LOG_DIR/Attempts.tsv}"
 readonly LOG_DRYRUN_COMPARISON="$LOG_DIR/DryRun_Comparison_${EXECUTION_TIMESTAMP}.log"
 readonly VMAF_QUEUE_FILE="$LOG_DIR/.vmaf_queue_${EXECUTION_TIMESTAMP}"
 

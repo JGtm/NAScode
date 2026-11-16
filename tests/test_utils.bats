@@ -237,6 +237,14 @@ teardown() {
     [ "$result" = "$expected" ]
 }
 
+@test "compute_heavy_output_path: sortie en C:/… et OUTPUT_DIR en /c/… gardent l'arborescence" {
+    export HEAVY_OUTPUT_DIR_SUFFIX="_Heavier"
+    result=$(compute_heavy_output_path "C:/Users/G/Converted/Le seigneur/LOTR.mkv" "/c/Users/G/Converted")
+    [ "$result" = "/c/Users/G/Converted_Heavier/Le seigneur/LOTR.mkv" ]
+    result=$(compute_heavy_output_path "/c/Users/G/Converted/a/b.mkv" "C:\Users\G\Converted")
+    [ "$result" = "/c/Users/G/Converted_Heavier/a/b.mkv" ]
+}
+
 @test "compute_heavy_output_path: fallback si final_output hors OUTPUT_DIR" {
     export OUTPUT_DIR="$TEST_TEMP_DIR/Converted"
     export HEAVY_OUTPUT_DIR_SUFFIX="_Heavier"

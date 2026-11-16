@@ -286,6 +286,11 @@ parse_arguments() {
                 REPLACE_ORIGINAL=true
                 shift
                 ;;
+            --retry-heavier)
+                # Retente les films déjà convertis sans gain (journal des tentatives)
+                RETRY_HEAVIER=true
+                shift
+                ;;
             --no-limit-fps)
                 # Désactive la limitation FPS (garde le FPS original, majore le bitrate)
                 LIMIT_FPS=false
@@ -418,6 +423,8 @@ ${CYAN}$(msg MSG_HELP_OPTIONS)${NOCOLOR}
                                  ${DIM}$(msg MSG_HELP_KEEP_METADATA_HINT)${NOCOLOR}
     ${GREEN}--replace${NOCOLOR}                    $(msg MSG_HELP_REPLACE)
                                  ${DIM}$(msg MSG_HELP_REPLACE_HINT)${NOCOLOR}
+    ${GREEN}--retry-heavier${NOCOLOR}              $(msg MSG_HELP_RETRY_HEAVIER)
+                                 ${DIM}$(msg MSG_HELP_RETRY_HEAVIER_HINT)${NOCOLOR}
     ${GREEN}--lang${NOCOLOR} LANG                  $(msg MSG_HELP_LANG)
 
 ${CYAN}$(msg MSG_HELP_SHORT_OPTIONS_TITLE)${NOCOLOR}

@@ -43,6 +43,7 @@ _process_queue_simple() {
         # Vérifier les heures creuses avant de lancer une nouvelle conversion
         if ! check_off_peak_before_processing; then
             print_warning "$(msg MSG_PROC_INTERRUPTED)"
+            QUEUE_STOPPED_EARLY=true
             break
         fi
         
@@ -209,6 +210,7 @@ _process_queue_with_fifo() {
             # Vérifier les heures creuses avant de lancer une nouvelle conversion
             if ! check_off_peak_before_processing; then
                 print_warning "$(msg MSG_PROC_INTERRUPTED)"
+                QUEUE_STOPPED_EARLY=true
                 break
             fi
             

@@ -98,7 +98,16 @@ _calculate_space_savings() {
     total_after=$(echo "$total_after" | tr -d '[:space:]')
     [[ -z "$total_before" ]] && total_before=0
     [[ -z "$total_after" ]] && total_after=0
-    
+
+    _format_space_savings "$total_before" "$total_after"
+}
+
+# Met en forme un gain de place : "show|avant → après|(−gain, %)".
+# Partagé par le résumé du run et le cumul de la campagne.
+# Usage: _format_space_savings <octets_avant> <octets_après>
+_format_space_savings() {
+    local total_before="${1:-0}" total_after="${2:-0}"
+
     if [[ "$total_before" -le 0 ]] || [[ "$total_after" -le 0 ]]; then
         echo "false||"
         return
@@ -129,6 +138,38 @@ _calculate_space_savings() {
     fi
     
     echo "true|${line1}|${line2}"
+}
+
+###########################################################
+# CUMUL DE LA CAMPAGNE (reprises successives)
+###########################################################
+
+# Section "Cumul" du résumé : totaux depuis le dernier passage complet de la
+# source (cf. attempts_campaign_totals), quand des runs précédents y ont
+# contribué. Un run interrompu (Ctrl+C, redémarrage, heures creuses) puis
+# relancé retrouve ainsi le gain total, même après réindexation.
+_render_campaign_totals() {
+    [[ "${SAMPLE_MODE:-false}" == true || "${DRYRUN:-false}" == true || -n "${SINGLE_FILE:-}" ]] && return 0
+    declare -f attempts_campaign_totals &>/dev/null || return 0
+
+    local nc before after nh first old
+    IFS='|' read -r nc before after nh first old <<< "$(attempts_campaign_totals)"
+    # Rien d'antérieur à ce run : le cumul serait identique au résumé du run.
+    [[ "${old:-0}" -gt 0 ]] || return 0
+
+    local show line1 line2
+    IFS='|' read -r show line1 line2 <<< "$(_format_space_savings "${before:-0}" "${after:-0}")"
+
+    print_summary_separator
+    print_summary_section_title "$(msg MSG_SUMMARY_CAMPAIGN_TITLE "${first%:*}")"
+    print_summary_separator
+    print_summary_item "$(msg MSG_SUMMARY_CAMPAIGN_CONVERTED)" "${nc:-0}" "$GREEN"
+    [[ "${nh:-0}" -gt 0 ]] && print_summary_item "$(msg MSG_SUMMARY_CAMPAIGN_HEAVIER)" "$nh" "$YELLOW"
+    if [[ "$show" == true ]]; then
+        print_summary_item "$(msg MSG_SUMMARY_SPACE_SAVED_LABEL)" "$line1" "$GREEN"
+        print_summary_value_only "$line2" "$GREEN"
+    fi
+    return 0
 }
 
 ###########################################################
@@ -298,6 +339,7 @@ show_summary() {
                 print_summary_item "$(msg MSG_SUMMARY_SPACE_SAVED_LABEL)" "$line1" "$GREEN"
                 print_summary_value_only "$line2" "$GREEN"
             fi
+            _render_campaign_totals
             print_summary_footer
         } | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
     fi

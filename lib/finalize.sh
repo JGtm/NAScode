@@ -193,7 +193,7 @@ _finalize_replace_original() {
         reason="source_missing"
     elif [[ ! -f "$final_actual" ]]; then
         reason="output_missing"
-    elif [[ -n "${OUTPUT_DIR:-}" && "$final_actual" == "$heavy_root"/* ]]; then
+    elif [[ -n "${OUTPUT_DIR:-}" && "$(_posix_drive_path "$final_actual")" == "$(_posix_drive_path "$heavy_root")"/* ]]; then
         reason="heavier_output"
     else
         original_bytes=$(get_file_size_bytes "$file_original")
@@ -384,6 +384,18 @@ _finalize_log_and_verify() {
             [[ -n "${TOTAL_SIZE_BEFORE_FILE:-}" ]] && atomic_add_int_to_file "$TOTAL_SIZE_BEFORE_FILE" "$original_size_bytes"
             [[ -n "${TOTAL_SIZE_AFTER_FILE:-}" ]] && atomic_add_int_to_file "$TOTAL_SIZE_AFTER_FILE" "$size_after_bytes"
         fi
+    fi
+
+    # Journal des tentatives (reprise) : avant --replace, qui change la source.
+    # Sortie dans _Heavier = tentative sans gain suffisant, à ne pas refaire.
+    if [[ "$verify_status" == "OK" || "$verify_status" == "SKIPPED" ]] && [[ -e "$final_actual" ]] \
+        && declare -f attempts_record &>/dev/null; then
+        local heavy_root="${OUTPUT_DIR%/}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
+        local attempt_result="converted"
+        [[ -n "${OUTPUT_DIR:-}" && "$(_posix_drive_path "$final_actual")" == "$(_posix_drive_path "$heavy_root")"/* ]] && attempt_result="heavier"
+        local attempt_src_bytes=0
+        [[ -e "$file_original" ]] && attempt_src_bytes=$(get_file_size_bytes "$file_original")
+        attempts_record "$attempt_result" "$file_original" "$attempt_src_bytes" "$size_after_bytes"
     fi
 
     # --replace : en dernier, une fois les compteurs calculés sur l'original.

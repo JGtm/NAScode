@@ -42,6 +42,7 @@ Modes disponibles (`-m`) : `serie` (défaut), `film`, `adaptatif`, `gaming` (con
 
 Options pratiques :
 - `--replace` : remplace la source par le fichier converti, uniquement après transfert vérifié, gain réel et durée identique (jamais sur un extrait).
+- `--retry-heavier` : retente les films déjà convertis sans gain suffisant (sinon écartés par `logs/Attempts.tsv`, voir « Logs & sortie »).
 - `--keep-metadata` : conserve les métadonnées, les chapitres et la date de modification de la source.
 
 ## 🌐 Internationalisation (i18n)
@@ -169,6 +170,8 @@ Référence code (audio) :
 - Sortie par défaut : `Converted/` (dans le dossier du script)
 - Logs : `logs/` (dans le dossier du script)
 - Si une conversion produit un fichier plus lourd (ou un gain < seuil), la sortie est redirigée vers `Converted_Heavier/` (configurable) pour éviter les boucles de re-traitement.
+- **Reprise** : `logs/Attempts.tsv` garde la trace de chaque conversion menée à terme. Au lancement suivant, même après réindexation, un film déjà converti sans gain suffisant n'est pas retraité tant que sa source (chemin et taille) et les paramètres d'encodage n'ont pas changé, et que le gain obtenu reste sous le seuil. Changer de codec, de mode ou de qualité, ou baisser le seuil, relance l'essai ; `--retry-heavier` le force. Les erreurs sont toujours retentées. Au premier lancement, le journal est amorcé depuis `Converted_Heavier/`, qui peut ensuite être vidé.
+- **Cumul** : après un run interrompu puis relancé, le résumé final ajoute une section « Cumul depuis le … » avec le gain total de la campagne, jusqu'au prochain passage complet de la source.
 
 Détails : [docs/fr/TROUBLESHOOTING.md](docs/fr/TROUBLESHOOTING.md)
 
