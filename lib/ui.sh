@@ -337,6 +337,29 @@ print_indexing_start() {
     echo -e "${MAGENTA}  ┌──────────────────────────────────────────────────┐${NOCOLOR}"
 }
 
+# Affiche l'avancement de l'exploration de la source, sur la ligne que
+# print_indexing_progress réécrira ensuite (même largeur, mise à jour in-place).
+# Le total n'est pas connu avant la fin de l'exploration : simple compteur.
+# Usage: print_indexing_scan <found>
+print_indexing_scan() {
+    _ui_is_quiet && return 0
+    local found="$1"
+    local pad
+    pad=$(_indexing_line_pad "$(msg MSG_UI_SCANNING) : ${found} $(msg MSG_UI_FILES_FOUND)")
+    printf "\r${MAGENTA}  │${NOCOLOR}  🔍 $(msg MSG_UI_SCANNING) : ${CYAN}%s${NOCOLOR} $(msg MSG_UI_FILES_FOUND)%*s${MAGENTA}│${NOCOLOR}" "$found" "$pad" "" >&2
+}
+
+# Espaces à ajouter après le texte d'une ligne du bloc d'indexation pour
+# aligner le bord droit (45 colonnes utiles après "  📊 ", quelle que soit la
+# langue). Compte en caractères, pas en octets (« trouvés »).
+_indexing_line_pad() {
+    local text="$1" width="${2:-45}" chars
+    chars=$(LC_ALL=C.UTF-8 awk -v s="$text" 'BEGIN { print length(s) }' 2>/dev/null) || chars=${#text}
+    local pad=$((width - chars))
+    (( pad < 1 )) && pad=1
+    echo "$pad"
+}
+
 # Affiche la progression de l'indexation (sur une seule ligne, mise à jour in-place)
 # Usage: print_indexing_progress <current> <total>
 # Largeur interne : 50 caractères (supporte jusqu'à 9999/9999 fichiers)
@@ -345,7 +368,9 @@ print_indexing_progress() {
     local current="$1"
     local total="$2"
     # Format : "  │  📊 Indexing : 9999/9999 files                  │"
-    printf "\r${MAGENTA}  │${NOCOLOR}  📊 $(msg MSG_UI_INDEXING) : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} $(msg MSG_UI_FILES)              ${MAGENTA}│${NOCOLOR}" "$current" "$total" >&2
+    local pad
+    pad=$(_indexing_line_pad "$(printf '%s : %4d/%4d %s' "$(msg MSG_UI_INDEXING)" "$current" "$total" "$(msg MSG_UI_FILES)")")
+    printf "\r${MAGENTA}  │${NOCOLOR}  📊 $(msg MSG_UI_INDEXING) : ${CYAN}%4d${NOCOLOR}/${WHITE}%4d${NOCOLOR} $(msg MSG_UI_FILES)%*s${MAGENTA}│${NOCOLOR}" "$current" "$total" "$pad" "" >&2
 }
 
 # Affiche la fin du bloc d'indexation avec le résultat
@@ -358,7 +383,9 @@ print_indexing_end() {
     # Format : "  │  ✅ 9 fichiers indexés                           │"
     local indexed_msg
     indexed_msg=$(msg MSG_UI_FILES_INDEXED "$count")
-    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%-46s${NOCOLOR}${MAGENTA}│${NOCOLOR}\n" "$indexed_msg" >&2
+    local pad
+    pad=$(_indexing_line_pad "$indexed_msg" 46)
+    printf "${MAGENTA}  │${NOCOLOR}  ${GREEN}✅ ${WHITE}%s%*s${NOCOLOR}${MAGENTA}│${NOCOLOR}\n" "$indexed_msg" "$pad" "" >&2
     echo -e "${MAGENTA}  └──────────────────────────────────────────────────┘${NOCOLOR}" >&2
 }
 

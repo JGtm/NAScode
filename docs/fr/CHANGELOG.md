@@ -6,7 +6,8 @@
 - ✅ **Sorties tronquées existantes** : au lieu de bloquer le fichier indéfiniment, elles sont renommées en `.corrupt-*` et le film est reconverti.
 - ✅ **Contrôle de durée fiable** : la comparaison porte sur la piste vidéo, plus sur le conteneur. Un sous-titre plus long que le film ne bloque plus `--replace`, et la tolérance passe de 1 % à 0,2 % (2 s minimum).
 - ✅ **Échec « fps mismatch with 1st pass » sur les films avec jaquettes (Windows)** : le `ffprobe` natif termine ses lignes par `\r`, si bien que les jaquettes (`attached_pic`) n'étaient jamais reconnues. Elles étaient mappées comme pistes vidéo et encodées en x265, ce qui faisait échouer la 2e passe après une 1re passe complète. `ffprobe_safe` retire désormais les `\r`, ce qui fiabilise aussi la détection de langue des sous-titres et le choix de la piste pour le VMAF.
-- ✅ **Tests** : nouveau `test_regression_duration_integrity.bats`, et deux tests CRLF dans `test_regression_coverage.bats`.
+- ✅ **Indexation sans affichage** : l'exploration de la source (environ 1 min 30 pour 700 films sur NAS) se déroulait avant l'ouverture du bloc d'indexation, écran figé. Le bloc s'ouvre désormais tout de suite et compte les fichiers trouvés en direct (`stdbuf -o0` sur `find`), puis la même ligne passe à « Indexation X/Y ». Le cadre est aussi aligné quelle que soit la langue.
+- ✅ **Tests** : nouveau `test_regression_duration_integrity.bats`, deux tests CRLF dans `test_regression_coverage.bats` et trois tests d'affichage de l'exploration dans `test_regression_macos_portability.bats`.
 
 ## v3.0.2
 

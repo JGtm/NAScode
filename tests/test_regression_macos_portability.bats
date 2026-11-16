@@ -177,3 +177,40 @@ make_fake_finds() {
     [ "$status" -eq 0 ]
     [ "${lines[${#lines[@]}-1]}" = "kept rc=0" ]
 }
+
+###########################################################
+# 4. Affichage pendant l'exploration de la source
+###########################################################
+
+@test "index: le bloc s'ouvre avant l'exploration et affiche les fichiers trouvés" {
+    run_strict '
+        NO_PROGRESS=false
+        _generate_index 2>"$LOG_DIR/ui.txt"
+        tr "\r" "\n" < "$LOG_DIR/ui.txt" | sed "s/\x1b\[[0-9;]*m//g" | awk "NF"
+        echo "indexed=$(wc -l < "$INDEX" | tr -d " ")"
+    '
+    [ "$status" -eq 0 ]
+    [[ "${lines[0]}" == *"┌"* ]]
+    [[ "${lines[1]}" == *"🔍"* ]]
+    [[ "$output" == *"📊"*"3/   3"* ]]
+    [ "${lines[${#lines[@]}-1]}" = "indexed=3" ]
+}
+
+@test "index: compteur d'exploration = enregistrements NUL écrits" {
+    run_strict '
+        printf "1\ta\0002\tb\0003\tc\000" > "$LOG_DIR/cand"
+        echo "$(_count_index_candidates "$LOG_DIR/cand") $(_count_index_candidates "$LOG_DIR/absent")"
+    '
+    [ "$status" -eq 0 ]
+    [ "$output" = "3 0" ]
+}
+
+@test "index: mode live identique au mode normal" {
+    run_strict '
+        _list_video_candidates "$OUTPUT_DIR" | tr "\0" "\n" | sort > "$LOG_DIR/a"
+        _list_video_candidates "$OUTPUT_DIR" live | tr "\0" "\n" | sort > "$LOG_DIR/b"
+        cmp "$LOG_DIR/a" "$LOG_DIR/b" && wc -l < "$LOG_DIR/b" | tr -d " "
+    '
+    [ "$status" -eq 0 ]
+    [ "$output" = "3" ]
+}
