@@ -207,12 +207,24 @@ _detect_find_printf() {
     _NASCODE_FIND_PRINTF=0
 }
 
+#
+# Mode "live" (2e argument) : find écrit par blocs de plusieurs dizaines de Ko
+# quand sa sortie n'est pas un terminal, donc rien n'apparaît avant la fin sur
+# une bibliothèque de taille courante. stdbuf -o0 (coreutils, présent sous MSYS
+# et Linux) rend chaque entrée visible aussitôt pour le compteur d'exploration.
+# Sans stdbuf, le compteur avance simplement par paquets.
 _list_video_candidates() {
     local exclude_dir_name="$1"
+    local mode="${2:-}"
     _detect_find_printf
 
+    local -a runner=()
+    if [[ "$mode" == live ]] && command -v stdbuf &>/dev/null; then
+        runner=(stdbuf -o0)
+    fi
+
     if [[ "$_NASCODE_FIND_PRINTF" == 1 ]]; then
-        { "$_NASCODE_FIND_BIN" "$SOURCE" \
+        { ${runner[@]+"${runner[@]}"} "$_NASCODE_FIND_BIN" "$SOURCE" \
             -wholename "$exclude_dir_name" -prune \
             -o \
             -type f \( -iname "*.mp4" -o -iname "*.mkv" -o -iname "*.avi" -o -iname "*.mov" \) \
@@ -240,6 +252,14 @@ _read_video_candidates() {
     else
         _list_video_candidates "$exclude_dir_name"
     fi
+}
+
+# Nombre d'enregistrements (séparés par NUL) déjà écrits par _list_video_candidates.
+# Avant filtrage : sert uniquement à l'affichage pendant l'exploration.
+_count_index_candidates() {
+    local n=0
+    [[ -f "$1" ]] && n=$(tr -cd '\0' < "$1" 2>/dev/null | wc -c)
+    echo $((n + 0))
 }
 
 _count_total_video_files() {
@@ -301,18 +321,27 @@ _generate_index() {
     local exclude_dir_name=$OUTPUT_DIR
 
     # Une seule exploration de la source (coûteuse sur un partage réseau),
-    # réutilisée pour le comptage puis pour l'indexation.
+    # réutilisée pour le comptage puis pour l'indexation. C'est elle qui prend
+    # le temps (~100 s pour 700 films sur NAS) : le bloc s'ouvre avant et
+    # affiche les fichiers trouvés au fil de l'eau.
     local candidates_file="$TMP_DIR/.index_candidates_$$"
-    _list_video_candidates "$exclude_dir_name" > "$candidates_file"
+    if [[ "$NO_PROGRESS" != true ]]; then
+        print_indexing_start >&2
+        _detect_find_printf
+        _list_video_candidates "$exclude_dir_name" live > "$candidates_file" &
+        local scan_pid=$!
+        while kill -0 "$scan_pid" 2>/dev/null; do
+            print_indexing_scan "$(_count_index_candidates "$candidates_file")"
+            sleep 0.5
+        done
+        wait "$scan_pid" 2>/dev/null || true
+    else
+        _list_video_candidates "$exclude_dir_name" > "$candidates_file"
+    fi
 
     # Première passe : compter le nombre total de fichiers vidéo candidats
     local total_files
     total_files=$(_count_total_video_files "$exclude_dir_name" "$candidates_file")
-
-    # Afficher l'en-tête du bloc d'indexation
-    if [[ "$NO_PROGRESS" != true ]]; then
-        print_indexing_start >&2
-    fi
 
     # Initialiser le compteur
     local count_file="$TMP_DIR/.index_count_$$"
