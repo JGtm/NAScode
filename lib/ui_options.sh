@@ -183,6 +183,11 @@ format_option_limit_fps() {
 format_option_keep_metadata() {
     echo -e "🗂️   ${CYAN}$(msg MSG_UI_OPT_KEEP_METADATA)${NOCOLOR}"
 }
+
+# Formate l'option --retry-heavier pour print_active_options
+format_option_retry_heavier() {
+    echo -e "🔁  ${CYAN}$(msg MSG_UI_OPT_RETRY_HEAVIER)${NOCOLOR}"
+}
 ###########################################################
 # FONCTIONS LEGACY (POUR RÉTRO-COMPATIBILITÉ)
 ###########################################################

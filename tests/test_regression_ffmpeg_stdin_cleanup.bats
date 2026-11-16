@@ -106,19 +106,55 @@ teardown() {
     ! kill -0 "$FAKE_PID" 2>/dev/null
 }
 
+@test "cleanup: sans ps -o (MSYS), les descendants sont trouvés via /proc" {
+    [[ -r /proc/self/stat ]] || skip "pas de /proc (macOS)"
+    local fake="$TEST_TEMP_DIR/nasfakeenc"
+    ln -s "$(command -v sleep)" "$fake"
+    bash -c 'trap "" TERM; exec "$1" 30' _ "$fake" &
+    FAKE_PID=$!
+    sleep 0.3
+
+    source "$LIB_DIR/lock.sh"
+    # ps de Cygwin/MSYS : -A et -o inconnus, rien sur stdout
+    ps() { echo "ps: unknown option -- A" >&2; return 1; }
+    _CLEANUP_KILL_NAMES="nasfakeenc"
+    local -a found=()
+    mapfile -t found < <(_cleanup_descendant_encoders "$$")
+    [ "${#found[@]}" -eq 1 ]
+    [ "${found[0]}" = "$FAKE_PID" ]
+    # Attendre la mort effective : sous Cygwin, un processus tué reste visible
+    # un instant et serait relevé par le test suivant.
+    kill -9 "$FAKE_PID" 2>/dev/null || true
+    local i
+    for i in $(seq 1 50); do kill -0 "$FAKE_PID" 2>/dev/null || break; sleep 0.1; done
+}
+
 @test "cleanup: un encodeur qui n'est pas un descendant n'est jamais visé" {
     local fake="$TEST_TEMP_DIR/nasfakeenc"
     ln -s "$(command -v sleep)" "$fake"
     # Double fork : le faux encodeur est rattaché à PID 1, hors de notre arbre
-    ( "$fake" 30 & echo $! > "$TEST_TEMP_DIR/pid" )
+    ( "$fake" 30 & echo $! > "$TEST_TEMP_DIR/pid"; echo "$BASHPID" > "$TEST_TEMP_DIR/sub" )
     FAKE_PID=$(cat "$TEST_TEMP_DIR/pid")
-    sleep 0.3
+    local sub_pid i
+    sub_pid=$(cat "$TEST_TEMP_DIR/sub")
+    # Sous charge (suite parallèle, surtout Cygwin), le rattachement à PID 1
+    # n'est effectif qu'une fois le sous-shell intermédiaire disparu.
+    for i in $(seq 1 50); do
+        kill -0 "$sub_pid" 2>/dev/null || break
+        sleep 0.1
+    done
+    if [[ -r "/proc/$FAKE_PID/stat" ]]; then
+        for i in $(seq 1 50); do
+            [[ "$(awk '{ print $4 }' "/proc/$FAKE_PID/stat" 2>/dev/null)" != "$sub_pid" ]] && break
+            sleep 0.1
+        done
+    fi
     kill -0 "$FAKE_PID"
 
     source "$LIB_DIR/lock.sh"
     _CLEANUP_KILL_NAMES="nasfakeenc"
     run _cleanup_descendant_encoders "$$"
-    [ -z "$output" ]
+    [[ " ${output//$'\n'/ } " != *" $FAKE_PID "* ]]
 }
 
 @test "cleanup: sans encodeur, _cleanup_kill_survivors rend la main tout de suite" {

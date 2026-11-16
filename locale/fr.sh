@@ -247,6 +247,8 @@ MSG_HELP_KEEP_METADATA="Conserver les métadonnées et la date de modification d
 MSG_HELP_KEEP_METADATA_HINT="ffmpeg : -map_metadata 0 -map_chapters 0 ; mtime/atime via touch -r"
 MSG_HELP_REPLACE="Remplacer le fichier source par la version convertie (FLAG)"
 MSG_HELP_REPLACE_HINT="Seulement si transfert vérifié, gain réel et durée identique ; sinon l'original est gardé"
+MSG_HELP_RETRY_HEAVIER="Retenter les films déjà convertis sans gain suffisant (FLAG)"
+MSG_HELP_RETRY_HEAVIER_HINT="Par défaut, logs/Attempts.tsv les écarte tant que la source et les paramètres n'ont pas changé"
 MSG_HELP_LANG="Langue de l'interface : fr, en (ARG) [défaut : fr]"
 
 MSG_HELP_SHORT_OPTIONS_TITLE="Remarque sur les options courtes groupées :"
@@ -302,6 +304,7 @@ MSG_UI_OPT_FILE_COUNT="Compteur de fichiers à traiter"
 MSG_UI_OPT_HFR_LIMITED="Vidéos HFR : limitées à %s fps"
 MSG_UI_OPT_HFR_BITRATE="Vidéos HFR : bitrate ajusté (fps original conservé)"
 MSG_UI_OPT_KEEP_METADATA="Conservation des métadonnées et de la date de modification source"
+MSG_UI_OPT_RETRY_HEAVIER="Nouvel essai des films déjà convertis sans gain"
 
 ###########################################################
 # UI MESSAGES (lib/ui.sh)
@@ -364,6 +367,11 @@ MSG_SUMMARY_ANOM_SIZE_LABEL="Taille"
 MSG_SUMMARY_ANOM_INTEGRITY_LABEL="Intégrité"
 MSG_SUMMARY_ANOM_VMAF_LABEL="VMAF"
 MSG_SUMMARY_SPACE_SAVED_LABEL="Espace économisé"
+MSG_SUMMARY_CAMPAIGN_TITLE="CUMUL DEPUIS LE %s"
+MSG_SUMMARY_CAMPAIGN_CONVERTED="Films convertis"
+MSG_SUMMARY_CAMPAIGN_HEAVIER="Tentés sans gain"
+MSG_ATTEMPTS_SKIPPED="%s film(s) déjà tenté(s) sans gain avec ces paramètres : ignoré(s) (--retry-heavier pour les retenter)"
+MSG_ATTEMPTS_SEEDED="Journal des tentatives amorcé : %s sortie(s) de _Heavier mémorisée(s) (le dossier peut être vidé)"
 
 ###########################################################
 # COMPLEXITY (lib/complexity.sh)

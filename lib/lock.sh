@@ -45,14 +45,39 @@ _cleanup_x265_logs() {
 # Noms des processus lourds à ne jamais laisser orphelins après un cleanup.
 _CLEANUP_KILL_NAMES="${_CLEANUP_KILL_NAMES:-ffmpeg ffprobe SvtAv1EncApp}"
 
+# Table des processus, une ligne "pid ppid comm" par processus.
+# `ps -o` (Linux, macOS) ; à défaut /proc/<pid>/stat, au format Linux
+# "pid (comm) état ppid ...", que fournissent Cygwin et MSYS dont le `ps`
+# n'a pas -o. Sans ce repli, la liste était vide sous Windows : aucun ffmpeg
+# n'était relevé, alors qu'un ffmpeg natif a son propre process group et
+# échappe donc aussi au `kill -- -$$` du cleanup (orphelin après Ctrl+C).
+_cleanup_process_table() {
+    local out
+    out=$(ps -A -o pid= -o ppid= -o comm= 2>/dev/null) || out=""
+    if [[ -n "$out" ]]; then
+        printf '%s\n' "$out"
+        return 0
+    fi
+
+    local f line comm rest _state ppid
+    for f in /proc/[0-9]*/stat; do
+        # Un processus peut disparaître entre le glob et la lecture
+        { IFS= read -r line < "$f"; } 2>/dev/null || continue
+        comm="${line#*(}"; comm="${comm%)*}"
+        rest="${line##*) }"
+        read -r _state ppid _ <<< "$rest"
+        printf '%s %s %s\n' "${line%% *}" "$ppid" "$comm"
+    done
+    return 0
+}
+
 # Liste les PID des encodeurs DESCENDANTS de <root> (défaut : ce shell), par
 # parcours de l'arbre ppid. À appeler AVANT de tuer les parents : un orphelin est
 # rattaché à PID 1 et sort de l'arbre. Ne vise jamais les ffmpeg d'autres
 # programmes du même process group (script appelant, autres runs, tests).
-# Silencieux et vide si `ps -o` est indisponible (MSYS).
 _cleanup_descendant_encoders() {
     local root="${1:-$$}"
-    ps -A -o pid= -o ppid= -o comm= 2>/dev/null | awk -v root="$root" -v names="$_CLEANUP_KILL_NAMES" '
+    _cleanup_process_table | awk -v root="$root" -v names="$_CLEANUP_KILL_NAMES" '
         BEGIN { n = split(names, arr, " "); for (i = 1; i <= n; i++) want[arr[i]] = 1 }
         {
             pid = $1; ppid = $2; c = $3

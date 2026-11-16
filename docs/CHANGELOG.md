@@ -2,12 +2,16 @@
 
 ## v3.0.3
 
+- ✅ **Resume without wasted work**: new `logs/Attempts.tsv` log. A film already converted without enough savings is no longer reprocessed on the next run (even after re-indexing) while the source and settings are unchanged; changing settings or lowering the threshold retries it, `--retry-heavier` forces it. Initialised once from `Converted_Heavier/`, which can then be emptied.
+- ✅ **Running total after a restart**: the final summary adds "Total since …" (films converted, tried without savings, total savings) when earlier runs of the same campaign contributed.
+- ✅ **Flat `_Heavier` on Windows**: the output path (`C:/…`) and `OUTPUT_DIR` (`/c/…`) did not use the same form, so films from subfolders landed at the root of `Converted_Heavier/`. The folder tree is now preserved.
 - ✅ **Truncated films**: an interrupted NAS copy went unnoticed, `ffmpeg` encoded the start of the film and the run reported success. The copy to temporary storage is now verified (exit code and size), and every output is compared with its source before publishing: an incomplete output is rejected (`ERROR DURATION`).
 - ✅ **Existing truncated outputs**: instead of blocking the file forever, they are renamed to `.corrupt-*` and the film is converted again.
 - ✅ **Reliable duration check**: the comparison now uses the video track instead of the container. A subtitle longer than the film no longer blocks `--replace`, and the tolerance goes from 1% to 0.2% (2 s minimum).
 - ✅ **"fps mismatch with 1st pass" failure on films with cover art (Windows)**: the native `ffprobe` ends its lines with `\r`, so cover art (`attached_pic`) was never recognised. It was mapped as video tracks and encoded with x265, which made the 2nd pass fail after a full 1st pass. `ffprobe_safe` now strips `\r`, which also makes subtitle language detection and the VMAF stream choice reliable.
 - ✅ **Indexing with no display**: scanning the source (about 1 min 30 for 700 films on a NAS) happened before the indexing block opened, with a frozen screen. The block now opens straight away and counts the files found live (`stdbuf -o0` on `find`), then the same line switches to "Indexing X/Y". The frame is also aligned whatever the language.
-- ✅ **Tests**: new `test_regression_duration_integrity.bats`, two CRLF tests in `test_regression_coverage.bats` and three scan display tests in `test_regression_macos_portability.bats`.
+- ✅ **Ctrl+C on Windows: orphaned ffmpeg**: the MSYS `ps` has no `-o` option, so the list of encoders to kill stayed empty. A native `ffmpeg` also runs in its own process group and escapes the group kill: it kept running alone after Ctrl+C. Descendants are now found through `/proc/<pid>/stat` when `ps -o` is not available.
+- ✅ **Tests**: new `test_regression_duration_integrity.bats`, a `/proc` fallback test in `test_regression_ffmpeg_stdin_cleanup.bats`, two CRLF tests in `test_regression_coverage.bats` and three scan display tests in `test_regression_macos_portability.bats`.
 
 ## v3.0.2
 

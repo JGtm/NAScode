@@ -375,12 +375,29 @@ atomic_add_int_to_file() {
 
 # Calcule un chemin de sortie alternatif "Heavier" en conservant l'arborescence.
 # Usage: compute_heavy_output_path <final_output> [output_dir]
+# "C:/x/y" ou "C:\x\y" → "/c/x/y" ; tout autre chemin est rendu tel quel.
+_posix_drive_path() {
+    local p="$1"
+    if [[ "$p" =~ ^([A-Za-z]):[/\\](.*)$ ]]; then
+        local rest="${BASH_REMATCH[2]//\\//}"
+        p="/${BASH_REMATCH[1],,}/${rest}"
+    fi
+    printf '%s' "$p"
+}
+
 compute_heavy_output_path() {
     local final_output="$1"
     local output_dir="${2:-${OUTPUT_DIR:-}}"
 
     [[ -z "$final_output" ]] && return 1
     [[ -z "$output_dir" ]] && return 1
+
+    # Même forme de lecteur des deux côtés : la sortie arrive souvent en
+    # "C:/…" (normalize_path) alors qu'OUTPUT_DIR est en "/c/…". Sans cela le
+    # préfixe ne correspondait jamais et tous les films de sous-dossiers
+    # tombaient à plat à la racine de _Heavier (collisions de noms possibles).
+    final_output=$(_posix_drive_path "$final_output")
+    output_dir=$(_posix_drive_path "$output_dir")
 
     local out_root="${output_dir%/}"
     local heavy_root="${out_root}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"

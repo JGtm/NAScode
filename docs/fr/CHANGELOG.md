@@ -2,12 +2,16 @@
 
 ## v3.0.3
 
+- ✅ **Reprise sans retraitement inutile** : nouveau journal `logs/Attempts.tsv`. Un film déjà converti sans gain suffisant n'est plus retraité au lancement suivant (même après réindexation) tant que la source et les paramètres n'ont pas changé ; changer de réglages ou baisser le seuil le relance, `--retry-heavier` le force. Amorcé une fois depuis `Converted_Heavier/`, qui peut ensuite être vidé.
+- ✅ **Cumul après reprise** : le résumé final ajoute « Cumul depuis le … » (films convertis, tentés sans gain, gain total) quand des runs précédents de la même campagne y contribuent.
+- ✅ **`_Heavier` à plat sous Windows** : le chemin de sortie (`C:/…`) et `OUTPUT_DIR` (`/c/…`) n'avaient pas la même forme, donc les films de sous-dossiers atterrissaient à la racine de `Converted_Heavier/`. L'arborescence est maintenant conservée.
 - ✅ **Films tronqués** : une copie NAS interrompue était ignorée, `ffmpeg` encodait le début du film et le run affichait un succès. La copie vers le stockage temporaire est désormais vérifiée (code de retour et taille), et chaque sortie est comparée à la source avant publication : une sortie incomplète est rejetée (`ERROR DURATION`).
 - ✅ **Sorties tronquées existantes** : au lieu de bloquer le fichier indéfiniment, elles sont renommées en `.corrupt-*` et le film est reconverti.
 - ✅ **Contrôle de durée fiable** : la comparaison porte sur la piste vidéo, plus sur le conteneur. Un sous-titre plus long que le film ne bloque plus `--replace`, et la tolérance passe de 1 % à 0,2 % (2 s minimum).
 - ✅ **Échec « fps mismatch with 1st pass » sur les films avec jaquettes (Windows)** : le `ffprobe` natif termine ses lignes par `\r`, si bien que les jaquettes (`attached_pic`) n'étaient jamais reconnues. Elles étaient mappées comme pistes vidéo et encodées en x265, ce qui faisait échouer la 2e passe après une 1re passe complète. `ffprobe_safe` retire désormais les `\r`, ce qui fiabilise aussi la détection de langue des sous-titres et le choix de la piste pour le VMAF.
 - ✅ **Indexation sans affichage** : l'exploration de la source (environ 1 min 30 pour 700 films sur NAS) se déroulait avant l'ouverture du bloc d'indexation, écran figé. Le bloc s'ouvre désormais tout de suite et compte les fichiers trouvés en direct (`stdbuf -o0` sur `find`), puis la même ligne passe à « Indexation X/Y ». Le cadre est aussi aligné quelle que soit la langue.
-- ✅ **Tests** : nouveau `test_regression_duration_integrity.bats`, deux tests CRLF dans `test_regression_coverage.bats` et trois tests d'affichage de l'exploration dans `test_regression_macos_portability.bats`.
+- ✅ **Ctrl+C sous Windows : ffmpeg orphelins** : le `ps` de MSYS n'a pas d'option `-o`, la liste des encodeurs à tuer restait donc vide. Or un `ffmpeg` natif a son propre groupe de processus et échappe aussi à l'arrêt de groupe : il continuait seul après Ctrl+C. Les descendants sont désormais relevés via `/proc/<pid>/stat` quand `ps -o` est indisponible.
+- ✅ **Tests** : nouveau `test_regression_duration_integrity.bats`, un test du repli `/proc` dans `test_regression_ffmpeg_stdin_cleanup.bats`, deux tests CRLF dans `test_regression_coverage.bats` et trois tests d'affichage de l'exploration dans `test_regression_macos_portability.bats`.
 
 ## v3.0.2
 

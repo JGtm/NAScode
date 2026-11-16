@@ -63,11 +63,20 @@ _build_queue_from_index() {
 
     # Appliquer un filtre taille (si demandé) AVANT le tri.
     # Cela s'applique aussi quand un index existant est conservé.
+    # Retire aussi les films déjà tentés sans gain avec les mêmes paramètres
+    # (journal des tentatives, lib/attempts.sh), listés dans ATTEMPTS_SKIPPED_FILE.
+    ATTEMPTS_SKIPPED_FILE="$LOG_DIR/.attempts_skipped_${EXECUTION_TIMESTAMP:-0}"
     _emit_index_lines() {
-        if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]]; then
-            awk -F'\t' -v min="$MIN_SIZE_BYTES" '$1+0 >= min {print}' "$INDEX"
+        {
+            if [[ "${MIN_SIZE_BYTES:-0}" -gt 0 ]]; then
+                awk -F'\t' -v min="$MIN_SIZE_BYTES" '$1+0 >= min {print}' "$INDEX"
+            else
+                cat "$INDEX"
+            fi
+        } | if declare -f attempts_filter_index_lines &>/dev/null; then
+            attempts_filter_index_lines "$ATTEMPTS_SKIPPED_FILE"
         else
-            cat "$INDEX"
+            cat
         fi
     }
 
@@ -93,6 +102,27 @@ _build_queue_from_index() {
             _emit_index_lines | sort -nrk1,1 | cut -f2- | tr '\n' '\0' > "$QUEUE"
             ;;
     esac
+}
+
+# Annonce les films retirés par le journal des tentatives et les note dans le
+# log de session (comptés dans SKIP au résumé).
+_report_attempts_skipped() {
+    local f="${ATTEMPTS_SKIPPED_FILE:-}"
+    [[ -n "$f" && -f "$f" ]] || return 0
+    local n
+    n=$(wc -l < "$f" | tr -d '[:space:]')
+    if [[ "${n:-0}" -gt 0 ]]; then
+        if [[ -n "${LOG_SESSION:-}" ]]; then
+            local now p
+            now=$(date '+%Y-%m-%d %H:%M:%S')
+            while IFS= read -r p; do
+                echo "$now | SKIPPED (Already tried, no gain) | $p"
+            done < "$f" >> "$LOG_SESSION" 2>/dev/null || true
+        fi
+        [[ "${NO_PROGRESS:-false}" != true ]] && print_info "$(msg MSG_ATTEMPTS_SKIPPED "$n")"
+    fi
+    rm -f "$f" 2>/dev/null || true
+    return 0
 }
 
 ###########################################################
@@ -250,6 +280,10 @@ _show_active_options() {
         options+=("$(format_option_keep_metadata)")
     fi
 
+    if [[ "${RETRY_HEAVIER:-false}" == true ]]; then
+        options+=("$(format_option_retry_heavier)")
+    fi
+
     # Afficher seulement si au moins une option est active
     if [[ ${#options[@]} -gt 0 ]]; then
         print_active_options "${options[@]}"
@@ -277,8 +311,17 @@ build_queue() {
         _generate_index
     fi
     
+    # Journal des tentatives : amorçage unique depuis _Heavier, puis position
+    # de départ (les lignes au-delà seront écrites par ce run).
+    if declare -f attempts_seed_from_heavy &>/dev/null; then
+        attempts_seed_from_heavy || true
+        ATTEMPTS_START_LINE=$(wc -l < "$(_attempts_file)" 2>/dev/null | tr -d '[:space:]') || ATTEMPTS_START_LINE=0
+        export ATTEMPTS_START_LINE="${ATTEMPTS_START_LINE:-0}"
+    fi
+
     # Étape 2 : Construire la QUEUE à partir de l'INDEX (tri par taille décroissante)
     _build_queue_from_index
+    _report_attempts_skipped
     
     # Sauvegarder la queue complète avant limitation (pour alimentation dynamique)
     cp -f "$QUEUE" "$QUEUE.full" 2>/dev/null || true

@@ -69,6 +69,7 @@ source "$LIB_DIR/svtav1_essential.sh" # SVT-AV1-Essential détection (Phase B, s
 source "$LIB_DIR/segmenter.sh"      # Segmentation/concat propres (Phase C)
 source "$LIB_DIR/utils.sh"        # Utilitaires (dépend de detect pour HAS_*)
 source "$LIB_DIR/logging.sh"      # Logs (dépend de config pour EXECUTION_TIMESTAMP)
+source "$LIB_DIR/attempts.sh"     # Journal des tentatives / reprise (dépend de logging, utils)
 source "$LIB_DIR/notify.sh"       # Notifications externes (Discord, etc.) — best-effort
 source "$LIB_DIR/progress.sh"     # Slots progression (dépend de config pour EXECUTION_TIMESTAMP)
 source "$LIB_DIR/lock.sh"         # Verrous (dépend de colors, config)
@@ -250,6 +251,14 @@ main() {
         print_header "$(msg MSG_MAIN_DRYRUN_DONE)" "$GREEN"
     else
         show_summary
+        # Passage complet de toute la source : le prochain run démarre un
+        # nouveau cumul. Un run interrompu ou partiel (-l, -r, queue perso,
+        # heures creuses) le prolonge au contraire (cf. lib/attempts.sh).
+        if [[ "${QUEUE_STOPPED_EARLY:-false}" != true && ! -f "$STOP_FLAG" ]] \
+            && [[ "${LIMIT_FILES:-0}" -eq 0 && "${RANDOM_MODE:-false}" != true ]] \
+            && [[ -z "${CUSTOM_QUEUE:-}" && "${SAMPLE_MODE:-false}" != true ]]; then
+            attempts_mark_campaign_end || true
+        fi
     fi
 }
 
