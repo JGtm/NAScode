@@ -148,24 +148,40 @@ _format_space_savings() {
 # source (cf. attempts_campaign_totals), quand des runs précédents y ont
 # contribué. Un run interrompu (Ctrl+C, redémarrage, heures creuses) puis
 # relancé retrouve ainsi le gain total, même après réindexation.
+# Même structure que le résumé du run : trois compteurs (convertis, sans gain,
+# erreurs), puis le gain de place sous un séparateur.
+# Usage: _render_campaign_totals [compact]
 _render_campaign_totals() {
+    local layout="${1:-wide}"
     [[ "${SAMPLE_MODE:-false}" == true || "${DRYRUN:-false}" == true || -n "${SINGLE_FILE:-}" ]] && return 0
     declare -f attempts_campaign_totals &>/dev/null || return 0
 
-    local nc before after nh first old
-    IFS='|' read -r nc before after nh first old <<< "$(attempts_campaign_totals)"
+    local nc before after nh first old ne
+    IFS='|' read -r nc before after nh first old ne <<< "$(attempts_campaign_totals)"
     # Rien d'antérieur à ce run : le cumul serait identique au résumé du run.
     [[ "${old:-0}" -gt 0 ]] || return 0
 
-    local show line1 line2
+    local show line1 line2 since="${first%:*}"
     IFS='|' read -r show line1 line2 <<< "$(_format_space_savings "${before:-0}" "${after:-0}")"
 
+    if [[ "$layout" == compact ]]; then
+        echo -e "${DIM}$(msg MSG_SUMMARY_CAMPAIGN_COMPACT "$since"):${NOCOLOR} ${GREEN}OK=${nc:-0}${NOCOLOR}  ${YELLOW}$(msg MSG_SUMMARY_CAMPAIGN_HEAVIER_SHORT)=${nh:-0}${NOCOLOR}  ${RED}ERR=${ne:-0}${NOCOLOR}"
+        if [[ "$show" == true ]]; then
+            echo -e "${DIM}$(msg MSG_SUMMARY_SPACE):${NOCOLOR} ${GREEN}${line1}${NOCOLOR}"
+            [[ -n "$line2" ]] && echo -e "${GREEN}${line2}${NOCOLOR}"
+        fi
+        echo ""
+        return 0
+    fi
+
     print_summary_separator
-    print_summary_section_title "$(msg MSG_SUMMARY_CAMPAIGN_TITLE "${first%:*}")"
+    print_summary_section_title "$(msg MSG_SUMMARY_CAMPAIGN_TITLE "$since")"
     print_summary_separator
     print_summary_item "$(msg MSG_SUMMARY_CAMPAIGN_CONVERTED)" "${nc:-0}" "$GREEN"
-    [[ "${nh:-0}" -gt 0 ]] && print_summary_item "$(msg MSG_SUMMARY_CAMPAIGN_HEAVIER)" "$nh" "$YELLOW"
+    print_summary_item "$(msg MSG_SUMMARY_CAMPAIGN_HEAVIER)" "${nh:-0}" "$YELLOW"
+    print_summary_item "$(msg MSG_SUMMARY_ERRORS_LABEL)" "${ne:-0}" "$RED"
     if [[ "$show" == true ]]; then
+        print_summary_separator
         print_summary_item "$(msg MSG_SUMMARY_SPACE_SAVED_LABEL)" "$line1" "$GREEN"
         print_summary_value_only "$line2" "$GREEN"
     fi
@@ -313,8 +329,10 @@ show_summary() {
     [[ "$cols" -lt 80 ]] && compact=true
 
     if [[ "$compact" == true ]]; then
-        _render_summary_compact "$end_date" "$total_elapsed_str" "$succ" "$skip" "$err" "$size_anomalies" "$checksum_anomalies" "$vmaf_anomalies" "$show_vmaf_anomaly" "$show_space_savings" "$line1" "$line2" \
-            | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
+        {
+            _render_summary_compact "$end_date" "$total_elapsed_str" "$succ" "$skip" "$err" "$size_anomalies" "$checksum_anomalies" "$vmaf_anomalies" "$show_vmaf_anomaly" "$show_space_savings" "$line1" "$line2"
+            _render_campaign_totals compact
+        } | tee >(_strip_ansi_stream > "$SUMMARY_FILE")
     else
         {
             print_summary_header

@@ -237,11 +237,16 @@ _finalize_replace_original() {
         [[ -n "$reason" ]] && rm -f "$partial" 2>/dev/null
     fi
 
+    # Sortie plus lourde : l'original est conservé comme prévu, ce n'est pas une
+    # erreur (la redirection est déjà journalisée en HEAVY_OUTPUT_REDIRECT).
+    [[ "$reason" == "heavier_output" ]] && return 2
+
     if [[ -n "$reason" ]]; then
         print_warning "$(msg MSG_FINAL_REPLACE_REFUSED "$reason" "$(basename "$file_original")")"
         if [[ -n "${LOG_SESSION:-}" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR REPLACE | $file_original -> ${target:-$final_actual} | reason:$reason" >> "$LOG_SESSION" 2>/dev/null || true
         fi
+        _attempts_note_error "$file_original"
         return 2
     fi
 
@@ -365,6 +370,7 @@ _finalize_log_and_verify() {
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ${verify_status} | $file_original -> $final_actual | size:${size_before_bytes}B->${size_after_bytes}B | checksum:${checksum_before:-NA}/${checksum_after:-NA}" >> "$LOG_SESSION" 2>/dev/null || true
         fi
+        _attempts_note_error "$file_original"
     fi
 
     # --- Comptabiliser les gains de place (uniquement si conversion réussie) ---
@@ -453,6 +459,7 @@ _finalize_output_duration_ok() {
     if [[ -n "${LOG_SESSION:-}" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR DURATION | $file_original | source:${dur_ref:-?}s output:${dur_out:-?}s" >> "$LOG_SESSION" 2>/dev/null || true
     fi
+    _attempts_note_error "$file_original"
     rm -f "$tmp_input" "$tmp_output" "$ffmpeg_log_temp" 2>/dev/null || true
     return 1
 }
@@ -538,6 +545,7 @@ _finalize_conversion_success() {
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR MISSING_OUTPUT | $file_original -> $tmp_output ($(msg MSG_FINAL_TEMP_MISSING))" >> "$LOG_SESSION" 2>/dev/null || true
         fi
+        _attempts_note_error "$file_original"
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null || true
         return 1
     fi
@@ -629,6 +637,7 @@ _finalize_conversion_error() {
     if [[ ! -f "$STOP_FLAG" ]]; then
         print_error "$(msg MSG_CONV_FAILED "$filename")"
     fi
+    _attempts_note_error "$file_original"
     if [[ -n "$LOG_SESSION" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         echo "--- $(msg MSG_FINAL_FFMPEG_ERROR) ---" >> "$LOG_SESSION" 2>/dev/null || true
