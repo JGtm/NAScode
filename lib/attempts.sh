@@ -136,6 +136,42 @@ attempts_has_entry() {
 # même nom, éventuellement suivi du suffixe de sortie). Les paramètres de ces
 # anciennes tentatives sont inconnus : on suppose ceux du run courant.
 # Après l'amorçage, le contenu de _Heavier peut être supprimé sans perdre la mémoire.
+# Films redirigés vers _Heavier d'après les logs de session (HEAVY_OUTPUT_REDIRECT),
+# sauf ceux remplacés ensuite (REPLACED) ou déjà amorcés ($@).
+# Taille source lue dans l'INDEX (film absent → ignoré) ; taille de sortie
+# déduite du gain journalisé. Sortie : "src_bytes<TAB>out_bytes<TAB>chemin".
+_attempts_heavy_from_logs() {
+    local -a logs=()
+    local f
+    for f in "${LOG_DIR:-}"/Session_*.log; do [[ -f "$f" ]] && logs+=("$f"); done
+    (( ${#logs[@]} > 0 )) || return 0
+    # Les fichiers sont triés par date dans leur nom : l'ordre du glob est chronologique
+    {
+        printf 'D\t%s\n' "$@"
+        awk '
+            function src(s,   i) { s = substr(s, index(s, " | ") + 3); s = substr(s, index(s, " | ") + 3)
+                                   i = index(s, " -> "); if (!i) i = index(s, " → "); return i ? substr(s, 1, i - 1) : "" }
+            / \| HEAVY_OUTPUT_REDIRECT \| / {
+                p = src($0); if (p == "") next
+                g = $0; sub(/.*savings:/, "", g); sub(/%.*/, "", g)
+                print "H\t" g "\t" p; next
+            }
+            / \| REPLACED \| / { p = src($0); if (p != "") print "R\t\t" p }
+        ' "${logs[@]}"
+        awk '{ print "I\t" $0 }' "$INDEX"
+    } | awk -F'\t' '
+        $1 == "D" { done[substr($0, 3)] = 1; next }
+        $1 == "H" { p = substr($0, length($1 $2) + 3); state[p] = "H"; gain[p] = $2; next }
+        $1 == "R" { p = substr($0, 4); state[p] = "R"; next }
+        $1 == "I" {
+            p = substr($0, length($1 $2) + 3)
+            if (state[p] != "H" || (p in done)) next
+            if ($2 !~ /^[0-9]+$/ || gain[p] !~ /^-?[0-9]+$/) next
+            printf "%s\t%.0f\t%s\n", $2, $2 * (100 - gain[p]) / 100, p
+            done[p] = 1
+        }'
+}
+
 # Usage: attempts_seed_from_heavy   (après construction de l'INDEX)
 attempts_seed_from_heavy() {
     [[ "${DRYRUN:-false}" == true || "${SAMPLE_MODE:-false}" == true ]] && return 0
@@ -146,6 +182,7 @@ attempts_seed_from_heavy() {
     local heavy_root="${OUTPUT_DIR%/}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
     local src_root="${SOURCE%/}"
     local count=0 h rel stem match src_bytes src_path out_bytes
+    local -a seeded=()
 
     if [[ -d "$heavy_root" && -f "${INDEX:-}" ]]; then
         while IFS= read -r -d '' h; do
@@ -177,8 +214,18 @@ attempts_seed_from_heavy() {
             src_path="${match#*$'\t'}"
             out_bytes=$(get_file_size_bytes "$h")
             attempts_record heavier "$src_path" "$src_bytes" "$out_bytes"
+            seeded+=("$src_path")
             count=$((count + 1))
         done < <(find "$heavy_root" -type f -iname '*.mkv' -print0 2>/dev/null || true)
+    fi
+
+    # Sorties lourdes déjà supprimées de _Heavier : les logs de session les gardent
+    if [[ -f "${INDEX:-}" ]]; then
+        while IFS=$'\t' read -r src_bytes out_bytes src_path; do
+            [[ -n "$src_path" ]] || continue
+            attempts_record heavier "$src_path" "$src_bytes" "$out_bytes"
+            count=$((count + 1))
+        done < <(_attempts_heavy_from_logs "${seeded[@]}")
     fi
 
     _attempts_append "$file" "$(printf '#SEED\t%s\t%s' "$(date '+%Y-%m-%d %H:%M:%S')" "$count")"

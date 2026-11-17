@@ -151,6 +151,29 @@ _setup_seed() {
     [ "$output" = "/z/Autre.mkv" ]
 }
 
+@test "amorçage: les sorties lourdes déjà supprimées sont retrouvées dans les logs" {
+    _setup_seed
+    printf '%s\n' $'1000\t/z/Star Wars/Jedi (1983).mkv' $'2000\t/z/Refait.mkv' \
+        $'3000\t/z/Interrompu.mkv' >> "$INDEX"
+    cat > "$LOG_DIR/Session_20261101_100000.log" <<'EOF'
+2026-11-01 10:00:00 | HEAVY_OUTPUT_REDIRECT | /z/Star Wars/Jedi (1983).mkv -> /c/C_Heavier/Jedi (1983).mkv | savings:8% (threshold:10%)
+2026-11-01 11:00:00 | HEAVY_OUTPUT_REDIRECT | /z/Refait.mkv -> /c/C_Heavier/Refait.mkv | savings:0% (threshold:10%)
+2026-11-01 11:00:00 | HEAVY_OUTPUT_REDIRECT | /z/The Batman (2022).mkv -> /c/C_Heavier/The Batman (2022).mkv | savings:0% (threshold:10%)
+2026-11-01 12:00:00 | ERROR | /z/Interrompu.mkv | ffmpeg
+EOF
+    cat > "$LOG_DIR/Session_20261105_100000.log" <<'EOF'
+2026-11-05 10:00:00 | REPLACED | /z/Refait.mkv -> /z/Refait.mkv | size:2000B->900B
+EOF
+    attempts_seed_from_heavy
+    run awk -F'\t' '!/^#/ { print $2 "|" $5 "|" $6 "|" $8 }' "$ATTEMPTS_FILE"
+    # 2 depuis _Heavier + Jedi depuis les logs ; Batman pas en double, Refait remplacé depuis
+    [ "${#lines[@]}" -eq 3 ]
+    [[ "$output" == *"heavier|1000|920|/z/Star Wars/Jedi (1983).mkv"* ]]
+    [[ "$output" != *"Refait"* && "$output" != *"Interrompu"* ]]
+    [ "$(grep -c 'The Batman' "$ATTEMPTS_FILE")" -eq 1 ]
+    grep -q $'^#SEED\t.*\t3$' "$ATTEMPTS_FILE"
+}
+
 ###########################################################
 # Cumul entre plusieurs runs
 ###########################################################
