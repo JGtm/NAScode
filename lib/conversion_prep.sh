@@ -279,6 +279,7 @@ _copy_to_temp_storage() {
         if [[ -n "$LOG_SESSION" ]]; then
             echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR custom_pv copy failed | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         fi
+        _attempts_note_error "$file_original"
         rm -f "$tmp_input" "$ffmpeg_log_temp" 2>/dev/null
         return 1
     fi

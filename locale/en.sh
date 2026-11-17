@@ -372,8 +372,10 @@ MSG_SUMMARY_SPACE_SAVED_LABEL="Space saved"
 MSG_SUMMARY_CAMPAIGN_TITLE="TOTAL SINCE %s"
 MSG_SUMMARY_CAMPAIGN_CONVERTED="Films converted"
 MSG_SUMMARY_CAMPAIGN_HEAVIER="Tried, no savings"
+MSG_SUMMARY_CAMPAIGN_HEAVIER_SHORT="NO GAIN"
+MSG_SUMMARY_CAMPAIGN_COMPACT="Total since %s"
 MSG_ATTEMPTS_SKIPPED="%s film(s) already tried without savings with these settings: skipped (--retry-heavier to retry)"
-MSG_ATTEMPTS_SEEDED="Attempt log initialised: %s no-gain film(s) recorded from _Heavier and the logs (the folder can be emptied)"
+MSG_ATTEMPTS_SEEDED="Attempt log initialised from previous runs: %s converted, %s with no savings, %s error(s) (Converted_Heavier can be emptied)"
 
 ###########################################################
 # COMPLEXITY (lib/complexity.sh)

@@ -2,9 +2,10 @@
 ###########################################################
 # JOURNAL DES TENTATIVES (reprise sans retraitement inutile)
 #
-# logs/Attempts.tsv garde une ligne par conversion menée à terme :
+# logs/Attempts.tsv garde une ligne par tentative menée à terme :
 #   date  résultat  empreinte  profil  taille_source  taille_sortie  gain%  chemin
 # résultat : converted (publiée) | heavier (gain sous le seuil, envoyée dans _Heavier)
+#            | error (échec ; jamais filtré, sert au cumul du résumé)
 #
 # Au lancement suivant, un film dont la dernière tentative est "heavier" sort
 # de la queue si :
@@ -13,11 +14,11 @@
 #   - le gain obtenu reste sous le seuil actuel (HEAVY_MIN_SAVINGS_PERCENT).
 # Changer de codec, de mode ou de qualité, ou baisser le seuil, relance donc
 # l'essai. --retry-heavier force un nouvel essai.
-# Les erreurs ne sont jamais notées : elles viennent souvent d'un bug corrigé
-# depuis, on les retente toujours.
+# Les erreurs sont notées pour le cumul mais toujours retentées : elles viennent
+# souvent d'un bug corrigé depuis. Une interruption (Ctrl+C, crash) n'est pas notée.
 #
 # Lignes spéciales :
-#   #SEED <date> <n>    amorçage unique depuis le dossier _Heavier existant
+#   #SEED <date> <n> <src>  amorçage unique par source, depuis les logs de session et _Heavier
 #   #END  <date> <src>  passage complet de la source : borne le cumul du résumé
 #
 # NOTE: Ce module n'active pas `set -euo pipefail` (sourcé par nascode qui
@@ -56,24 +57,36 @@ _attempts_append() {
     rmdir "$lockdir" 2>/dev/null || true
 }
 
-# Note une conversion menée à terme.
-# Usage: attempts_record <converted|heavier> <source> <octets_source> <octets_sortie>
+# Note l'issue d'une tentative.
+# Usage: attempts_record <converted|heavier|error> <source> <octets_source> <octets_sortie> [date]
+# [date] : "AAAA-MM-JJ HH:MM:SS" d'origine (amorçage), maintenant par défaut.
 attempts_record() {
     local result="$1" path="$2" src_bytes="${3:-0}" out_bytes="${4:-0}"
+    local when="${5:-$(date '+%Y-%m-%d %H:%M:%S')}"
 
     [[ "${DRYRUN:-false}" == true || "${SAMPLE_MODE:-false}" == true ]] && return 0
     [[ -n "$path" && "$path" != *$'\t'* && "$path" != *$'\n'* ]] || return 0
     [[ "$src_bytes" =~ ^[0-9]+$ && "$out_bytes" =~ ^[0-9]+$ ]] || return 0
 
     local savings=0
-    (( src_bytes > 0 )) && savings=$(( (src_bytes - out_bytes) * 100 / src_bytes ))
+    [[ "$result" != error ]] && (( src_bytes > 0 )) && savings=$(( (src_bytes - out_bytes) * 100 / src_bytes ))
 
     local line
     printf -v line '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s' \
-        "$(date '+%Y-%m-%d %H:%M:%S')" "$result" "$(attempts_fingerprint)" \
+        "$when" "$result" "$(attempts_fingerprint)" \
         "${CONVERSION_MODE:-}/${VIDEO_CODEC:-}" "$src_bytes" "$out_bytes" "$savings" "$path"
     _attempts_append "$(_attempts_file)" "$line"
     return 0
+}
+
+# Note un échec de conversion (sauf interruption volontaire : Ctrl+C, arrêt).
+# Usage: attempts_record_error <source>
+attempts_record_error() {
+    local path="$1"
+    [[ -n "${STOP_FLAG:-}" && -f "$STOP_FLAG" ]] && return 0
+    local src_bytes=0
+    [[ -e "$path" ]] && src_bytes=$(get_file_size_bytes "$path")
+    attempts_record error "$path" "$src_bytes" 0
 }
 
 # Filtre des lignes d'index ("taille<TAB>chemin") lues sur stdin : retire les
@@ -131,60 +144,80 @@ attempts_has_entry() {
         END { exit found ? 0 : 1 }' "$file"
 }
 
-# Amorçage unique : note comme "heavier" chaque sortie déjà présente dans le
-# dossier _Heavier, en retrouvant sa source dans l'INDEX (même dossier relatif,
-# même nom, éventuellement suivi du suffixe de sortie). Les paramètres de ces
-# anciennes tentatives sont inconnus : on suppose ceux du run courant.
-# Après l'amorçage, le contenu de _Heavier peut être supprimé sans perdre la mémoire.
-# Films redirigés vers _Heavier d'après les logs de session (HEAVY_OUTPUT_REDIRECT),
-# sauf ceux remplacés ensuite (REPLACED) ou déjà amorcés ($@).
-# Taille source lue dans l'INDEX (film absent → ignoré) ; taille de sortie
-# déduite du gain journalisé. Sortie : "src_bytes<TAB>out_bytes<TAB>chemin".
-_attempts_heavy_from_logs() {
+# Événements des logs de session, un par ligne, dans l'ordre chronologique :
+#   H <date> <gain%> <chemin>          sortie redirigée vers _Heavier
+#   C <date> <avant> <après> <chemin>  conversion publiée (REPLACED en octets, sinon SUCCESS en Mo)
+#   E <date> <chemin>                  échec de conversion
+# Ne comptent pas comme échecs : KEEP_METADATA, TRANSFER_FALLBACK (sortie publiée
+# ailleurs) et l'ancien « ERROR REPLACE … reason:heavier_output » (sortie lourde).
+_attempts_log_events() {
     local -a logs=()
     local f
     for f in "${LOG_DIR:-}"/Session_*.log; do [[ -f "$f" ]] && logs+=("$f"); done
     (( ${#logs[@]} > 0 )) || return 0
-    # Les fichiers sont triés par date dans leur nom : l'ordre du glob est chronologique
-    {
-        printf 'D\t%s\n' "$@"
-        awk '
-            function src(s,   i) { s = substr(s, index(s, " | ") + 3); s = substr(s, index(s, " | ") + 3)
-                                   i = index(s, " -> "); if (!i) i = index(s, " → "); return i ? substr(s, 1, i - 1) : "" }
-            / \| HEAVY_OUTPUT_REDIRECT \| / {
-                p = src($0); if (p == "") next
-                g = $0; sub(/.*savings:/, "", g); sub(/%.*/, "", g)
-                print "H\t" g "\t" p; next
-            }
-            / \| REPLACED \| / { p = src($0); if (p != "") print "R\t\t" p }
-        ' "${logs[@]}"
-        awk '{ print "I\t" $0 }' "$INDEX"
-    } | awk -F'\t' '
-        $1 == "D" { done[substr($0, 3)] = 1; next }
-        $1 == "H" { p = substr($0, length($1 $2) + 3); state[p] = "H"; gain[p] = $2; next }
-        $1 == "R" { p = substr($0, 4); state[p] = "R"; next }
-        $1 == "I" {
-            p = substr($0, length($1 $2) + 3)
-            if (state[p] != "H" || (p in done)) next
-            if ($2 !~ /^[0-9]+$/ || gain[p] !~ /^-?[0-9]+$/) next
-            printf "%s\t%.0f\t%s\n", $2, $2 * (100 - gain[p]) / 100, p
-            done[p] = 1
-        }'
+    # Noms horodatés : l'ordre du glob est chronologique
+    awk -v heavy="${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}/" '
+        function cut(s,   i, j, k) {
+            i = index(s, " -> "); j = index(s, " → "); k = index(s, " | ")
+            if (j && (!i || j < i)) i = j
+            if (k && (!i || k < i)) i = k
+            return i ? substr(s, 1, i - 1) : s
+        }
+        !/^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9] \| / { next }
+        {
+            d = substr($0, 1, 19)
+            rest = substr($0, 23)
+            i = index(rest, " | "); if (!i) next
+            kind = substr(rest, 1, i - 1)
+            payload = substr(rest, i + 3)
+            p = cut(payload); if (p == "") next
+        }
+        kind == "HEAVY_OUTPUT_REDIRECT" {
+            g = payload; if (!sub(/.*savings:/, "", g)) next; sub(/%.*/, "", g)
+            print "H\t" d "\t" g "\t" p; next
+        }
+        kind == "REPLACED" {
+            if (!match(payload, /size:[0-9]+B->[0-9]+B/)) next
+            sz = substr(payload, RSTART + 5, RLENGTH - 6); split(sz, a, "B->")
+            print "C\t" d "\t" a[1] "\t" a[2] "\t" p; next
+        }
+        kind == "SUCCESS" {
+            if (index(payload, heavy)) next
+            if (!match(payload, /\| [0-9]+MB → [0-9]+MB/)) next
+            sz = substr(payload, RSTART + 2, RLENGTH - 4); split(sz, a, "MB → ")
+            printf "C\t%s\t%.0f\t%.0f\t%s\n", d, a[1] * 1048576, a[2] * 1048576, p; next
+        }
+        kind ~ /^ERROR/ {
+            if (kind == "ERROR KEEP_METADATA" || kind == "ERROR TRANSFER_FALLBACK") next
+            if (index(payload, "reason:heavier_output")) next
+            print "E\t" d "\t" p
+        }
+    ' "${logs[@]}"
 }
 
+# Amorçage unique du journal avec l'historique d'avant son existence :
+#   - logs de session : dernière issue de chaque film (convertie, sans gain, échec),
+#     à sa date d'origine, pour que le cumul du résumé reparte du premier run ;
+#   - dossier _Heavier : sorties sans gain (taille exacte), y compris celles des
+#     runs dont les logs ont été purgés ; la source est retrouvée dans l'INDEX
+#     (même dossier relatif, même nom, éventuellement suivi du suffixe de sortie).
+# Les sans-gain et les échecs ne sont repris que si le film est encore dans l'INDEX.
+# Les paramètres de ces anciennes tentatives sont inconnus : on suppose ceux du run courant.
+# Après l'amorçage, le contenu de _Heavier peut être supprimé sans perdre la mémoire.
 # Usage: attempts_seed_from_heavy   (après construction de l'INDEX)
 attempts_seed_from_heavy() {
     [[ "${DRYRUN:-false}" == true || "${SAMPLE_MODE:-false}" == true ]] && return 0
+    [[ -f "${INDEX:-}" ]] || return 0
     local file
     file=$(_attempts_file)
-    grep -q '^#SEED' "$file" 2>/dev/null && return 0
+    # Une fois par dossier source : une autre source garde son propre amorçage
+    awk -F'\t' -v src="${SOURCE%/}" '$1 == "#SEED" && $4 == src { found = 1; exit } END { exit !found }' "$file" 2>/dev/null && return 0
 
     local heavy_root="${OUTPUT_DIR%/}${HEAVY_OUTPUT_DIR_SUFFIX:-_Heavier}"
     local src_root="${SOURCE%/}"
-    local count=0 h rel stem match src_bytes src_path out_bytes
-    local -a seeded=()
+    local h rel stem match mtime folder=""
 
-    if [[ -d "$heavy_root" && -f "${INDEX:-}" ]]; then
+    if [[ -d "$heavy_root" ]]; then
         while IFS= read -r -d '' h; do
             rel="${h#"$heavy_root"/}"
             stem="${rel%.*}"
@@ -210,27 +243,59 @@ attempts_seed_from_heavy() {
                     else if (nflat == 1) print flat
                 }' "$INDEX")
             [[ -n "$match" ]] || continue
-            src_bytes="${match%%$'\t'*}"
-            src_path="${match#*$'\t'}"
-            out_bytes=$(get_file_size_bytes "$h")
-            attempts_record heavier "$src_path" "$src_bytes" "$out_bytes"
-            seeded+=("$src_path")
-            count=$((count + 1))
+            mtime=$(date -r "$h" '+%Y-%m-%d %H:%M:%S' 2>/dev/null) || mtime=$(date '+%Y-%m-%d %H:%M:%S')
+            # F <octets_source> <octets_sortie> <date> <chemin>
+            folder+="F"$'\t'"${match%%$'\t'*}"$'\t'"$(get_file_size_bytes "$h")"$'\t'"$mtime"$'\t'"${match#*$'\t'}"$'\n'
         done < <(find "$heavy_root" -type f -iname '*.mkv' -print0 2>/dev/null || true)
     fi
 
-    # Sorties lourdes déjà supprimées de _Heavier : les logs de session les gardent
-    if [[ -f "${INDEX:-}" ]]; then
-        while IFS=$'\t' read -r src_bytes out_bytes src_path; do
-            [[ -n "$src_path" ]] || continue
-            attempts_record heavier "$src_path" "$src_bytes" "$out_bytes"
-            count=$((count + 1))
-        done < <(_attempts_heavy_from_logs "${seeded[@]}")
-    fi
+    local nc=0 nh=0 ne=0 date result src_bytes out_bytes path
+    while IFS=$'\t' read -r date result src_bytes out_bytes path; do
+        [[ -n "$path" ]] || continue
+        attempts_record "$result" "$path" "$src_bytes" "$out_bytes" "$date"
+        case "$result" in
+            converted) nc=$((nc + 1)) ;;
+            heavier)   nh=$((nh + 1)) ;;
+            error)     ne=$((ne + 1)) ;;
+        esac
+    done < <(
+        {
+            awk '{ print "I\t" $0 }' "$INDEX"
+            _attempts_log_events
+            printf '%s' "$folder"
+        } | awk -F'\t' -v root="$src_root/" '
+            function rest(n,   s, i) { s = $0; for (i = 1; i < n; i++) s = substr(s, index(s, "\t") + 1); return s }
+            $1 == "I" { idx[rest(3)] = $2; next }
+            $1 == "H" { p = rest(4); st[p] = "H"; dt[p] = $2; gain[p] = $3; next }
+            $1 == "C" { p = rest(5); st[p] = "C"; dt[p] = $2; sb[p] = $3; ob[p] = $4; next }
+            $1 == "E" { p = rest(3); st[p] = "E"; dt[p] = $2; next }
+            $1 == "F" { p = rest(5); fsb[p] = $2; fob[p] = $3; fdt[p] = $4; next }
+            END {
+                # Sortie lourde encore présente : taille exacte, sauf si le film a été converti ou a échoué depuis
+                for (p in fsb) {
+                    if (st[p] != "" && st[p] != "H") continue
+                    printf "%s\theavier\t%s\t%s\t%s\n", (dt[p] != "" ? dt[p] : fdt[p]), fsb[p], fob[p], p
+                    done[p] = 1
+                }
+                for (p in st) {
+                    # Seulement les films de cette source : les autres auront leur propre amorçage
+                    if ((p in done) || index(p, root) != 1) continue
+                    if (st[p] == "C") {
+                        printf "%s\tconverted\t%.0f\t%.0f\t%s\n", dt[p], sb[p], ob[p], p
+                    } else if (st[p] == "H") {
+                        if (!(p in idx) || idx[p] !~ /^[0-9]+$/ || gain[p] !~ /^-?[0-9]+$/) continue
+                        printf "%s\theavier\t%s\t%.0f\t%s\n", dt[p], idx[p], idx[p] * (100 - gain[p]) / 100, p
+                    } else if (st[p] == "E") {
+                        if (!(p in idx)) continue
+                        printf "%s\terror\t%s\t0\t%s\n", dt[p], idx[p], p
+                    }
+                }
+            }' | LC_ALL=C sort -s -t$'\t' -k1,1
+    )
 
-    _attempts_append "$file" "$(printf '#SEED\t%s\t%s' "$(date '+%Y-%m-%d %H:%M:%S')" "$count")"
-    if (( count > 0 )) && [[ "${NO_PROGRESS:-false}" != true ]]; then
-        print_info "$(msg MSG_ATTEMPTS_SEEDED "$count")"
+    _attempts_append "$file" "$(printf '#SEED\t%s\t%s\t%s' "$(date '+%Y-%m-%d %H:%M:%S')" "$((nc + nh + ne))" "$src_root")"
+    if (( nc + nh + ne > 0 )) && [[ "${NO_PROGRESS:-false}" != true ]]; then
+        print_info "$(msg MSG_ATTEMPTS_SEEDED "$nc" "$nh" "$ne")"
     fi
     return 0
 }
@@ -243,12 +308,14 @@ attempts_mark_campaign_end() {
 
 # Cumul depuis le dernier passage complet de la source : dernière tentative
 # de chaque film seulement (un film reconverti n'est pas compté deux fois).
-# Sortie : "nb_converted|octets_avant|octets_après|nb_heavier|date_début|nb_antérieurs"
+# Sortie : "nb_converted|octets_avant|octets_après|nb_heavier|date_début|nb_antérieurs|nb_erreurs"
+# date_début = plus ancienne tentative de la campagne.
 # nb_antérieurs = lignes de la campagne écrites avant ce run (1..ATTEMPTS_START_LINE).
+# nb_erreurs = films dont la dernière tentative a échoué (pas réussis depuis).
 attempts_campaign_totals() {
     local file
     file=$(_attempts_file)
-    [[ -s "$file" && -n "${SOURCE:-}" ]] || { echo "0|0|0|0||0"; return 0; }
+    [[ -s "$file" && -n "${SOURCE:-}" ]] || { echo "0|0|0|0||0|0"; return 0; }
 
     awk -F'\t' -v root="${SOURCE%/}/" -v src="${SOURCE%/}" -v start="${ATTEMPTS_START_LINE:-0}" '
         function reset() { delete res; delete sb; delete ob; first = ""; old = 0 }
@@ -257,17 +324,18 @@ attempts_campaign_totals() {
         {
             p = $8; for (i = 9; i <= NF; i++) p = p "\t" $i
             if (index(p, root) != 1) next
-            if (first == "") first = $1
+            if (first == "" || $1 < first) first = $1
             # Toute ligne antérieure compte, même si le film a été refait depuis
             if (NR <= start) old++
             res[p] = $2; sb[p] = $5; ob[p] = $6
         }
         END {
-            nc = 0; nh = 0; before = 0; after = 0
+            nc = 0; nh = 0; ne = 0; before = 0; after = 0
             for (p in res) {
                 if (res[p] == "converted") { nc++; before += sb[p]; after += ob[p] }
                 else if (res[p] == "heavier") nh++
+                else if (res[p] == "error") ne++
             }
-            printf "%d|%.0f|%.0f|%d|%s|%d\n", nc, before, after, nh, first, old
+            printf "%d|%.0f|%.0f|%d|%s|%d|%d\n", nc, before, after, nh, first, old, ne
         }' "$file"
 }

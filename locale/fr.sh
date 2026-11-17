@@ -370,8 +370,10 @@ MSG_SUMMARY_SPACE_SAVED_LABEL="Espace économisé"
 MSG_SUMMARY_CAMPAIGN_TITLE="CUMUL DEPUIS LE %s"
 MSG_SUMMARY_CAMPAIGN_CONVERTED="Films convertis"
 MSG_SUMMARY_CAMPAIGN_HEAVIER="Tentés sans gain"
+MSG_SUMMARY_CAMPAIGN_HEAVIER_SHORT="SANS GAIN"
+MSG_SUMMARY_CAMPAIGN_COMPACT="Cumul depuis le %s"
 MSG_ATTEMPTS_SKIPPED="%s film(s) déjà tenté(s) sans gain avec ces paramètres : ignoré(s) (--retry-heavier pour les retenter)"
-MSG_ATTEMPTS_SEEDED="Journal des tentatives amorcé : %s film(s) sans gain mémorisé(s) d'après _Heavier et les logs (le dossier peut être vidé)"
+MSG_ATTEMPTS_SEEDED="Journal des tentatives amorcé depuis les runs précédents : %s converti(s), %s sans gain, %s erreur(s) (Converted_Heavier peut être vidé)"
 
 ###########################################################
 # COMPLEXITY (lib/complexity.sh)

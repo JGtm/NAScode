@@ -373,6 +373,13 @@ atomic_add_int_to_file() {
 # SORTIES "HEAVY" (PLUS LOURDES / GAIN FAIBLE)
 ###########################################################
 
+# Note un échec de conversion dans le journal des tentatives, s'il est chargé
+# (lib/attempts.sh n'est pas sourcé par tous les tests).
+_attempts_note_error() {
+    declare -f attempts_record_error &>/dev/null || return 0
+    attempts_record_error "$1"
+}
+
 # Calcule un chemin de sortie alternatif "Heavier" en conservant l'arborescence.
 # Usage: compute_heavy_output_path <final_output> [output_dir]
 # "C:/x/y" ou "C:\x\y" → "/c/x/y" ; tout autre chemin est rendu tel quel.

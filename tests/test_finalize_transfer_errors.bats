@@ -578,7 +578,8 @@ _setup_replace() {
     run _finalize_replace_original "$REPL_SRC" "$heavy"
     [ "$status" -eq 2 ]
     [ -f "$heavy" ]
-    grep -q "reason:heavier_output" "$LOG_SESSION"
+    # Original conservé comme prévu : pas une erreur (ne gonfle pas le compteur du résumé)
+    ! grep -q "ERROR" "$LOG_SESSION"
 }
 
 @test "_finalize_log_and_verify: --replace remplace après vérif, compteurs sur la taille d'origine" {

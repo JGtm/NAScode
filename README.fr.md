@@ -171,7 +171,7 @@ Référence code (audio) :
 - Logs : `logs/` (dans le dossier du script)
 - Si une conversion produit un fichier plus lourd (ou un gain < seuil), la sortie est redirigée vers `Converted_Heavier/` (configurable) pour éviter les boucles de re-traitement.
 - **Reprise** : `logs/Attempts.tsv` garde la trace de chaque conversion menée à terme. Au lancement suivant, même après réindexation, un film déjà converti sans gain suffisant n'est pas retraité tant que sa source (chemin et taille) et les paramètres d'encodage n'ont pas changé, et que le gain obtenu reste sous le seuil. Changer de codec, de mode ou de qualité, ou baisser le seuil, relance l'essai ; `--retry-heavier` le force. Les erreurs sont toujours retentées. Au premier lancement, le journal est amorcé depuis `Converted_Heavier/` et les logs de session (sorties lourdes déjà supprimées), le dossier peut ensuite être vidé.
-- **Cumul** : après un run interrompu puis relancé, le résumé final ajoute une section « Cumul depuis le … » avec le gain total de la campagne, jusqu'au prochain passage complet de la source.
+- **Cumul** : après un run interrompu puis relancé, le résumé final ajoute une section « Cumul depuis le … » pour toute la campagne (films convertis, tentés sans gain, erreurs non résolues, gain), jusqu'au prochain passage complet de la source. Les erreurs y sont comptées mais toujours retentées ; une interruption (Ctrl+C, crash) n'en est pas une.
 
 Détails : [docs/fr/TROUBLESHOOTING.md](docs/fr/TROUBLESHOOTING.md)
 

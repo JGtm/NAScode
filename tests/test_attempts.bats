@@ -139,7 +139,7 @@ _setup_seed() {
     [[ "$output" == *"heavier|100|100|/z/The Batman (2022).mkv"* ]]
     # Nom suivi d'un suffixe "_…" : rattaché à Endgame, pas à « Endgame 2 »
     [[ "$output" == *"heavier|100|91|/z/Marvel/Endgame.mkv"* ]]
-    grep -q $'^#SEED\t.*\t2$' "$ATTEMPTS_FILE"
+    grep -q $'^#SEED\t.*\t2\t/z$' "$ATTEMPTS_FILE"
 }
 
 @test "amorçage: une seule fois, et les films amorcés sortent de la queue" {
@@ -151,27 +151,75 @@ _setup_seed() {
     [ "$output" = "/z/Autre.mkv" ]
 }
 
-@test "amorçage: les sorties lourdes déjà supprimées sont retrouvées dans les logs" {
+# Logs de session de deux runs précédents (format réel de NAScode)
+_setup_seed_logs() {
     _setup_seed
-    printf '%s\n' $'1000\t/z/Star Wars/Jedi (1983).mkv' $'2000\t/z/Refait.mkv' \
-        $'3000\t/z/Interrompu.mkv' >> "$INDEX"
-    cat > "$LOG_DIR/Session_20261101_100000.log" <<'EOF'
-2026-11-01 10:00:00 | HEAVY_OUTPUT_REDIRECT | /z/Star Wars/Jedi (1983).mkv -> /c/C_Heavier/Jedi (1983).mkv | savings:8% (threshold:10%)
-2026-11-01 11:00:00 | HEAVY_OUTPUT_REDIRECT | /z/Refait.mkv -> /c/C_Heavier/Refait.mkv | savings:0% (threshold:10%)
-2026-11-01 11:00:00 | HEAVY_OUTPUT_REDIRECT | /z/The Batman (2022).mkv -> /c/C_Heavier/The Batman (2022).mkv | savings:0% (threshold:10%)
-2026-11-01 12:00:00 | ERROR | /z/Interrompu.mkv | ffmpeg
+    printf '%s\n' $'1000\t/z/Star Wars/Jedi (1983).mkv' $'900\t/z/Refait.mkv' \
+        $'3000\t/z/Echec.mkv' $'4000\t/z/Repris.mkv' >> "$INDEX"
+    local H="/c/Converted_Heavier"
+    cat > "$LOG_DIR/Session_20261101_100000.log" <<EOF
+2026-11-01 09:00:00 | SUCCESS | /z/Hook.avi → C:/Converted/Hook.mkv | 100MB → 40MB
+2026-11-01 10:00:00 | HEAVY_OUTPUT_REDIRECT | /z/Star Wars/Jedi (1983).mkv -> $H/Jedi (1983).mkv | savings:8% (threshold:10%)
+2026-11-01 10:00:00 | SUCCESS | /z/Star Wars/Jedi (1983).mkv → $H/Jedi (1983).mkv | 1MB → 1MB
+2026-11-01 10:00:05 | ERROR REPLACE | /z/Star Wars/Jedi (1983).mkv -> $H/Jedi (1983).mkv | reason:heavier_output
+2026-11-01 11:00:00 | HEAVY_OUTPUT_REDIRECT | /z/Refait.mkv -> $H/Refait.mkv | savings:0% (threshold:10%)
+2026-11-01 11:00:00 | HEAVY_OUTPUT_REDIRECT | /z/The Batman (2022).mkv -> $H/The Batman (2022).mkv | savings:0% (threshold:10%)
+2026-11-01 12:00:00 | ERROR ffmpeg | /z/Echec.mkv
+2026-11-01 12:30:00 | ERROR DURATION | /z/Repris.mkv | source:7000s output:3000s
+2026-11-01 13:00:00 | SUCCESS | /z/Meta.mkv → C:/Converted/Meta.mkv | 10MB → 5MB
+2026-11-01 13:00:09 | ERROR KEEP_METADATA | /z/Meta.mkv → C:/Converted/Meta.mkv | reason:touch_failed
+2026-11-01 14:00:00 | SUCCESS | /y/Autre source.mkv → C:/Converted/Autre source.mkv | 10MB → 5MB
 EOF
     cat > "$LOG_DIR/Session_20261105_100000.log" <<'EOF'
 2026-11-05 10:00:00 | REPLACED | /z/Refait.mkv -> /z/Refait.mkv | size:2000B->900B
+2026-11-05 11:00:00 | REPLACED | /z/Repris.mkv -> /z/Repris.mkv | size:4000B->1000B
 EOF
+}
+
+@test "amorçage: l'historique des logs est repris à sa date (convertis, sans gain, erreurs)" {
+    _setup_seed_logs
     attempts_seed_from_heavy
-    run awk -F'\t' '!/^#/ { print $2 "|" $5 "|" $6 "|" $8 }' "$ATTEMPTS_FILE"
-    # 2 depuis _Heavier + Jedi depuis les logs ; Batman pas en double, Refait remplacé depuis
-    [ "${#lines[@]}" -eq 3 ]
-    [[ "$output" == *"heavier|1000|920|/z/Star Wars/Jedi (1983).mkv"* ]]
-    [[ "$output" != *"Refait"* && "$output" != *"Interrompu"* ]]
+    run awk -F'\t' '!/^#/ { print $1 "|" $2 "|" $5 "|" $6 "|" $8 }' "$ATTEMPTS_FILE"
+    [ "${#lines[@]}" -eq 8 ]            # + Endgame, encore dans _Heavier
+    # Ordre chronologique, dates d'origine
+    [ "${lines[0]}" = "2026-11-01 09:00:00|converted|104857600|41943040|/z/Hook.avi" ]
+    # Sortie lourde supprimée de _Heavier : taille déduite du gain journalisé
+    [[ "$output" == *"2026-11-01 10:00:00|heavier|1000|920|/z/Star Wars/Jedi (1983).mkv"* ]]
+    # Encore dans _Heavier : taille exacte, date du log, pas de doublon
+    [[ "$output" == *"2026-11-01 11:00:00|heavier|100|100|/z/The Batman (2022).mkv"* ]]
     [ "$(grep -c 'The Batman' "$ATTEMPTS_FILE")" -eq 1 ]
-    grep -q $'^#SEED\t.*\t3$' "$ATTEMPTS_FILE"
+    [[ "$output" == *"2026-11-01 12:00:00|error|3000|0|/z/Echec.mkv"* ]]
+    # Dernière issue seulement : remplacés depuis, en octets exacts
+    [[ "$output" == *"2026-11-05 10:00:00|converted|2000|900|/z/Refait.mkv"* ]]
+    [[ "$output" == *"2026-11-05 11:00:00|converted|4000|1000|/z/Repris.mkv"* ]]
+    # KEEP_METADATA n'est pas un échec ; une autre source n'est pas reprise
+    [[ "$output" == *"|converted|10485760|5242880|/z/Meta.mkv"* ]]
+    [[ "$output" != *"Autre source"* ]]
+    grep -q $'^#SEED\t.*\t8\t/z$' "$ATTEMPTS_FILE"
+}
+
+@test "amorçage: une fois par source, une autre source a le sien" {
+    _setup_seed_logs
+    attempts_seed_from_heavy
+    attempts_seed_from_heavy
+    [ "$(grep -c '^#SEED' "$ATTEMPTS_FILE")" -eq 1 ]
+    printf '%s\n' $'10485760\t/y/Autre source.mkv' > "$INDEX"
+    SOURCE=/y attempts_seed_from_heavy
+    [ "$(grep -c '^#SEED' "$ATTEMPTS_FILE")" -eq 2 ]
+    grep -q $'\t/y/Autre source.mkv$' "$ATTEMPTS_FILE"
+}
+
+@test "amorçage: le cumul repart du premier run des logs" {
+    source "$LIB_DIR/summary.sh"
+    _setup_seed_logs
+    attempts_seed_from_heavy
+    export ATTEMPTS_START_LINE=$(wc -l < "$ATTEMPTS_FILE")
+    run attempts_campaign_totals
+    IFS='|' read -r nc before after nh first old ne <<< "$output"
+    [ "$nc" -eq 4 ]            # Hook, Meta, Refait, Repris
+    [ "$nh" -eq 3 ]            # Jedi, Batman, Endgame
+    [ "$ne" -eq 1 ]            # Echec (Repris a réussi depuis)
+    [ "$first" = "2026-11-01 09:00:00" ]
 }
 
 ###########################################################
@@ -188,13 +236,35 @@ EOF
     export ATTEMPTS_START_LINE=3                            # lignes 1-3 : runs précédents
 
     run attempts_campaign_totals
-    IFS='|' read -r nc before after nh first old <<< "$output"
+    IFS='|' read -r nc before after nh first old ne <<< "$output"
     [ "$nc" -eq 1 ]
     [ "$before" -eq 4000 ]
     [ "$after" -eq 1500 ]
     [ "$nh" -eq 1 ]
     [ -n "$first" ]
     [ "$old" -eq 1 ]           # ligne 3 (A, 1re version) ; Vieux est effacé par le #END
+}
+
+@test "cumul: erreurs non résolues comptées, effacées par une réussite ultérieure" {
+    attempts_record error "/z/A.mkv" 4000 0
+    attempts_record error "/z/B.mkv" 3000 0
+    attempts_record converted "/z/B.mkv" 3000 1000
+    run attempts_campaign_totals
+    IFS='|' read -r nc before after nh first old ne <<< "$output"
+    [ "$nc" -eq 1 ]
+    [ "$ne" -eq 1 ]
+}
+
+@test "erreur: notée en échec, pas en interruption, et toujours retentée" {
+    local stop="$TEST_TEMP_DIR/stop"
+    export STOP_FLAG="$stop"
+    _attempts_note_error "/z/A.mkv"
+    touch "$stop"
+    _attempts_note_error "/z/B.mkv"
+    run awk -F'\t' '!/^#/ { print $2 "|" $7 "|" $8 }' "$ATTEMPTS_FILE"
+    [ "$output" = "error|0|/z/A.mkv" ]
+    run _filter $'0\t/z/A.mkv'
+    [ "$output" = "/z/A.mkv" ]
 }
 
 @test "cumul: un passage complet d'une autre source ne remet pas à zéro" {
@@ -213,9 +283,15 @@ EOF
 
     export ATTEMPTS_START_LINE=1
     attempts_record converted "/z/B.mkv" 6000 2000
+    attempts_record error "/z/C.mkv" 6000 0
     run _render_campaign_totals
     [[ "$output" == *"CUMUL DEPUIS LE"* ]]
-    [[ "$output" == *"Films convertis"*"2"* ]]
+    # Même structure que le résumé du run : trois compteurs, puis le gain
+    [[ "$output" == *"Films convertis"*"2"*"Tentés sans gain"*"0"*"Erreurs"*"1"*"Espace économisé"* ]]
+    [[ "$output" == *"60.0%"* ]]
+
+    run _render_campaign_totals compact
+    [[ "$output" == *"Cumul depuis le"*"OK=2"*"SANS GAIN=0"*"ERR=1"* ]]
     [[ "$output" == *"60.0%"* ]]
 }
 
