@@ -2,7 +2,7 @@
 
 ## v3.0.3
 
-- ✅ **Resume without wasted work**: new `logs/Attempts.tsv` log. A film already converted without enough savings is no longer reprocessed on the next run (even after re-indexing) while the source and settings are unchanged; changing settings or lowering the threshold retries it, `--retry-heavier` forces it. Initialised once from `Converted_Heavier/`, which can then be emptied.
+- ✅ **Resume without wasted work**: new `logs/Attempts.tsv` log. A film already converted without enough savings is no longer reprocessed on the next run (even after re-indexing) while the source and settings are unchanged; changing settings or lowering the threshold retries it, `--retry-heavier` forces it. Initialised once from `Converted_Heavier/` and from the session logs (heavier outputs already deleted), so the folder can then be emptied.
 - ✅ **Running total after a restart**: the final summary adds "Total since …" (films converted, tried without savings, total savings) when earlier runs of the same campaign contributed.
 - ✅ **Flat `_Heavier` on Windows**: the output path (`C:/…`) and `OUTPUT_DIR` (`/c/…`) did not use the same form, so films from subfolders landed at the root of `Converted_Heavier/`. The folder tree is now preserved.
 - ✅ **Truncated films**: an interrupted NAS copy went unnoticed, `ffmpeg` encoded the start of the film and the run reported success. The copy to temporary storage is now verified (exit code and size), and every output is compared with its source before publishing: an incomplete output is rejected (`ERROR DURATION`).

@@ -170,7 +170,7 @@ Code reference (audio):
 - Default output: `Converted/` (in script folder)
 - Logs: `logs/` (in script folder)
 - If a conversion produces a heavier file (or gain < threshold), the output is redirected to `Converted_Heavier/` (configurable) to avoid reprocessing loops.
-- **Resume**: `logs/Attempts.tsv` records every conversion that completes. On the next run, even after re-indexing, a film already converted without enough savings is not processed again while its source (path and size) and the encoding settings are unchanged and the savings stay below the threshold. Changing codec, mode or quality, or lowering the threshold, retries it; `--retry-heavier` forces a retry. Errors are always retried. On the first run, the log is initialised from `Converted_Heavier/`, which can then be emptied.
+- **Resume**: `logs/Attempts.tsv` records every conversion that completes. On the next run, even after re-indexing, a film already converted without enough savings is not processed again while its source (path and size) and the encoding settings are unchanged and the savings stay below the threshold. Changing codec, mode or quality, or lowering the threshold, retries it; `--retry-heavier` forces a retry. Errors are always retried. On the first run, the log is initialised from `Converted_Heavier/` and from the session logs (heavier outputs already deleted), so the folder can then be emptied.
 - **Running total**: after an interrupted run is restarted, the final summary adds a "Total since …" section with the savings of the whole campaign, until the next complete pass over the source.
 
 Details: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)
