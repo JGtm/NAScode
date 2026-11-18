@@ -539,6 +539,20 @@ _nascode_maybe_write_svt_config_log() {
     fi
 }
 
+# Le log ffmpeg montre-t-il une panne du décodage matériel (et non du fichier) ?
+# Ex. "Failed to transfer data to output frame: -12" (copie VRAM → RAM impossible),
+# "cuInit(0) failed", "CUDA_ERROR_OUT_OF_MEMORY".
+_ffmpeg_log_has_hwaccel_failure() {
+    local log_file="$1"
+    [[ -s "$log_file" ]] || return 1
+    awk '
+        { l = tolower($0) }
+        index(l, "failed to transfer data to output frame") \
+            || index(l, "cuinit(") || index(l, "cuda_error") \
+            || (index(l, "hwaccel") && index(l, "fail")) { found = 1; exit }
+        END { exit found ? 0 : 1 }' "$log_file"
+}
+
 # Exécute un encodage ffmpeg avec le mode spécifié.
 # Usage: _run_ffmpeg_encode <mode> <input_file> <output_file> <ffmpeg_log> <base_name> 
 #                           <encoder_base_params> <audio_params> <stream_mapping>
@@ -731,6 +745,18 @@ _run_ffmpeg_encode() {
     # Code 255 = signal reçu, 130 = SIGINT (128+2), 143 = SIGTERM (128+15)
     if [[ "${_INTERRUPTED:-0}" -ne 1 && "$ffmpeg_rc" -ne 255 && "$ffmpeg_rc" -lt 128 ]]; then
         local log_file="${ffmpeg_log}${log_suffix}"
+        # Garde-fou : le décodage matériel a lâché (VRAM prise par un jeu, hoquet
+        # du pilote…). On refait cette passe une fois en décodage logiciel ;
+        # l'encodeur, les réglages et le résultat sont inchangés.
+        if [[ -n "$hwaccel_opts" ]] && _ffmpeg_log_has_hwaccel_failure "$log_file"; then
+            print_warning "$(msg MSG_TRANSCODE_HWACCEL_RETRY)"
+            if [[ -n "${LOG_SESSION:-}" ]]; then
+                echo "$(date '+%Y-%m-%d %H:%M:%S') | WARNING: HWACCEL_FALLBACK | $base_name | mode:$mode" >> "$LOG_SESSION" 2>/dev/null || true
+            fi
+            mv -f "$log_file" "${log_file}.hwaccel" 2>/dev/null || true
+            HWACCEL=none _run_ffmpeg_encode "$@"
+            return $?
+        fi
         if [[ "$mode" == "pass1" ]]; then
             log_error "$(msg MSG_TRANSCODE_PASS1_ERROR)"
         fi
