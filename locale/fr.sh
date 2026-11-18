@@ -144,6 +144,7 @@ MSG_CONV_MOVE_ERROR="ERREUR Impossible de déplacer (custom_pv) : %s"
 
 MSG_TRANSCODE_UNKNOWN_MODE="Mode d'encodage inconnu: %s"
 MSG_TRANSCODE_PASS1_ERROR="Erreur lors de l'analyse (pass 1)"
+MSG_TRANSCODE_HWACCEL_RETRY="Le décodage matériel (GPU) a échoué : nouvel essai de cette passe en décodage logiciel"
 
 ###########################################################
 # FFMPEG PIPELINE (lib/ffmpeg_pipeline.sh)

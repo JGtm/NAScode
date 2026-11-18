@@ -641,8 +641,13 @@ _finalize_conversion_error() {
     if [[ -n "$LOG_SESSION" ]]; then
         echo "$(date '+%Y-%m-%d %H:%M:%S') | ERROR ffmpeg | $file_original" >> "$LOG_SESSION" 2>/dev/null || true
         echo "--- $(msg MSG_FINAL_FFMPEG_ERROR) ---" >> "$LOG_SESSION" 2>/dev/null || true
-        if [[ -n "$ffmpeg_log_temp" ]] && [[ -f "$ffmpeg_log_temp" ]] && [[ -s "$ffmpeg_log_temp" ]]; then
-            cat "$ffmpeg_log_temp" >> "$LOG_SESSION" 2>/dev/null || true
+        # Échec en pass 1 : ffmpeg a écrit dans <log>.pass1, le log principal n'existe pas
+        local err_log="$ffmpeg_log_temp"
+        if [[ -n "$err_log" && ! -s "$err_log" && -s "${err_log}.pass1" ]]; then
+            err_log="${err_log}.pass1"
+        fi
+        if [[ -n "$err_log" ]] && [[ -f "$err_log" ]] && [[ -s "$err_log" ]]; then
+            cat "$err_log" >> "$LOG_SESSION" 2>/dev/null || true
         else
             echo "(Log error: ffmpeg_log_temp='$ffmpeg_log_temp' exists=$([ -f "$ffmpeg_log_temp" ] && echo 'YES' || echo 'NO'))" >> "$LOG_SESSION" 2>/dev/null || true
         fi

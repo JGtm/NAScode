@@ -145,6 +145,7 @@ MSG_CONV_MOVE_ERROR="ERROR: Unable to move (custom_pv): %s"
 
 MSG_TRANSCODE_UNKNOWN_MODE="Unknown encoding mode: %s"
 MSG_TRANSCODE_PASS1_ERROR="Error during analysis (pass 1)"
+MSG_TRANSCODE_HWACCEL_RETRY="Hardware (GPU) decoding failed: retrying this pass with software decoding"
 
 ###########################################################
 # FFMPEG PIPELINE (lib/ffmpeg_pipeline.sh)
